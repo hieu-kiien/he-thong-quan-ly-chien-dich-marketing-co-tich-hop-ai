@@ -1,0 +1,24 @@
+{% if is_paginated %}
+<nav class="pagination-bar" aria-label="Phân trang">
+    <span class="pagination-meta">
+        Trang {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+    </span>
+    <ul class="pagination mb-0">
+        <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+            <a class="page-link" href="?page={% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% else %}1{% endif %}&q={{ query }}&status={{ selected_status }}&per_page={{ per_page }}&sort={{ sort }}&dir={{ direction }}" aria-label="Trang trước">
+                <i class="bi bi-chevron-left" aria-hidden="true"></i>
+            </a>
+        </li>
+        {% for number in page_obj.paginator.page_range %}
+            <li class="page-item {% if number == page_obj.number %}active{% endif %}">
+                <a class="page-link" href="?page={{ number }}&q={{ query }}&status={{ selected_status }}&per_page={{ per_page }}&sort={{ sort }}&dir={{ direction }}">{{ number }}</a>
+            </li>
+        {% endfor %}
+        <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+            <a class="page-link" href="?page={% if page_obj.has_next %}{{ page_obj.next_page_number }}{% else %}{{ page_obj.paginator.num_pages }}{% endif %}&q={{ query }}&status={{ selected_status }}&per_page={{ per_page }}&sort={{ sort }}&dir={{ direction }}" aria-label="Trang sau">
+                <i class="bi bi-chevron-right" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</nav>
+{% endif %}

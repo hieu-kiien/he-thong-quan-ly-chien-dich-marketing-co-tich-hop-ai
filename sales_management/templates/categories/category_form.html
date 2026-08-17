@@ -1,0 +1,44 @@
+{% extends "base/base.html" %}
+
+{% block title %}{% if object %}Sửa nhóm sản phẩm{% else %}Thêm nhóm sản phẩm{% endif %}{% endblock %}
+
+{% block content %}
+<section class="form-shell">
+    <div class="form-intro">
+        <p class="section-kicker">Catalog setup</p>
+        <h2>{% if object %}Cập nhật thông tin nhóm{% else %}Tạo nhóm sản phẩm mới{% endif %}</h2>
+        <p class="text-muted">Thông tin nhóm giúp nhân viên tìm kiếm, lọc và báo cáo sản phẩm chính xác hơn.</p>
+    </div>
+    <form method="post" class="editor-panel" novalidate data-loading-form>
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
+        {% endif %}
+        {% for field in form %}
+            <div class="mb-4">
+                <label class="form-label" for="{{ field.id_for_label }}">
+                    {{ field.label }}
+                    {% if field.field.required %}<span class="required-mark">*</span>{% endif %}
+                </label>
+                {{ field }}
+                {% if field.help_text %}
+                    <div class="form-text">{{ field.help_text }}</div>
+                {% endif %}
+                {% for error in field.errors %}
+                    <div class="invalid-feedback d-block" role="alert">{{ error }}</div>
+                {% endfor %}
+            </div>
+        {% endfor %}
+        <div class="form-actions">
+            <a class="btn btn-light" href="{% url 'categories:category_list' %}">Hủy</a>
+            <button class="btn btn-primary" type="submit">
+                <span class="button-label">
+                    <i class="bi bi-check2" aria-hidden="true"></i>
+                    {% if object %}Lưu thay đổi{% else %}Thêm nhóm{% endif %}
+                </span>
+                <span class="spinner-border spinner-border-sm d-none" aria-hidden="true"></span>
+            </button>
+        </div>
+    </form>
+</section>
+{% endblock %}

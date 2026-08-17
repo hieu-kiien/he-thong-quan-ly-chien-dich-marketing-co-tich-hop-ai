@@ -1,0 +1,23 @@
+.venv/
+.venv-*/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.env
+*.sqlite3
+.gitnexus/
+knowledge_store/
+.rag/
+.lo_profile*/
+~$*.docx
+
+# Generated/local runtime files
+media/
+staticfiles/
+
+# Educational binaries/notebooks are kept on disk but are not the code baseline.
+**/Slide_PDF/
+**/.ipynb_checkpoints/
+**/*.ipynb

@@ -1,0 +1,128 @@
+{% extends "base/base.html" %}
+
+{% block title %}Quản lý Nhóm sản phẩm{% endblock %}
+
+{% block content %}
+<section class="page-toolbar">
+    <div>
+        <p class="section-kicker">Catalog</p>
+        <h2>Nhóm sản phẩm</h2>
+        <p class="text-muted mb-0">Quản lý cấu trúc phân loại sản phẩm cho bán hàng, tồn kho và báo cáo.</p>
+    </div>
+    <a class="btn btn-primary" href="{% url 'categories:category_create' %}">
+        <i class="bi bi-plus-lg" aria-hidden="true"></i>
+        Thêm nhóm
+    </a>
+</section>
+
+<section class="metric-grid" aria-label="Tổng quan nhóm sản phẩm">
+    <div class="metric-card">
+        <span>Tổng nhóm</span>
+        <strong>{{ total_count }}</strong>
+    </div>
+    <div class="metric-card">
+        <span>Đang hoạt động</span>
+        <strong>{{ active_count }}</strong>
+    </div>
+</section>
+
+<section class="data-panel">
+    <form class="filter-bar" method="get" data-loading-form>
+        <div class="search-field">
+            <label for="category-search" class="form-label">Tìm kiếm</label>
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
+                <input id="category-search" class="form-control" type="search" name="q" value="{{ query }}" placeholder="Tên hoặc mã nhóm">
+            </div>
+        </div>
+        <div>
+            <label for="category-status" class="form-label">Trạng thái</label>
+            <select id="category-status" class="form-select" name="status">
+                <option value="">Tất cả</option>
+                {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="category-per-page" class="form-label">Bản ghi/trang</label>
+            <select id="category-per-page" class="form-select" name="per_page">
+                <option value="5" {% if per_page == "5" %}selected{% endif %}>5</option>
+                <option value="10" {% if per_page == "10" %}selected{% endif %}>10</option>
+                <option value="20" {% if per_page == "20" %}selected{% endif %}>20</option>
+                <option value="50" {% if per_page == "50" %}selected{% endif %}>50</option>
+            </select>
+        </div>
+        <input type="hidden" name="sort" value="{{ sort }}">
+        <input type="hidden" name="dir" value="{{ direction }}">
+        <button class="btn btn-outline-primary" type="submit">
+            <span class="button-label">
+                <i class="bi bi-funnel" aria-hidden="true"></i>
+                Lọc
+            </span>
+            <span class="spinner-border spinner-border-sm d-none" aria-hidden="true"></span>
+        </button>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table align-middle data-table">
+            <thead>
+                <tr>
+                    <th scope="col">STT</th>
+                    <th scope="col"><a href="?q={{ query }}&status={{ selected_status }}&per_page={{ per_page }}&sort=code&dir={% if sort == 'code' and direction == 'asc' %}desc{% else %}asc{% endif %}">Mã nhóm</a></th>
+                    <th scope="col"><a href="?q={{ query }}&status={{ selected_status }}&per_page={{ per_page }}&sort=name&dir={% if sort == 'name' and direction == 'asc' %}desc{% else %}asc{% endif %}">Tên nhóm</a></th>
+                    <th scope="col">Mô tả</th>
+                    <th scope="col"><a href="?q={{ query }}&status={{ selected_status }}&per_page={{ per_page }}&sort=product_count&dir={% if sort == 'product_count' and direction == 'asc' %}desc{% else %}asc{% endif %}">Số SP</a></th>
+                    <th scope="col">Trạng thái</th>
+                    <th scope="col"><a href="?q={{ query }}&status={{ selected_status }}&per_page={{ per_page }}&sort=created_at&dir={% if sort == 'created_at' and direction == 'asc' %}desc{% else %}asc{% endif %}">Ngày tạo</a></th>
+                    <th scope="col" class="text-end">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for category in categories %}
+                    <tr>
+                        <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
+                        <td><span class="code-pill">{{ category.code }}</span></td>
+                        <td class="fw-semibold">{{ category.name }}</td>
+                        <td class="text-muted">{{ category.description|default:"-" }}</td>
+                        <td>{{ category.product_count }}</td>
+                        <td>
+                            {% if category.status == "active" %}
+                                <span class="status-badge active">Hoạt động</span>
+                            {% else %}
+                                <span class="status-badge inactive">Không hoạt động</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ category.created_at|date:"d/m/Y" }}</td>
+                        <td>
+                            <div class="table-actions">
+                                <a class="icon-btn" href="{% url 'categories:category_detail' category.pk %}" aria-label="Xem {{ category.name }}" title="Xem">
+                                    <i class="bi bi-eye" aria-hidden="true"></i>
+                                </a>
+                                <a class="icon-btn" href="{% url 'categories:category_update' category.pk %}" aria-label="Sửa {{ category.name }}" title="Sửa">
+                                    <i class="bi bi-pencil" aria-hidden="true"></i>
+                                </a>
+                                <a class="icon-btn danger" href="{% url 'categories:category_delete' category.pk %}" aria-label="Xóa {{ category.name }}" title="Xóa">
+                                    <i class="bi bi-trash" aria-hidden="true"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8">
+                            <div class="empty-state">
+                                <i class="bi bi-inboxes" aria-hidden="true"></i>
+                                <h3>Chưa có nhóm sản phẩm</h3>
+                                <p>Tạo nhóm đầu tiên để bắt đầu phân loại sản phẩm trong hệ thống.</p>
+                                <a class="btn btn-primary" href="{% url 'categories:category_create' %}">Thêm nhóm</a>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "components/pagination.html" %}
+</section>
+{% endblock %}

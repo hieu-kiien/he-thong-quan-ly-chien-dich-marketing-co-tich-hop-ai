@@ -1,0 +1,54 @@
+{% extends "base/base.html" %}
+
+{% block title %}Chi tiết nhóm sản phẩm{% endblock %}
+
+{% block content %}
+<section class="detail-layout">
+    <div class="detail-panel">
+        <div class="detail-heading">
+            <div>
+                <p class="section-kicker">Category detail</p>
+                <h2>{{ category.name }}</h2>
+                <span class="code-pill">{{ category.code }}</span>
+            </div>
+            {% if category.status == "active" %}
+                <span class="status-badge active">Hoạt động</span>
+            {% else %}
+                <span class="status-badge inactive">Không hoạt động</span>
+            {% endif %}
+        </div>
+        <dl class="detail-list">
+            <div>
+                <dt>Mô tả</dt>
+                <dd>{{ category.description|default:"Chưa có mô tả" }}</dd>
+            </div>
+            <div>
+                <dt>Số lượng sản phẩm</dt>
+                <dd>{{ category.product_count }}</dd>
+            </div>
+            <div>
+                <dt>Ngày tạo</dt>
+                <dd>{{ category.created_at|date:"d/m/Y H:i" }}</dd>
+            </div>
+            <div>
+                <dt>Cập nhật gần nhất</dt>
+                <dd>{{ category.updated_at|date:"d/m/Y H:i" }}</dd>
+            </div>
+        </dl>
+        <div class="form-actions">
+            <a class="btn btn-light" href="{% url 'categories:category_list' %}">
+                <i class="bi bi-arrow-left" aria-hidden="true"></i>
+                Danh sách
+            </a>
+            <a class="btn btn-primary" href="{% url 'categories:category_update' category.pk %}">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+                Sửa
+            </a>
+            <a class="btn btn-outline-danger" href="{% url 'categories:category_delete' category.pk %}">
+                <i class="bi bi-trash" aria-hidden="true"></i>
+                Xóa
+            </a>
+        </div>
+    </div>
+</section>
+{% endblock %}

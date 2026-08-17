@@ -1,0 +1,1 @@
+"""Read-side purchase queries."""

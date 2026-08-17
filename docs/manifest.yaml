@@ -1,0 +1,54 @@
+manifest_version: 1
+project_id: BAI03-SALES-AI
+title: He thong quan ly ban hang co tich hop AI
+language: vi
+last_reviewed: 2026-08-17
+retrieval_order:
+  - docs/README.md
+  - docs/00-project-context.md
+  - docs/01-requirements-summary.md
+  - docs/02-architecture-and-code-status.md
+  - docs/03-business-flows.md
+  - docs/04-ai-specification.md
+  - docs/05-deliverables-and-validation.md
+  - docs/06-open-questions.md
+  - docs/99-source-register.md
+  - docs/07-knowledge-retrieval.md
+source_precedence:
+  - path: project.md
+    status: CANONICAL
+    purpose: project_requirements_and_rubric
+  - path: informember.md
+    status: CANONICAL
+    purpose: team_identity
+  - path: Code QLBH/
+    status: IMPLEMENTED
+    purpose: modular_architecture_skeleton
+  - path: sales_management/
+    status: IMPLEMENTED
+    purpose: partial_business_implementation
+  - path: docs/
+    status: DERIVED
+    purpose: curated_retrieval_layer
+  - path: sales_management/apps/knowledge/
+    status: IMPLEMENTED
+    purpose: cited_document_rag_retrieval
+  - path: ../Bai 02/CacGiaiDoanThucHien/
+    status: REFERENCE
+    purpose: upstream_sdlc_document_pipeline
+excluded_patterns:
+  - '**/.venv/**'
+  - '**/venv/**'
+  - '**/__pycache__/**'
+  - '**/.pytest_cache/**'
+  - '**/.venv-rag/**'
+  - '**/.gitnexus/**'
+  - '**/knowledge_store/**'
+  - '**/.ipynb_checkpoints/**'
+  - '**/.env'
+  - '**/db.sqlite3'
+  - '**/*.pyc'
+notes:
+  - "QLBH demo/ is legacy and is not the implementation baseline."
+  - "KT1_PHAN_TICH_THIET_KE.md belongs to project BAOHANHAI and is separate."
+  - "Requirements and implementation status must not be conflated."

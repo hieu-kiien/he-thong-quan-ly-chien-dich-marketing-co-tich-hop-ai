@@ -1,0 +1,38 @@
+{% extends "base/base.html" %}
+
+{% block title %}Xóa nhóm sản phẩm{% endblock %}
+
+{% block content %}
+<section class="confirm-shell">
+    <div class="confirm-dialog" role="dialog" aria-labelledby="delete-title" aria-describedby="delete-desc">
+        <div class="danger-icon" aria-hidden="true">
+            <i class="bi bi-exclamation-triangle"></i>
+        </div>
+        <h2 id="delete-title">Xác nhận xóa nhóm sản phẩm</h2>
+        <p id="delete-desc">
+            Bạn đang chuẩn bị xóa nhóm <strong>{{ category.name }}</strong>
+            với mã <span class="code-pill">{{ category.code }}</span>.
+        </p>
+        {% if category.product_count > 0 %}
+            <div class="alert alert-warning" role="alert">
+                Nhóm này đang chứa {{ category.product_count }} sản phẩm. Hệ thống sẽ không cho xóa cho đến khi các sản phẩm được chuyển sang nhóm khác.
+            </div>
+        {% else %}
+            <div class="alert alert-danger" role="alert">
+                Hành động này không thể hoàn tác sau khi xác nhận.
+            </div>
+        {% endif %}
+        <form method="post" class="form-actions justify-content-center" data-loading-form>
+            {% csrf_token %}
+            <a class="btn btn-light" href="{% url 'categories:category_detail' category.pk %}">Hủy</a>
+            <button class="btn btn-danger" type="submit" {% if category.product_count > 0 %}disabled{% endif %}>
+                <span class="button-label">
+                    <i class="bi bi-trash" aria-hidden="true"></i>
+                    Xác nhận xóa
+                </span>
+                <span class="spinner-border spinner-border-sm d-none" aria-hidden="true"></span>
+            </button>
+        </form>
+    </div>
+</section>
+{% endblock %}

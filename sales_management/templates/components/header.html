@@ -1,0 +1,17 @@
+<header class="app-header">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item"><a href="#">Trang chủ</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ page_title|default:"Nhóm sản phẩm" }}</li>
+            </ol>
+        </nav>
+        <h1 class="header-title">{{ page_title|default:"Quản lý bán hàng" }}</h1>
+    </div>
+    <div class="header-actions">
+        <span class="system-pill">
+            <i class="bi bi-shield-check" aria-hidden="true"></i>
+            Admin
+        </span>
+    </div>
+</header>

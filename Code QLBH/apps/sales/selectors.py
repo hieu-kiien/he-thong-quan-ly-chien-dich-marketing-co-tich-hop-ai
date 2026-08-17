@@ -1,0 +1,1 @@
+"""Read-side sale queries."""
