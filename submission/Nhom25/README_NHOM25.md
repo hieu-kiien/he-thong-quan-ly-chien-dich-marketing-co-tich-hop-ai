@@ -4,7 +4,9 @@
 **Mã dự án:** `BAI03-SALES-AI`  
 **Thành viên:** Nguyễn Hải Đăng; Vũ Hiếu Kiên  
 **Mã sinh viên:** dtc2451200051; dtc245200244  
-**Lớp:** CNTTK23C
+**Lớp:** CNTTK23C  
+**Trường:** Trường Đại học Công nghệ Thông tin và Truyền thông Thái Nguyên  
+**Khoa:** Công nghệ thông tin
 
 ## Danh mục file
 

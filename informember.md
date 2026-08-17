@@ -8,8 +8,8 @@ Nhóm 25
 
 Lớp: CNTTK23C
 Trường: Trường Đại học Công nghệ Thông tin và Truyền thông Thái Nguyên
-Khoa: Chưa được cung cấp
+Khoa: Công nghệ thông tin
 
 > **Nguồn xác nhận:** Danh sách thành viên nhóm 25 do người dùng cung cấp ngày 18/08/2026.
 >
-> **Metadata:** `document_id=BAI03-TEAM`; `project_id=BAI03-SALES-AI`; `status=CANONICAL`. Vai trò thành viên được ghi đúng theo nguồn xác nhận; thông tin khoa chưa được cung cấp.
+> **Metadata:** `document_id=BAI03-TEAM`; `project_id=BAI03-SALES-AI`; `status=CANONICAL`. Vai trò thành viên và khoa được ghi theo thông tin người dùng xác nhận.

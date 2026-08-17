@@ -8,7 +8,7 @@
 **Thành viên:** Nguyễn Hải Đăng (Thành viên); Vũ Hiếu Kiên (Thành viên)  
 **Mã sinh viên:** dtc2451200051; dtc245200244  
 **Lớp:** CNTTK23C  
-**Đơn vị:** Trường Đại học Công nghệ Thông tin và Truyền thông Thái Nguyên — Khoa chưa được cung cấp  
+**Đơn vị:** Trường Đại học Công nghệ Thông tin và Truyền thông Thái Nguyên — Khoa Công nghệ thông tin  
 **Ngày nộp:** 18/08/2026  
 **Trạng thái:** Bản nộp đã kiểm tra chéo; phần chưa triển khai được ghi rõ `PROPOSED/OPEN`.
 
