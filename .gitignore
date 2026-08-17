@@ -20,3 +20,7 @@ staticfiles/
 # Generated notebook checkpoints remain local; source notebooks and reference PDFs
 # are included in the repository because they are part of the project materials.
 **/.ipynb_checkpoints/
+
+# Working drafts for the assignment orchestration; final files live under submission/
+.submission-work/
+submission/qa/

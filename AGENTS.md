@@ -51,7 +51,7 @@ ghi rõ đó là kiểm tra tĩnh, không gọi là test đã đạt.
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **Bai 03** (1258 symbols, 1419 relationships, 11 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **he-thong-quan-ly-ban-hang-co-tich-hop-ai** (1261 symbols, 1419 relationships, 11 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
@@ -74,10 +74,10 @@ This project is indexed by GitNexus as **Bai 03** (1258 symbols, 1419 relationsh
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/Bai 03/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/Bai 03/clusters` | All functional areas |
-| `gitnexus://repo/Bai 03/processes` | All execution flows |
-| `gitnexus://repo/Bai 03/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/he-thong-quan-ly-ban-hang-co-tich-hop-ai/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/he-thong-quan-ly-ban-hang-co-tich-hop-ai/clusters` | All functional areas |
+| `gitnexus://repo/he-thong-quan-ly-ban-hang-co-tich-hop-ai/processes` | All execution flows |
+| `gitnexus://repo/he-thong-quan-ly-ban-hang-co-tich-hop-ai/process/{name}` | Step-by-step execution trace |
 
 ## CLI
 
