@@ -17,7 +17,6 @@ knowledge_store/
 media/
 staticfiles/
 
-# Educational binaries/notebooks are kept on disk but are not the code baseline.
-**/Slide_PDF/
+# Generated notebook checkpoints remain local; source notebooks and reference PDFs
+# are included in the repository because they are part of the project materials.
 **/.ipynb_checkpoints/
-**/*.ipynb
