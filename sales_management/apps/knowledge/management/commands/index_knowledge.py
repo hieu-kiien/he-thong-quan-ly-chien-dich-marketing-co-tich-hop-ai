@@ -22,7 +22,7 @@ class Command(BaseCommand):
             raise CommandError(str(exc)) from exc
         self.stdout.write(
             self.style.SUCCESS(
-                "Indexed {files} files / {chunks} chunks; collection={collection_count}; store={store_path}".format(
+                "Indexed {files} files / {chunks} chunks; skipped={skipped}; collection={collection_count}; store={store_path}".format(
                     **result
                 )
             )

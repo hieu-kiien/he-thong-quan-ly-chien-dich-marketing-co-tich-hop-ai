@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from django.test import SimpleTestCase
+from django.urls import reverse
 
 from .services import (
     chunk_text,
@@ -43,6 +44,7 @@ class KnowledgeTextTests(SimpleTestCase):
             "LEGACY",
         )
         self.assertFalse(is_allowed_source(Path("Slide_PDF/slide.pdf")))
+        self.assertFalse(is_allowed_source(Path("Bai 02/CacGiaiDoanThucHien/~$draft.docx")))
         self.assertFalse(is_allowed_source(Path("Code QLBH/apps/sales/models.py")))
 
     def test_stable_chunk_id_is_deterministic(self):
@@ -68,3 +70,21 @@ class KnowledgeTextTests(SimpleTestCase):
         self.assertIn("[1]", context)
         self.assertIn("sales_management/apps/sales/models.py", context)
         self.assertIn("Invoice.confirm", context)
+
+
+class KnowledgeEndpointTests(SimpleTestCase):
+    def test_search_requires_a_query(self):
+        response = self.client.get(reverse("knowledge:search"), HTTP_HOST="localhost")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "q là bắt buộc")
+
+    def test_context_rejects_invalid_top_k_before_loading_model(self):
+        response = self.client.get(
+            reverse("knowledge:context"),
+            {"q": "hóa đơn", "top_k": "not-a-number"},
+            HTTP_HOST="localhost",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "top_k phải là số nguyên")

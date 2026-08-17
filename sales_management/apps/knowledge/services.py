@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from zipfile import BadZipFile
 from pathlib import Path
 
 from django.conf import settings
@@ -39,6 +40,10 @@ HEADING_RE = re.compile(r"^#{1,6}\s+(.+?)\s*$", re.MULTILINE)
 
 class KnowledgeDependencyError(RuntimeError):
     """Raised when the optional vector/embedding runtime is not available."""
+
+
+class KnowledgeSourceError(RuntimeError):
+    """Raised when one source file cannot be parsed safely."""
 
 
 def _normalise_path(path: Path | str) -> Path:
@@ -122,6 +127,8 @@ def is_allowed_source(path: Path | str, include_code: bool = False) -> bool:
 
     if parts & SKIP_PARTS or "legacy-prime-number-utilities" in lower:
         return False
+    if candidate.name.startswith("~$"):
+        return False
     if suffix not in SUPPORTED_EXTENSIONS:
         return False
     if "bai 02" in parts and "cacgiaidoanthuchien" not in lower:
@@ -198,7 +205,10 @@ def _read_source(path: Path) -> str:
             from docx import Document
         except ImportError as exc:
             raise KnowledgeDependencyError("Cài python-docx để đọc DOCX") from exc
-        document = Document(path)
+        try:
+            document = Document(path)
+        except (BadZipFile, OSError, ValueError) as exc:
+            raise KnowledgeSourceError(f"DOCX không hợp lệ: {source_path(path)}") from exc
         blocks = [paragraph.text.strip() for paragraph in document.paragraphs if paragraph.text.strip()]
         for table in document.tables:
             for row in table.rows:
@@ -211,9 +221,13 @@ def _read_source(path: Path) -> str:
             from pypdf import PdfReader
         except ImportError as exc:
             raise KnowledgeDependencyError("Cài pypdf để đọc PDF") from exc
-        pages = []
-        for index, page in enumerate(PdfReader(path).pages, start=1):
-            pages.append(f"[Page {index}]\n{page.extract_text() or ''}")
+        try:
+            reader = PdfReader(path)
+            pages = []
+            for index, page in enumerate(reader.pages, start=1):
+                pages.append(f"[Page {index}]\n{page.extract_text() or ''}")
+        except (OSError, ValueError) as exc:
+            raise KnowledgeSourceError(f"PDF không đọc được: {source_path(path)}") from exc
         return "\n\n".join(pages)
     return path.read_text(encoding="utf-8", errors="replace")
 
@@ -294,8 +308,15 @@ class KnowledgeService:
 
         files_indexed = 0
         chunks_indexed = 0
+        files_skipped = 0
         for path in iter_source_files(include_code=include_code):
-            text = _read_source(path)
+            try:
+                text = _read_source(path)
+            except KnowledgeDependencyError:
+                raise
+            except KnowledgeSourceError:
+                files_skipped += 1
+                continue
             chunks = chunk_text(text, max_chars=max_chars, overlap=overlap)
             if not chunks:
                 continue
@@ -330,6 +351,7 @@ class KnowledgeService:
         return {
             "files": files_indexed,
             "chunks": chunks_indexed,
+            "skipped": files_skipped,
             "collection_count": self._collection.count(),
             "store_path": str(self.store_path),
         }
