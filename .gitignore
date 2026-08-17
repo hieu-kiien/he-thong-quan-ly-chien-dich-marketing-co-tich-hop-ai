@@ -24,3 +24,4 @@ staticfiles/
 # Working drafts for the assignment orchestration; final files live under submission/
 .submission-work/
 submission/qa/
+submission/archive/

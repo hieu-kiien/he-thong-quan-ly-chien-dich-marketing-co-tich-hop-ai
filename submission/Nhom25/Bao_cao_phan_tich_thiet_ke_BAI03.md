@@ -2,13 +2,14 @@
 
 ## HỆ THỐNG QUẢN LÝ BÁN HÀNG CÓ TÍCH HỢP AI
 
-**Bài kiểm tra thường xuyên 1 — Bài kiểm tra số 01**
-**Mã dự án:** `BAI03-SALES-AI`
-**Nhóm:** Nhóm 01
-**Thành viên:** Nguyễn Thị Mộng Mơ (Trưởng nhóm); Mai Quyết Tâm (Phó nhóm)
-**Lớp:** CNTT K23K
-**Đơn vị:** Trường Đại học Công nghệ Thông tin và Truyền thông — Khoa Công nghệ thông tin
-**Ngày nộp:** 18/08/2026
+**Bài kiểm tra thường xuyên 1 — Bài kiểm tra số 01**  
+**Mã dự án:** `BAI03-SALES-AI`  
+**Nhóm:** Nhóm 25  
+**Thành viên:** Nguyễn Hải Đăng (Thành viên); Vũ Hiếu Kiên (Thành viên)  
+**Mã sinh viên:** dtc2451200051; dtc245200244  
+**Lớp:** CNTTK23C  
+**Đơn vị:** Trường Đại học Công nghệ Thông tin và Truyền thông Thái Nguyên — Khoa chưa được cung cấp  
+**Ngày nộp:** 18/08/2026  
 **Trạng thái:** Bản nộp đã kiểm tra chéo; phần chưa triển khai được ghi rõ `PROPOSED/OPEN`.
 
 ---
@@ -66,8 +67,8 @@ Các hình dưới đây là bản dựng trực quan từ Mermaid/source design
 
 # Bản thảo mục 1–3 — Phân tích và yêu cầu hệ thống
 
-**Đề tài:** Hệ thống quản lý bán hàng có tích hợp AI (`BAI03-SALES-AI`)
-**Phạm vi bản thảo:** mục 1 — phân tích bài toán; mục 2 — yêu cầu chức năng; mục 3 — yêu cầu phi chức năng.
+**Đề tài:** Hệ thống quản lý bán hàng có tích hợp AI (`BAI03-SALES-AI`)  
+**Phạm vi bản thảo:** mục 1 — phân tích bài toán; mục 2 — yêu cầu chức năng; mục 3 — yêu cầu phi chức năng.  
 **Nguyên tắc trạng thái:** nội dung mô tả yêu cầu và thiết kế không được dùng để suy ra rằng mã đã hoàn thành.
 
 > Các đường dẫn trong bản thảo được tính từ thư mục gốc `Bai 03`. Bằng chứng mã hiện trạng chủ yếu là kiểm tra tĩnh; `IMPLEMENTED` dưới đây chỉ có nghĩa là đã thấy mã và/hoặc kiểm thử tương ứng, không mặc nhiên có nghĩa là toàn hệ thống đã nghiệm thu.
@@ -356,8 +357,8 @@ Vì vậy, báo cáo cuối có thể dùng các bảng trên làm yêu cầu v�
 
 # Bản thảo Worker B — Mục 4–6
 
-**Dự án:** `BAI03-SALES-AI` — Hệ thống quản lý bán hàng có tích hợp AI
-**Phạm vi:** actor/use case, thiết kế dữ liệu logic và kiến trúc hệ thống.
+**Dự án:** `BAI03-SALES-AI` — Hệ thống quản lý bán hàng có tích hợp AI  
+**Phạm vi:** actor/use case, thiết kế dữ liệu logic và kiến trúc hệ thống.  
 **Căn cứ:** `project.md`, `docs/01-requirements-summary.md`, `docs/02-architecture-and-code-status.md`, `docs/03-business-flows.md`, `docs/04-ai-specification.md`, mã trong `sales_management/` và khung `Code QLBH/`.
 
 ## Quy ước trạng thái và phạm vi hiện trạng
@@ -886,8 +887,8 @@ Lớp RAG hiện chỉ truy hồi tài liệu/code; chưa có LLM answer runtime
 
 # Bản thảo mục 7–10 — Worker C
 
-> Dự án: `BAI03-SALES-AI` — Hệ thống quản lý bán hàng có tích hợp AI.
-> Quy ước trạng thái: `IMPLEMENTED` = đã kiểm tra trực tiếp trong mã/index/test; `DERIVED` = tổng hợp từ nguồn chuẩn; `PROPOSED` = thiết kế cho giai đoạn sau; `OPEN` = chưa chốt hoặc chưa có đủ bằng chứng.
+> Dự án: `BAI03-SALES-AI` — Hệ thống quản lý bán hàng có tích hợp AI.  
+> Quy ước trạng thái: `IMPLEMENTED` = đã kiểm tra trực tiếp trong mã/index/test; `DERIVED` = tổng hợp từ nguồn chuẩn; `PROPOSED` = thiết kế cho giai đoạn sau; `OPEN` = chưa chốt hoặc chưa có đủ bằng chứng.  
 > Các ví dụ prompt và JSON dưới đây là **minh họa hợp đồng thiết kế**, không phải phản hồi đã gọi provider.
 
 ## 7. Vị trí ứng dụng AI hợp lý gắn với dữ liệu và nhu cầu

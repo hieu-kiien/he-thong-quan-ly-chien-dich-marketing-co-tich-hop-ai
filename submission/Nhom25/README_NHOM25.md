@@ -1,9 +1,10 @@
-# Nộp bài — Nhóm 01
+# Nộp bài — Nhóm 25
 
-**Đề tài:** Hệ thống quản lý bán hàng có tích hợp AI
-**Mã dự án:** `BAI03-SALES-AI`
-**Thành viên:** Nguyễn Thị Mộng Mơ; Mai Quyết Tâm
-**Lớp:** CNTT K23K
+**Đề tài:** Hệ thống quản lý bán hàng có tích hợp AI  
+**Mã dự án:** `BAI03-SALES-AI`  
+**Thành viên:** Nguyễn Hải Đăng; Vũ Hiếu Kiên  
+**Mã sinh viên:** dtc2451200051; dtc245200244  
+**Lớp:** CNTTK23C
 
 ## Danh mục file
 
