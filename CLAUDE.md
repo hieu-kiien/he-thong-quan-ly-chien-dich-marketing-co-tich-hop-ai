@@ -1,7 +1,16 @@
+# AIA331-80300-MARKETING-AI — hướng dẫn AI trong repo
+
+- Đề tài canonical: **Hệ thống quản lý chiến dịch marketing có tích hợp AI**.
+- Đọc `AGENTS.md`, `project.md`, `docs/README.md` trước khi sửa.
+- Baseline code: `marketing_management/`; legacy sales không được dùng làm
+  yêu cầu hoặc bằng chứng marketing.
+- Khi sửa logic, chạy test; khi tuyên bố hoàn thành phải có bằng chứng lệnh chạy.
+- AI output phải qua kiểm tra và human approval; không commit secret.
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **he-thong-quan-ly-ban-hang-co-tich-hop-ai** (1261 symbols, 1419 relationships, 11 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai** (1602 symbols, 1946 relationships, 31 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
@@ -24,10 +33,10 @@ This project is indexed by GitNexus as **he-thong-quan-ly-ban-hang-co-tich-hop-a
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/he-thong-quan-ly-ban-hang-co-tich-hop-ai/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/he-thong-quan-ly-ban-hang-co-tich-hop-ai/clusters` | All functional areas |
-| `gitnexus://repo/he-thong-quan-ly-ban-hang-co-tich-hop-ai/processes` | All execution flows |
-| `gitnexus://repo/he-thong-quan-ly-ban-hang-co-tich-hop-ai/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai/clusters` | All functional areas |
+| `gitnexus://repo/he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai/processes` | All execution flows |
+| `gitnexus://repo/he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai/process/{name}` | Step-by-step execution trace |
 
 ## CLI
 

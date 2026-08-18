@@ -1,0 +1,3 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — Marketing AI{% endblock %}
+{% block content %}<section class="card form-card"><span class="eyebrow">{{ campaign.name }}</span><h1>{{ title }}</h1><p class="muted">Nội dung mới được lưu ở trạng thái bản nháp; phải duyệt trước khi đăng.</p><form method="post">{% csrf_token %}{{ form.as_p }}<div class="actions"><button class="button" type="submit">Lưu bản nháp</button><a class="button secondary" href="{% url 'campaigns:detail' campaign.pk %}">Hủy</a></div></form></section>{% endblock %}

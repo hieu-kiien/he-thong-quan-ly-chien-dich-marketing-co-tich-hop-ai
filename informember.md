@@ -12,4 +12,4 @@ Khoa: Công nghệ thông tin
 
 > **Nguồn xác nhận:** Danh sách thành viên nhóm 25 do người dùng cung cấp ngày 18/08/2026.
 >
-> **Metadata:** `document_id=BAI03-TEAM`; `project_id=BAI03-SALES-AI`; `status=CANONICAL`. Vai trò thành viên và khoa được ghi theo thông tin người dùng xác nhận.
+> **Metadata:** `document_id=AIA331-TEAM`; `project_id=AIA331-80300-MARKETING-AI`; `status=CANONICAL`. Vai trò thành viên và khoa được ghi theo thông tin người dùng xác nhận.

@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}{{ campaign.name }} — Marketing AI{% endblock %}
+{% block content %}
+<div class="section-head"><div><span class="eyebrow">{{ campaign.get_status_display }}</span><h1>{{ campaign.name }}</h1><p class="muted">{{ campaign.objective }}</p></div><div class="actions"><a class="button secondary" href="{% url 'campaigns:update' campaign.pk %}">Sửa</a><a class="button" href="{% url 'campaigns:content-create' campaign.pk %}">+ Thêm nội dung</a></div></div>
+<section class="stats"><div class="stat card"><span>Lượt xem</span><strong>{{ summary.impressions }}</strong></div><div class="stat card"><span>Click</span><strong>{{ summary.clicks }}</strong></div><div class="stat card"><span>Chuyển đổi</span><strong>{{ summary.conversions }}</strong></div><div class="stat card"><span>CTR</span><strong>{{ summary.ctr_percent }}%</strong></div><div class="stat card"><span>Chi phí</span><strong>{{ summary.cost|floatformat:0 }} đ</strong></div></section>
+<section class="card"><div class="section-head"><h2>Nội dung</h2><span class="pill">Duyệt thủ công trước khi dùng</span></div><div class="table-wrap"><table><thead><tr><th>Tiêu đề</th><th>Kênh</th><th>Nguồn</th><th>Trạng thái</th></tr></thead><tbody>{% for content in contents %}<tr><td>{{ content.title }}</td><td>{{ content.channel.name }}</td><td>{{ content.get_source_display }}</td><td>{{ content.get_status_display }}</td></tr>{% empty %}<tr><td colspan="4" class="muted">Chưa có nội dung.</td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

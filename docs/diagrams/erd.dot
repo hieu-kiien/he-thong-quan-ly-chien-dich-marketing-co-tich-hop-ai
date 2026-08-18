@@ -1,0 +1,13 @@
+digraph erd {
+  graph [rankdir=LR, bgcolor="white", pad=0.2, nodesep=0.3, ranksep=0.7];
+  node [shape=record, fontname="Arial", fontsize=10, style="filled", fillcolor="#f8f9fc", color="#d0d5dd"];
+  edge [fontname="Arial", fontsize=9, color="#6841d8"];
+  Campaign [label="{Campaign|id PK|name|objective|audience|product|start/end|budget|status}", fillcolor="#eef4ff"];
+  Channel [label="{Channel|id PK|name|channel_type|is_active}", fillcolor="#eef4ff"];
+  Content [label="{Content|id PK|campaign FK|channel FK|title/body|status|source|scheduled_at|approved_by}", fillcolor="#fff7ed"];
+  Metric [label="{Metric|id PK|campaign FK|channel FK|metric_date|impressions|clicks|conversions|cost}", fillcolor="#ecfdf3"];
+  Campaign -> Content [label="1:N"];
+  Campaign -> Metric [label="1:N"];
+  Channel -> Content [label="1:N"];
+  Channel -> Metric [label="1:N"];
+}

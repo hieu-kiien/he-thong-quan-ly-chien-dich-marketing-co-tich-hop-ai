@@ -1,38 +1,40 @@
-# Hồ sơ nộp BAI03 — Nhóm 25
+---
+document_id: AIA331-SUBMISSION-INDEX
+project_id: AIA331-80300-MARKETING-AI
+project_title: Hệ thống quản lý chiến dịch marketing có tích hợp AI
+priority: P1
+status: SUBMISSION_CANONICAL
+version: 1.0
+last_reviewed: 2026-08-18
+---
 
-document_id=BAI03-SUBMISSION-INDEX; project_id=BAI03-SALES-AI;
-project_title=Hệ thống quản lý bán hàng có tích hợp AI; priority=P1;
-status=CANONICAL; version=1.1; last_reviewed=2026-08-18.
+# Hồ sơ nộp — Nhóm 25
 
-**Đề tài:** Hệ thống quản lý bán hàng có tích hợp AI  
-**Mã dự án:** `BAI03-SALES-AI`  
-**Thành viên:** Nguyễn Hải Đăng; Vũ Hiếu Kiên  
-**Mã sinh viên:** dtc2451200051; dtc245200244  
-**Lớp:** CNTTK23C  
-**Trường:** Trường Đại học Công nghệ Thông tin và Truyền thông Thái Nguyên  
-**Khoa:** Công nghệ thông tin
+## Thông tin
 
-## Quy ước bản nộp
+- **Học phần:** Ứng dụng trí tuệ nhân tạo - AIA331.
+- **Mã số:** 80300; **hình thức:** Dự án.
+- **Đề tài:** Hệ thống quản lý chiến dịch marketing có tích hợp AI.
+- **Thành viên:** Nguyễn Hải Đăng (`dtc2451200051`); Vũ Hiếu Kiên (`dtc245200244`).
+- **Lớp:** CNTTK23C; **Khoa:** Công nghệ thông tin.
+- **Trường:** Trường Đại học Công nghệ Thông tin và Truyền thông Thái Nguyên.
 
-- Đây là hồ sơ của Bài 03, độc lập với Bài 01.
-- Bao_cao_phan_tich_thiet_ke_BAI03.md là nguồn nội dung canonical; DOCX/PDF
-  phải được kiểm tra đồng bộ với cùng version.
-- Báo cáo áp dụng docs/08-documentation-standard.md: bìa một trang, mục lục
-  tự động, nội dung chính gọn, phụ lục cho minh chứng dài và trạng thái
-  PROPOSED/OPEN được giữ nguyên khi chưa có code/test.
-- Thư mục nộp không chứa secret, database local, vector store, cache hoặc
-  .gitnexus/.
+## Cách nộp
 
-## Danh mục file
+Đặt toàn bộ file liên quan vào thư mục `Nhom25`, nén thành `Nhom25.zip`, rồi
+nộp file ZIP theo hướng dẫn Google Classroom. Gói nộp không chứa `.env`, database
+local, virtualenv, cache, vector store hoặc `.gitnexus/`.
 
-- `Bao_cao_phan_tich_thiet_ke_BAI03.docx`: báo cáo Word chính.
-- `Bao_cao_phan_tich_thiet_ke_BAI03.pdf`: bản PDF để xem/in.
-- `Bao_cao_phan_tich_thiet_ke_BAI03.md`: nguồn Markdown có thể tra cứu trên GitHub.
-- `Phu_luc_minh_chung_AI.md`: prompt, kiểm chứng RAG/GitNexus, test output và giới hạn bằng chứng.
-- `diagrams/`: ba hình PNG được dựng từ thiết kế; source Mermaid nằm trong báo cáo.
+## Danh mục
 
-## Phạm vi và tính trung thực học thuật
+- `Bao_cao_du_an_marketing_ai.md` — nguồn nội dung canonical.
+- `Bao_cao_du_an_marketing_ai.docx` — báo cáo Word.
+- `Bao_cao_du_an_marketing_ai.pdf` — bản xem/in.
+- `Phu_luc_minh_chung_AI.md` — prompt, test và giới hạn bằng chứng.
+- `diagrams/` — sơ đồ use case, ERD, kiến trúc.
+- `source-materials/` — bản sao đề bài nếu cần đối chiếu.
 
-Báo cáo chọn `sales_management/` làm baseline phân tích hiện trạng. Những phần mới chỉ có model/schema/retrieval hoặc thiết kế tương lai đều được ghi qualifier; provider LLM, AI nghiệp vụ end-to-end, RBAC đầy đủ và luồng bán–tồn hoàn chỉnh chưa được tuyên bố đã triển khai.
+## Trạng thái trung thực
 
-Thư mục này không chứa secret, `.env`, database local, vector store, cache hay chỉ mục GitNexus. Các artifact trên máy phát triển có thể tái sinh theo hướng dẫn trong repo.
+Báo cáo phân biệt `IMPLEMENTED_BASELINE`, `PROPOSED` và `OPEN`. Chỉ các phần có
+file code/test tương ứng mới được gọi là baseline đã kiểm chứng.

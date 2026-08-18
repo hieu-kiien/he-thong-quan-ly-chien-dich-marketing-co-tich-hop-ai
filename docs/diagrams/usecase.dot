@@ -1,0 +1,16 @@
+digraph usecase {
+  graph [rankdir=LR, bgcolor="white", pad=0.2, nodesep=0.25, ranksep=0.55];
+  node [shape=ellipse, fontname="Arial", fontsize=10, style="filled", fillcolor="#f8f9fc", color="#d0d5dd"];
+  edge [fontname="Arial", fontsize=9, color="#667085"];
+  manager [label="Marketing\nManager", shape=box, style="rounded,filled", fillcolor="#eef4ff"];
+  staff [label="Marketing\nStaff", shape=box, style="rounded,filled", fillcolor="#eef4ff"];
+  campaign [label="Quản lý\nchiến dịch"];
+  content [label="Quản lý nội dung\nvà lịch đăng"];
+  metric [label="Ghi nhận metric\nvà thống kê"];
+  approval [label="Duyệt nội dung\ntrước khi đăng"];
+  ai [label="Sinh ý tưởng /\ncaption / email"];
+  report [label="Tóm tắt hiệu quả\nvà gợi ý"];
+  manager -> campaign; manager -> approval; manager -> report; manager -> metric;
+  staff -> campaign; staff -> content; staff -> metric; staff -> ai;
+  ai -> approval [label="draft"];
+}

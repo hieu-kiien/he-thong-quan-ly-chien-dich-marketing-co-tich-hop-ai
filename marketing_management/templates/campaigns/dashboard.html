@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="hero">
+    <div><span class="eyebrow">AIA331 · 80300 · P1/HIGH</span><h1>Hệ thống quản lý chiến dịch marketing có tích hợp AI</h1><p>Quản lý chiến dịch, nội dung, lịch đăng và chỉ số; AI chỉ tạo bản nháp để người phụ trách duyệt.</p></div>
+    <a class="button" href="{% url 'campaigns:create' %}">+ Tạo chiến dịch</a>
+</div>
+<section class="card"><div class="section-head"><h2>Chiến dịch gần đây</h2><a href="{% url 'campaigns:list' %}">Xem tất cả</a></div>
+{% if campaigns %}<div class="table-wrap"><table><thead><tr><th>Tên</th><th>Mục tiêu</th><th>Thời gian</th><th>Trạng thái</th></tr></thead><tbody>{% for campaign in campaigns %}<tr><td><a href="{% url 'campaigns:detail' campaign.pk %}">{{ campaign.name }}</a></td><td>{{ campaign.objective|truncatechars:70 }}</td><td>{{ campaign.start_date }} → {{ campaign.end_date }}</td><td>{{ campaign.get_status_display }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="muted">Chưa có chiến dịch. Hãy tạo chiến dịch đầu tiên.</p>{% endif %}</section>
+{% endblock %}

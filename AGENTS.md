@@ -1,57 +1,60 @@
-# Quy ước dự án quản lý bán hàng
+# Quy ước dự án AIA331-80300-MARKETING-AI
 
-## Phạm vi
+## Phạm vi canonical
 
-Thư mục này là nguồn làm việc chính cho dự án `BAI03-SALES-AI`, một hệ thống
-quản lý bán hàng bằng Django có định hướng tích hợp AI. Không trộn nội dung của
-dự án `BAOHANHAI` ở file `KT1_PHAN_TICH_THIET_KE.md` vào dự án này.
+Nguồn chính của repo là đề tài **Hệ thống quản lý chiến dịch marketing có tích
+hợp AI** trong học phần **Ứng dụng trí tuệ nhân tạo - AIA331**, mã **80300**.
+Không được dùng nội dung quản lý bán hàng làm yêu cầu của dự án này. Các thư mục
+và tài liệu bán hàng tồn tại từ phiên bản trước chỉ có trạng thái `LEGACY`.
 
 ## Thứ tự ưu tiên nguồn
 
-1. `project.md` và `informember.md`: yêu cầu gốc và thông tin nhóm.
-2. Mã nguồn đã kiểm tra trong `Code QLBH/` và `sales_management/`.
-3. Tài liệu phân tích/kiến trúc được suy ra từ hai nguồn trên.
-4. DOCX đã sinh, prompt, template và tài liệu tham khảo.
+1. `project.md` và `informember.md`.
+2. `DỰ ÁN.png`/bản sao trong `source-materials/` do người dùng cung cấp.
+3. Mã nguồn `marketing_management/` và test tương ứng.
+4. Tài liệu trong `docs/`, prompt và báo cáo sinh từ các nguồn trên.
+5. Tài liệu học tập/tham khảo bên ngoài — chỉ dùng `REFERENCE`.
 
-Tài liệu phải ghi rõ trạng thái `CANONICAL`, `IMPLEMENTED`, `DERIVED`,
-`PROPOSED`, `TEMPLATE`, `REFERENCE`, `LEGACY` hoặc `OPEN`. Không được trình
-bày một yêu cầu như thể đã được triển khai nếu chưa có mã nguồn và kiểm thử
-tương ứng.
+Nếu có xung đột, ưu tiên đề bài ảnh và ghi rõ trong `docs/06-open-questions.md`;
+không tự hợp nhất hai đề tài.
 
-## Quy tắc đọc và cập nhật
+## Trạng thái tài liệu
 
-- Khi bắt đầu tra cứu, đọc `docs/README.md`, sau đó `docs/00-project-context.md`.
-- Dùng các ID ổn định như `FR-001`, `NFR-001`, `AI-001` và `BR-001` khi liên kết
-  yêu cầu, thiết kế, mã nguồn và kiểm thử.
-- Dùng liên kết tương đối trong Markdown; không dùng đường dẫn ổ đĩa cá nhân
-  hoặc đường dẫn phụ thuộc máy người viết trong tài liệu mới.
-- Loại khỏi chỉ mục các thư mục sinh ra như `.venv/`, `venv/`, `__pycache__/`,
-  file cơ sở dữ liệu local, cache và file chứa bí mật.
-- Không đưa API key, mật khẩu hoặc nội dung `.env` vào tài liệu. Chỉ tham chiếu
-  `.env.example`.
+Mỗi tài liệu phải ghi một trong các trạng thái: `CANONICAL`,
+`IMPLEMENTED_BASELINE`, `DERIVED`, `PROPOSED`, `OPEN`, `TEMPLATE`,
+`REFERENCE` hoặc `LEGACY`. Yêu cầu chưa có code/test không được mô tả là đã
+triển khai.
 
-## Hai nhánh mã nguồn cần phân biệt
+## Quy tắc truy hồi cho AI
 
-- `Code QLBH/`: skeleton kiến trúc modular; nhiều model, view, URL và test còn
-  là khung trống.
-- `sales_management/`: nhánh hiện thực một phần; model nghiệp vụ và CRUD
-  danh mục có nội dung, nhưng phần lớn URL/view/test và toàn bộ tích hợp AI
-  chưa hoàn chỉnh.
+- Dùng ID ổn định: `FR-*`, `NFR-*`, `AI-*`, `DB-*`, `ARCH-*`, `FLOW-*`, `EV-*`.
+- Khi trả lời, nêu kết luận → trạng thái → file nguồn → điểm chưa xác minh.
+- Ưu tiên `docs/README.md`, sau đó `docs/00-project-context.md`.
+- Dùng liên kết tương đối trong Markdown; không ghi đường dẫn máy cá nhân.
+- Loại `.venv/`, `.env`, database local, cache, vector store và `.gitnexus/` khỏi
+  hồ sơ nộp.
 
-`QLBH demo/` ở cấp `Codes/` là bản demo cũ, chỉ dùng làm tài liệu lịch sử và
-không phải nguồn triển khai chuẩn.
+## Quy tắc mã nguồn
 
-## Kiểm chứng trước khi bàn giao
+- Baseline chạy trong `marketing_management/`, dùng Django + SQLite cho demo.
+- AI nằm sau adapter, prompt có version; kết quả AI luôn là bản nháp và phải
+  qua human approval.
+- Không commit API key, mật khẩu hoặc dữ liệu cá nhân thật.
+- Sau khi sửa logic, chạy `manage.py check` và test liên quan.
+- Trước commit, chạy GitNexus `detect_changes()` nếu môi trường có CLI/MCP;
+  nếu không có, ghi rõ kiểm tra tĩnh thay thế.
 
-Khi thay đổi mã nguồn hoặc tuyên bố tính năng đã hoàn thành, kiểm tra tối thiểu
-`python manage.py check`, test liên quan và đối chiếu với ma trận trong
-`docs/02-architecture-and-code-status.md`. Nếu môi trường chưa cài dependency,
-ghi rõ đó là kiểm tra tĩnh, không gọi là test đã đạt.
+## Legacy
+
+Các đường dẫn `Code QLBH/`, `sales_management/`, các báo cáo bán hàng cũ và
+`QLBH demo/` là artifact lịch sử của một đề tài khác. Không tham chiếu chúng để
+chứng minh yêu cầu marketing. Không xóa dữ liệu lịch sử nếu chưa có yêu cầu
+riêng; chỉ đánh dấu và loại khỏi manifest canonical.
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **he-thong-quan-ly-ban-hang-co-tich-hop-ai** (1261 symbols, 1419 relationships, 11 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai** (1602 symbols, 1946 relationships, 31 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
@@ -74,10 +77,10 @@ This project is indexed by GitNexus as **he-thong-quan-ly-ban-hang-co-tich-hop-a
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/he-thong-quan-ly-ban-hang-co-tich-hop-ai/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/he-thong-quan-ly-ban-hang-co-tich-hop-ai/clusters` | All functional areas |
-| `gitnexus://repo/he-thong-quan-ly-ban-hang-co-tich-hop-ai/processes` | All execution flows |
-| `gitnexus://repo/he-thong-quan-ly-ban-hang-co-tich-hop-ai/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai/clusters` | All functional areas |
+| `gitnexus://repo/he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai/processes` | All execution flows |
+| `gitnexus://repo/he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai/process/{name}` | Step-by-step execution trace |
 
 ## CLI
 

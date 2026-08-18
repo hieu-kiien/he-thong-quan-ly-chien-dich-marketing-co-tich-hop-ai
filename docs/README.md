@@ -1,61 +1,41 @@
 ---
-document_id: BAI03-DOCS-README
+document_id: AIA331-DOCS-README
 document_type: documentation-index
-project_id: BAI03-SALES-AI
+project_id: AIA331-80300-MARKETING-AI
+priority: P1
 status: CANONICAL
 language: vi
 last_reviewed: 2026-08-18
 ---
 
-# Chỉ mục tài liệu chuẩn hóa — BAI03-SALES-AI
-
-Thư mục này là lớp “nguồn tra cứu” được biên tập từ yêu cầu gốc, DOCX đã sinh,
-prompt và mã nguồn. Mục tiêu là giúp AI hoặc người mới phân biệt rõ: yêu cầu
-phải làm, tính năng đã có, đề xuất thiết kế và tài liệu mẫu.
+# Chỉ mục tài liệu chuẩn hóa — Marketing AI
 
 ## Đọc theo câu hỏi
 
-| Câu hỏi | Đọc file |
+| Câu hỏi | Tài liệu |
 |---|---|
-| Dự án này là gì, phạm vi nào? | [`00-project-context.md`](00-project-context.md) |
-| Cần làm những chức năng nào? | [`01-requirements-summary.md`](01-requirements-summary.md) |
-| Chức năng nào đã có trong code? | [`02-architecture-and-code-status.md`](02-architecture-and-code-status.md) |
-| Quy trình bán hàng và bất biến dữ liệu ra sao? | [`03-business-flows.md`](03-business-flows.md) |
-| AI được phép làm gì, dữ liệu vào/ra thế nào? | [`04-ai-specification.md`](04-ai-specification.md) |
-| Cần nộp và kiểm chứng những gì? | [`05-deliverables-and-validation.md`](05-deliverables-and-validation.md) |
-| Còn mâu thuẫn hoặc quyết định mở nào? | [`06-open-questions.md`](06-open-questions.md) |
-| Một thông tin đến từ đâu, có đáng tin không? | [`99-source-register.md`](99-source-register.md) |
-| GitNexus và RAG được vận hành thế nào? | [`07-knowledge-retrieval.md`](07-knowledge-retrieval.md) |
-| Chuẩn Word, bìa, độ dài, source-of-truth và hồ sơ nộp? | [`08-documentation-standard.md`](08-documentation-standard.md) |
-| Cần đọc bằng máy theo danh sách nào? | [`manifest.yaml`](manifest.yaml) |
+| Đề tài chính thức là gì? | [`../project.md`](../project.md) |
+| Bối cảnh, nhóm và phạm vi? | [`00-project-context.md`](00-project-context.md) |
+| Những chức năng nào phải có? | [`01-requirements-summary.md`](01-requirements-summary.md) |
+| Code đã có gì, thiếu gì? | [`02-architecture-and-code-status.md`](02-architecture-and-code-status.md) |
+| Luồng nghiệp vụ và bất biến? | [`03-business-flows.md`](03-business-flows.md) |
+| AI input/output/prompt/safety? | [`04-ai-specification.md`](04-ai-specification.md) |
+| Cần nộp và kiểm tra gì? | [`05-deliverables-and-validation.md`](05-deliverables-and-validation.md) |
+| Điểm nào còn mở? | [`06-open-questions.md`](06-open-questions.md) |
+| RAG/GitNexus dùng thế nào? | [`07-knowledge-retrieval.md`](07-knowledge-retrieval.md) |
+| Chuẩn Word/PDF/bìa? | [`08-documentation-standard.md`](08-documentation-standard.md) |
+| Nguồn nào đáng tin? | [`99-source-register.md`](99-source-register.md) |
 
-## Quy ước trạng thái nguồn
+## Trạng thái
 
-| Nhãn | Ý nghĩa |
-|---|---|
-| `CANONICAL` | Nguồn yêu cầu/định danh được ưu tiên trong phạm vi dự án |
-| `IMPLEMENTED` | Đã xác minh trực tiếp trong mã nguồn; chưa mặc định là đã đạt mọi test |
-| `DERIVED` | Nội dung được tổng hợp hoặc suy ra từ nguồn khác |
-| `PROPOSED` | Thiết kế/giải pháp đề xuất, chưa phải hiện trạng |
-| `OPEN` | Chưa có quyết định hoặc bằng chứng đủ chắc chắn |
-| `TEMPLATE` | Mẫu dùng để sinh tài liệu, không phải sự thật dự án |
-| `REFERENCE` | Tài liệu học tập/tham khảo bên ngoài phạm vi triển khai |
-| `LEGACY` | Bản cũ, chỉ dùng để đối chiếu lịch sử |
+`CANONICAL` = yêu cầu/định danh chính thức; `IMPLEMENTED_BASELINE` = đã có code
+và test trong baseline; `DERIVED` = biên tập từ nguồn; `PROPOSED` = thiết kế
+chưa triển khai; `OPEN` = cần quyết định; `REFERENCE` = tham khảo;
+`LEGACY` = lịch sử, không dùng làm nguồn của đề tài.
 
-## Cách trả lời khi tra cứu
+## Quy tắc trả lời cho AI
 
-1. Xác định `project_id` và `document_id` trước khi dùng thông tin.
-2. Ưu tiên `project.md`, `informember.md`, sau đó đối chiếu mã nguồn.
-3. Với mỗi kết luận về triển khai, nêu đường dẫn file và trạng thái.
-4. Nếu có xung đột, dùng [`06-open-questions.md`](06-open-questions.md), không
-   tự gộp hai phiên bản thành một sự thật.
-5. Không coi các con số mục tiêu như tốc độ, độ chính xác AI hoặc uptime là
-   số đo đã đạt nếu chưa có kết quả kiểm thử/đo lường.
-
-## Nguồn gốc và phạm vi
-
-Danh mục đầy đủ nằm trong [`99-source-register.md`](99-source-register.md).
-Các file sinh ra, virtual environment, database local và secret bị loại khỏi
-chỉ mục theo [`manifest.yaml`](manifest.yaml). Báo cáo nộp dùng DOCX/PDF để
-đọc/in, còn Markdown/YAML trong `docs/` là lớp canonical cho Git và RAG; hai
-lớp này phải trỏ về cùng một version nội dung.
+Luôn xác định `project_id` trước khi trả lời. Ưu tiên `project.md`, rồi nhóm
+`docs/`, sau đó code/test. Khi chưa có bằng chứng, dùng “chưa được chứng minh”;
+không biến mục tiêu hoặc prompt mẫu thành kết quả đã đạt. Các tệp bán hàng cũ
+không thuộc corpus canonical.

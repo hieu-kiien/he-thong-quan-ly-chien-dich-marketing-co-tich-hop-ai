@@ -1,65 +1,71 @@
 ---
-document_id: BAI03-README
+document_id: AIA331-README
 document_type: project-index
-project_id: BAI03-SALES-AI
-project_title: Hệ thống quản lý bán hàng có tích hợp AI
+project_id: AIA331-80300-MARKETING-AI
+project_title: Hệ thống quản lý chiến dịch marketing có tích hợp AI
 priority: P1
+priority_level: HIGH
 status: CANONICAL
 language: vi
 last_reviewed: 2026-08-18
 ---
 
-# BAI03-SALES-AI — Hệ thống quản lý bán hàng có tích hợp AI
+# AIA331-80300-MARKETING-AI
 
-Đây là README điều hướng của dự án. Tài liệu phân tích đã được chuẩn hóa ở
-[`docs/README.md`](docs/README.md); file này không mô tả một tính năng là đã
-hoàn thành nếu chưa có bằng chứng trong mã nguồn và kiểm thử.
+## Hệ thống quản lý chiến dịch marketing có tích hợp AI
 
-## Bắt đầu trong 5 phút
+Đây là đề tài chính thức trong ảnh `DỰ ÁN.png` của học phần **Ứng dụng trí tuệ
+nhân tạo - AIA331**, mã **80300**, hình thức **Dự án**. Repo này dùng tên đề tài
+này làm source-of-truth; không trộn với dự án quản lý bán hàng trước đó.
 
-1. Đọc [`docs/00-project-context.md`](docs/00-project-context.md).
-2. Tra yêu cầu trong [`docs/01-requirements-summary.md`](docs/01-requirements-summary.md).
-3. Kiểm tra hiện trạng mã trong
-   [`docs/02-architecture-and-code-status.md`](docs/02-architecture-and-code-status.md).
-4. Nếu cần chạy nhánh skeleton, xem [`Code QLBH/README.md`](<Code QLBH/README.md>).
-5. Nếu cần xem nhánh đã có model và CRUD danh mục, xem
-   [`sales_management/README.md`](<sales_management/README.md>).
-6. Nếu cần index tài liệu và tra cứu có citation, xem
-   [`docs/07-knowledge-retrieval.md`](docs/07-knowledge-retrieval.md).
-7. Nếu cần chuẩn hóa Word/PDF, bìa, độ dài và checklist hồ sơ, xem
-   [`docs/08-documentation-standard.md`](docs/08-documentation-standard.md).
+## Đọc nhanh
 
-## Cấu trúc chính
+1. Đọc [`project.md`](project.md) để biết yêu cầu gốc và ID yêu cầu.
+2. Đọc [`docs/00-project-context.md`](docs/00-project-context.md) để biết phạm vi,
+   nhóm và quy tắc suy luận.
+3. Tra chức năng trong [`docs/01-requirements-summary.md`](docs/01-requirements-summary.md).
+4. Đối chiếu code và trạng thái trong [`docs/02-architecture-and-code-status.md`](docs/02-architecture-and-code-status.md).
+5. Xem AI contract/prompt tại [`docs/04-ai-specification.md`](docs/04-ai-specification.md).
+6. Xem hồ sơ nộp tại [`submission/Nhom25/README_NHOM25.md`](submission/Nhom25/README_NHOM25.md).
+
+## Chạy baseline
+
+```powershell
+cd marketing_management
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py seed_demo
+python manage.py createsuperuser
+python manage.py runserver
+```
+
+Mở `http://127.0.0.1:8000/`. Provider mặc định là fallback offline; cấu hình
+provider ngoài chỉ qua `.env` theo `marketing_management/.env.example`.
+
+## Thông tin nhóm
+
+- Nhóm 25 — lớp CNTTK23C.
+- Nguyễn Hải Đăng — `dtc2451200051`.
+- Vũ Hiếu Kiên — `dtc245200244`.
+- Trường Đại học Công nghệ Thông tin và Truyền thông Thái Nguyên.
+- Khoa Công nghệ thông tin.
+
+## Cấu trúc nguồn
 
 | Đường dẫn | Vai trò |
 |---|---|
-| [`project.md`](project.md) | Yêu cầu gốc và rubric 40 tiêu chí; `CANONICAL` |
-| [`informember.md`](informember.md) | Thông tin nhóm; `CANONICAL`, còn một điểm cần xác nhận |
-| [`docs/`](docs/) | Lớp tài liệu chuẩn hóa cho AI và con người |
-| [`Code QLBH/`](<Code QLBH/>) | Blueprint/skeleton Django modular |
-| [`sales_management/`](<sales_management/>) | Nhánh hiện thực một phần |
-| [`prompts/`](prompts/) | Prompt/kỹ thuật thử nghiệm; không phải nguồn yêu cầu |
-| [`../Bai 02/CacGiaiDoanThucHien/`](<../Bai%2002/CacGiaiDoanThucHien/>) | Pipeline tài liệu upstream để đối chiếu; `REFERENCE` |
-| [`QLBH demo/`](<../QLBH demo/>) | Không nằm trong thư mục này; bản demo cũ ở cấp `Codes/` |
+| `project.md` | Yêu cầu gốc, `CANONICAL` |
+| `docs/` | Tài liệu đã chuẩn hóa cho AI/người đọc |
+| `marketing_management/` | Baseline Django marketing, `IMPLEMENTED_BASELINE` |
+| `prompts/` | Prompt/minh chứng theo đề tài marketing |
+| `submission/Nhom25/` | Hồ sơ nộp được sinh từ nguồn canonical |
+| `submission/legacy-sales/`, `Code QLBH/`, `sales_management/` và các nhánh bán hàng cũ | `LEGACY`, không phải source của đề tài |
 
-## Trạng thái hiện tại
+## Quy tắc trạng thái
 
-- Định hướng kỹ thuật trong code là Django, dù yêu cầu gốc cho phép FastAPI,
-  Flask hoặc Django.
-- `Code QLBH/` có cấu trúc module rõ nhưng nhiều model, URL, view và test còn
-  là khung trống.
-- `sales_management/` có model nghiệp vụ đáng kể và CRUD `categories`, nhưng
-  phần lớn route/view/test chưa hoàn chỉnh.
-- Chưa thấy bộ gọi provider AI, prompt runtime hoặc luồng AI chạy trong hai
-  nhánh code; `AIEventLog` mới là mô hình ghi nhận sự kiện.
-- Hồ sơ nộp được quản lý theo hai lớp: Markdown/YAML canonical cho tra cứu và
-  DOCX/PDF cho giảng viên; trạng thái và giới hạn phải giống nhau ở cả hai.
-
-Chi tiết và bằng chứng nằm trong
-[`docs/02-architecture-and-code-status.md`](docs/02-architecture-and-code-status.md).
-
-## Quy ước
-
-Đọc [`AGENTS.md`](AGENTS.md) trước khi sửa dự án. Các tài liệu mới dùng
-frontmatter YAML, ID ổn định và liên kết tương đối. Không đưa secret hoặc file
-local sinh ra vào tài liệu.
+`CANONICAL` là yêu cầu chính thức; `IMPLEMENTED_BASELINE` là phần đã có code/test;
+`DERIVED` là nội dung suy ra; `PROPOSED` là thiết kế chưa triển khai; `OPEN` là
+điểm cần chốt; `LEGACY` chỉ để giữ lịch sử. Không gọi mục tiêu hoặc prompt mẫu
+là bằng chứng nghiệm thu.

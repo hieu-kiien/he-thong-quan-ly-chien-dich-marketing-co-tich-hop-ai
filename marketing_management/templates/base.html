@@ -1,0 +1,26 @@
+{% load static %}
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Marketing AI{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+<header class="topbar">
+    <a class="brand" href="{% url 'campaigns:dashboard' %}">Marketing AI</a>
+    {% if request.user.is_authenticated %}
+    <nav>
+        <a href="{% url 'campaigns:list' %}">Chiến dịch</a>
+        <a href="{% url 'campaigns:create' %}">Tạo mới</a>
+        <a href="{% url 'logout' %}">Đăng xuất</a>
+    </nav>
+    {% endif %}
+</header>
+<main class="container">
+    {% for message in messages %}<div class="alert">{{ message }}</div>{% endfor %}
+    {% block content %}{% endblock %}
+</main>
+</body>
+</html>
