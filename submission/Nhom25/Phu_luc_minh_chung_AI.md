@@ -2,6 +2,8 @@
 document_id: BAI03-SUBMISSION-APP-A
 document_type: evidence-appendix
 project_id: BAI03-SALES-AI
+project_title: Hệ thống quản lý bán hàng có tích hợp AI
+priority: P1
 status: DERIVED
 last_reviewed: 2026-08-18
 source_of_truth: false

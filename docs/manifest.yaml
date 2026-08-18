@@ -1,6 +1,8 @@
 manifest_version: 1
 project_id: BAI03-SALES-AI
+project_title: Hệ thống quản lý bán hàng có tích hợp AI
 title: He thong quan ly ban hang co tich hop AI
+priority: P1
 language: vi
 last_reviewed: 2026-08-18
 retrieval_order:

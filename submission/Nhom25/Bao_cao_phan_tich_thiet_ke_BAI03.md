@@ -2,6 +2,8 @@
 document_id: BAI03-SUBMISSION-REPORT
 document_type: course-project-analysis-design-report
 project_id: BAI03-SALES-AI
+project_title: Hệ thống quản lý bán hàng có tích hợp AI
+priority: P1
 status: CANONICAL
 authority: group-submission
 language: vi

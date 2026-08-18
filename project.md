@@ -1,5 +1,5 @@
 ﻿Hệ thống quản lý bán hàng có tích hợp AI
-> **Metadata:** `document_id=BAI03-PROJECT-BRIEF`; `project_id=BAI03-SALES-AI`; `status=CANONICAL`; đây là nguồn yêu cầu gốc, không phải bằng chứng triển khai.
+> **Metadata:** `document_id=BAI03-PROJECT-BRIEF`; `project_id=BAI03-SALES-AI`; `project_title=Hệ thống quản lý bán hàng có tích hợp AI`; `priority=P1`; `status=CANONICAL`; đây là nguồn yêu cầu gốc, không phải bằng chứng triển khai.
 
 1. Mô tả bài toán
 

@@ -2,6 +2,8 @@
 document_id: BAI03-README
 document_type: project-index
 project_id: BAI03-SALES-AI
+project_title: Hệ thống quản lý bán hàng có tích hợp AI
+priority: P1
 status: CANONICAL
 language: vi
 last_reviewed: 2026-08-18

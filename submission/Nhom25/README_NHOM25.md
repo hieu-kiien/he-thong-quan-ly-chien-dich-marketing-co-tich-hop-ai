@@ -1,6 +1,7 @@
 # Hồ sơ nộp BAI03 — Nhóm 25
 
 document_id=BAI03-SUBMISSION-INDEX; project_id=BAI03-SALES-AI;
+project_title=Hệ thống quản lý bán hàng có tích hợp AI; priority=P1;
 status=CANONICAL; version=1.1; last_reviewed=2026-08-18.
 
 **Đề tài:** Hệ thống quản lý bán hàng có tích hợp AI  

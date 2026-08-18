@@ -232,6 +232,7 @@ def normalize(input_path: Path, output_path: Path) -> None:
         ("Học phần", "Ứng dụng AI"),
         ("Giảng viên", "Nguyễn Tuấn Anh"),
         ("Mã dự án", "BAI03-SALES-AI"),
+        ("Cấp ưu tiên", "P1 / HIGH — ưu tiên cao nhất cho hồ sơ BAI03 và truy hồi AI"),
         ("Nhóm", "Nhóm 25"),
         ("Thành viên", "Nguyễn Hải Đăng (Thành viên); Vũ Hiếu Kiên (Thành viên)"),
         ("Mã sinh viên", "dtc2451200051; dtc245200244"),

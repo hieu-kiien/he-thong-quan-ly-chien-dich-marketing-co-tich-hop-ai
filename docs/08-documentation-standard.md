@@ -2,6 +2,8 @@
 document_id: BAI03-DOC-08
 document_type: documentation-standard
 project_id: BAI03-SALES-AI
+project_title: Hệ thống quản lý bán hàng có tích hợp AI
+priority: P1
 status: CANONICAL
 authority: project-documentation-policy
 language: vi
@@ -27,6 +29,13 @@ Chuẩn có hai tầng:
 
 Mục tiêu không phải kéo dài tài liệu. Mỗi phần phải trả lời một mục của đề,
 cung cấp bằng chứng hoặc giúp người đọc tái lập kết luận.
+
+### 1.1. Cấp ưu tiên dự án
+
+`P1`/`HIGH` là cấp ưu tiên của hồ sơ BAI03: AI/RAG phải ưu tiên nguồn
+CANONICAL của dự án này trước tài liệu `REFERENCE`, `LEGACY` hoặc project khác.
+Đây là ưu tiên quản lý và truy hồi tài liệu, không tự biến một yêu cầu thành
+tính năng đã triển khai.
 
 ## 2. Thứ tự ưu tiên nguồn
 

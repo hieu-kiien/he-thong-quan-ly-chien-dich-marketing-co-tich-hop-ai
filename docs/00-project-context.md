@@ -2,6 +2,8 @@
 document_id: BAI03-DOC-00
 document_type: project-context
 project_id: BAI03-SALES-AI
+project_title: Hệ thống quản lý bán hàng có tích hợp AI
+priority: P1
 status: DERIVED
 authority: curated-context
 sources:
@@ -20,6 +22,7 @@ last_reviewed: 2026-08-17
 |---|---|---|
 | `project_id` | `BAI03-SALES-AI` | `CANONICAL` trong lớp tài liệu này |
 | Tên | Hệ thống quản lý bán hàng có tích hợp AI | `CANONICAL` |
+| Cấp ưu tiên | `P1` / `HIGH` | Ưu tiên cao nhất trong phạm vi hồ sơ Bài 03 và truy hồi AI |
 | Miền nghiệp vụ | Bán lẻ: sản phẩm, khách hàng, hóa đơn, nhập hàng, tồn kho, báo cáo | `CANONICAL` |
 | Mục tiêu AI | Tư vấn sản phẩm, nhận xét doanh thu, hỏi đáp dữ liệu bán hàng | `CANONICAL` về phạm vi; chưa phải hiện thực |
 | Framework hiện đang có trong code | Django | `IMPLEMENTED`/quan sát được; yêu cầu gốc vẫn cho phép framework khác |
