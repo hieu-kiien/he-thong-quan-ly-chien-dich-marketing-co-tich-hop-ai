@@ -1,8 +1,11 @@
 version: 1
 project_id: AIA331-80300-MARKETING-AI
 project_title: Hệ thống quản lý chiến dịch marketing có tích hợp AI
-priority: P0
-priority_level: CRITICAL
+priority: P1
+priority_level: HIGH
+source_priority: P0 / CRITICAL
+priority_scope: source-materials/BÀI KIỂM TRA.png; source-materials/DỰ ÁN.png
+priority_policy: docs/10-priority-policy.md
 last_reviewed: 2026-08-18
 canonical_sources:
   - path: source-materials/README.md
@@ -28,6 +31,19 @@ canonical_sources:
     status: DERIVED
   - path: submission/Nhom25/*.md
     status: SUBMISSION_CANONICAL
+reference_sources:
+  - path: Slide_PDF/**
+    priority: P2
+    status: REFERENCE
+  - path: Do_an_tot_nghiep_thiet_ke_website_ban_dien_thoai_di_dong.pdf
+    priority: P3
+    status: REFERENCE
+  - path: "*.ipynb"
+    priority: P3
+    status: REFERENCE
+  - path: "func*.py"
+    priority: P3
+    status: LEGACY
 excluded_from_canonical_retrieval:
   - "**/.venv/**"
   - "**/.env"

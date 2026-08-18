@@ -229,10 +229,10 @@ def normalize(input_path: Path, output_path: Path) -> None:
     metadata = doc.tables[0]
     rows = [
         ("Bài kiểm tra", "Bài kiểm tra thường xuyên 1 — Bài kiểm tra số 01"),
-        ("Học phần", "Ứng dụng AI"),
+        ("Học phần", "Ứng dụng trí tuệ nhân tạo — AIA331"),
         ("Giảng viên", "Nguyễn Tuấn Anh"),
-        ("Mã dự án", "BAI03-SALES-AI"),
-        ("Cấp ưu tiên", "P1 / HIGH — ưu tiên cao nhất cho hồ sơ BAI03 và truy hồi AI"),
+        ("Mã dự án", "AIA331-80300-MARKETING-AI"),
+        ("Cấp ưu tiên", "P1 / HIGH — hồ sơ bám hai nguồn P0 / CRITICAL"),
         ("Nhóm", "Nhóm 25"),
         ("Thành viên", "Nguyễn Hải Đăng (Thành viên); Vũ Hiếu Kiên (Thành viên)"),
         ("Mã sinh viên", "dtc2451200051; dtc245200244"),
@@ -315,7 +315,7 @@ def normalize(input_path: Path, output_path: Path) -> None:
     if appendix is not None and not any(p.text.strip() == "TÀI LIỆU THAM KHẢO" for p in doc.paragraphs):
         references = [
             "TÀI LIỆU THAM KHẢO",
-            "1. Nhóm 25, project.md — yêu cầu gốc và rubric của BAI03-SALES-AI.",
+            "1. Nhóm 25, project.md — yêu cầu gốc của AIA331-80300-MARKETING-AI.",
             "2. Nhóm 25, informember.md — thông tin nhóm, lớp, trường và khoa.",
             "3. Nhóm 25, docs/01-requirements-summary.md — ma trận yêu cầu chuẩn hóa.",
             "4. Nhóm 25, docs/02-architecture-and-code-status.md — đối chiếu kiến trúc và hiện trạng code.",
@@ -361,10 +361,10 @@ def normalize(input_path: Path, output_path: Path) -> None:
             shape.width = Cm(15.0)
             shape.height = int(shape.width * ratio)
 
-    doc.core_properties.title = "Báo cáo phân tích và thiết kế — BAI03-SALES-AI"
+    doc.core_properties.title = "Báo cáo phân tích và thiết kế — Hệ thống quản lý chiến dịch marketing có tích hợp AI"
     doc.core_properties.author = "Nhóm 25 — Nguyễn Hải Đăng; Vũ Hiếu Kiên"
-    doc.core_properties.subject = "Báo cáo học phần Ứng dụng AI"
-    doc.core_properties.comments = "Nguồn canonical: Bao_cao_phan_tich_thiet_ke_BAI03.md; version 1.1"
+    doc.core_properties.subject = "Báo cáo dự án học phần Ứng dụng trí tuệ nhân tạo — AIA331"
+    doc.core_properties.comments = "Nguồn canonical: Bao_cao_du_an_marketing_ai.md; version 1.0"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(output_path))
 

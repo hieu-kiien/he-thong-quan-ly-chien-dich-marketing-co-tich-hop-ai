@@ -3,8 +3,8 @@ document_id: AIA331-DOC-01
 document_type: requirements-summary
 project_id: AIA331-80300-MARKETING-AI
 status: CANONICAL_DERIVED
-priority: P0
-priority_level: CRITICAL
+priority: P1
+priority_level: HIGH
 sources: [../source-materials/BÀI KIỂM TRA.png, ../source-materials/DỰ ÁN.png, ../project.md]
 last_reviewed: 2026-08-18
 ---

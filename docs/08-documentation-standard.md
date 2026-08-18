@@ -2,6 +2,8 @@
 document_id: AIA331-DOC-08
 document_type: documentation-standard
 project_id: AIA331-80300-MARKETING-AI
+priority: P2
+priority_level: MEDIUM
 status: DERIVED
 last_reviewed: 2026-08-18
 ---

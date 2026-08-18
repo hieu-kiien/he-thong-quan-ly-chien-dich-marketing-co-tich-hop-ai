@@ -2,8 +2,8 @@
 document_id: AIA331-DOCS-README
 document_type: documentation-index
 project_id: AIA331-80300-MARKETING-AI
-priority: P0
-priority_level: CRITICAL
+priority: P1
+priority_level: HIGH
 status: CANONICAL
 language: vi
 last_reviewed: 2026-08-18
@@ -27,6 +27,7 @@ last_reviewed: 2026-08-18
 | Chuẩn Word/PDF/bìa? | [`08-documentation-standard.md`](08-documentation-standard.md) |
 | Nguồn nào đáng tin? | [`99-source-register.md`](99-source-register.md) |
 | 10 tiêu chí bài kiểm tra? | [`09-assessment-checklist.md`](09-assessment-checklist.md) |
+| Cấp ưu tiên và cấu trúc repo? | [`10-priority-policy.md`](10-priority-policy.md) |
 
 ## Trạng thái
 
@@ -38,7 +39,7 @@ chưa triển khai; `OPEN` = cần quyết định; `REFERENCE` = tham khảo;
 ## Quy tắc trả lời cho AI
 
 Luôn xác định `project_id` trước khi trả lời. Ưu tiên hai ảnh P0 / CRITICAL trong
-`source-materials/`, rồi `project.md` và nhóm `docs/`, sau đó code/test. Khi chưa
-có bằng chứng, dùng “chưa được chứng minh”;
+`source-materials/`, rồi nhóm P1 và P2 theo [`10-priority-policy.md`](10-priority-policy.md),
+sau đó mới tra cứu tài liệu `LEGACY`. Khi chưa có bằng chứng, dùng “chưa được chứng minh”;
 không biến mục tiêu hoặc prompt mẫu thành kết quả đã đạt. Các tệp bán hàng cũ
 không thuộc corpus canonical.

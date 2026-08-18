@@ -4,13 +4,15 @@
 - Đọc `AGENTS.md`, `project.md`, `docs/README.md` trước khi sửa.
 - Baseline code: `marketing_management/`; legacy sales không được dùng làm
   yêu cầu hoặc bằng chứng marketing.
+- Chỉ hai ảnh trong `source-materials/` là `P0 / CRITICAL`; xem
+  `docs/10-priority-policy.md` để biết các mức P1/P2/P3.
 - Khi sửa logic, chạy test; khi tuyên bố hoàn thành phải có bằng chứng lệnh chạy.
 - AI output phải qua kiểm tra và human approval; không commit secret.
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai** (1613 symbols, 1957 relationships, 31 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai** (1620 symbols, 1966 relationships, 31 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

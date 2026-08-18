@@ -2,6 +2,8 @@
 document_id: AIA331-DOC-03
 document_type: business-flows
 project_id: AIA331-80300-MARKETING-AI
+priority: P1
+priority_level: HIGH
 status: DERIVED
 last_reviewed: 2026-08-18
 ---

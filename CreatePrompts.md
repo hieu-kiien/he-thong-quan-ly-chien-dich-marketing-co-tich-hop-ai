@@ -1,6 +1,8 @@
 ---
 document_id: AIA331-PROMPT-GUIDE
 project_id: AIA331-80300-MARKETING-AI
+priority: P2
+priority_level: MEDIUM
 status: CANONICAL_DERIVED
 ---
 

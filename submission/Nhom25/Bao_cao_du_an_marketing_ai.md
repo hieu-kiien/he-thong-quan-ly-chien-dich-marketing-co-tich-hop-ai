@@ -5,8 +5,8 @@ project_id: AIA331-80300-MARKETING-AI
 project_title: Hệ thống quản lý chiến dịch marketing có tích hợp AI
 course: Ứng dụng trí tuệ nhân tạo - AIA331
 assignment_code: "80300"
-priority: P0
-priority_level: CRITICAL
+priority: P1
+priority_level: HIGH
 status: SUBMISSION_CANONICAL
 version: 1.0
 authors: [Nguyễn Hải Đăng, Vũ Hiếu Kiên]
@@ -26,7 +26,7 @@ last_reviewed: 2026-08-18
 **Khoa:** Công nghệ thông tin
 **Trường:** Trường Đại học Công nghệ Thông tin và Truyền thông Thái Nguyên
 **Thành viên:** Nguyễn Hải Đăng (`dtc2451200051`); Vũ Hiếu Kiên (`dtc245200244`)
-**Cấp ưu tiên hồ sơ:** P0 / CRITICAL — hai ảnh nguồn có authority cao nhất
+**Cấp ưu tiên hồ sơ:** P1 / HIGH — hồ sơ phải bám hai nguồn P0 / CRITICAL
 
 > Tài liệu này đối chiếu hai nguồn P0 / CRITICAL: `source-materials/BÀI KIỂM TRA.png`
 > (10 tiêu chí đánh giá) và `source-materials/DỰ ÁN.png` (đề tài chính thức).

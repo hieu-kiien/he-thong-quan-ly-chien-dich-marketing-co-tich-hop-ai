@@ -360,7 +360,7 @@ def add_cover(document):
         ("Sinh viên", "Nguyễn Hải Đăng; Vũ Hiếu Kiên"),
         ("Mã sinh viên", "dtc2451200051; dtc245200244"),
         ("Lớp", "CNTTK23C"),
-        ("Cấp ưu tiên", "P0 / CRITICAL — hai ảnh nguồn authority cao nhất"),
+        ("Cấp ưu tiên", "P1 / HIGH — hồ sơ bám hai nguồn P0 / CRITICAL"),
     ]
     for row, (label, value) in zip(table.rows, metadata):
         for cell in row.cells:

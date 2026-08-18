@@ -3,8 +3,8 @@ document_id: AIA331-README
 document_type: project-index
 project_id: AIA331-80300-MARKETING-AI
 project_title: Hệ thống quản lý chiến dịch marketing có tích hợp AI
-priority: P0
-priority_level: CRITICAL
+priority: P1
+priority_level: HIGH
 status: CANONICAL
 language: vi
 last_reviewed: 2026-08-18
@@ -21,6 +21,10 @@ Hai ảnh `source-materials/BÀI KIỂM TRA.png` và
 **80300**, hình thức **Dự án**. Repo này dùng chúng làm source-of-truth; không
 trộn với dự án quản lý bán hàng trước đó.
 
+Phân cấp đầy đủ được ghi tại [`docs/10-priority-policy.md`](docs/10-priority-policy.md):
+chỉ hai ảnh là P0; hồ sơ, checklist, baseline và test là P1; tài liệu hỗ trợ và
+prompt là P2; các dự án bán hàng cũ là LEGACY.
+
 ## Đọc nhanh
 
 1. Đọc [`project.md`](project.md) để biết yêu cầu gốc và ID yêu cầu.
@@ -30,6 +34,7 @@ trộn với dự án quản lý bán hàng trước đó.
 4. Đối chiếu code và trạng thái trong [`docs/02-architecture-and-code-status.md`](docs/02-architecture-and-code-status.md).
 5. Xem AI contract/prompt tại [`docs/04-ai-specification.md`](docs/04-ai-specification.md).
 6. Xem hồ sơ nộp tại [`submission/Nhom25/README_NHOM25.md`](submission/Nhom25/README_NHOM25.md).
+7. Xem cấp ưu tiên và bản đồ thư mục tại [`docs/10-priority-policy.md`](docs/10-priority-policy.md).
 
 ## Chạy baseline
 
@@ -64,6 +69,8 @@ provider ngoài chỉ qua `.env` theo `marketing_management/.env.example`.
 | `marketing_management/` | Baseline Django marketing, `IMPLEMENTED_BASELINE` |
 | `prompts/` | Prompt/minh chứng theo đề tài marketing |
 | `submission/Nhom25/` | Hồ sơ nộp được sinh từ nguồn canonical |
+| `source-materials/` | Hai nguồn P0 / CRITICAL, không chỉnh nội dung |
+| `Slide_PDF/` và các file học tập ở root | Tài liệu tham khảo, không phải source-of-truth |
 | `submission/legacy-sales/`, `Code QLBH/`, `sales_management/` và các nhánh bán hàng cũ | `LEGACY`, không phải source của đề tài |
 
 ## Quy tắc trạng thái

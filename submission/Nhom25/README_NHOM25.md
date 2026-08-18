@@ -2,8 +2,8 @@
 document_id: AIA331-SUBMISSION-INDEX
 project_id: AIA331-80300-MARKETING-AI
 project_title: Hệ thống quản lý chiến dịch marketing có tích hợp AI
-priority: P0
-priority_level: CRITICAL
+priority: P1
+priority_level: HIGH
 status: SUBMISSION_CANONICAL
 version: 1.0
 last_reviewed: 2026-08-18

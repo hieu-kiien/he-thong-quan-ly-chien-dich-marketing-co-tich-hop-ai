@@ -2,6 +2,8 @@
 document_id: AIA331-DOC-02
 document_type: architecture-and-code-status
 project_id: AIA331-80300-MARKETING-AI
+priority: P1
+priority_level: HIGH
 status: DERIVED
 sources: [../marketing_management/README.md, ../marketing_management/campaigns, 01-requirements-summary.md]
 last_reviewed: 2026-08-18

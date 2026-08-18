@@ -5,8 +5,8 @@ project_id: AIA331-80300-MARKETING-AI
 project_title: Hệ thống quản lý chiến dịch marketing có tích hợp AI
 course: Ứng dụng trí tuệ nhân tạo - AIA331
 assignment_code: "80300"
-priority: P0
-priority_level: CRITICAL
+priority: P1
+priority_level: HIGH
 status: DERIVED
 sources: [../source-materials/BÀI KIỂM TRA.png, ../source-materials/DỰ ÁN.png, ../project.md, ../informember.md]
 last_reviewed: 2026-08-18
@@ -22,7 +22,7 @@ last_reviewed: 2026-08-18
 | Học phần | Ứng dụng trí tuệ nhân tạo - AIA331 | CANONICAL |
 | Mã số | 80300 | CANONICAL |
 | Hình thức | Dự án | CANONICAL |
-| Ưu tiên | P0 / CRITICAL | INTERNAL_PRIORITY |
+| Ưu tiên hồ sơ triển khai | P1 / HIGH | INTERNAL_PRIORITY; hai ảnh nguồn là P0 |
 | Nhóm | Nhóm 25 | CANONICAL |
 | Thành viên | Nguyễn Hải Đăng; Vũ Hiếu Kiên | CANONICAL |
 | Lớp/khoa | CNTTK23C / Khoa Công nghệ thông tin | CANONICAL |

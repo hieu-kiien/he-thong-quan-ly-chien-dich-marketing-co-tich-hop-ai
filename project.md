@@ -6,9 +6,9 @@ project_title: Hệ thống quản lý chiến dịch marketing có tích hợp 
 course: Ứng dụng trí tuệ nhân tạo - AIA331
 assignment_code: "80300"
 assignment_type: Dự án
-priority: P0
-priority_level: CRITICAL
-priority_rationale: Hai ảnh nguồn người dùng cung cấp là căn cứ cao nhất cho tiêu chí đánh giá, tên đề tài, phạm vi và hồ sơ nộp.
+priority: P1
+priority_level: HIGH
+priority_rationale: Bản brief biên tập để triển khai; hai ảnh nguồn được giữ ở P0 / CRITICAL làm căn cứ cao nhất.
 status: CANONICAL
 source:
   - source-materials/BÀI KIỂM TRA.png do người dùng cung cấp
@@ -163,7 +163,8 @@ nội dung AI và cách đánh giá kết quả chiến dịch.
 
 ## 10. Cấp ưu tiên của dự án
 
-`P0 / CRITICAL` là metadata quản lý hồ sơ do nhóm đặt theo yêu cầu người dùng:
-hai ảnh nguồn phải được đọc trước và dùng làm căn cứ cao nhất cho tài liệu, mã
-nguồn, RAG và hồ sơ nộp. Cấp ưu tiên không phải là điểm số hay yêu cầu mới của
-giảng viên.
+`P1 / HIGH` là cấp ưu tiên thực hiện của brief và hồ sơ dự án. Chỉ hai ảnh nguồn
+trong `source-materials/` là `P0 / CRITICAL`; chúng phải được đọc trước và dùng
+làm căn cứ cao nhất cho tài liệu, mã nguồn, RAG và hồ sơ nộp. Cấp ưu tiên không
+phải là điểm số hay yêu cầu mới của giảng viên. Xem bảng đầy đủ tại
+`docs/10-priority-policy.md`.

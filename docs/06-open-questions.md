@@ -2,6 +2,8 @@
 document_id: AIA331-DOC-06
 document_type: open-questions
 project_id: AIA331-80300-MARKETING-AI
+priority: P2
+priority_level: MEDIUM
 status: OPEN
 last_reviewed: 2026-08-18
 ---

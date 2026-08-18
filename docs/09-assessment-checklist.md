@@ -2,8 +2,8 @@
 document_id: AIA331-DOC-09
 document_type: assessment-checklist
 project_id: AIA331-80300-MARKETING-AI
-priority: P0
-priority_level: CRITICAL
+priority: P1
+priority_level: HIGH
 status: CANONICAL_DERIVED
 source: ../source-materials/BÀI KIỂM TRA.png
 last_reviewed: 2026-08-18

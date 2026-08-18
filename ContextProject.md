@@ -1,5 +1,7 @@
 # CONTEXT CHUNG — AIA331 MARKETING AI
 
+> Tài liệu dẫn nhập `P2 / MEDIUM`; nguồn P0 là hai ảnh trong `source-materials/`.
+
 Đây là context dùng chung cho việc phân tích và xây dựng **Hệ thống quản lý
 chiến dịch marketing có tích hợp AI** của học phần AIA331, mã 80300.
 

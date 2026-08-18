@@ -9,6 +9,9 @@ và tài liệu bán hàng tồn tại từ phiên bản trước chỉ có tr�
 
 ## Thứ tự ưu tiên nguồn
 
+Chỉ hai ảnh nguồn là `P0 / CRITICAL`; cấp phân chia đầy đủ nằm trong
+`docs/10-priority-policy.md`.
+
 1. `source-materials/BÀI KIỂM TRA.png` — nguồn P0 / CRITICAL về 10 tiêu chí
    đánh giá và nội dung phải hoàn thành.
 2. `source-materials/DỰ ÁN.png` — nguồn P0 / CRITICAL về tên đề tài, học phần,
@@ -58,7 +61,7 @@ riêng; chỉ đánh dấu và loại khỏi manifest canonical.
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai** (1613 symbols, 1957 relationships, 31 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai** (1620 symbols, 1966 relationships, 31 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

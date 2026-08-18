@@ -2,6 +2,8 @@
 document_id: AIA331-DOC-07
 document_type: knowledge-retrieval-guide
 project_id: AIA331-80300-MARKETING-AI
+priority: P2
+priority_level: MEDIUM
 status: DERIVED
 last_reviewed: 2026-08-18
 ---
@@ -10,8 +12,9 @@ last_reviewed: 2026-08-18
 
 ## 1. Corpus canonical
 
-Ưu tiên index P0 / CRITICAL: `source-materials/BÀI KIỂM TRA.png`,
-`source-materials/DỰ ÁN.png`, sau đó `project.md`, `informember.md`,
+Ưu tiên index P0 / CRITICAL trước: `source-materials/BÀI KIỂM TRA.png`,
+`source-materials/DỰ ÁN.png`; sau đó index các tài liệu P1/P2 có truy vết như
+`project.md`, `informember.md`,
 `docs/*.md`, `marketing_management/**/*.py`, prompt và
 `submission/Nhom25/*.md`. Loại khỏi corpus canonical: `.venv`, `.env`, database,
 cache, `.gitnexus`, notebook checkpoint và toàn bộ nội dung bán hàng legacy.
