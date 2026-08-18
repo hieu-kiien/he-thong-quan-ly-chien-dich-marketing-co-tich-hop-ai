@@ -1,0 +1,58 @@
+# GitNexus is the code graph.  Canonical business-document retrieval is handled
+# by tools/rag_index.py and docs/rag-corpus.json, so generated/reference files
+# do not belong in the graph.
+
+# Unrelated legacy sales project.
+Code QLBH/
+sales_management/
+submission/legacy-sales/
+docs/legacy/
+
+# Old sales/prompt exercise folders; the active prompts live in prompts/marketing/.
+prompts/01-Cau-truc-prompt-hieu-qua/
+prompts/02-Zero-Shot-Prompting/
+prompts/03-Few-Shot-Prompting/
+prompts/04-Chain-of-Thought/
+prompts/05-Self-Consistency/
+prompts/06-ReAct/
+prompts/07-RAG/
+prompts/08-Prompt-cho-sinh-ma-nguon/
+prompts/09-Prompt-cho-go-loi/
+prompts/10-Prompt-cho-sinh-kiem-thu/
+prompts/11-Prompt-cho-viet-tai-lieu/
+prompts/12-Prompt-cho-tac-vu-lap-trinh-nang-cao/
+prompts/13-Chu-trinh-quan-ly-prompt/
+prompts/14-Kiem-thu-va-tinh-chinh-prompt/
+prompts/15-Bao-mat-prompt/
+
+# Learning/reference material and notebooks are not application code.
+Slide_PDF/
+*.ipynb
+*.pdf
+func.py
+func1.py
+func2.py
+test_func.py
+test_func2.py
+prompts_code.md
+CreatePrompts.md
+ContextProject.md
+
+# Report-generation helpers create a large, low-value document utility graph.
+tools/build_marketing_report.py
+tools/normalize_submission_docx.py
+tools/render_marketing_diagrams.py
+
+# Binary/generated submission assets are indexed by the document RAG manifest
+# only when they have an explicit canonical text representation.
+docs/
+README.md
+project.md
+informember.md
+source-materials/
+prompts/marketing/
+submission/Nhom25/*.md
+source-materials/*.png
+submission/Nhom25/*.docx
+submission/Nhom25/*.pdf
+submission/Nhom25/diagrams/

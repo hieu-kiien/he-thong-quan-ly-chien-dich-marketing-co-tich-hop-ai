@@ -35,6 +35,8 @@ prompt là P2; các dự án bán hàng cũ là LEGACY.
 5. Xem AI contract/prompt tại [`docs/04-ai-specification.md`](docs/04-ai-specification.md).
 6. Xem hồ sơ nộp tại [`submission/Nhom25/README_NHOM25.md`](submission/Nhom25/README_NHOM25.md).
 7. Xem cấp ưu tiên và bản đồ thư mục tại [`docs/10-priority-policy.md`](docs/10-priority-policy.md).
+8. Dùng [`docs/11-rag-implementation.md`](docs/11-rag-implementation.md) để
+   build/truy hồi corpus tài liệu; dùng GitNexus riêng cho code graph.
 
 ## Chạy baseline
 
@@ -66,6 +68,7 @@ provider ngoài chỉ qua `.env` theo `marketing_management/.env.example`.
 |---|---|
 | `project.md` | Yêu cầu gốc, `CANONICAL` |
 | `docs/` | Tài liệu đã chuẩn hóa cho AI/người đọc |
+| `docs/rag-corpus.json` và `tools/rag_index.py` | Manifest + RAG local có citation; database `.rag/` sinh lại được |
 | `marketing_management/` | Baseline Django marketing, `IMPLEMENTED_BASELINE` |
 | `prompts/` | Prompt/minh chứng theo đề tài marketing |
 | `submission/Nhom25/` | Hồ sơ nộp được sinh từ nguồn canonical |

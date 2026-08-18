@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "project_id": "AIA331-80300-MARKETING-AI",
+  "project_title": "Hệ thống quản lý chiến dịch marketing có tích hợp AI",
+  "last_reviewed": "2026-08-18",
+  "authority_assets": [
+    {
+      "source_id": "SRC-000",
+      "document_id": "AIA331-ASSESSMENT-SOURCE",
+      "path": "source-materials/BÀI KIỂM TRA.png",
+      "priority": "P0",
+      "priority_level": "CRITICAL",
+      "status": "CANONICAL",
+      "description": "Ảnh chứa 10 tiêu chí đánh giá bài kiểm tra."
+    },
+    {
+      "source_id": "SRC-001",
+      "document_id": "AIA331-PROJECT-SOURCE",
+      "path": "source-materials/DỰ ÁN.png",
+      "priority": "P0",
+      "priority_level": "CRITICAL",
+      "status": "CANONICAL",
+      "description": "Ảnh chứa tên đề tài, học phần, mã số và yêu cầu dự án."
+    }
+  ],
+  "sources": [
+    {
+      "source_id": "DOC-PROJECT",
+      "path": "project.md",
+      "priority": "P1",
+      "priority_level": "HIGH",
+      "status": "CANONICAL",
+      "authority_source_id": "SRC-001",
+      "front_matter": true
+    },
+    {
+      "source_id": "DOC-TEAM",
+      "path": "informember.md",
+      "priority": "P1",
+      "priority_level": "HIGH",
+      "status": "CANONICAL",
+      "front_matter": true
+    },
+    {
+      "source_id": "DOC-README",
+      "path": "README.md",
+      "priority": "P1",
+      "priority_level": "HIGH",
+      "status": "CANONICAL",
+      "front_matter": true
+    },
+    {
+      "source_id": "DOC-ASSESSMENT",
+      "path": "docs/09-assessment-checklist.md",
+      "priority": "P1",
+      "priority_level": "HIGH",
+      "status": "CANONICAL_DERIVED",
+      "authority_source_id": "SRC-000",
+      "front_matter": true
+    },
+    {
+      "source_id": "DOCS-CANONICAL",
+      "glob": "docs/*.md",
+      "priority": "P1",
+      "priority_level": "HIGH",
+      "status": "CANONICAL_DERIVED",
+      "front_matter": true
+    },
+    {
+      "source_id": "CODE-MARKETING-PY",
+      "glob": "marketing_management/**/*.py",
+      "priority": "P1",
+      "priority_level": "HIGH",
+      "status": "IMPLEMENTED_BASELINE",
+      "front_matter": true
+    },
+    {
+      "source_id": "CODE-MARKETING-TEMPLATES",
+      "glob": "marketing_management/**/*.html",
+      "priority": "P1",
+      "priority_level": "HIGH",
+      "status": "IMPLEMENTED_BASELINE",
+      "front_matter": true
+    },
+    {
+      "source_id": "CODE-MARKETING-README",
+      "path": "marketing_management/README.md",
+      "priority": "P1",
+      "priority_level": "HIGH",
+      "status": "IMPLEMENTED_BASELINE",
+      "front_matter": true
+    },
+    {
+      "source_id": "CODE-MARKETING-REQUIREMENTS",
+      "path": "marketing_management/requirements.txt",
+      "priority": "P1",
+      "priority_level": "HIGH",
+      "status": "IMPLEMENTED_BASELINE",
+      "front_matter": false
+    },
+    {
+      "source_id": "PROMPTS-MARKETING",
+      "glob": "prompts/marketing/**/*.md",
+      "priority": "P2",
+      "priority_level": "MEDIUM",
+      "status": "DERIVED",
+      "front_matter": true
+    },
+    {
+      "source_id": "SUBMISSION-INDEX",
+      "path": "submission/Nhom25/README_NHOM25.md",
+      "priority": "P1",
+      "priority_level": "HIGH",
+      "status": "SUBMISSION_CANONICAL",
+      "front_matter": true
+    },
+    {
+      "source_id": "SUBMISSION-AI-EVIDENCE",
+      "path": "submission/Nhom25/Phu_luc_minh_chung_AI.md",
+      "priority": "P1",
+      "priority_level": "HIGH",
+      "status": "SUBMISSION_CANONICAL",
+      "front_matter": true
+    }
+  ],
+  "excluded_paths": [
+    "Code QLBH/**",
+    "sales_management/**",
+    "submission/legacy-sales/**",
+    "submission/archive/**",
+    "docs/legacy/**",
+    "prompts/01-*",
+    "prompts/02-*",
+    "prompts/03-*",
+    "prompts/04-*",
+    "prompts/05-*",
+    "prompts/06-*",
+    "prompts/07-*",
+    "prompts/08-*",
+    "prompts/09-*",
+    "prompts/10-*",
+    "prompts/11-*",
+    "prompts/12-*",
+    "prompts/13-*",
+    "prompts/14-*",
+    "prompts/15-*",
+    "Slide_PDF/**",
+    "**/.venv/**",
+    "**/.env",
+    "**/*.sqlite3",
+    "**/__pycache__/**",
+    "**/.gitnexus/**",
+    "**/.rag/**",
+    "submission/Nhom25/*.docx",
+    "submission/Nhom25/*.pdf",
+    "submission/Nhom25/diagrams/**"
+  ]
+}

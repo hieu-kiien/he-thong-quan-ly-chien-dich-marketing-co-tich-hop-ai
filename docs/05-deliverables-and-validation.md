@@ -42,6 +42,11 @@ cd marketing_management
 .venv\Scripts\python.exe manage.py check
 .venv\Scripts\python.exe manage.py test campaigns -v 1
 .venv\Scripts\python.exe manage.py migrate --check
+
+cd ..
+python tools/rag_index.py validate
+python tools/rag_index.py build
+python -m unittest tools.test_rag_index -v
 ```
 
 ## 4. Trạng thái bằng chứng hiện tại
@@ -51,3 +56,5 @@ cd marketing_management
 - System check: `IMPLEMENTED_BASELINE` — không có lỗi tại lần kiểm tra gần nhất.
 - Provider ngoài: `PROPOSED/OPTIONAL` — cần key và test tích hợp riêng.
 - Độ chính xác AI: `OPEN` — chưa có bộ chấm định lượng, không được tự ghi điểm.
+- RAG tài liệu: `IMPLEMENTED_BASELINE` — index local có allowlist, citation và
+  test chống legacy; `.rag/` là artifact sinh lại được, không đưa vào ZIP nộp.

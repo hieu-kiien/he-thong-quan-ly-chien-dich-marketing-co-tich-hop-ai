@@ -12,17 +12,16 @@ last_reviewed: 2026-08-18
 
 ## 1. Corpus canonical
 
-Ưu tiên index P0 / CRITICAL trước: `source-materials/BÀI KIỂM TRA.png`,
-`source-materials/DỰ ÁN.png`; sau đó index các tài liệu P1/P2 có truy vết như
-`project.md`, `informember.md`,
-`docs/*.md`, `marketing_management/**/*.py`, prompt và
-`submission/Nhom25/*.md`. Loại khỏi corpus canonical: `.venv`, `.env`, database,
-cache, `.gitnexus`, notebook checkpoint và toàn bộ nội dung bán hàng legacy.
+Ưu tiên kiểm tra P0 / CRITICAL trước: `source-materials/BÀI KIỂM TRA.png`,
+`source-materials/DỰ ÁN.png`; sau đó truy hồi các tài liệu P1/P2 có truy vết.
+Allowlist thực thi nằm trong [`docs/rag-corpus.json`](rag-corpus.json), thay vì
+quét toàn bộ repo. Database sinh ra nằm trong `.rag/` và có thể build lại.
 
 ## 2. GitNexus
 
 GitNexus phù hợp để truy vết symbol, module, execution flow và impact của code.
-Nó không thay thế `project.md` và không phải vector RAG cho tài liệu nghiệp vụ.
+`.gitnexusignore` loại legacy, tài liệu học tập và helper sinh báo cáo khỏi code
+graph. GitNexus không thay thế `project.md` và không phải RAG tài liệu nghiệp vụ.
 Sau khi code đổi, chạy lại analyze/index; trước commit kiểm tra thay đổi symbol
 và flow nếu CLI khả dụng.
 
@@ -32,16 +31,17 @@ Pipeline đề xuất:
 
 ```text
 canonical Markdown + code
-  -> lọc trạng thái/path
-  -> chunk theo heading, giữ document_id/project_id/status
-  -> embedding + vector store local
-  -> retrieve top-k có metadata filter
-  -> câu trả lời có citation file/section
+  -> allowlist theo docs/rag-corpus.json
+  -> chunk theo heading/symbol, giữ document_id/project_id/status/priority
+  -> SQLite FTS5 local + BM25 và boost theo ưu tiên
+  -> retrieve top-k có project/status filter
+  -> câu trả lời có citation file/section/dòng và authority P0
 ```
 
 Metadata tối thiểu: `project_id`, `document_id`, `status`, `source`, `path`,
-`last_reviewed`. Truy hồi không được trộn `LEGACY` với `CANONICAL` nếu câu hỏi
-liên quan yêu cầu chính thức.
+`last_reviewed`, `priority`, `authority_paths`. Truy hồi không được trộn
+`LEGACY` với `CANONICAL` nếu câu hỏi liên quan yêu cầu chính thức. Chi tiết lệnh
+và giới hạn baseline nằm ở [`docs/11-rag-implementation.md`](11-rag-implementation.md).
 
 ## 4. Quy tắc citation
 

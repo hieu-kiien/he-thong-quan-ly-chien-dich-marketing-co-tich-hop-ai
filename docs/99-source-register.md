@@ -21,6 +21,7 @@ last_reviewed: 2026-08-18
 | SRC-006 | `Slide_PDF/`, PDF/notebook học tập | P2/P3 | tài liệu tham khảo, không override nguồn canonical |
 | SRC-007 | Google Classroom screenshots/user notes | REFERENCE_TO_CANONICAL | quy cách thư mục ZIP, mốc nộp |
 | SRC-008 | `Code QLBH/`, `sales_management/`, báo cáo bán hàng | LEGACY | lịch sử; không dùng làm yêu cầu marketing |
+| SRC-009 | `docs/rag-corpus.json`, `tools/rag_index.py`, `tools/test_rag_index.py` | P1 / HIGH | manifest, truy hồi có citation và kiểm thử chống nhiễm legacy |
 
 ## Quy tắc nguồn
 

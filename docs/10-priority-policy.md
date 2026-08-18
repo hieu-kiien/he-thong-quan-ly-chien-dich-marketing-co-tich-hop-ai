@@ -22,7 +22,7 @@ một yêu cầu mới của giảng viên.
 | Mức | Ý nghĩa | Phạm vi hiện tại | Cách xử lý |
 |---|---|---|---|
 | `P0 / CRITICAL` | Nguồn ràng buộc cao nhất | `source-materials/BÀI KIỂM TRA.png`; `source-materials/DỰ ÁN.png` | Đọc trước; không chỉnh nội dung; dùng để phân xử xung đột |
-| `P1 / HIGH` | Phải hoàn thành/đối chiếu để làm và nộp bài | `project.md`, `informember.md`, `docs/00`–`docs/05`, `docs/09`, `docs/99`, code baseline, tests, `submission/Nhom25/` | Ưu tiên triển khai, kiểm thử và kiểm tra hồ sơ |
+| `P1 / HIGH` | Phải hoàn thành/đối chiếu để làm và nộp bài | `project.md`, `informember.md`, `docs/00`–`docs/05`, `docs/09`, `docs/11`, `docs/99`, code baseline, tests, RAG manifest/tool, `submission/Nhom25/` | Ưu tiên triển khai, kiểm thử và kiểm tra hồ sơ |
 | `P2 / MEDIUM` | Tài liệu hỗ trợ thực hiện | `docs/06`–`docs/08`, guides, prompts, slide học tập | Dùng để thiết kế/tra cứu; không được override P0/P1 |
 | `P3 / LOW` | Tài liệu tham khảo không ảnh hưởng phạm vi hiện tại | bài tập thử nghiệm, notebook, PDF tham khảo không thuộc đề tài | Chỉ mở khi cần; không đưa vào source-of-truth |
 | `LEGACY` | Lịch sử của đề tài khác | `Code QLBH/`, `sales_management/`, báo cáo bán hàng cũ, `docs/legacy/` | Giữ nguyên để bảo toàn lịch sử; loại khỏi truy hồi canonical |
@@ -61,4 +61,6 @@ một yêu cầu mới của giảng viên.
   `docs/05-deliverables-and-validation.md`.
 - Xác định code đã chạy được đến đâu: đọc `docs/02-architecture-and-code-status.md`,
   sau đó kiểm tra `marketing_management/` và tests.
+- Tra cứu tài liệu có citation: chạy `python tools/rag_index.py validate`, rồi
+  `build` và `search`; không dùng database `.rag/` làm file nộp.
 - Không dùng thư mục `LEGACY` để suy ra yêu cầu marketing.
