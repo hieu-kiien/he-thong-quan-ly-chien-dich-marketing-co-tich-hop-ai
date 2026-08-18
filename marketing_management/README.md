@@ -1,7 +1,8 @@
 ---
 project_id: AIA331-80300-MARKETING-AI
 project_title: Hệ thống quản lý chiến dịch marketing có tích hợp AI
-priority: P1
+priority: P0
+priority_level: CRITICAL
 status: IMPLEMENTED_BASELINE
 ---
 
