@@ -2,7 +2,8 @@
 document_id: AIA331-DOC-05
 document_type: deliverables-and-validation
 project_id: AIA331-80300-MARKETING-AI
-priority: P1
+priority: P0
+priority_level: CRITICAL
 status: DERIVED
 last_reviewed: 2026-08-18
 ---
@@ -22,6 +23,8 @@ Gói chuẩn của nhóm gồm:
 4. Phụ lục prompt và minh chứng dùng AI.
 5. Sơ đồ use case, ERD, kiến trúc.
 6. Mã nguồn baseline và `.env.example` (không có `.env`, database, cache).
+7. Hai ảnh nguồn P0 / CRITICAL: `source-materials/BÀI KIỂM TRA.png` và
+   `source-materials/DỰ ÁN.png`.
 
 ## 2. Cổng chất lượng
 

@@ -5,10 +5,10 @@ project_id: AIA331-80300-MARKETING-AI
 project_title: Hệ thống quản lý chiến dịch marketing có tích hợp AI
 course: Ứng dụng trí tuệ nhân tạo - AIA331
 assignment_code: "80300"
-priority: P1
-priority_level: HIGH
+priority: P0
+priority_level: CRITICAL
 status: DERIVED
-sources: [../project.md, ../informember.md, ../source-materials/DỰ ÁN.png]
+sources: [../source-materials/BÀI KIỂM TRA.png, ../source-materials/DỰ ÁN.png, ../project.md, ../informember.md]
 last_reviewed: 2026-08-18
 ---
 
@@ -22,7 +22,7 @@ last_reviewed: 2026-08-18
 | Học phần | Ứng dụng trí tuệ nhân tạo - AIA331 | CANONICAL |
 | Mã số | 80300 | CANONICAL |
 | Hình thức | Dự án | CANONICAL |
-| Ưu tiên | P1 / HIGH | INTERNAL_PRIORITY |
+| Ưu tiên | P0 / CRITICAL | INTERNAL_PRIORITY |
 | Nhóm | Nhóm 25 | CANONICAL |
 | Thành viên | Nguyễn Hải Đăng; Vũ Hiếu Kiên | CANONICAL |
 | Lớp/khoa | CNTTK23C / Khoa Công nghệ thông tin | CANONICAL |
@@ -48,3 +48,9 @@ kiểm tra được.
 `marketing_management/` là baseline canonical. Các thư mục `Code QLBH/`,
 `sales_management/`, báo cáo bán hàng và `QLBH demo/` là `LEGACY`, giữ lại để
 không mất lịch sử nhưng không được dùng để chứng minh đề tài marketing.
+
+## 5. Nguồn P0 / CRITICAL
+
+`source-materials/BÀI KIỂM TRA.png` là checklist 10 tiêu chí đánh giá;
+`source-materials/DỰ ÁN.png` là đề bài chính thức. Hai ảnh phải được ưu tiên
+trước tài liệu diễn giải, code và prompt khi có xung đột.

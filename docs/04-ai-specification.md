@@ -2,7 +2,8 @@
 document_id: AIA331-DOC-04
 document_type: ai-specification
 project_id: AIA331-80300-MARKETING-AI
-priority: P1
+priority: P0
+priority_level: CRITICAL
 status: DERIVED
 last_reviewed: 2026-08-18
 ---

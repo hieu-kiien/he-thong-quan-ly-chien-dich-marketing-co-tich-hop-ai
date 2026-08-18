@@ -10,10 +10,11 @@ last_reviewed: 2026-08-18
 
 ## 1. Corpus canonical
 
-Ưu tiên index: `project.md`, `informember.md`, `docs/*.md`,
-`marketing_management/**/*.py`, prompt và `submission/Nhom25/*.md`. Loại khỏi
-corpus canonical: `.venv`, `.env`, database, cache, `.gitnexus`, notebook
-checkpoint và toàn bộ nội dung bán hàng legacy.
+Ưu tiên index P0 / CRITICAL: `source-materials/BÀI KIỂM TRA.png`,
+`source-materials/DỰ ÁN.png`, sau đó `project.md`, `informember.md`,
+`docs/*.md`, `marketing_management/**/*.py`, prompt và
+`submission/Nhom25/*.md`. Loại khỏi corpus canonical: `.venv`, `.env`, database,
+cache, `.gitnexus`, notebook checkpoint và toàn bộ nội dung bán hàng legacy.
 
 ## 2. GitNexus
 

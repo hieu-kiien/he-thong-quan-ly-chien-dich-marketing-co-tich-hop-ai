@@ -6,11 +6,13 @@ project_title: Hệ thống quản lý chiến dịch marketing có tích hợp 
 course: Ứng dụng trí tuệ nhân tạo - AIA331
 assignment_code: "80300"
 assignment_type: Dự án
-priority: P1
-priority_level: HIGH
-priority_rationale: Hồ sơ chính thức của đề tài AIA331, cần ưu tiên cao nhất cho phân tích, triển khai và nộp bài.
+priority: P0
+priority_level: CRITICAL
+priority_rationale: Hai ảnh nguồn người dùng cung cấp là căn cứ cao nhất cho tiêu chí đánh giá, tên đề tài, phạm vi và hồ sơ nộp.
 status: CANONICAL
-source: source-materials/DỰ ÁN.png do người dùng cung cấp
+source:
+  - source-materials/BÀI KIỂM TRA.png do người dùng cung cấp
+  - source-materials/DỰ ÁN.png do người dùng cung cấp
 language: vi
 last_reviewed: 2026-08-18
 ---
@@ -19,7 +21,19 @@ last_reviewed: 2026-08-18
 
 Đây là bản yêu cầu gốc của dự án môn **Ứng dụng trí tuệ nhân tạo - AIA331**,
 mã số **80300**, hình thức **Dự án**. Tên đề tài chính thức được lấy nguyên
-nghĩa từ ảnh `DỰ ÁN.png`; không được thay bằng đề tài quản lý bán hàng.
+nghĩa từ ảnh `DỰ ÁN.png`; không được thay bằng đề tài quản lý bán hàng. Mười
+tiêu chí đánh giá trong ảnh `BÀI KIỂM TRA.png` là checklist P0 / CRITICAL cho
+phân tích, thiết kế, minh chứng và hồ sơ nộp.
+
+## 0. Hai nguồn ưu tiên P0 / CRITICAL
+
+| Nguồn | Vai trò | Cách xử lý |
+|---|---|---|
+| `source-materials/BÀI KIỂM TRA.png` | 10 tiêu chí đánh giá bài kiểm tra | Đối chiếu với `docs/09-assessment-checklist.md` trước khi kết luận hồ sơ đủ |
+| `source-materials/DỰ ÁN.png` | Tên đề tài, học phần, mã số, mục tiêu, chức năng và yêu cầu kỹ thuật | Làm căn cứ canonical cho phạm vi marketing AI |
+
+Nếu tài liệu khác mâu thuẫn với một trong hai ảnh này, giữ ảnh ở mức authority
+cao nhất và ghi xung đột trong `docs/06-open-questions.md`.
 
 ## 1. Phân tích đúng bài toán quản lý
 
@@ -149,6 +163,7 @@ nội dung AI và cách đánh giá kết quả chiến dịch.
 
 ## 10. Cấp ưu tiên của dự án
 
-`P1 / HIGH` là metadata quản lý hồ sơ do nhóm đặt theo yêu cầu người dùng: đây
-là đề tài chính thức cần dùng làm nguồn duy nhất cho tài liệu, mã nguồn, RAG và
-hồ sơ nộp. Cấp ưu tiên không phải là điểm số hay yêu cầu mới của giảng viên.
+`P0 / CRITICAL` là metadata quản lý hồ sơ do nhóm đặt theo yêu cầu người dùng:
+hai ảnh nguồn phải được đọc trước và dùng làm căn cứ cao nhất cho tài liệu, mã
+nguồn, RAG và hồ sơ nộp. Cấp ưu tiên không phải là điểm số hay yêu cầu mới của
+giảng viên.

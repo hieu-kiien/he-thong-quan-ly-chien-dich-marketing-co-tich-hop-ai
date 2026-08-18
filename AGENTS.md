@@ -9,11 +9,15 @@ và tài liệu bán hàng tồn tại từ phiên bản trước chỉ có tr�
 
 ## Thứ tự ưu tiên nguồn
 
-1. `project.md` và `informember.md`.
-2. `DỰ ÁN.png`/bản sao trong `source-materials/` do người dùng cung cấp.
-3. Mã nguồn `marketing_management/` và test tương ứng.
-4. Tài liệu trong `docs/`, prompt và báo cáo sinh từ các nguồn trên.
-5. Tài liệu học tập/tham khảo bên ngoài — chỉ dùng `REFERENCE`.
+1. `source-materials/BÀI KIỂM TRA.png` — nguồn P0 / CRITICAL về 10 tiêu chí
+   đánh giá và nội dung phải hoàn thành.
+2. `source-materials/DỰ ÁN.png` — nguồn P0 / CRITICAL về tên đề tài, học phần,
+   mã số và yêu cầu nghiệp vụ.
+3. `project.md`, `informember.md` và `docs/09-assessment-checklist.md` — bản
+   chép/biên tập có truy vết từ hai ảnh nguồn.
+4. Mã nguồn `marketing_management/` và test tương ứng.
+5. Tài liệu trong `docs/`, prompt và báo cáo sinh từ các nguồn trên.
+6. Tài liệu học tập/tham khảo bên ngoài — chỉ dùng `REFERENCE`.
 
 Nếu có xung đột, ưu tiên đề bài ảnh và ghi rõ trong `docs/06-open-questions.md`;
 không tự hợp nhất hai đề tài.
@@ -54,7 +58,7 @@ riêng; chỉ đánh dấu và loại khỏi manifest canonical.
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai** (1602 symbols, 1946 relationships, 31 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai** (1613 symbols, 1957 relationships, 31 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

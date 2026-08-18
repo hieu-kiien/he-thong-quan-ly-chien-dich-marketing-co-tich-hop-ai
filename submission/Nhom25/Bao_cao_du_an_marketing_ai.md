@@ -5,7 +5,8 @@ project_id: AIA331-80300-MARKETING-AI
 project_title: Hệ thống quản lý chiến dịch marketing có tích hợp AI
 course: Ứng dụng trí tuệ nhân tạo - AIA331
 assignment_code: "80300"
-priority: P1
+priority: P0
+priority_level: CRITICAL
 status: SUBMISSION_CANONICAL
 version: 1.0
 authors: [Nguyễn Hải Đăng, Vũ Hiếu Kiên]
@@ -25,9 +26,10 @@ last_reviewed: 2026-08-18
 **Khoa:** Công nghệ thông tin
 **Trường:** Trường Đại học Công nghệ Thông tin và Truyền thông Thái Nguyên
 **Thành viên:** Nguyễn Hải Đăng (`dtc2451200051`); Vũ Hiếu Kiên (`dtc245200244`)
-**Cấp ưu tiên hồ sơ:** P1 / HIGH — metadata quản lý nội bộ của nhóm
+**Cấp ưu tiên hồ sơ:** P0 / CRITICAL — hai ảnh nguồn có authority cao nhất
 
-> Tài liệu này là báo cáo phân tích và thiết kế theo đề bài `source-materials/DỰ ÁN.png`.
+> Tài liệu này đối chiếu hai nguồn P0 / CRITICAL: `source-materials/BÀI KIỂM TRA.png`
+> (10 tiêu chí đánh giá) và `source-materials/DỰ ÁN.png` (đề tài chính thức).
 > Nội dung chưa có code/test được đánh dấu `PROPOSED` hoặc `OPEN`, không trình bày
 > như kết quả đã nghiệm thu.
 
@@ -52,7 +54,8 @@ phần mở rộng `PROPOSED`.
 
 | ID | Nguồn | Trạng thái | Vai trò |
 |---|---|---|---|
-| SRC-001 | `source-materials/DỰ ÁN.png` | CANONICAL | Đề tài, học phần, mã và yêu cầu |
+| SRC-000 | `source-materials/BÀI KIỂM TRA.png` | CANONICAL | P0 / CRITICAL — 10 tiêu chí đánh giá |
+| SRC-001 | `source-materials/DỰ ÁN.png` | CANONICAL | P0 / CRITICAL — đề tài, học phần, mã và yêu cầu |
 | SRC-002 | `project.md` | CANONICAL | Bản yêu cầu có ID truy vết |
 | SRC-003 | `informember.md` | CANONICAL | Thành viên, lớp, khoa, trường |
 | SRC-004 | `marketing_management/` | IMPLEMENTED_BASELINE | Mã nguồn baseline |

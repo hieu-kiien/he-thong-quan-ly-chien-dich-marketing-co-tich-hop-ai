@@ -3,8 +3,8 @@ document_id: AIA331-README
 document_type: project-index
 project_id: AIA331-80300-MARKETING-AI
 project_title: Hệ thống quản lý chiến dịch marketing có tích hợp AI
-priority: P1
-priority_level: HIGH
+priority: P0
+priority_level: CRITICAL
 status: CANONICAL
 language: vi
 last_reviewed: 2026-08-18
@@ -14,9 +14,12 @@ last_reviewed: 2026-08-18
 
 ## Hệ thống quản lý chiến dịch marketing có tích hợp AI
 
-Đây là đề tài chính thức trong ảnh `DỰ ÁN.png` của học phần **Ứng dụng trí tuệ
-nhân tạo - AIA331**, mã **80300**, hình thức **Dự án**. Repo này dùng tên đề tài
-này làm source-of-truth; không trộn với dự án quản lý bán hàng trước đó.
+Hai ảnh `source-materials/BÀI KIỂM TRA.png` và
+`source-materials/DỰ ÁN.png` là nguồn P0 / CRITICAL do người dùng cung cấp.
+Ảnh **BÀI KIỂM TRA** quy định 10 tiêu chí đánh giá; ảnh **DỰ ÁN** quy định tên
+đề tài chính thức của học phần **Ứng dụng trí tuệ nhân tạo - AIA331**, mã
+**80300**, hình thức **Dự án**. Repo này dùng chúng làm source-of-truth; không
+trộn với dự án quản lý bán hàng trước đó.
 
 ## Đọc nhanh
 
