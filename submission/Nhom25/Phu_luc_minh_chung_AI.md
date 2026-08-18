@@ -1,3 +1,12 @@
+---
+document_id: BAI03-SUBMISSION-APP-A
+document_type: evidence-appendix
+project_id: BAI03-SALES-AI
+status: DERIVED
+last_reviewed: 2026-08-18
+source_of_truth: false
+---
+
 # Phụ lục A — Minh chứng sử dụng AI và kiểm chứng
 
 Phụ lục này phân biệt bằng chứng nguồn, artifact cục bộ, template prompt và phản hồi provider. Nhóm không chèn câu trả lời LLM giả lập vào bài. Các JSON/Markdown trong mục 8 của báo cáo là hợp đồng thiết kế minh họa, không phải API response đã thu được.

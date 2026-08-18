@@ -8,7 +8,7 @@ sources:
   - ../project.md
   - ../../../Bai 02/CacGiaiDoanThucHien/01_GenAI_SoftwareDevelopment_project-plan.docx
   - 01-requirements-summary.md
-last_reviewed: 2026-08-17
+last_reviewed: 2026-08-18
 ---
 
 # Sản phẩm bàn giao và cổng kiểm chứng
@@ -81,3 +81,18 @@ evidence/
 
 Thư mục trên là đề xuất; không tạo file bằng chứng giả. Mỗi bằng chứng nên ghi
 ngày, commit/version, lệnh chạy, kết quả và người kiểm tra.
+
+## 5. Chuẩn hồ sơ tài liệu
+
+Áp dụng [`08-documentation-standard.md`](08-documentation-standard.md) cho
+mọi bản nộp BAI03:
+
+- DOCX/PDF là lớp trình bày cho giảng viên; Markdown/YAML là lớp canonical cho
+  Git, AI và RAG.
+- Báo cáo phân tích và thiết kế dùng một bìa, mục lục tự động, phần nội dung
+  chính khoảng 25–40 trang và phụ lục cho prompt/bằng chứng dài.
+- Khi không có mẫu riêng của giảng viên, dùng baseline A4, Times New Roman
+  13 pt, lề trái 3,5 cm/phải 2 cm/trên-dưới 2,5 cm, Multiple 1,3 và Before/
+  After 6 pt.
+- Không coi mục tiêu, prompt template, model-only, schema-only hoặc
+  `PROPOSED/OPEN` là kết quả nghiệm thu.

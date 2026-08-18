@@ -4,7 +4,7 @@ document_type: source-register
 project_id: BAI03-SALES-AI
 status: CANONICAL
 language: vi
-last_reviewed: 2026-08-17
+last_reviewed: 2026-08-18
 ---
 
 # Sổ đăng ký nguồn tài liệu và mã nguồn
@@ -25,6 +25,7 @@ dùng nguồn, không phải đánh giá chất lượng tuyệt đối.
 | SRC-007 | [`docs/`](.) | Curated documentation layer | `DERIVED` | Tra cứu có ID, trạng thái và ma trận đối chiếu |
 | SRC-008 | [`sales_management/apps/knowledge/`](<../sales_management/apps/knowledge/>) | Document retrieval app | `IMPLEMENTED` | Index tài liệu có metadata, embedding và context trích dẫn |
 | SRC-009 | [`docs/07-knowledge-retrieval.md`](07-knowledge-retrieval.md) | RAG operating contract | `DERIVED` | Cách index, truy vấn và giới hạn của lớp truy hồi |
+| SRC-025 | [`docs/08-documentation-standard.md`](08-documentation-standard.md) | Project documentation policy | `CANONICAL` | Quy tắc hai tầng submission/knowledge, source-of-truth, bìa, Word baseline và checklist |
 
 ## Nguồn cùng miền nhưng cũ hơn hoặc chỉ là đầu vào
 
@@ -55,6 +56,8 @@ dùng nguồn, không phải đánh giá chất lượng tuyệt đối.
 | SRC-022 | [`Slide_PDF/`](<../../../Slide_PDF/>) | `REFERENCE` | Tài liệu bài giảng AI, không phải đặc tả sản phẩm |
 | SRC-023 | [`Bài giảng DJANGO.docx`](<../../../Bài giảng DJANGO.docx>) | `REFERENCE` | Tài liệu học Django |
 | SRC-024 | [`legacy-prime-number-utilities.md`](legacy-prime-number-utilities.md) | `LEGACY` | README cũ không liên quan, đã tách khỏi README dự án |
+| SRC-026 | [Trang mẫu quyển báo cáo của Khoa CNTT](https://fit.ictu.edu.vn/nhiem-vu-cua-gvql-truong-doan-va-mau-quyen-bao-cao/) | `REFERENCE` | Nguồn chính thức cho việc phân biệt mẫu báo cáo thực tập và hướng dẫn đồ án |
+| SRC-027 | [Quyết định 147 và quy trình đồ án/khóa luận](https://fit.ictu.edu.vn/quyet-dinh-so-147-ban-hanh-quy-trinh-thuc-hien-do-an-khoa-luan-tot-nghiep-nam-2025/) | `REFERENCE` | Nguồn chính thức về quy trình đồ án/khóa luận áp dụng từ 02/2025; không áp trực tiếp cho bài kiểm tra môn học |
 
 ## Nguyên tắc loại trừ
 

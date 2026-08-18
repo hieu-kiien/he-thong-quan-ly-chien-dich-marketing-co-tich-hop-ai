@@ -1,8 +1,29 @@
+---
+document_id: BAI03-SUBMISSION-REPORT
+document_type: course-project-analysis-design-report
+project_id: BAI03-SALES-AI
+status: CANONICAL
+authority: group-submission
+language: vi
+version: 1.1
+last_reviewed: 2026-08-18
+source_of_truth: true
+rendered_artifacts:
+  - Bao_cao_phan_tich_thiet_ke_BAI03.docx
+  - Bao_cao_phan_tich_thiet_ke_BAI03.pdf
+---
+
+**ĐẠI HỌC THÁI NGUYÊN**<br>
+**TRƯỜNG ĐẠI HỌC CÔNG NGHỆ THÔNG TIN VÀ TRUYỀN THÔNG**<br>
+**KHOA CÔNG NGHỆ THÔNG TIN**
+
 # BÁO CÁO PHÂN TÍCH VÀ THIẾT KẾ
 
 ## HỆ THỐNG QUẢN LÝ BÁN HÀNG CÓ TÍCH HỢP AI
 
-**Bài kiểm tra thường xuyên 1 — Bài kiểm tra số 01**  
+**Bài kiểm tra thường xuyên 1 — Bài kiểm tra số 01**<br>
+**Học phần:** Ứng dụng AI<br>
+**Giảng viên:** Nguyễn Tuấn Anh<br>
 **Mã dự án:** `BAI03-SALES-AI`  
 **Nhóm:** Nhóm 25  
 **Thành viên:** Nguyễn Hải Đăng (Thành viên); Vũ Hiếu Kiên (Thành viên)  
@@ -10,6 +31,7 @@
 **Lớp:** CNTTK23C  
 **Đơn vị:** Trường Đại học Công nghệ Thông tin và Truyền thông Thái Nguyên — Khoa Công nghệ thông tin  
 **Ngày nộp:** 18/08/2026  
+**Địa điểm/năm:** Thái Nguyên, 2026<br>
 **Trạng thái:** Bản nộp đã kiểm tra chéo; phần chưa triển khai được ghi rõ `PROPOSED/OPEN`.
 
 ---
@@ -65,10 +87,10 @@ Các hình dưới đây là bản dựng trực quan từ Mermaid/source design
 
 *Hình 3. ERD logic của dữ liệu nghiệp vụ; RAG được tách khỏi ledger giao dịch.*
 
-# Bản thảo mục 1–3 — Phân tích và yêu cầu hệ thống
+# Mở đầu và phạm vi báo cáo
 
 **Đề tài:** Hệ thống quản lý bán hàng có tích hợp AI (`BAI03-SALES-AI`)  
-**Phạm vi bản thảo:** mục 1 — phân tích bài toán; mục 2 — yêu cầu chức năng; mục 3 — yêu cầu phi chức năng.  
+**Phạm vi báo cáo:** phân tích bài toán; yêu cầu chức năng; yêu cầu phi chức năng; actor/use case; CSDL; kiến trúc; AI; minh chứng và kế hoạch.
 **Nguyên tắc trạng thái:** nội dung mô tả yêu cầu và thiết kế không được dùng để suy ra rằng mã đã hoàn thành.
 
 > Các đường dẫn trong bản thảo được tính từ thư mục gốc `Bai 03`. Bằng chứng mã hiện trạng chủ yếu là kiểm tra tĩnh; `IMPLEMENTED` dưới đây chỉ có nghĩa là đã thấy mã và/hoặc kiểm thử tương ứng, không mặc nhiên có nghĩa là toàn hệ thống đã nghiệm thu.
@@ -1154,6 +1176,23 @@ Như vậy, phần “AI hỗ trợ phân tích/thiết kế” đã có prompt/
 
 **Kết luận hiện trạng:** RAG/document retrieval đã có mã, index local và test được xác minh. Provider LLM, prompt runtime, câu trả lời end-to-end, đánh giá accuracy/latency và tích hợp AI nghiệp vụ vẫn là `PROPOSED` hoặc `OPEN`; chỉ chuyển sang `IMPLEMENTED` sau khi hoàn tất các cổng `PLAN-002` đến `PLAN-005`.
 
+
+# TÀI LIỆU THAM KHẢO
+
+1. Nhóm 25, project.md — yêu cầu gốc và rubric của BAI03-SALES-AI.
+2. Nhóm 25, informember.md — thông tin nhóm, lớp, trường và khoa.
+3. Nhóm 25, docs/01-requirements-summary.md — ma trận yêu cầu chuẩn hóa.
+4. Nhóm 25, docs/02-architecture-and-code-status.md — đối chiếu kiến trúc và
+   hiện trạng code.
+5. Nhóm 25, docs/03-business-flows.md và docs/04-ai-specification.md — quy trình
+   nghiệp vụ, đặc tả AI và guardrail.
+6. Khoa Công nghệ thông tin ICTU, trang mẫu quyển báo cáo:
+   https://fit.ictu.edu.vn/nhiem-vu-cua-gvql-truong-doan-va-mau-quyen-bao-cao/
+7. Khoa Công nghệ thông tin ICTU, Quyết định 147 và quy trình đồ án/khóa luận:
+   https://fit.ictu.edu.vn/quyet-dinh-so-147-ban-hanh-quy-trinh-thuc-hien-do-an-khoa-luan-tot-nghiep-nam-2025/
+
+Các tài liệu trên được dùng để truy vết nguồn; chúng không biến phần
+PROPOSED/OPEN thành tính năng đã triển khai.
 
 # Phụ lục A — Minh chứng sử dụng AI và kiểm chứng
 

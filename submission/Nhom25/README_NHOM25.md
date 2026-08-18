@@ -1,4 +1,7 @@
-# Nộp bài — Nhóm 25
+# Hồ sơ nộp BAI03 — Nhóm 25
+
+document_id=BAI03-SUBMISSION-INDEX; project_id=BAI03-SALES-AI;
+status=CANONICAL; version=1.1; last_reviewed=2026-08-18.
 
 **Đề tài:** Hệ thống quản lý bán hàng có tích hợp AI  
 **Mã dự án:** `BAI03-SALES-AI`  
@@ -7,6 +10,17 @@
 **Lớp:** CNTTK23C  
 **Trường:** Trường Đại học Công nghệ Thông tin và Truyền thông Thái Nguyên  
 **Khoa:** Công nghệ thông tin
+
+## Quy ước bản nộp
+
+- Đây là hồ sơ của Bài 03, độc lập với Bài 01.
+- Bao_cao_phan_tich_thiet_ke_BAI03.md là nguồn nội dung canonical; DOCX/PDF
+  phải được kiểm tra đồng bộ với cùng version.
+- Báo cáo áp dụng docs/08-documentation-standard.md: bìa một trang, mục lục
+  tự động, nội dung chính gọn, phụ lục cho minh chứng dài và trạng thái
+  PROPOSED/OPEN được giữ nguyên khi chưa có code/test.
+- Thư mục nộp không chứa secret, database local, vector store, cache hoặc
+  .gitnexus/.
 
 ## Danh mục file
 

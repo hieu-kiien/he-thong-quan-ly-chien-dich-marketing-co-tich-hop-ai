@@ -4,7 +4,7 @@ document_type: project-index
 project_id: BAI03-SALES-AI
 status: CANONICAL
 language: vi
-last_reviewed: 2026-08-17
+last_reviewed: 2026-08-18
 ---
 
 # BAI03-SALES-AI — Hệ thống quản lý bán hàng có tích hợp AI
@@ -24,6 +24,8 @@ hoàn thành nếu chưa có bằng chứng trong mã nguồn và kiểm thử.
    [`sales_management/README.md`](<sales_management/README.md>).
 6. Nếu cần index tài liệu và tra cứu có citation, xem
    [`docs/07-knowledge-retrieval.md`](docs/07-knowledge-retrieval.md).
+7. Nếu cần chuẩn hóa Word/PDF, bìa, độ dài và checklist hồ sơ, xem
+   [`docs/08-documentation-standard.md`](docs/08-documentation-standard.md).
 
 ## Cấu trúc chính
 
@@ -48,6 +50,8 @@ hoàn thành nếu chưa có bằng chứng trong mã nguồn và kiểm thử.
   phần lớn route/view/test chưa hoàn chỉnh.
 - Chưa thấy bộ gọi provider AI, prompt runtime hoặc luồng AI chạy trong hai
   nhánh code; `AIEventLog` mới là mô hình ghi nhận sự kiện.
+- Hồ sơ nộp được quản lý theo hai lớp: Markdown/YAML canonical cho tra cứu và
+  DOCX/PDF cho giảng viên; trạng thái và giới hạn phải giống nhau ở cả hai.
 
 Chi tiết và bằng chứng nằm trong
 [`docs/02-architecture-and-code-status.md`](docs/02-architecture-and-code-status.md).

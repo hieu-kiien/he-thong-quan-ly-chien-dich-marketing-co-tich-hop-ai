@@ -4,7 +4,7 @@ document_type: documentation-index
 project_id: BAI03-SALES-AI
 status: CANONICAL
 language: vi
-last_reviewed: 2026-08-17
+last_reviewed: 2026-08-18
 ---
 
 # Chỉ mục tài liệu chuẩn hóa — BAI03-SALES-AI
@@ -26,6 +26,7 @@ phải làm, tính năng đã có, đề xuất thiết kế và tài liệu m�
 | Còn mâu thuẫn hoặc quyết định mở nào? | [`06-open-questions.md`](06-open-questions.md) |
 | Một thông tin đến từ đâu, có đáng tin không? | [`99-source-register.md`](99-source-register.md) |
 | GitNexus và RAG được vận hành thế nào? | [`07-knowledge-retrieval.md`](07-knowledge-retrieval.md) |
+| Chuẩn Word, bìa, độ dài, source-of-truth và hồ sơ nộp? | [`08-documentation-standard.md`](08-documentation-standard.md) |
 | Cần đọc bằng máy theo danh sách nào? | [`manifest.yaml`](manifest.yaml) |
 
 ## Quy ước trạng thái nguồn
@@ -55,4 +56,6 @@ phải làm, tính năng đã có, đề xuất thiết kế và tài liệu m�
 
 Danh mục đầy đủ nằm trong [`99-source-register.md`](99-source-register.md).
 Các file sinh ra, virtual environment, database local và secret bị loại khỏi
-chỉ mục theo [`manifest.yaml`](manifest.yaml).
+chỉ mục theo [`manifest.yaml`](manifest.yaml). Báo cáo nộp dùng DOCX/PDF để
+đọc/in, còn Markdown/YAML trong `docs/` là lớp canonical cho Git và RAG; hai
+lớp này phải trỏ về cùng một version nội dung.

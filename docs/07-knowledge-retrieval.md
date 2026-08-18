@@ -9,6 +9,10 @@ last_reviewed: 2026-08-18
 
 # Kiến trúc GitNexus và Document RAG
 
+Quy ước phân loại tài liệu, source-of-truth và định dạng bản nộp nằm trong
+[08-documentation-standard.md](08-documentation-standard.md). Tài liệu này
+chỉ mô tả vận hành lớp truy hồi.
+
 ## Mục tiêu
 
 `GitNexus` lập bản đồ quan hệ trong mã nguồn để AI truy vết symbol, caller,
