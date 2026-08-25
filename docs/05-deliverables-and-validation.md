@@ -59,9 +59,9 @@ python -m unittest tools.test_rag_eval -v
 
 ## 4. Trạng thái bằng chứng hiện tại
 
-- Test baseline: `IMPLEMENTED_BASELINE` — 21 test cho model, RBAC, CRUD,
-  filter/dashboard, metric entry, approval/rejection, AI fallback và provider
-  contract.
+- Test baseline: `IMPLEMENTED_BASELINE` — 25 test cho model, RBAC, CRUD,
+  filter/dashboard, report theo ngày/kênh, phân trang, metric entry,
+  approval/rejection, AI fallback và provider contract.
 - Bài kiểm tra thường xuyên 2: `IMPLEMENTED_BASELINE` — ma trận đối chiếu chi tiết
   ở `docs/13-bai-2-implementation.md`.
 - System check: `IMPLEMENTED_BASELINE` — không có lỗi tại lần kiểm tra gần nhất.

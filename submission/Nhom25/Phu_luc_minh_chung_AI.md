@@ -37,7 +37,7 @@ Tất cả prompt đều yêu cầu output nháp, nêu thiếu dữ liệu và k
 ## 4. Kết quả kiểm thử
 
 ```text
-Ran 21 tests ... OK
+Ran 25 tests ... OK
 System check identified no issues (0 silenced).
 ```
 

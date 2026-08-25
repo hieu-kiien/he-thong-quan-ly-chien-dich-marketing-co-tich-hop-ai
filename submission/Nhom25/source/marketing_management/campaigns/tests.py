@@ -167,6 +167,26 @@ class MarketingAIServiceTests(TestCase):
         self.assertEqual(len(result["ideas"]), 5)
         self.assertTrue(result["needs_human_approval"])
 
+    def test_provider_contract_accepts_valid_reviewable_result(self):
+        service = MarketingAIService(api_key="secret", provider="provider", base_url="https://example.test")
+        ideas = [
+            {"title": "Ý tưởng", "channel": "Facebook", "hook": "Hook", "draft": "Bản nháp", "cta": "CTA"}
+            for _ in range(5)
+        ]
+        valid_result = {
+            "provider": "provider",
+            "prompt_version": "AI-CAM-001-v1",
+            "ideas": ideas,
+            "needs_human_approval": True,
+        }
+
+        with patch.object(service, "_call_openai_compatible", return_value=valid_result):
+            result = service.generate_content_ideas("Ra mắt sản phẩm A", "Facebook")
+
+        self.assertEqual(result["provider"], "provider")
+        self.assertEqual(len(result["ideas"]), 5)
+        self.assertTrue(result["needs_human_approval"])
+
 
 class DemoSeedCommandTests(TestCase):
     def test_seed_demo_is_idempotent_and_console_safe(self):
@@ -505,6 +525,89 @@ class CampaignViewTests(TestCase):
         self.assertEqual(summary["pending_review"], 1)
         self.assertEqual(summary["clicks"], 25)
         self.assertEqual(summary["cost"], Decimal("700000"))
+
+    def test_dashboard_filters_metrics_by_date_and_builds_channel_report(self):
+        channel = Channel.objects.create(name="Dashboard date channel", channel_type=Channel.Type.FACEBOOK)
+        campaign = Campaign.objects.create(
+            name="Chiến dịch dashboard theo ngày",
+            objective="Tăng click",
+            audience="Người dùng thử nghiệm",
+            product="Sản phẩm dashboard ngày",
+            start_date=date(2026, 8, 1),
+            end_date=date(2026, 8, 31),
+            budget=Decimal("2000000"),
+            status=Campaign.Status.ACTIVE,
+        )
+        Metric.objects.create(
+            campaign=campaign,
+            channel=channel,
+            metric_date=date(2026, 8, 10),
+            impressions=100,
+            clicks=25,
+            conversions=5,
+            cost=Decimal("700000"),
+        )
+        Metric.objects.create(
+            campaign=campaign,
+            channel=channel,
+            metric_date=date(2026, 8, 20),
+            impressions=200,
+            clicks=40,
+            conversions=8,
+            cost=Decimal("900000"),
+        )
+
+        response = self.client.get(
+            reverse("campaigns:dashboard"),
+            data={"date_from": "2026-08-15", "date_to": "2026-08-25"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        summary = response.context["dashboard_summary"]
+        self.assertEqual(summary["impressions"], 200)
+        self.assertEqual(summary["clicks"], 40)
+        self.assertEqual(summary["cost"], Decimal("900000"))
+        self.assertEqual(response.context["date_from"], "2026-08-15")
+        self.assertEqual(response.context["date_to"], "2026-08-25")
+        self.assertEqual(len(response.context["channel_report"]), 1)
+        self.assertEqual(response.context["channel_report"][0]["clicks"], 40)
+        self.assertEqual(response.context["channel_report"][0]["bar_width"], 100)
+        self.assertContains(response, "Cập nhật báo cáo")
+        self.assertContains(response, "Hiệu quả theo kênh")
+        self.assertContains(response, 'role="img"')
+
+    def test_dashboard_rejects_invalid_date_range_without_crash(self):
+        response = self.client.get(
+            reverse("campaigns:dashboard"),
+            data={"date_from": "not-a-date", "date_to": "2026-08-01"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ngày bắt đầu lọc không hợp lệ.")
+
+    def test_campaign_list_paginates_results_and_preserves_filters(self):
+        for index in range(9):
+            Campaign.objects.create(
+                name=f"Chiến dịch phân trang {index}",
+                objective="Kiểm tra danh sách",
+                audience="Người dùng thử nghiệm",
+                product="Sản phẩm phân trang",
+                start_date=date(2026, 8, 1),
+                end_date=date(2026, 8, 5),
+                budget=Decimal("1000000"),
+            )
+
+        response = self.client.get(
+            reverse("campaigns:list"),
+            data={"q": "phân trang", "page": 2},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["page_obj"].number, 2)
+        self.assertEqual(response.context["page_obj"].paginator.count, 9)
+        self.assertEqual(len(response.context["campaigns"]), 1)
+        self.assertEqual(response.context["filter_query"], "q=ph%C3%A2n+trang")
+        self.assertContains(response, "Trang 2 / 2")
 
     def test_channel_delete_handles_protected_data_without_crash(self):
         channel = Channel.objects.create(name="Protected channel", channel_type=Channel.Type.EMAIL)

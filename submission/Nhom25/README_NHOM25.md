@@ -35,6 +35,9 @@ local, virtualenv, cache, vector store hoặc `.gitnexus/`.
 - `Phu_luc_minh_chung_AI.md` — prompt, phản hồi, bảng kiểm chứng, test và giới hạn bằng chứng.
 - `docs/13-bai-2-implementation.md` — ma trận 10 tiêu chí Bài 2 và lệnh kiểm tra.
 - `evidence/ai/B2-CODE-001-v1-review.md` — nhật ký AI hỗ trợ CRUD, filter, dashboard và kiểm chứng.
+- `evidence/runtime/B2-UI-001-v1-review.md` — minh chứng test client/template cho dashboard, biểu đồ ARIA và phân trang.
+- Bài 2 đã bổ sung báo cáo dashboard theo khoảng ngày/kênh, biểu đồ thanh có nhãn
+  và phân trang danh sách campaign; lệnh test hiện bao phủ 25 test.
 - `diagrams/` — logo ICTU tham chiếu, sơ đồ use case, ERD, kiến trúc và biểu đồ metric.
 - `evidence/ai/` — JSON phản hồi fallback đã khử dữ liệu và review trước/sau.
 - `docs/12-operations-and-backup.md` — yêu cầu sao lưu, phục hồi và vận hành.

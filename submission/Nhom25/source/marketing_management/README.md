@@ -15,7 +15,8 @@ duyệt thủ công.
 ## Đối chiếu Bài 2
 
 Baseline hiện có CRUD campaign/channel/content/metric, đăng nhập và phân quyền,
-tìm kiếm/lọc/sắp xếp campaign, dashboard KPI, validation và dữ liệu mẫu. Ma trận
+tìm kiếm/lọc/sắp xếp/phân trang campaign, dashboard KPI có lọc ngày và report
+theo kênh, validation và dữ liệu mẫu. Ma trận
 10 tiêu chí cùng bằng chứng nằm ở `../docs/13-bai-2-implementation.md`.
 
 ## Chạy local
@@ -44,8 +45,8 @@ OpenAI-compatible qua `.env` theo `.env.example`; API key không được commit
 ## Phạm vi hiện thực
 
 - `Campaign`, `Channel`, `Content`, `Metric` có migration và admin.
-- Có tạo/sửa/tìm kiếm/lọc chiến dịch, quản lý channel, ghi metric, xem tổng hợp
-  chỉ số và thêm nội dung.
+- Có tạo/sửa/tìm kiếm/lọc/phân trang chiến dịch, quản lý channel, ghi metric, xem
+  tổng hợp chỉ số theo khoảng ngày/kênh và thêm nội dung.
 - Nội dung AI luôn có cảnh báo và phải chuyển qua trạng thái duyệt trước khi
   được đăng.
 - Provider adapter có prompt version `AI-CAM-001-v1`, JSON contract validation và

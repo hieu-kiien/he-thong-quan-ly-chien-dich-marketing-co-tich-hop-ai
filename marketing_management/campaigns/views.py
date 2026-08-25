@@ -1,8 +1,10 @@
 from datetime import date
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
 from django.db.models import Q, Sum
 from django.db.models.deletion import ProtectedError
 from django.http import JsonResponse
@@ -34,26 +36,96 @@ manager_access_required = user_passes_test(has_manager_access, login_url="/accou
 
 @marketing_access_required
 def dashboard(request):
-    campaigns = Campaign.objects.all()[:5]
-    totals = Metric.objects.aggregate(
+    date_from_value = request.GET.get("date_from", "").strip()
+    date_to_value = request.GET.get("date_to", "").strip()
+    date_from = None
+    date_to = None
+    filter_errors = []
+    if date_from_value:
+        try:
+            date_from = date.fromisoformat(date_from_value)
+        except ValueError:
+            filter_errors.append("Ngày bắt đầu lọc không hợp lệ.")
+    if date_to_value:
+        try:
+            date_to = date.fromisoformat(date_to_value)
+        except ValueError:
+            filter_errors.append("Ngày kết thúc lọc không hợp lệ.")
+    if date_from and date_to and date_from > date_to:
+        filter_errors.append("Khoảng ngày lọc không hợp lệ.")
+        date_from = None
+        date_to = None
+    for error in filter_errors:
+        messages.error(request, error)
+
+    metrics = Metric.objects.all()
+    if date_from:
+        metrics = metrics.filter(metric_date__gte=date_from)
+    if date_to:
+        metrics = metrics.filter(metric_date__lte=date_to)
+    totals = metrics.aggregate(
         impressions=Sum("impressions"),
         clicks=Sum("clicks"),
         conversions=Sum("conversions"),
         cost=Sum("cost"),
     )
+    impressions = totals["impressions"] or 0
+    clicks = totals["clicks"] or 0
+    conversions = totals["conversions"] or 0
+    cost = totals["cost"] or Decimal("0")
+    channel_report = []
+    grouped_metrics = list(
+        metrics.values("channel__name")
+        .annotate(
+            impressions=Sum("impressions"),
+            clicks=Sum("clicks"),
+            conversions=Sum("conversions"),
+            cost=Sum("cost"),
+        )
+        .order_by("-clicks", "channel__name")
+    )
+    max_channel_clicks = max((row["clicks"] or 0 for row in grouped_metrics), default=0)
+    for row in grouped_metrics:
+        row_clicks = row["clicks"] or 0
+        row_impressions = row["impressions"] or 0
+        row_conversions = row["conversions"] or 0
+        row_cost = row["cost"] or Decimal("0")
+        row["channel_name"] = row.pop("channel__name")
+        row["ctr_percent"] = Campaign._percent(row_clicks, row_impressions)
+        row["conversion_rate_percent"] = Campaign._percent(row_conversions, row_clicks)
+        row["cost_per_conversion"] = (
+            (Decimal(row_cost) / Decimal(row_conversions)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            if row_conversions
+            else Decimal("0.00")
+        )
+        row["bar_width"] = round((row_clicks * 100) / max_channel_clicks) if max_channel_clicks else 0
+        channel_report.append(row)
     dashboard_summary = {
         "campaigns": Campaign.objects.count(),
         "active_campaigns": Campaign.objects.filter(status=Campaign.Status.ACTIVE).count(),
         "pending_review": Content.objects.filter(status=Content.Status.PENDING_REVIEW).count(),
-        "impressions": totals["impressions"] or 0,
-        "clicks": totals["clicks"] or 0,
-        "conversions": totals["conversions"] or 0,
-        "cost": totals["cost"] or 0,
+        "impressions": impressions,
+        "clicks": clicks,
+        "conversions": conversions,
+        "cost": cost,
+        "ctr_percent": Campaign._percent(clicks, impressions),
+        "conversion_rate_percent": Campaign._percent(conversions, clicks),
+        "cost_per_conversion": (
+            (Decimal(cost) / Decimal(conversions)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            if conversions
+            else Decimal("0.00")
+        ),
     }
     return render(
         request,
         "campaigns/dashboard.html",
-        {"campaigns": campaigns, "dashboard_summary": dashboard_summary},
+        {
+            "campaigns": Campaign.objects.all()[:5],
+            "dashboard_summary": dashboard_summary,
+            "channel_report": channel_report,
+            "date_from": date_from_value,
+            "date_to": date_to_value,
+        },
     )
 
 
@@ -118,11 +190,17 @@ def campaign_list(request):
     if filter_errors:
         for error in filter_errors:
             messages.error(request, error)
+    paginator = Paginator(campaigns, 8)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    filter_params = request.GET.copy()
+    filter_params.pop("page", None)
     return render(
         request,
         "campaigns/campaign_list.html",
         {
-            "campaigns": campaigns,
+            "campaigns": page_obj.object_list,
+            "page_obj": page_obj,
+            "filter_query": filter_params.urlencode(),
             "query": query,
             "status": status,
             "status_choices": Campaign.Status.choices,

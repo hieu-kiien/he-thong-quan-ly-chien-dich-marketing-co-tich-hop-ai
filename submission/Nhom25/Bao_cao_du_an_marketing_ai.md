@@ -42,8 +42,8 @@ duyệt nội dung và lớp AI sinh bản nháp. AI được đặt sau adapter
 fallback offline và cảnh báo; người phụ trách phải duyệt trước khi sử dụng.
 
 Baseline trong repo đã kiểm chứng model `Campaign`, `Channel`, `Content`, `Metric`,
-CRUD đầy đủ cho bốn nhóm dữ liệu, tìm kiếm/lọc/sắp xếp campaign, dashboard KPI,
-approval gate, permission guard, fallback AI và kiểm tra output contract. Provider
+CRUD đầy đủ cho bốn nhóm dữ liệu, tìm kiếm/lọc/sắp xếp/phân trang campaign,
+dashboard KPI có lọc theo ngày và báo cáo hiệu quả theo kênh, approval gate, permission guard, fallback AI và kiểm tra output contract. Provider
 thật cần API key; AI performance summary vẫn là `PROPOSED`, còn RAG tài liệu là
 công cụ truy hồi phục vụ kiểm chứng hồ sơ, không thay thế metric nghiệp vụ.
 
@@ -237,7 +237,7 @@ Browser
 | Service | `campaigns/services.py` | create campaign transaction | IMPLEMENTED_BASELINE |
 | View | `campaigns/views.py` | auth/list/create/detail/channel/metric/approval/AI | IMPLEMENTED_BASELINE |
 | AI | `campaigns/ai_service.py` | prompt/provider/fallback/schema validation | IMPLEMENTED_BASELINE |
-| Test | `campaigns/tests.py` | 21 test model/permission/view/AI/CRUD/filter/dashboard/seed | IMPLEMENTED_BASELINE |
+| Test | `campaigns/tests.py` | 25 test model/permission/view/AI/CRUD/filter/dashboard/report/pagination/seed | IMPLEMENTED_BASELINE |
 
 ---
 
@@ -253,7 +253,7 @@ sự thật của ngân sách/metric và không tự thay đổi dữ liệu.
 | Giai đoạn | Cách sử dụng | Minh chứng |
 |---|---|---|
 | KT1 | phân tích actor, FR/NFR, ERD, vị trí AI | `docs/` + prompt review |
-| KT2 | sinh model/CRUD/test/debug | 21 test + `manage.py check` |
+| KT2 | sinh model/CRUD/test/debug | 25 test + `manage.py check` |
 | KT3 | thử prompt, kiểm tra schema/overclaim | `evidence/ai/AI-CAM-001-v1-review.md` |
 | Cuối kỳ | tạo README/report/asset và review | LaTeX/PDF + checklist |
 
@@ -312,7 +312,7 @@ cd marketing_management
 .venv\Scripts\python.exe manage.py migrate --check
 ```
 
-Các test hiện có (**21 test**):
+Các test hiện có (**25 test**):
 
 1. Aggregate metric và tính CTR/conversion rate/cost per conversion.
 2. Chặn publish khi content AI chưa được duyệt; cho publish sau approve.
@@ -328,8 +328,12 @@ Các test hiện có (**21 test**):
 12. Xóa channel đang được tham chiếu xử lý `ProtectedError` an toàn.
 13. Staff bị chặn các route delete chỉ dành cho manager.
 14. `seed_demo` idempotent và không lỗi mã hóa console Windows.
+15. Dashboard lọc metric theo khoảng ngày và nhóm KPI theo kênh.
+16. Biểu đồ thanh dashboard có nhãn mô tả và hoạt động cùng bảng số liệu.
+17. Campaign list phân trang 8 dòng/trang và giữ nguyên bộ lọc khi chuyển trang.
+18. Provider contract hợp lệ được chấp nhận; contract sai chuyển fallback an toàn.
 
-Kết quả gần nhất: 21 tests, OK; Django system check không có lỗi; migration
+Kết quả gần nhất: 25 tests, OK; Django system check không có lỗi; migration
 check đạt. PDF A4 đã được render kiểm tra ở cả màu và grayscale; biểu đồ/sơ đồ
 không dùng màu làm tín hiệu duy nhất. Phản hồi AI fallback đã lưu và kiểm chứng tại
 `evidence/ai/AI-CAM-001-v1-review.md` cùng JSON redacted.
@@ -340,7 +344,10 @@ Ma trận đầy đủ 10 tiêu chí, lệnh chạy và giới hạn bằng ch�
 `docs/13-bai-2-implementation.md`. Baseline hiện có cấu trúc dự án, đăng nhập và
 RBAC, CRUD bốn nhóm dữ liệu, tìm kiếm/lọc/sắp xếp, dashboard KPI, validation và
 README/`.env.example`. Minh chứng AI hỗ trợ lập trình được lưu tại
-`evidence/ai/B2-CODE-001-v1-review.md`.
+`evidence/ai/B2-CODE-001-v1-review.md`. Minh chứng template/test client cho
+dashboard, biểu đồ ARIA và phân trang nằm tại
+`evidence/runtime/B2-UI-001-v1-review.md`; chưa tuyên bố kiểm thử mọi trình duyệt
+khi môi trường DevTools chưa được cấu hình.
 
 ---
 
@@ -348,7 +355,7 @@ README/`.env.example`. Minh chứng AI hỗ trợ lập trình được lưu t�
 
 | ID | Rủi ro/điểm mở | Mức | Cách xử lý |
 |---|---|---|---|
-| RISK-001 | Provider ngoài chưa test | Cao | fallback + mock/contract |
+| RISK-001 | Provider ngoài chưa gọi thật | Cao | fallback + mock/contract; cần API key/endpoint |
 | RISK-002 | Overclaim/prompt injection | Cao | grounding + approval + redaction |
 | RISK-003 | Ma trận quyền cần xác nhận | Trung bình | test quyền; chốt khi demo |
 | RISK-004 | AI UI summary chưa có | Trung bình | giữ PROPOSED |
@@ -358,11 +365,12 @@ README/`.env.example`. Minh chứng AI hỗ trợ lập trình được lưu t�
 
 ## 12. Kế hoạch triển khai tiếp
 
-1. Bổ sung filter channel/thời gian và audit log đầy đủ.
+1. Bổ sung audit log đầy đủ cho các thao tác duyệt/xóa.
 2. Thêm màn hình AI ideas và tạo Content từ draft với audit record.
 3. Thêm AI performance summary từ metric đã kiểm quyền.
-4. Thêm integration test provider mock, injection, PII, timeout và schema lỗi.
-5. Đóng gói LaTeX/PDF/ZIP sau khi checklist và render QA đạt.
+4. Nếu được cấp endpoint, bổ sung integration test provider thật, timeout và
+   schema lỗi.
+5. Tiếp tục kiểm thử browser/hiệu năng production nếu triển khai ngoài demo local.
 
 ## Kết luận
 

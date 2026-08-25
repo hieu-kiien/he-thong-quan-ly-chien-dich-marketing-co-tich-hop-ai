@@ -102,7 +102,7 @@
     },
     {
       "source_id": "PROMPTS-MARKETING",
-      "glob": "prompts/marketing/**/*.md",
+      "glob": "prompts/marketing/*.md",
       "priority": "P2",
       "priority_level": "MEDIUM",
       "status": "DERIVED",
@@ -127,6 +127,14 @@
     {
       "source_id": "AI-EVIDENCE-REVIEW",
       "glob": "evidence/ai/*.md",
+      "priority": "P1",
+      "priority_level": "HIGH",
+      "status": "IMPLEMENTED_BASELINE",
+      "front_matter": true
+    },
+    {
+      "source_id": "RUNTIME-EVIDENCE",
+      "glob": "evidence/runtime/*.md",
       "priority": "P1",
       "priority_level": "HIGH",
       "status": "IMPLEMENTED_BASELINE",

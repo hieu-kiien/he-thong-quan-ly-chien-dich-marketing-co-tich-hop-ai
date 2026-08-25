@@ -4,12 +4,31 @@
     <div><span class="eyebrow">AIA331 · 80300 · P1/HIGH</span><h1>Hệ thống quản lý chiến dịch marketing có tích hợp AI</h1><p>Quản lý chiến dịch, nội dung, lịch đăng và chỉ số; AI chỉ tạo bản nháp để người phụ trách duyệt.</p></div>
     <a class="button" href="{% url 'campaigns:create' %}">+ Tạo chiến dịch</a>
 </div>
+<section class="card report-filter">
+    <div class="section-head"><div><h2>Báo cáo theo khoảng ngày</h2><p class="muted">Lọc các chỉ số hiệu quả theo ngày ghi nhận; để trống để xem toàn bộ dữ liệu.</p></div></div>
+    <form class="filters filters-grid" method="get">
+        <label>Từ ngày<input type="date" name="date_from" value="{{ date_from }}"></label>
+        <label>Đến ngày<input type="date" name="date_to" value="{{ date_to }}"></label>
+        <button class="button secondary" type="submit">Cập nhật báo cáo</button>
+    </form>
+</section>
 <section class="stats">
     <div class="stat card"><span>Tổng chiến dịch</span><strong>{{ dashboard_summary.campaigns }}</strong></div>
     <div class="stat card"><span>Đang chạy</span><strong>{{ dashboard_summary.active_campaigns }}</strong></div>
     <div class="stat card"><span>Nội dung chờ duyệt</span><strong>{{ dashboard_summary.pending_review }}</strong></div>
+    <div class="stat card"><span>Lượt xem</span><strong>{{ dashboard_summary.impressions }}</strong></div>
     <div class="stat card"><span>Tổng click</span><strong>{{ dashboard_summary.clicks }}</strong></div>
+    <div class="stat card"><span>CTR</span><strong>{{ dashboard_summary.ctr_percent }}%</strong></div>
+    <div class="stat card"><span>Chuyển đổi</span><strong>{{ dashboard_summary.conversions }}</strong></div>
     <div class="stat card"><span>Tổng chi phí</span><strong>{{ dashboard_summary.cost|floatformat:0 }} đ</strong></div>
+</section>
+<section class="card">
+    <div class="section-head"><div><h2>Hiệu quả theo kênh</h2><p class="muted">Biểu đồ thanh thể hiện tỷ trọng click tương đối giữa các kênh trong khoảng lọc.</p></div></div>
+    {% if channel_report %}
+    <div class="table-wrap"><table><thead><tr><th>Kênh</th><th>Lượt xem</th><th>Click</th><th>CTR</th><th>Chuyển đổi</th><th>Chi phí</th><th>So sánh click</th></tr></thead><tbody>
+        {% for row in channel_report %}<tr><td>{{ row.channel_name }}</td><td>{{ row.impressions }}</td><td>{{ row.clicks }}</td><td>{{ row.ctr_percent }}%</td><td>{{ row.conversions }}</td><td>{{ row.cost|floatformat:0 }} đ</td><td><div class="bar-track" role="img" aria-label="{{ row.clicks }} click, {{ row.bar_width }} phần trăm mức cao nhất"><span class="bar-fill" style="--bar-width: {{ row.bar_width }}%"></span></div></td></tr>{% endfor %}
+    </tbody></table></div>
+    {% else %}<p class="muted" role="status">Chưa có chỉ số trong khoảng ngày đã chọn.</p>{% endif %}
 </section>
 <section class="card"><div class="section-head"><h2>Chiến dịch gần đây</h2><a href="{% url 'campaigns:list' %}">Xem tất cả</a></div>
 {% if campaigns %}<div class="table-wrap"><table><thead><tr><th>Tên</th><th>Mục tiêu</th><th>Thời gian</th><th>Trạng thái</th></tr></thead><tbody>{% for campaign in campaigns %}<tr><td><a href="{% url 'campaigns:detail' campaign.pk %}">{{ campaign.name }}</a></td><td>{{ campaign.objective|truncatechars:70 }}</td><td>{{ campaign.start_date }} → {{ campaign.end_date }}</td><td>{{ campaign.get_status_display }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="muted">Chưa có chiến dịch. Hãy tạo chiến dịch đầu tiên.</p>{% endif %}</section>

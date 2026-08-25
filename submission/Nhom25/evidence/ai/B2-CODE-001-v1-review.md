@@ -25,7 +25,9 @@ AI hỗ trợ phân tích baseline hiện có và đề xuất các lát cắt c
 2. Mở rộng campaign list với từ khóa, status, channel, khoảng ngày và sort.
 3. Bổ sung dashboard aggregate từ Metric và số nội dung chờ duyệt.
 4. Bổ sung xử lý ProtectedError, 405/400 và trạng thái lỗi trên giao diện.
-5. Ghi lại ma trận Bài 2, README, `.env.example` và bằng chứng kiểm thử.
+5. Nâng dashboard với lọc theo khoảng ngày, KPI theo kênh và biểu đồ thanh; thêm
+   phân trang campaign để dữ liệu lớn không dồn vào một trang.
+6. Ghi lại ma trận Bài 2, README, `.env.example` và bằng chứng kiểm thử.
 
 Đây là bản tóm tắt phạm vi hỗ trợ được lưu theo code diff; không phải bản chép
 toàn bộ hội thoại nội bộ và không khẳng định AI provider bên ngoài đã được gọi.
@@ -35,10 +37,10 @@ toàn bộ hội thoại nội bộ và không khẳng định AI provider bên 
 | Phần | File | Cách kiểm chứng/chỉnh sửa |
 |---|---|---|
 | URL CRUD | `marketing_management/campaigns/urls.py` | Đối chiếu từng route với view và test `reverse()` |
-| CRUD, filter, dashboard, RBAC | `marketing_management/campaigns/views.py` | Kiểm tra quyền, method POST, filter invalid và redirect; chạy test Django |
+| CRUD, filter, dashboard, RBAC | `marketing_management/campaigns/views.py` | Kiểm tra quyền, method POST, filter invalid, report theo ngày/kênh, phân trang và redirect; chạy test Django |
 | Form datetime-local | `marketing_management/campaigns/forms.py` | Kiểm tra input format khi sửa lịch đăng |
-| Giao diện | `marketing_management/templates/`, `static/css/app.css` | Kiểm tra URL template, trạng thái rỗng, message lỗi, confirm xóa và responsive CSS tĩnh |
-| Regression tests | `marketing_management/campaigns/tests.py` | Sinh test trước khi sửa CRUD; sau đó chạy lại và đọc toàn bộ output |
+| Giao diện | `marketing_management/templates/`, `static/css/app.css` | Kiểm tra URL template, trạng thái rỗng, message lỗi, confirm xóa, biểu đồ có nhãn ARIA và responsive CSS tĩnh |
+| Regression tests | `marketing_management/campaigns/tests.py` | Sinh test trước khi sửa CRUD/report; sau đó chạy lại và đọc toàn bộ output |
 | Hướng dẫn/ma trận | `README.md`, `marketing_management/README.md`, `docs/13-bai-2-implementation.md` | Đối chiếu với 10 tiêu chí P0, không ghi provider thật là đã nghiệm thu |
 
 ## 4. Bằng chứng kiểm tra đã chạy
@@ -46,12 +48,13 @@ toàn bộ hội thoại nội bộ và không khẳng định AI provider bên 
 ```text
 python manage.py check                         -> no issues
 python manage.py migrate --check                -> pass
-python manage.py test campaigns -v 1            -> 21 tests, OK
+python manage.py test campaigns -v 1            -> 25 tests, OK
 ```
 
-Các test mới bao phủ CRUD bốn nhóm dữ liệu, lọc keyword/channel/date/sort,
-dashboard KPI, filter sai không crash, channel đang được dùng, seed demo
-idempotent/console-safe và staff bị chặn route delete manager-only.
+Các test bao phủ CRUD bốn nhóm dữ liệu, lọc keyword/channel/date/sort, phân trang,
+dashboard KPI và report theo ngày/kênh, filter sai không crash, channel đang
+được dùng, seed demo idempotent/console-safe, provider contract và staff bị chặn
+route delete manager-only.
 
 ## 5. Giới hạn
 

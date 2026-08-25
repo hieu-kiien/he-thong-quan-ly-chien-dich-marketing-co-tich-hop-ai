@@ -62,8 +62,8 @@
 \newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
 \newcommand{\code}[1]{\texttt{\small #1}}
 \newcommand{\status}[1]{\textsc{\small #1}}
-\newcommand{\baseline}{\shortstack[l]{IMPLEMENTED\\BASELINE}}
-\newcommand{\baselineplus}[1]{\shortstack[l]{IMPLEMENTED\\BASELINE\\#1}}
+\newcommand{\baseline}{\parbox[t]{\linewidth}{\scriptsize\raggedright IMPLEMENTED\\BASELINE}}
+\newcommand{\baselineplus}[1]{\parbox[t]{\linewidth}{\scriptsize\raggedright IMPLEMENTED\\BASELINE\\#1}}
 \newcommand{\sourcefile}[1]{\path{#1}}
 \newcommand{\tablehead}[1]{\cellcolor{ictuLight}\textbf{#1}}
 \newcommand{\metricfigure}[2]{%
@@ -148,10 +148,10 @@ liệu chỉ là công cụ truy hồi để kiểm chứng hồ sơ, không tha
 
 \section{Nguồn và phạm vi}
 \subsection{Nguồn chính}
-Hai nguồn P0 / CRITICAL là ảnh đề bài trong
-\sourcefile{source-materials/BÀI KIỂM TRA.png} và
-\sourcefile{source-materials/DỰ ÁN.png}. Các nguồn triển khai được đối chiếu
-trong bảng sau.
+Hai nguồn P0 / CRITICAL là hai ảnh đề bài
+\code{BÀI KIỂM TRA.png} và \code{DỰ ÁN.png} trong thư mục
+\sourcefile{source-materials/}. Các nguồn triển khai được đối chiếu trong bảng
+sau.
 
 \begin{tabularx}{\linewidth}{@{}P{17mm}Y P{34mm}Y@{}}
 \toprule
@@ -213,7 +213,7 @@ AI Service & Sinh ý tưởng, draft, summary & Không tự ghi/publish; chỉ n
 \tablehead{ID} & \tablehead{Mô tả} & \tablehead{Input} & \tablehead{Output} & \tablehead{Trạng thái}\\
 \midrule
 \endhead
-FR--001 & Đăng nhập/phân quyền & username/password/role & phiên đăng nhập, quyền & \baselineplus{một phần}\\
+FR--001 & Đăng nhập/phân quyền & \shortstack[l]{username/\\password/\\role} & phiên đăng nhập, quyền & \baselineplus{một phần}\\
 FR--002 & Quản lý campaign & tên, objective, audience, product, dates, budget, status & bản ghi campaign & \baseline\\
 FR--003 & Quản lý channel & tên, loại, active & bản ghi channel & \baselineplus{CRUD}\\
 FR--004 & Quản lý content/schedule & channel, title/body/type/scheduled\_at & content gắn campaign & \baselineplus{CRUD}\\
@@ -221,7 +221,7 @@ FR--005 & Ghi metric & ngày, views, clicks, conversions, cost & metric theo cam
 FR--006 & Duyệt content & content, approver, action & \shortstack[l]{approved/rejected/\\published} & manager-only routes\\
 FR--007 & Tìm kiếm/lọc & tên/status/kênh/khoảng ngày/sort & danh sách campaign & \baseline\\
 FR--008 & Thống kê & metric & totals, CTR, conversion rate, CPA & dashboard KPI\\
-AI--001 & Sinh ý tưởng & \shortstack[l]{brief/objective/audience/\\product/channel/tone} & 5 ideas & fallback baseline\\
+AI--001 & Sinh ý tưởng & \shortstack[l]{brief/objective/\\audience/product/\\channel/tone} & 5 ideas & fallback baseline\\
 AI--002 & Sinh caption/email & brief/channel/tone & draft theo kênh & PROPOSED mở rộng UI\\
 AI--003 & Tóm tắt/gợi ý & metrics/budget/period & \shortstack[l]{summary/\\recommendations} & PROPOSED\\
 \bottomrule
@@ -368,7 +368,7 @@ Form & \sourcefile{campaigns/forms.py} & input form & \baseline\\
 Service & \sourcefile{campaigns/services.py} & create campaign transaction & \baseline\\
 View & \sourcefile{campaigns/views.py} & \shortstack[l]{auth/list/create/detail/\\channel/metric/filter/\\dashboard/approval/AI} & \baseline\\
 AI & \sourcefile{campaigns/ai_service.py} & prompt/provider/fallback/schema validation & \baseline\\
-Test & \sourcefile{campaigns/tests.py} & 21 test model/permission/view/AI/CRUD/filter/dashboard/seed & \baseline\\
+Test & \sourcefile{campaigns/tests.py} & 25 test model/permission/view/AI/CRUD/filter/dashboard/report/pagination/seed & \baseline\\
 \bottomrule
 \end{tabularx}
 
@@ -386,7 +386,7 @@ sự thật của ngân sách/metric và không tự thay đổi dữ liệu.
 \tablehead{Giai đoạn} & \tablehead{Cách sử dụng} & \tablehead{Minh chứng}\\
 \midrule
 KT1 & phân tích actor, FR/NFR, ERD, vị trí AI & \sourcefile{docs/} + prompt review\\
-KT2 & sinh model/CRUD/test/debug & 21 test + \code{manage.py check}\\
+KT2 & sinh model/CRUD/test/debug & 25 test + \code{manage.py check}\\
 KT3 & thử prompt, kiểm tra schema/overclaim & \sourcefile{evidence/ai/AI-CAM-001-v1-review.md}\\
 Cuối kỳ & tạo README/report/asset và review & PDF/LaTeX + checklist\\
 \bottomrule
@@ -452,21 +452,22 @@ trong Django admin; repository không chứa mật khẩu mẫu.
 \begin{lstlisting}
 python manage.py check                 -> no issues
 python manage.py migrate --check       -> pass
-python manage.py test campaigns -v 1   -> 21 tests, OK
+python manage.py test campaigns -v 1   -> 25 tests, OK
 python manage.py seed_demo              -> Demo marketing data is ready.
 \end{lstlisting}
 
-Các test bao phủ aggregate metric, approval gate, fallback AI, permission guard,
-CRUD bốn nhóm dữ liệu, lọc keyword/channel/date/sort, filter sai không crash,
-dashboard KPI, xử lý \code{ProtectedError}, staff bị chặn route manager-only và
-\code{seed\_demo} idempotent/console-safe.
+Các test bao phủ aggregate metric, approval gate, fallback AI, provider contract,
+permission guard, CRUD bốn nhóm dữ liệu, lọc keyword/channel/date/sort, phân trang,
+filter sai không crash, dashboard KPI/report theo ngày và kênh, xử lý
+\code{ProtectedError}, staff bị chặn route manager-only và \code{seed\_demo}
+idempotent/console-safe.
 
 \subsection{Đối chiếu Bài kiểm tra thường xuyên 2}
 Ma trận đầy đủ 10 tiêu chí nằm tại
 \sourcefile{docs/13-bai-2-implementation.md}. Bảng sau tóm tắt bằng chứng trong
 repository.
 
-\begin{longtable}{@{}P{9mm}P{44mm}P{35mm}P{72mm}@{}}
+\begin{longtable}{@{}P{9mm}P{44mm}P{35mm}P{62mm}@{}}
 \toprule
 \tablehead{\#} & \tablehead{Tiêu chí} & \tablehead{Trạng thái} & \tablehead{Bằng chứng}\\
 \midrule
@@ -474,13 +475,13 @@ repository.
 1 & Cấu trúc dự án hợp lý & \baseline & \sourcefile{config/}, \sourcefile{campaigns/}, templates, static, docs, requirements\\
 2 & Đăng nhập và phân quyền & \baseline & auth URLs, \code{marketing\_access\_required}, \code{manager\_access\_required}, test staff bị chặn\\
 3 & CRUD nghiệp vụ chính & \baseline & CRUD Campaign/Channel/Content/Metric; test update và POST delete\\
-4 & Tìm kiếm, lọc, sắp xếp & \baseline & keyword, status, channel, date range, sort; ngày sai không crash\\
-5 & Thống kê/báo cáo & \baseline & dashboard aggregate campaign/active/pending/clicks/cost\\
-6 & Giao diện dễ dùng & \baseline & templates, CSS responsive, empty state, message, validation, confirm delete\\
+4 & Tìm kiếm, lọc, sắp xếp & \baseline & keyword, status, channel, date range, sort và pagination; ngày sai không crash\\
+5 & Thống kê/báo cáo & \baseline & dashboard lọc ngày, KPI CTR/conversion/cost và report/biểu đồ theo kênh\\
+6 & Giao diện dễ dùng & \baseline & templates, CSS responsive, empty state, message, validation, confirm delete, ARIA\\
 7 & CSDL và dữ liệu mẫu & \baseline & SQLite, migration, seed demo, constraint; test seed idempotent\\
-8 & Xử lý lỗi cơ bản & \baseline & validation, 400/405, protected delete và thông báo không crash\\
-9 & Minh chứng AI lập trình & \baseline & \sourcefile{evidence/ai/B2-CODE-001-v1-review.md}\\
-10 & Mã nguồn/tài liệu chạy thử & \baseline & README, \code{.env.example}, requirements, lệnh chạy/test; commit cuối cần chốt\\
+8 & Xử lý lỗi cơ bản & \baseline & validation, lọc ngày sai, 400/405, protected delete và thông báo không crash\\
+9 & Minh chứng AI lập trình & \baseline & \sourcefile{evidence/ai/B2-CODE-001-v1-review.md}, fallback/provider contract test\\
+10 & Mã nguồn/tài liệu chạy thử & \baseline & README, \code{.env.example}, requirements, lệnh chạy/test, LaTeX/PDF/ZIP và Git history\\
 \bottomrule
 \end{longtable}
 
@@ -488,7 +489,10 @@ repository.
 \sourcefile{evidence/ai/B2-CODE-001-v1-review.md} ghi input theo nguồn P0, phạm
 vi hỗ trợ CRUD/filter/dashboard, file đã sửa, cách sinh viên kiểm chứng và giới
 hạn. Phản hồi AI nghiệp vụ fallback được lưu riêng trong thư mục
-\sourcefile{evidence/ai/} cùng JSON đã khử dữ liệu.
+\sourcefile{evidence/ai/} cùng JSON đã khử dữ liệu. Kiểm tra template/test client
+cho dashboard, ARIA và pagination được ghi tại
+\sourcefile{evidence/runtime/B2-UI-001-v1-review.md}; không tuyên bố đã kiểm thử
+mọi trình duyệt khi chưa có môi trường DevTools.
 
 % -------------------------------------------------------------------------
 % Risks and conclusion
@@ -498,7 +502,7 @@ hạn. Phản hồi AI nghiệp vụ fallback được lưu riêng trong thư m�
 \toprule
 \tablehead{ID} & \tablehead{Rủi ro/điểm mở} & \tablehead{Mức} & \tablehead{Cách xử lý}\\
 \midrule
-RISK--001 & Provider ngoài chưa test & Cao & fallback + mock/contract\\
+RISK--001 & Provider ngoài chưa gọi thật & Cao & fallback + mock/contract; cần API key/endpoint để tích hợp\\
 RISK--002 & Overclaim/prompt injection & Cao & grounding + approval + redaction\\
 RISK--003 & Ma trận quyền cần xác nhận & Trung bình & test quyền; chốt khi demo\\
 RISK--004 & AI UI summary chưa có & Trung bình & giữ PROPOSED\\
@@ -511,8 +515,9 @@ RISK--005 & Tài liệu legacy & Cao & loại khỏi manifest\\
   \item Bổ sung audit log đầy đủ và các filter nghiệp vụ nâng cao.
   \item Thêm màn hình AI ideas và tạo Content từ draft với audit record.
   \item Thêm AI performance summary từ metric đã kiểm quyền.
-  \item Thêm integration test provider mock, injection, PII, timeout và schema lỗi.
-  \item Chốt commit cuối, chạy lại checklist và đóng gói PDF/LaTeX/ZIP.
+  \item Nếu được cấp endpoint, thêm integration test provider thật, injection, PII,
+    timeout và schema lỗi.
+  \item Đã chốt baseline; trước khi nộp kiểm tra \code{git status}, chạy lại checklist và đóng gói PDF/LaTeX/ZIP.
 \end{enumerate}
 
 \section*{Kết luận}
