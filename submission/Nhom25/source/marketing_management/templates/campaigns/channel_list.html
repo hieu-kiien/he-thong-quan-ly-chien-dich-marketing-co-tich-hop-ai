@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Kênh truyền thông — Marketing AI{% endblock %}
+{% block content %}
+<div class="section-head"><div><span class="eyebrow">Danh mục dùng chung</span><h1>Kênh truyền thông</h1></div><a class="button" href="{% url 'campaigns:channel-create' %}">+ Thêm kênh</a></div>
+<section class="card table-wrap"><table><thead><tr><th>Tên kênh</th><th>Loại</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{% for channel in channels %}<tr><td>{{ channel.name }}</td><td>{{ channel.get_channel_type_display }}</td><td>{% if channel.is_active %}Đang hoạt động{% else %}Tạm dừng{% endif %}</td><td><div class="inline-actions"><a class="button tiny secondary" href="{% url 'campaigns:channel-update' channel.pk %}">Sửa</a>{% if can_manage %}<form method="post" action="{% url 'campaigns:channel-delete' channel.pk %}" onsubmit="return confirm('Xóa kênh này? Nếu đang được dùng, hệ thống sẽ giữ lại dữ liệu.');">{% csrf_token %}<button class="button tiny danger" type="submit">Xóa</button></form>{% endif %}</div></td></tr>{% empty %}<tr><td colspan="4" class="muted">Chưa có kênh.</td></tr>{% endfor %}</tbody></table></section>
+{% endblock %}

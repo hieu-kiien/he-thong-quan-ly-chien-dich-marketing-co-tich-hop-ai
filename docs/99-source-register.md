@@ -5,7 +5,7 @@ project_id: AIA331-80300-MARKETING-AI
 priority: P1
 priority_level: HIGH
 status: CANONICAL_DERIVED
-last_reviewed: 2026-08-18
+last_reviewed: 2026-08-19
 ---
 
 # Sổ đăng ký nguồn
@@ -22,6 +22,8 @@ last_reviewed: 2026-08-18
 | SRC-007 | Google Classroom screenshots/user notes | REFERENCE_TO_CANONICAL | quy cách thư mục ZIP, mốc nộp |
 | SRC-008 | `Code QLBH/`, `sales_management/`, báo cáo bán hàng | LEGACY | lịch sử; không dùng làm yêu cầu marketing |
 | SRC-009 | `docs/rag-corpus.json`, `tools/rag_index.py`, `tools/test_rag_index.py` | P1 / HIGH | manifest, truy hồi có citation và kiểm thử chống nhiễm legacy |
+| SRC-010 | `evidence/ai/` | P1 / HIGH | phản hồi AI đã khử dữ liệu, kiểm chứng schema và chỉnh sửa của sinh viên |
+| SRC-011 | [Template format ICTU công khai](https://repository.ictu.edu.vn/cam-nang-so/huong-dan-format-quyen-khoa-luan-tot-nghiep/) | REFERENCE | tham chiếu logo/bố cục bìa; không khẳng định là mẫu bắt buộc của bài kiểm tra |
 
 ## Quy tắc nguồn
 

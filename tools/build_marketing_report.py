@@ -15,10 +15,13 @@ from docx.shared import Inches, Mm, Pt, RGBColor
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "submission" / "Nhom25" / "Bao_cao_du_an_marketing_ai.md"
 OUTPUT = ROOT / "submission" / "Nhom25" / "Bao_cao_du_an_marketing_ai.docx"
+LOGO = SOURCE.parent / "diagrams" / "logo_ictu.jpg"
 FONT = "Times New Roman"
-BLUE = RGBColor(31, 78, 121)
-MUTED = RGBColor(89, 89, 89)
-TABLE_HEADER = "D9E2F3"
+# Print-safe palette: one dark slate accent plus neutral grays. The PDF remains
+# visually interesting in color, but hierarchy and table structure survive B/W.
+BLUE = RGBColor(47, 58, 69)
+MUTED = RGBColor(90, 98, 106)
+TABLE_HEADER = "E7EBEE"
 
 
 def set_run_font(run, size=13, bold=None, italic=None, color=None, name=FONT):
@@ -58,7 +61,7 @@ def set_cell_margins(cell, top=100, start=120, bottom=100, end=120):
         node.set(qn("w:type"), "dxa")
 
 
-def set_table_borders(table, color="B7C9D6", size="6"):
+def set_table_borders(table, color="A8B0B7", size="6"):
     properties = table._tbl.tblPr
     borders = properties.first_child_found_in("w:tblBorders")
     if borders is None:
@@ -196,6 +199,12 @@ def repeat_table_header(row):
     properties.append(header)
 
 
+def prevent_row_split(row):
+    properties = row._tr.get_or_add_trPr()
+    if properties.find(qn("w:cantSplit")) is None:
+        properties.append(OxmlElement("w:cantSplit"))
+
+
 def add_rich_text(paragraph, text, size=13):
     pattern = re.compile(r"(\*\*.*?\*\*|`.*?`|\[.*?\]\(.*?\))")
     cursor = 0
@@ -234,6 +243,31 @@ def add_paragraph(document, text, style=None, size=13, italic=False, color=None)
     return paragraph
 
 
+def add_markdown_image(document, line):
+    match = re.match(r"^!\[(.*?)\]\((.*?)\)$", line.strip())
+    if not match:
+        return False
+    alt, target = match.groups()
+    image_path = (SOURCE.parent / target).resolve()
+    if not image_path.exists():
+        add_paragraph(document, f"[Thiếu hình: {target}]", size=11, color=MUTED)
+        return True
+    paragraph = document.add_paragraph()
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph.paragraph_format.space_before = Pt(6)
+    paragraph.paragraph_format.space_after = Pt(3)
+    paragraph.add_run().add_picture(str(image_path), width=Mm(155))
+    caption = document.add_paragraph()
+    caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    caption.paragraph_format.space_before = Pt(0)
+    caption.paragraph_format.space_after = Pt(8)
+    add_rich_text(caption, alt, size=10.5)
+    for run in caption.runs:
+        run.italic = True
+        run.font.color.rgb = MUTED
+    return True
+
+
 def add_markdown_table(document, lines):
     rows = []
     for line in lines:
@@ -261,6 +295,7 @@ def add_markdown_table(document, lines):
     set_table_widths(table, widths)
     repeat_table_header(table.rows[0])
     for row_index, row in enumerate(rows):
+        prevent_row_split(table.rows[row_index])
         for col_index, value in enumerate(row):
             cell = table.cell(row_index, col_index)
             cell.text = ""
@@ -322,13 +357,20 @@ def add_cover(document):
     for text, size, bold, space_after in (
         ("ĐẠI HỌC THÁI NGUYÊN", 13, False, 4),
         ("TRƯỜNG ĐẠI HỌC CÔNG NGHỆ THÔNG TIN VÀ TRUYỀN THÔNG", 13, True, 2),
-        ("KHOA CÔNG NGHỆ THÔNG TIN", 13, True, 36),
+        ("KHOA CÔNG NGHỆ THÔNG TIN", 13, True, 8),
     ):
         paragraph = document.add_paragraph()
         paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
         paragraph.paragraph_format.space_after = Pt(space_after)
         run = paragraph.add_run(text)
         set_run_font(run, size=size, bold=bold)
+
+    if LOGO.exists():
+        paragraph = document.add_paragraph()
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraph.paragraph_format.space_after = Pt(16)
+        run = paragraph.add_run()
+        run.add_picture(str(LOGO), width=Mm(28))
 
     paragraph = document.add_paragraph()
     paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -454,12 +496,15 @@ def parse_report(document):
             numbered_active = False
             index += 1
             continue
+        if line.startswith("!["):
+            numbered_active = False
+            add_markdown_image(document, line)
+            index += 1
+            continue
         heading = re.match(r"^(#{2,4})\s+(.*)$", line)
         if heading:
             level = len(heading.group(1)) - 1
             paragraph = document.add_paragraph(heading.group(2), style=f"Heading {min(level, 3)}")
-            if heading.group(2).startswith("3. Yêu cầu chức năng"):
-                paragraph.paragraph_format.page_break_before = True
             numbered_active = False
             index += 1
             continue

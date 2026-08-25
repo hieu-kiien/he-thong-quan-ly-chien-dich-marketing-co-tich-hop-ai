@@ -10,6 +10,7 @@ __pycache__/
 .gitnexus/
 knowledge_store/
 .rag/
+tmp/
 .lo_profile*/
 ~$*.docx
 
@@ -25,3 +26,7 @@ staticfiles/
 .submission-work/
 submission/qa/
 submission/archive/
+submission/Nhom25/*.log
+submission/Nhom25/*.aux
+submission/Nhom25/*.out
+submission/Nhom25/*.toc

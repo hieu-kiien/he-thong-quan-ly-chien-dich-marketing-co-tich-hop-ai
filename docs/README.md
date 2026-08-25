@@ -6,7 +6,7 @@ priority: P1
 priority_level: HIGH
 status: CANONICAL
 language: vi
-last_reviewed: 2026-08-18
+last_reviewed: 2026-08-25
 ---
 
 # Chỉ mục tài liệu chuẩn hóa — Marketing AI
@@ -24,10 +24,12 @@ last_reviewed: 2026-08-18
 | Cần nộp và kiểm tra gì? | [`05-deliverables-and-validation.md`](05-deliverables-and-validation.md) |
 | Điểm nào còn mở? | [`06-open-questions.md`](06-open-questions.md) |
 | RAG/GitNexus dùng thế nào? | [`07-knowledge-retrieval.md`](07-knowledge-retrieval.md) |
-| Chuẩn Word/PDF/bìa? | [`08-documentation-standard.md`](08-documentation-standard.md) |
+| Chuẩn LaTeX/PDF/bìa? | [`08-documentation-standard.md`](08-documentation-standard.md) |
 | Nguồn nào đáng tin? | [`99-source-register.md`](99-source-register.md) |
 | 10 tiêu chí bài kiểm tra? | [`09-assessment-checklist.md`](09-assessment-checklist.md) |
+| 10 tiêu chí triển khai Bài 2? | [`13-bai-2-implementation.md`](13-bai-2-implementation.md) |
 | Cấp ưu tiên và cấu trúc repo? | [`10-priority-policy.md`](10-priority-policy.md) |
+| Sao lưu, phục hồi và hiệu năng? | [`12-operations-and-backup.md`](12-operations-and-backup.md) |
 
 ## Trạng thái
 

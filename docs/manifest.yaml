@@ -6,7 +6,7 @@ priority_level: HIGH
 source_priority: P0 / CRITICAL
 priority_scope: source-materials/BÀI KIỂM TRA.png; source-materials/DỰ ÁN.png
 priority_policy: docs/10-priority-policy.md
-last_reviewed: 2026-08-18
+last_reviewed: 2026-08-25
 canonical_sources:
   - path: source-materials/README.md
     document_id: AIA331-SOURCE-MATERIALS
@@ -29,6 +29,8 @@ canonical_sources:
     status: IMPLEMENTED_BASELINE
   - path: prompts/marketing/**/*.md
     status: DERIVED
+  - path: evidence/ai/*.md
+    status: AI_EVIDENCE_REVIEWED
   - path: submission/Nhom25/*.md
     status: SUBMISSION_CANONICAL
 reference_sources:

@@ -14,7 +14,7 @@ last_reviewed: 2026-08-18
 
 1. Người dùng đăng nhập và được kiểm tra quyền.
 2. Tạo campaign với mục tiêu, audience, product, thời gian, budget, status.
-3. Gắn các channel và content vào campaign.
+3. Quản lý channel, gắn channel và content vào campaign.
 4. Nhập metric theo ngày và kênh.
 5. Hệ thống tính tổng views/clicks/conversions/cost và các tỷ lệ.
 
@@ -27,6 +27,7 @@ Campaign brief + channel + tone
         -> draft + warning + needs_human_approval=true
         -> Marketing Manager review
         -> APPROVED -> PUBLISHED
+        -> REJECTED -> chỉnh sửa và gửi lại
 ```
 
 Nếu nội dung chưa `APPROVED`, thao tác publish phải bị từ chối. Đây là ranh giới
@@ -43,6 +44,12 @@ nêu “chưa đủ dữ liệu”, không suy đoán thành số thật.
 Người dùng nhập tên hoặc trạng thái → view áp filter ORM → trả danh sách campaign
 đã lọc. Khi mở rộng, thêm filter theo channel, thời gian và trạng thái content.
 
+## FLOW-005 — Ghi metric qua màn hình
+
+Staff chọn campaign → chọn channel → nhập ngày, impressions, clicks, conversions,
+cost → form kiểm tra dữ liệu → lưu bản ghi hoặc hiển thị lỗi. Manager/Staff đều
+được xem tổng hợp; dữ liệu trùng cùng campaign/channel/ngày bị DB từ chối.
+
 ## Invariants
 
 | ID | Bất biến | Cách bảo vệ |
@@ -52,3 +59,4 @@ Người dùng nhập tên hoặc trạng thái → view áp filter ORM → tr�
 | FLOW-I03 | Conversion không vượt click | `Metric.clean()` |
 | FLOW-I04 | Không trùng metric cùng ngày/kênh | DB unique constraint |
 | FLOW-I05 | AI không tự đăng | `Content.publish()` |
+| FLOW-I06 | Chỉ Manager được duyệt/từ chối/đăng | `has_manager_access()` + route POST |

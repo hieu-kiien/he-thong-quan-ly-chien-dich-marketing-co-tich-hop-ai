@@ -17,7 +17,7 @@ last_reviewed: 2026-08-18
 | Prompt ID | `AI-CAM-001` |
 | Version | `AI-CAM-001-v1` |
 | Input | campaign brief, objective, audience, product, channel, tone |
-| Output | `provider`, `prompt_version`, `ideas[]`, `needs_human_approval`, `warning` |
+| Output | `provider`, `prompt_version`, `ideas[]`, `requested_count`, `needs_human_approval`, `warning` |
 | Fallback | deterministic offline ideas; không gọi mạng khi không có key/config |
 | Human gate | `Content` phải `APPROVED` mới được `PUBLISHED` |
 
@@ -45,7 +45,16 @@ Hãy đề xuất 5 ý tưởng nội dung phù hợp kênh; mỗi ý tưởng c
 - Hiển thị warning “bản nháp” và nguồn/provider/version.
 - Không coi câu chữ AI là sự thật marketing đã được xác minh.
 - Có fallback khi timeout, thiếu key hoặc output sai schema.
+- Backend chỉ nhận provider output khi có đúng 5 object, đủ `title`, `channel`,
+  `hook`, `draft`, `cta`, đúng prompt version và `needs_human_approval=true`.
 - Lưu minh chứng prompt và phản hồi đã redaction; không lưu API key.
+
+## 4.1 Luồng lỗi và giới hạn
+
+Provider được gọi với timeout 20 giây. JSON sai, thiếu trường, sai số lượng ý
+tưởng hoặc lỗi mạng đều chuyển sang fallback offline và giữ warning human review.
+Fallback không đại diện cho độ sáng tạo của provider thật; chất lượng provider
+chỉ được kết luận sau khi có bộ dữ liệu đánh giá riêng.
 
 ## 5. RAG boundary
 

@@ -39,6 +39,17 @@ class RagIndexTests(unittest.TestCase):
         self.assertEqual(report["authority_assets"], 2)
         self.assertEqual(report["project_id"], "AIA331-80300-MARKETING-AI")
 
+    def test_validate_detects_p0_checksum_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            altered_manifest = Path(temp_dir) / "rag-corpus.json"
+            payload = json.loads(self.manifest.read_text(encoding="utf-8"))
+            payload["authority_assets"][0]["sha256"] = "0" * 64
+            altered_manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+            report = validate_corpus(ROOT, altered_manifest)
+
+            self.assertTrue(any("sha256 mismatch" in item for item in report["missing"]))
+
     def test_build_filters_legacy_and_writes_citations(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "marketing-rag.sqlite3"
@@ -96,6 +107,15 @@ class RagIndexTests(unittest.TestCase):
 
             json.dumps(payload, ensure_ascii=False)
             self.assertLessEqual(len(payload), 3)
+
+    def test_search_returns_diverse_source_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "marketing-rag.sqlite3"
+            build_index(ROOT, self.manifest, db_path)
+
+            results = search_index(db_path, "tên đề tài chính thức chiến dịch marketing", top_k=5)
+
+            self.assertEqual(len(results), len({item["path"] for item in results}))
 
 
 if __name__ == "__main__":

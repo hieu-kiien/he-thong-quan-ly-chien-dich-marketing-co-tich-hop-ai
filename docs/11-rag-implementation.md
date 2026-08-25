@@ -5,7 +5,7 @@ project_id: AIA331-80300-MARKETING-AI
 priority: P1
 priority_level: HIGH
 status: IMPLEMENTED_BASELINE
-last_reviewed: 2026-08-18
+last_reviewed: 2026-08-25
 ---
 
 # RAG tài liệu canonical — hướng dẫn vận hành
@@ -45,7 +45,9 @@ Chạy từ thư mục gốc repo:
 python tools/rag_index.py validate
 python tools/rag_index.py build
 python tools/rag_index.py search "tên đề tài chính thức chiến dịch marketing" --top-k 5
+python tools/rag_eval.py --top-k 5
 python -m unittest tools.test_rag_index -v
+python -m unittest tools.test_rag_eval -v
 ```
 
 Nếu máy không có Python trong PATH, dùng Python bundled của môi trường Codex
@@ -57,10 +59,20 @@ canonical.
 
 Baseline hiện tại kiểm tra được: đủ hai ảnh P0, không có đường dẫn legacy trong
 allowlist, citation có file/section/dòng, kết quả có metadata ưu tiên và ID
-chunk ổn định qua hai lần build. Corpus lần build ngày 18/08/2026 gồm 48 nguồn
-và 160 chunk.
+chunk ổn định qua hai lần build. Lần build ngày 25/08/2026 có 56 nguồn và 220
+chunk.
 
-Đây là lexical RAG có xếp hạng theo BM25 + ưu tiên nguồn, chưa phải semantic
+Evaluator tại `tools/rag_eval_cases.json` có 9 câu hỏi đại diện cho định danh,
+tiêu chí P0, yêu cầu, thiết kế dữ liệu, AI, prompt version và chống lẫn legacy.
+Mỗi câu có `expected_paths`; các câu P0 còn yêu cầu `expected_authority_paths`.
+Ngưỡng CLI mặc định là hit-rate >= 0.90 và không có kết quả từ đường dẫn cấm.
+Metric MRR và thứ hạng từng câu được in ra để theo dõi chất lượng.
+
+Kết quả search trả tối đa một chunk cho mỗi đường dẫn trong top-k để tránh nhiều
+chunk của một tài liệu chiếm hết kết quả và làm mất nguồn liên quan khác.
+
+Đây là lexical RAG có xếp hạng theo BM25 + ưu tiên nguồn + đa dạng đường dẫn,
+chưa phải semantic
 embedding. Cách này được chọn vì môi trường hiện có SQLite FTS5 nhưng không có
 `chromadb`/`sentence-transformers`, đồng thời dễ kiểm chứng citation. Chỉ thêm
 embedding khi bộ đánh giá truy hồi chứng minh lexical RAG chưa đủ; không thêm

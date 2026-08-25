@@ -5,7 +5,7 @@ project_id: AIA331-80300-MARKETING-AI
 priority: P2
 priority_level: MEDIUM
 status: OPEN
-last_reviewed: 2026-08-18
+last_reviewed: 2026-08-24
 ---
 
 # Điểm mở cần chốt
@@ -20,7 +20,8 @@ Các câu hỏi dưới đây không được AI tự trả lời như sự th�
 | DEC-004 | Schedule/Budget có cần tách bảng riêng? | Gộp vào Content/Campaign | Nhóm |
 | DEC-005 | Metric cần thêm reach/impressions hay doanh thu? | views, clicks, conversions, cost | Nhóm |
 | DEC-006 | Có cần RAG trả lời tài liệu trong sản phẩm? | RAG hỗ trợ tài liệu, không dùng thay metric | Nhóm |
-| DEC-007 | Độ dài báo cáo và mẫu bìa chính thức? | 25–40 trang nội dung, bìa ICTU tối giản | Giảng viên |
+| DEC-007 | Độ dài báo cáo và mẫu bìa chính thức? | Bản kiểm tra được cô đọng còn 13 trang A4; bìa dùng logo/bố cục ICTU công khai làm tham chiếu, vẫn chờ mẫu GV | Giảng viên |
+| DEC-008 | Bài 2 có yêu cầu nộp commit hash hoặc demo trên trình duyệt cụ thể không? | README/lệnh chạy/test đã có; commit cuối và trình duyệt/thiết bị demo cần nhóm chốt | Giảng viên/nhóm |
 
 ## Quy tắc chốt
 

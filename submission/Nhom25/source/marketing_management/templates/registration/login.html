@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Đăng nhập — Marketing AI{% endblock %}
+{% block content %}
+<section class="card narrow">
+    <h1>Đăng nhập</h1>
+    <p class="muted">Dùng tài khoản có quyền Marketing Manager/Marketing Staff hoặc tài khoản staff.</p>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="button" type="submit">Đăng nhập</button>
+    </form>
+</section>
+{% endblock %}

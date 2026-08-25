@@ -10,15 +10,15 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "docs" / "diagrams"
 FONT_PATH = Path("C:/Windows/Fonts/arial.ttf")
 BOLD_PATH = Path("C:/Windows/Fonts/arialbd.ttf")
-NAVY = "#1f4e79"
-PURPLE = "#6841d8"
-INK = "#172033"
-MUTED = "#667085"
-LINE = "#b7c9d6"
-BLUE_FILL = "#eef4ff"
-PURPLE_FILL = "#f4f3ff"
-GREEN_FILL = "#ecfdf3"
-ORANGE_FILL = "#fff7ed"
+NAVY = "#34495e"
+PURPLE = "#4b5563"
+INK = "#1f2933"
+MUTED = "#5f6872"
+LINE = "#a8b0b7"
+BLUE_FILL = "#f8f9fa"
+PURPLE_FILL = "#e7ebee"
+GREEN_FILL = "#f1f3f5"
+ORANGE_FILL = "#d9e0e5"
 
 
 def font(size, bold=False):

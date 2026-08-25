@@ -11,7 +11,7 @@ status: SUBMISSION_CANONICAL
 version: 1.0
 authors: [Nguyễn Hải Đăng, Vũ Hiếu Kiên]
 class: CNTTK23C
-last_reviewed: 2026-08-18
+last_reviewed: 2026-08-25
 ---
 
 # BÁO CÁO DỰ ÁN
@@ -41,10 +41,11 @@ Báo cáo đề xuất hệ thống Django + SQLite có phân quyền, CRUD chi�
 duyệt nội dung và lớp AI sinh bản nháp. AI được đặt sau adapter có prompt version,
 fallback offline và cảnh báo; người phụ trách phải duyệt trước khi sử dụng.
 
-Baseline trong repo đã kiểm chứng model `Campaign`, `Channel`, `Content`,
-`Metric`, thống kê CTR/chi phí/chuyển đổi, approval gate, CRUD tra cứu chiến dịch
-và fallback AI. Provider ngoài, báo cáo AI đầy đủ trong UI và RAG nghiệp vụ là
-phần mở rộng `PROPOSED`.
+Baseline trong repo đã kiểm chứng model `Campaign`, `Channel`, `Content`, `Metric`,
+CRUD đầy đủ cho bốn nhóm dữ liệu, tìm kiếm/lọc/sắp xếp campaign, dashboard KPI,
+approval gate, permission guard, fallback AI và kiểm tra output contract. Provider
+thật cần API key; AI performance summary vẫn là `PROPOSED`, còn RAG tài liệu là
+công cụ truy hồi phục vụ kiểm chứng hồ sơ, không thay thế metric nghiệp vụ.
 
 ---
 
@@ -60,6 +61,7 @@ phần mở rộng `PROPOSED`.
 | SRC-003 | `informember.md` | CANONICAL | Thành viên, lớp, khoa, trường |
 | SRC-004 | `marketing_management/` | IMPLEMENTED_BASELINE | Mã nguồn baseline |
 | SRC-005 | `marketing_management/campaigns/tests.py` | IMPLEMENTED_BASELINE | Test hành vi |
+| SRC-011 | Template format ICTU công khai | REFERENCE | Tham chiếu logo và bố cục bìa; không thay thế mẫu GV cung cấp |
 
 ### 1.2. Ranh giới
 
@@ -106,12 +108,12 @@ file báo cáo. Hệ quả là:
 |---|---|---|---|---|
 | FR-001 | Đăng nhập/phân quyền | username/password/role | phiên đăng nhập, quyền | IMPLEMENTED_BASELINE một phần |
 | FR-002 | Quản lý campaign | tên, objective, audience, product, dates, budget, status | bản ghi campaign | IMPLEMENTED_BASELINE |
-| FR-003 | Quản lý channel | tên, loại, active | bản ghi channel | IMPLEMENTED_BASELINE model/admin |
-| FR-004 | Quản lý content/schedule | channel, title/body/type/scheduled_at | content gắn campaign | IMPLEMENTED_BASELINE create |
-| FR-005 | Ghi metric | ngày, views, clicks, conversions, cost | metric theo campaign/channel | IMPLEMENTED_BASELINE model |
-| FR-006 | Duyệt content | content, approver, action | approved/rejected/published | IMPLEMENTED_BASELINE guard |
-| FR-007 | Tìm kiếm/lọc | tên/status | danh sách campaign | IMPLEMENTED_BASELINE |
-| FR-008 | Thống kê | metric | totals, CTR, conversion rate, CPA | IMPLEMENTED_BASELINE |
+| FR-003 | Quản lý channel | tên, loại, active | bản ghi channel | IMPLEMENTED_BASELINE CRUD |
+| FR-004 | Quản lý content/schedule | channel, title/body/type/scheduled_at | content gắn campaign | IMPLEMENTED_BASELINE CRUD |
+| FR-005 | Ghi metric | ngày, views, clicks, conversions, cost | metric theo campaign/channel | IMPLEMENTED_BASELINE CRUD + validation |
+| FR-006 | Duyệt content | content, approver, action | approved/rejected/published | IMPLEMENTED_BASELINE manager-only routes |
+| FR-007 | Tìm kiếm/lọc | tên/status/kênh/khoảng ngày/sort | danh sách campaign | IMPLEMENTED_BASELINE |
+| FR-008 | Thống kê | metric | totals, CTR, conversion rate, CPA | IMPLEMENTED_BASELINE dashboard KPI |
 | AI-001 | Sinh ý tưởng | brief/objective/audience/product/channel/tone | 5 ideas | IMPLEMENTED_BASELINE fallback |
 | AI-002 | Sinh caption/email | brief/channel/tone | draft theo kênh | PROPOSED mở rộng UI |
 | AI-003 | Tóm tắt/gợi ý | metrics/budget/period | summary/recommendations | PROPOSED |
@@ -125,18 +127,36 @@ file báo cáo. Hệ quả là:
 - Không có API key trong repository.
 - Khi không có provider, fallback trả đúng 5 ý tưởng và luôn có warning human review.
 
+![Hình 1. Biểu đồ minh họa impressions và clicks theo 7 ngày (dữ liệu demo)](diagrams/metric-chart.png)
+
 ---
 
 ## 4. Yêu cầu phi chức năng
 
 | ID | Nhóm | Yêu cầu | Cách xác minh |
 |---|---|---|---|
-| NFR-001 | Security | authentication, authorization, CSRF, env secret | code review + test quyền |
+| NFR-001 | Security | authentication, authorization, CSRF, env secret, không commit API key | code review + test quyền |
 | NFR-002 | AI safety | không bịa claim, không tự đăng, có warning | unit/integration test + review |
 | NFR-003 | Data integrity | validation và unique constraint | model test/migration |
-| NFR-004 | Availability | migrate/seed/run từ môi trường sạch | runbook |
-| NFR-005 | UX | status/filter/error message rõ | manual/browser check |
-| NFR-006 | Maintainability | module hóa app, prompt tách khỏi view | structure review |
+| NFR-004 | Availability | migrate/seed/run sạch; backup/restore có hướng dẫn | runbook + restore check |
+| NFR-005 | Performance | CRUD p95 mục tiêu <2 giây/50 user; AI timeout 20 giây | target + timeout/fallback |
+| NFR-006 | Authorization | Staff nhập; Manager duyệt/từ chối/đăng; route đều kiểm tra role | permission tests |
+| NFR-007 | UX | status/filter/error/empty state rõ | manual/browser check |
+| NFR-008 | Maintainability | module hóa app, prompt tách khỏi view | structure review |
+| NFR-009 | Printability | A4; in đen trắng vẫn đọc được; màu không phải tín hiệu duy nhất; sơ đồ/biểu đồ có nhãn và nét phân biệt | grayscale render check |
+
+### 4.1. Ma trận phân quyền
+
+| Chức năng | Marketing Staff | Marketing Manager |
+|---|---:|---:|
+| Xem/tạo/sửa campaign | Có | Có |
+| Quản lý channel | Có | Có |
+| Tạo content và ghi metric | Có | Có |
+| Duyệt/từ chối/đăng content | Không | Có |
+| Xem thống kê và gọi AI | Có | Có |
+
+Backup SQLite, RPO/RTO và cách restore được ghi tại
+`docs/12-operations-and-backup.md`.
 
 ---
 
@@ -155,7 +175,7 @@ file báo cáo. Hệ quả là:
 
 - **Actor:** Staff yêu cầu; Manager duyệt.
 - **Luồng chính:** chọn brief/kênh/giọng → AI adapter tạo draft → lưu/hiển thị
-  warning → Manager kiểm tra → approve → mới cho publish.
+  warning → Manager kiểm tra → approve hoặc reject → chỉ approved mới publish.
 - **Ngoại lệ:** provider lỗi/thiếu key → fallback; thiếu dữ liệu → warning.
 - **Hậu điều kiện:** content có source AI, prompt version và trạng thái duyệt.
 
@@ -165,6 +185,8 @@ file báo cáo. Hệ quả là:
 - **Luồng chính:** nhập metric theo ngày/kênh → hệ thống validate → aggregate →
   hiển thị views/clicks/conversions/cost/CTR/CPA.
 - **Ngoại lệ:** click vượt view hoặc conversion vượt click → từ chối.
+
+![Hình 2. Use Case của hệ thống](diagrams/usecase.png)
 
 ---
 
@@ -176,7 +198,7 @@ file báo cáo. Hệ quả là:
 |---|---|---|---|
 | `campaigns_channel` | id | — | name unique |
 | `campaigns_campaign` | id | created_by → User | budget >= 0, date range |
-| `campaigns_content` | id | campaign, channel, approved_by | status workflow |
+| `campaigns_content` | id | campaign, channel, approved_by → User | status workflow |
 | `campaigns_metric` | id | campaign, channel | unique campaign/channel/date; nonnegative |
 
 ### 6.2. Quan hệ
@@ -187,7 +209,7 @@ file báo cáo. Hệ quả là:
 - Channel 1–N Metric.
 - User 1–N Campaign qua `created_by` và 1–N Content qua `approved_by`.
 
-Sơ đồ nguồn: [`../../docs/diagrams/erd.dot`](../../docs/diagrams/erd.dot).
+![Hình 3. ERD — có User, approved_by và các quan hệ 1–N](diagrams/erd.png)
 
 ---
 
@@ -198,9 +220,12 @@ Browser
   -> Django URLs/Views + auth/RBAC
   -> Forms/Services/validation
   -> Django ORM + SQLite
-  -> Campaign/Channel/Content/Metric
-  -> AI adapter (prompt version + provider/fallback)
+  -> Campaign/Channel/Content/Metric/User
+  -> AI adapter (prompt version + provider/fallback + JSON validation)
+  -> human approval gate
 ```
+
+![Hình 4. Kiến trúc và luồng dữ liệu chính](diagrams/architecture.png)
 
 ### 7.1. Mapping code
 
@@ -210,9 +235,9 @@ Browser
 | Model | `campaigns/models.py` | entity, validation, aggregate, approval | IMPLEMENTED_BASELINE |
 | Form | `campaigns/forms.py` | input form | IMPLEMENTED_BASELINE |
 | Service | `campaigns/services.py` | create campaign transaction | IMPLEMENTED_BASELINE |
-| View | `campaigns/views.py` | auth/list/create/detail/AI endpoint | IMPLEMENTED_BASELINE |
-| AI | `campaigns/ai_service.py` | prompt/provider/fallback | IMPLEMENTED_BASELINE |
-| Test | `campaigns/tests.py` | hành vi cốt lõi | IMPLEMENTED_BASELINE |
+| View | `campaigns/views.py` | auth/list/create/detail/channel/metric/approval/AI | IMPLEMENTED_BASELINE |
+| AI | `campaigns/ai_service.py` | prompt/provider/fallback/schema validation | IMPLEMENTED_BASELINE |
+| Test | `campaigns/tests.py` | 21 test model/permission/view/AI/CRUD/filter/dashboard/seed | IMPLEMENTED_BASELINE |
 
 ---
 
@@ -227,10 +252,10 @@ sự thật của ngân sách/metric và không tự thay đổi dữ liệu.
 
 | Giai đoạn | Cách sử dụng | Minh chứng |
 |---|---|---|
-| KT1 | phân tích actor, FR/NFR, ERD, vị trí AI | prompt + bản review |
-| KT2 | sinh model/CRUD/test/debug | commit + test output |
-| KT3 | thử prompt caption/summary, kiểm tra overclaim | prompt versions + evaluation |
-| Cuối kỳ | tạo README/report/slide và review | artifacts + checklist |
+| KT1 | phân tích actor, FR/NFR, ERD, vị trí AI | `docs/` + prompt review |
+| KT2 | sinh model/CRUD/test/debug | 21 test + `manage.py check` |
+| KT3 | thử prompt, kiểm tra schema/overclaim | `evidence/ai/AI-CAM-001-v1-review.md` |
+| Cuối kỳ | tạo README/report/asset và review | LaTeX/PDF + checklist |
 
 ---
 
@@ -263,10 +288,15 @@ Hãy đề xuất đúng 5 ý tưởng, mỗi ý tưởng gồm title, hook, dra
   "provider": "fallback|provider-name",
   "prompt_version": "AI-CAM-001-v1",
   "ideas": [{"title": "...", "channel": "...", "hook": "...", "draft": "...", "cta": "..."}],
+  "requested_count": 5,
   "needs_human_approval": true,
   "warning": "..."
 }
 ```
+
+Backend chỉ nhận provider output khi có đúng 5 object đủ `title`, `channel`,
+`hook`, `draft`, `cta`, đúng prompt version và approval flag; nếu sai schema,
+timeout hoặc lỗi mạng thì dùng fallback.
 
 ---
 
@@ -276,21 +306,41 @@ Lệnh đã dùng:
 
 ```powershell
 cd marketing_management
-.venv\Scripts\python.exe manage.py makemigrations campaigns
 .venv\Scripts\python.exe manage.py migrate --noinput
 .venv\Scripts\python.exe manage.py test campaigns -v 1
 .venv\Scripts\python.exe manage.py check
+.venv\Scripts\python.exe manage.py migrate --check
 ```
 
-Các test hiện có:
+Các test hiện có (**21 test**):
 
 1. Aggregate metric và tính CTR/conversion rate/cost per conversion.
 2. Chặn publish khi content AI chưa được duyệt; cho publish sau approve.
 3. Fallback AI trả 5 ý tưởng, provider/fallback và warning/approval flag.
-4. User staff xem được danh sách chiến dịch.
+4. User staff xem được danh sách chiến dịch; user không có role bị chặn dashboard.
+5. Metric sai funnel bị từ chối; staff ghi metric được qua form.
+6. Manager duyệt content qua route; AI endpoint từ chối brief rỗng.
+7. Provider output sai contract chuyển fallback an toàn.
+8. Campaign/Channel/Content/Metric đều hỗ trợ update và POST delete.
+9. Campaign list lọc theo từ khóa, channel, khoảng ngày và sắp xếp.
+10. Bộ lọc ngày/sắp xếp sai trả thông báo, không làm ứng dụng crash.
+11. Dashboard aggregate KPI từ metric và số nội dung chờ duyệt.
+12. Xóa channel đang được tham chiếu xử lý `ProtectedError` an toàn.
+13. Staff bị chặn các route delete chỉ dành cho manager.
+14. `seed_demo` idempotent và không lỗi mã hóa console Windows.
 
-Kết quả gần nhất: **4 tests, OK; Django system check không có lỗi**. Đây là
-bằng chứng baseline tại thời điểm báo cáo, không phải cam kết production.
+Kết quả gần nhất: 21 tests, OK; Django system check không có lỗi; migration
+check đạt. PDF A4 đã được render kiểm tra ở cả màu và grayscale; biểu đồ/sơ đồ
+không dùng màu làm tín hiệu duy nhất. Phản hồi AI fallback đã lưu và kiểm chứng tại
+`evidence/ai/AI-CAM-001-v1-review.md` cùng JSON redacted.
+
+### 10.1. Đối chiếu Bài kiểm tra thường xuyên 2
+
+Ma trận đầy đủ 10 tiêu chí, lệnh chạy và giới hạn bằng chứng nằm tại
+`docs/13-bai-2-implementation.md`. Baseline hiện có cấu trúc dự án, đăng nhập và
+RBAC, CRUD bốn nhóm dữ liệu, tìm kiếm/lọc/sắp xếp, dashboard KPI, validation và
+README/`.env.example`. Minh chứng AI hỗ trợ lập trình được lưu tại
+`evidence/ai/B2-CODE-001-v1-review.md`.
 
 ---
 
@@ -298,26 +348,26 @@ bằng chứng baseline tại thời điểm báo cáo, không phải cam kết 
 
 | ID | Rủi ro/điểm mở | Mức | Cách xử lý |
 |---|---|---|---|
-| RISK-001 | Provider ngoài chưa có integration test | Cao | dùng fallback; thêm test mock/contract |
-| RISK-002 | AI overclaim hoặc prompt injection | Cao | grounding, warning, approval, redaction |
-| RISK-003 | Quyền Manager/Staff cần chốt với giảng viên | Trung bình | ghi decision log, test ma trận quyền |
-| RISK-004 | Báo cáo AI UI chưa hoàn thiện | Trung bình | làm sau baseline, giữ PROPOSED |
-| RISK-005 | Tài liệu bán hàng cũ trong repo | Cao | manifest loại khỏi canonical, đánh dấu LEGACY |
+| RISK-001 | Provider ngoài chưa test | Cao | fallback + mock/contract |
+| RISK-002 | Overclaim/prompt injection | Cao | grounding + approval + redaction |
+| RISK-003 | Ma trận quyền cần xác nhận | Trung bình | test quyền; chốt khi demo |
+| RISK-004 | AI UI summary chưa có | Trung bình | giữ PROPOSED |
+| RISK-005 | Tài liệu legacy | Cao | loại khỏi manifest |
 
 ---
 
 ## 12. Kế hoạch triển khai tiếp
 
-1. Hoàn thiện channel/metric CRUD và filter theo kênh/thời gian.
+1. Bổ sung filter channel/thời gian và audit log đầy đủ.
 2. Thêm màn hình AI ideas và tạo Content từ draft với audit record.
 3. Thêm AI performance summary từ metric đã kiểm quyền.
-4. Thêm test integration provider mock, injection, PII, timeout và schema lỗi.
-5. Sinh DOCX/PDF/ZIP sau khi nội dung canonical ổn định.
+4. Thêm integration test provider mock, injection, PII, timeout và schema lỗi.
+5. Đóng gói LaTeX/PDF/ZIP sau khi checklist và render QA đạt.
 
 ## Kết luận
 
 Đề tài đúng của nhóm là **Hệ thống quản lý chiến dịch marketing có tích hợp AI**,
-không phải hệ thống quản lý bán hàng. Thiết kế đã xác định rõ bối cảnh, actor,
-FR/NFR, dữ liệu, kiến trúc, vị trí AI, prompt và cơ chế duyệt. Baseline code chứng
-minh các phần cốt lõi ở mức học tập; các phần chưa có bằng chứng được giữ nhãn
-`PROPOSED/OPEN` để bảo đảm trung thực học thuật.
+không phải hệ thống quản lý bán hàng. Hồ sơ đã xác định bối cảnh, actor, FR/NFR,
+dữ liệu, kiến trúc, vị trí AI, prompt, approval gate, backup và minh chứng phản
+hồi. Baseline code/test khớp với các trạng thái trong báo cáo; provider thật và
+AI summary vẫn giữ nhãn `PROPOSED/OPEN` để bảo đảm trung thực học thuật.

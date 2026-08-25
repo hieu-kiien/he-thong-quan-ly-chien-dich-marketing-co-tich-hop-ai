@@ -1,0 +1,50 @@
+[
+  {
+    "id": "RAG-01",
+    "query": "tên đề tài chính thức học phần AIA331 chiến dịch marketing",
+    "expected_paths": ["project.md"],
+    "expected_authority_paths": ["source-materials/DỰ ÁN.png"]
+  },
+  {
+    "id": "RAG-02",
+    "query": "10 tiêu chí bài kiểm tra đánh giá dự án",
+    "expected_paths": ["docs/09-assessment-checklist.md"],
+    "expected_authority_paths": ["source-materials/BÀI KIỂM TRA.png"]
+  },
+  {
+    "id": "RAG-03",
+    "query": "yêu cầu chức năng campaign input process output",
+    "expected_paths": ["docs/01-requirements-summary.md", "project.md"]
+  },
+  {
+    "id": "RAG-04",
+    "query": "ERD database khóa và ràng buộc chiến dịch",
+    "expected_paths": ["docs/09-assessment-checklist.md", "docs/02-architecture-and-code-status.md"]
+  },
+  {
+    "id": "RAG-05",
+    "query": "AI prompt version human approval output contract",
+    "expected_paths": ["marketing_management/campaigns/ai_service.py", "docs/04-ai-specification.md"]
+  },
+  {
+    "id": "RAG-06",
+    "query": "AI-CAM-001-v1 prompt marketing Facebook hook CTA",
+    "expected_paths": ["marketing_management/campaigns/ai_service.py", "prompts/marketing/AI-CAM-001-v1-content-ideas.md"]
+  },
+  {
+    "id": "RAG-07",
+    "query": "không trộn đề tài quản lý bán hàng legacy",
+    "expected_paths": ["project.md", "docs/10-priority-policy.md"],
+    "forbidden_paths": ["sales_management/", "Code QLBH/", "prompts/07-RAG/"]
+  },
+  {
+    "id": "RAG-08",
+    "query": "human approval nội dung AI bản nháp",
+    "expected_paths": ["marketing_management/campaigns/services.py", "docs/04-ai-specification.md"]
+  },
+  {
+    "id": "RAG-09",
+    "query": "Campaign model start_date end_date budget validation",
+    "expected_paths": ["marketing_management/campaigns/models.py"]
+  }
+]

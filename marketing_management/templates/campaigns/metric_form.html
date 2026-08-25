@@ -1,0 +1,3 @@
+{% extends "base.html" %}
+{% block title %}{{ title|default:'Ghi metric' }} — Marketing AI{% endblock %}
+{% block content %}<section class="card form-card"><span class="eyebrow">{{ campaign.name }}</span><h1>{{ title|default:'Ghi nhận metric' }}</h1><p class="muted">Mỗi kênh chỉ có một bản ghi trong một ngày; hệ thống tự chặn số liệu không hợp lệ.</p><form method="post">{% csrf_token %}{{ form.as_p }}<div class="actions"><button class="button" type="submit">Lưu metric</button><a class="button secondary" href="{% url 'campaigns:detail' campaign.pk %}">Hủy</a></div></form></section>{% endblock %}

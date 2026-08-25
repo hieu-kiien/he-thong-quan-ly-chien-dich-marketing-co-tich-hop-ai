@@ -1,0 +1,43 @@
+{
+  "provider": "fallback",
+  "prompt_version": "AI-CAM-001-v1",
+  "ideas": [
+    {
+      "title": "Ý tưởng 1: Nêu vấn đề thường gặp của khách hàng",
+      "channel": "Facebook",
+      "hook": "Bạn đang quan tâm đến ra mắt sản phẩm a cho sinh viên và người đi làm trẻ tại thái nguyên?",
+      "draft": "Nội dung nháp theo giọng thân thiện, rõ ràng, tập trung vào: nêu vấn đề thường gặp của khách hàng.",
+      "cta": "Tìm hiểu thêm và liên hệ để được tư vấn."
+    },
+    {
+      "title": "Ý tưởng 2: Giải thích lợi ích bằng một tình huống ngắn",
+      "channel": "Facebook",
+      "hook": "Bạn đang quan tâm đến ra mắt sản phẩm a cho sinh viên và người đi làm trẻ tại thái nguyên?",
+      "draft": "Nội dung nháp theo giọng thân thiện, rõ ràng, tập trung vào: giải thích lợi ích bằng một tình huống ngắn.",
+      "cta": "Tìm hiểu thêm và liên hệ để được tư vấn."
+    },
+    {
+      "title": "Ý tưởng 3: Đưa ra checklist thực hành nhanh",
+      "channel": "Facebook",
+      "hook": "Bạn đang quan tâm đến ra mắt sản phẩm a cho sinh viên và người đi làm trẻ tại thái nguyên?",
+      "draft": "Nội dung nháp theo giọng thân thiện, rõ ràng, tập trung vào: đưa ra checklist thực hành nhanh.",
+      "cta": "Tìm hiểu thêm và liên hệ để được tư vấn."
+    },
+    {
+      "title": "Ý tưởng 4: Kể câu chuyện trải nghiệm của người dùng",
+      "channel": "Facebook",
+      "hook": "Bạn đang quan tâm đến ra mắt sản phẩm a cho sinh viên và người đi làm trẻ tại thái nguyên?",
+      "draft": "Nội dung nháp theo giọng thân thiện, rõ ràng, tập trung vào: kể câu chuyện trải nghiệm của người dùng.",
+      "cta": "Tìm hiểu thêm và liên hệ để được tư vấn."
+    },
+    {
+      "title": "Ý tưởng 5: Mời khách hàng tham gia ưu đãi hoặc thử nghiệm",
+      "channel": "Facebook",
+      "hook": "Bạn đang quan tâm đến ra mắt sản phẩm a cho sinh viên và người đi làm trẻ tại thái nguyên?",
+      "draft": "Nội dung nháp theo giọng thân thiện, rõ ràng, tập trung vào: mời khách hàng tham gia ưu đãi hoặc thử nghiệm.",
+      "cta": "Tìm hiểu thêm và liên hệ để được tư vấn."
+    }
+  ],
+  "needs_human_approval": true,
+  "warning": "Đây là nội dung nháp; cần kiểm tra sự thật và duyệt trước khi sử dụng."
+}

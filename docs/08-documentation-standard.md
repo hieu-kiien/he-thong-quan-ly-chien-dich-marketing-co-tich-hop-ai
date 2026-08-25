@@ -5,7 +5,7 @@ project_id: AIA331-80300-MARKETING-AI
 priority: P2
 priority_level: MEDIUM
 status: DERIVED
-last_reviewed: 2026-08-18
+last_reviewed: 2026-08-19
 ---
 
 # Chuẩn tài liệu và hồ sơ nộp
@@ -13,16 +13,17 @@ last_reviewed: 2026-08-18
 ## 1. Thứ tự ưu tiên
 
 Đề bài/giảng viên → mẫu hiện hành của Khoa/ICTU → quy định trường → chuẩn học
-thuật/kỹ thuật. Không áp một mẫu Word duy nhất cho mọi loại tài liệu.
+thuật/kỹ thuật. Không áp một mẫu định dạng duy nhất cho mọi loại tài liệu.
 
-## 2. Baseline Word/PDF an toàn
+## 2. Baseline LaTeX/PDF an toàn
 
-- A4.
-- Lề trái 3,5 cm; phải 2 cm; trên/dưới 2,5 cm.
-- Times New Roman, Unicode, 13 pt.
-- Line spacing Multiple 1.3; Before/After 6 pt.
-- Heading dùng Styles; mục lục tự động; đánh số hình/bảng.
+- A4; chọn lề theo mẫu Khoa/ICTU và giữ nhất quán trong tệp `.tex`.
+- Unicode tiếng Việt, font tương đương Times New Roman; cỡ chữ và giãn dòng
+  phải đọc được khi in.
+- Mục lục tự động; đánh số hình/bảng; mã nguồn LaTeX có thể biên dịch lại.
 - Một bìa đơn giản, không đưa prompt/code/URL lên bìa.
+- Print-safe: palette tiết chế, nền rất nhạt, chữ/đường viền đủ đậm; không dùng
+  màu làm kênh thông tin duy nhất; biểu đồ phải có nhãn, chú giải và dạng nét.
 
 ## 3. Bìa dự án
 
@@ -45,10 +46,11 @@ Thái Nguyên, 2026
 
 ## 4. Độ dài và cấu trúc
 
-Bài tập ngắn 3–8 trang chỉ cần đúng yêu cầu và bằng chứng cốt lõi. Báo cáo dự
-án nên khoảng 25–40 trang nội dung chính; prompt dài, log và ảnh để phụ lục.
-“Đủ” nghĩa là mọi yêu cầu có ID, mô tả, thiết kế, trạng thái và bằng chứng —
-không phải kéo dài bằng nội dung lặp.
+Bài tập ngắn 3–8 trang chỉ cần đúng yêu cầu và bằng chứng cốt lõi. Độ dài báo
+cáo dự án theo yêu cầu GV; bản kiểm tra này ưu tiên bản cô đọng 13 trang A4,
+còn prompt/log/ảnh cần thiết được giữ trong phụ lục và ZIP. “Đủ” nghĩa là mọi
+yêu cầu có ID, mô tả, thiết kế, trạng thái và bằng chứng — không phải kéo dài
+bằng nội dung lặp.
 
 ## 5. Kiểm tra trước khi nộp
 

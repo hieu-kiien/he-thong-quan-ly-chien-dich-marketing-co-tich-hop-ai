@@ -37,6 +37,7 @@ prompt là P2; các dự án bán hàng cũ là LEGACY.
 7. Xem cấp ưu tiên và bản đồ thư mục tại [`docs/10-priority-policy.md`](docs/10-priority-policy.md).
 8. Dùng [`docs/11-rag-implementation.md`](docs/11-rag-implementation.md) để
    build/truy hồi corpus tài liệu; dùng GitNexus riêng cho code graph.
+9. Đối chiếu triển khai Bài 2 tại [`docs/13-bai-2-implementation.md`](docs/13-bai-2-implementation.md).
 
 ## Chạy baseline
 

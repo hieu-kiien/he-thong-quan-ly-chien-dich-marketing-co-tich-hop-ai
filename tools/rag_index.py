@@ -162,10 +162,13 @@ def _authority_map(manifest: dict[str, Any], root: Path) -> tuple[dict[str, dict
     missing: list[str] = []
     for item in manifest.get("authority_assets", []):
         path = str(item["path"])
-        exists = (root / path).is_file()
+        source_path = root / path
+        exists = source_path.is_file()
         assets[item["source_id"]] = {**item, "exists": exists}
         if not exists:
             missing.append(path)
+        elif item.get("sha256") and _sha256(source_path.read_bytes()) != item["sha256"]:
+            missing.append(f"{path} (sha256 mismatch)")
     return assets, missing
 
 
@@ -528,7 +531,7 @@ def search_index(
             ORDER BY bm25_rank ASC
             LIMIT ?
             """,
-            (fts_query, project_id, max(top_k * 4, top_k)),
+            (fts_query, project_id, max(top_k * 8, top_k)),
         ).fetchall()
     finally:
         connection.close()
@@ -564,7 +567,16 @@ def search_index(
             }
         )
     results.sort(key=lambda item: (-item["score"], item["path"], item["line_start"]))
-    return results[:top_k]
+    diverse_results: list[dict[str, Any]] = []
+    seen_paths: set[str] = set()
+    for result in results:
+        if result["path"] in seen_paths:
+            continue
+        seen_paths.add(result["path"])
+        diverse_results.append(result)
+        if len(diverse_results) == top_k:
+            break
+    return diverse_results
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:

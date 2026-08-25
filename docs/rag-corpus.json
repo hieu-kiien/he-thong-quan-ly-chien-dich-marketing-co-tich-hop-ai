@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project_id": "AIA331-80300-MARKETING-AI",
   "project_title": "Hệ thống quản lý chiến dịch marketing có tích hợp AI",
-  "last_reviewed": "2026-08-18",
+  "last_reviewed": "2026-08-25",
   "authority_assets": [
     {
       "source_id": "SRC-000",
@@ -11,6 +11,7 @@
       "priority": "P0",
       "priority_level": "CRITICAL",
       "status": "CANONICAL",
+      "sha256": "d12f72d01eff51649108c867e0e30d74d445daebf36360bcddfa1460666957fd",
       "description": "Ảnh chứa 10 tiêu chí đánh giá bài kiểm tra."
     },
     {
@@ -20,6 +21,7 @@
       "priority": "P0",
       "priority_level": "CRITICAL",
       "status": "CANONICAL",
+      "sha256": "6c4fe9441baf80ba5cb574357b3295c37ef032b2799bec7e7ba0d150264ad7e3",
       "description": "Ảnh chứa tên đề tài, học phần, mã số và yêu cầu dự án."
     }
   ],
@@ -120,6 +122,14 @@
       "priority": "P1",
       "priority_level": "HIGH",
       "status": "SUBMISSION_CANONICAL",
+      "front_matter": true
+    },
+    {
+      "source_id": "AI-EVIDENCE-REVIEW",
+      "glob": "evidence/ai/*.md",
+      "priority": "P1",
+      "priority_level": "HIGH",
+      "status": "IMPLEMENTED_BASELINE",
       "front_matter": true
     }
   ],

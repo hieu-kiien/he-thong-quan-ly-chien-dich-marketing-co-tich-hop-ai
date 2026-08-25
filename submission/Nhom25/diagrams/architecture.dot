@@ -1,14 +1,19 @@
 digraph architecture {
   graph [rankdir=LR, bgcolor="white", pad=0.2, nodesep=0.35, ranksep=0.6];
   node [shape=box, style="rounded,filled", fontname="Arial", fontsize=11, color="#d0d5dd", fillcolor="#f8f9fc"];
-  edge [fontname="Arial", fontsize=9, color="#6841d8"];
-  Browser [label="Browser\nHTML/CSS", fillcolor="#eef4ff"];
-  Django [label="Django\nAuth + Views + Forms", fillcolor="#f4f3ff"];
-  Services [label="Services\nvalidation + workflow", fillcolor="#f4f3ff"];
-  DB [label="SQLite\nCampaign/Channel/Content/Metric", shape=cylinder, fillcolor="#ecfdf3"];
-  AI [label="AI adapter\nprompt v1 + provider/fallback", fillcolor="#fff7ed"];
+  edge [fontname="Arial", fontsize=9, color="#4b5563"];
+  Browser [label="Browser\nHTML/CSS", fillcolor="#f8f9fa"];
+  Django [label="Django\nAuth + Views + Forms", fillcolor="#e7ebee"];
+  Services [label="Services\nvalidation + workflow", fillcolor="#e7ebee"];
+  DB [label="SQLite\nCampaign/Channel/Content/Metric/User", shape=cylinder, fillcolor="#d9e0e5"];
+  AI [label="AI adapter\nprompt v1 + provider/fallback\nJSON schema validation", fillcolor="#e7ebee"];
+  RAG [label="RAG tài liệu\nallowlist + citation", fillcolor="#f1f3f5"];
+  Approval [label="Human approval\nDRAFT → APPROVED → PUBLISHED", fillcolor="#d9e0e5"];
   Browser -> Django -> Services;
   Services -> DB [label="CRUD/metrics"];
   Services -> AI [label="approved context"];
-  AI -> Services [label="draft + warning"];
+  Services -> RAG [label="requirements/docs"];
+  AI -> Services [label="validated draft + warning"];
+  AI -> Approval [label="needs review"];
+  Approval -> DB [label="status/audit"];
 }
