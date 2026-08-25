@@ -11,7 +11,7 @@ source: ../README.md (nội dung README cũ)
 Module này cung cấp các hàm tiện ích để kiểm tra số nguyên tố và tính tổng các
 số nguyên tố trong một danh sách số nguyên. Nội dung này không thuộc dự án
 `BAI03-SALES-AI`, nhưng được giữ lại để không làm mất tài liệu của các file
-`func*.py` và `test_func*.py`.
+`archive/experiments/prime-utilities/func*.py` và các test đi kèm.
 
 ## `is_prime(n: int) -> bool`
 

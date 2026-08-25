@@ -23,9 +23,9 @@ một yêu cầu mới của giảng viên.
 |---|---|---|---|
 | `P0 / CRITICAL` | Nguồn ràng buộc cao nhất | `source-materials/BÀI KIỂM TRA.png`; `source-materials/DỰ ÁN.png` | Đọc trước; không chỉnh nội dung; dùng để phân xử xung đột |
 | `P1 / HIGH` | Phải hoàn thành/đối chiếu để làm và nộp bài | `project.md`, `informember.md`, `docs/00`–`docs/05`, `docs/09`, `docs/11`, `docs/99`, code baseline, tests, RAG manifest/tool, `submission/Nhom25/` | Ưu tiên triển khai, kiểm thử và kiểm tra hồ sơ |
-| `P2 / MEDIUM` | Tài liệu hỗ trợ thực hiện | `docs/06`–`docs/08`, guides, prompts, slide học tập | Dùng để thiết kế/tra cứu; không được override P0/P1 |
+| `P2 / MEDIUM` | Tài liệu hỗ trợ thực hiện | `docs/06`–`docs/08`, `docs/reference/`, prompts, `archive/reference/` | Dùng để thiết kế/tra cứu; không được override P0/P1 |
 | `P3 / LOW` | Tài liệu tham khảo không ảnh hưởng phạm vi hiện tại | bài tập thử nghiệm, notebook, PDF tham khảo không thuộc đề tài | Chỉ mở khi cần; không đưa vào source-of-truth |
-| `LEGACY` | Lịch sử của đề tài khác | `Code QLBH/`, `sales_management/`, báo cáo bán hàng cũ, `docs/legacy/` | Giữ nguyên để bảo toàn lịch sử; loại khỏi truy hồi canonical |
+| `LEGACY` | Lịch sử của đề tài khác | `archive/legacy/`, `docs/legacy/` | Giữ nguyên để bảo toàn lịch sử; loại khỏi truy hồi canonical |
 
 `LEGACY` là trạng thái loại khỏi phạm vi, không phải một yêu cầu cần làm.
 
@@ -40,8 +40,8 @@ một yêu cầu mới của giảng viên.
 | `prompts/marketing/` | Prompt theo đề tài marketing | P2; prompt chưa triển khai ghi `PROPOSED` |
 | `submission/Nhom25/` | Hồ sơ nộp và bản sao nguồn | P1 |
 | `tools/` | Script sinh/kiểm tra artifact | P1 nếu dùng cho hồ sơ hiện tại |
-| `Slide_PDF/` và file học tập ở root | Tài liệu học tập/tham khảo | P2/P3 |
-| `Code QLBH/`, `sales_management/`, `submission/legacy-sales/` | Artifact đề tài bán hàng cũ | LEGACY |
+| `archive/reference/` | Tài liệu học tập/tham khảo | P2/P3 |
+| `archive/legacy/` | Artifact đề tài bán hàng cũ | LEGACY |
 
 ## 4. Quy tắc khi có tài liệu mới
 

@@ -139,12 +139,18 @@
       "priority_level": "HIGH",
       "status": "IMPLEMENTED_BASELINE",
       "front_matter": true
+    },
+    {
+      "source_id": "SKILL-INDEX",
+      "glob": "skill/*.md",
+      "priority": "P2",
+      "priority_level": "MEDIUM",
+      "status": "REFERENCE",
+      "front_matter": true
     }
   ],
   "excluded_paths": [
-    "Code QLBH/**",
-    "sales_management/**",
-    "submission/legacy-sales/**",
+    "archive/**",
     "submission/archive/**",
     "docs/legacy/**",
     "prompts/01-*",
@@ -162,7 +168,6 @@
     "prompts/13-*",
     "prompts/14-*",
     "prompts/15-*",
-    "Slide_PDF/**",
     "**/.venv/**",
     "**/.env",
     "**/*.sqlite3",

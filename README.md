@@ -7,7 +7,7 @@ priority: P1
 priority_level: HIGH
 status: CANONICAL
 language: vi
-last_reviewed: 2026-08-18
+last_reviewed: 2026-08-25
 ---
 
 # AIA331-80300-MARKETING-AI
@@ -20,6 +20,21 @@ Hai ảnh `source-materials/BÀI KIỂM TRA.png` và
 đề tài chính thức của học phần **Ứng dụng trí tuệ nhân tạo - AIA331**, mã
 **80300**, hình thức **Dự án**. Repo này dùng chúng làm source-of-truth; không
 trộn với dự án quản lý bán hàng trước đó.
+
+## Bản đồ thư mục khi mở repo
+
+```text
+marketing_management/  # Django + SQLite: mã nguồn web canonical
+docs/                  # phân tích, thiết kế, checklist, RAG
+source-materials/      # hai ảnh P0, không chỉnh sửa
+prompts/               # prompt marketing có version
+evidence/              # minh chứng AI và runtime
+submission/            # hồ sơ nộp Nhóm 25
+tools/                 # script build/kiểm tra
+skill/                 # chỉ mục skill cho web/testing/RAG
+archive/               # legacy, reference và thử nghiệm cũ
+.local/                # cache/artifact local, bị loại khỏi Git
+```
 
 Phân cấp đầy đủ được ghi tại [`docs/10-priority-policy.md`](docs/10-priority-policy.md):
 chỉ hai ảnh là P0; hồ sơ, checklist, baseline và test là P1; tài liệu hỗ trợ và
@@ -69,13 +84,17 @@ provider ngoài chỉ qua `.env` theo `marketing_management/.env.example`.
 |---|---|
 | `project.md` | Yêu cầu gốc, `CANONICAL` |
 | `docs/` | Tài liệu đã chuẩn hóa cho AI/người đọc |
+| `docs/reference/` | Context và prompt guide hỗ trợ, không thay thế nguồn P0 |
 | `docs/rag-corpus.json` và `tools/rag_index.py` | Manifest + RAG local có citation; database `.rag/` sinh lại được |
 | `marketing_management/` | Baseline Django marketing, `IMPLEMENTED_BASELINE` |
+| `skill/` | Chỉ mục skill phục vụ phát triển web, test và RAG |
 | `prompts/` | Prompt/minh chứng theo đề tài marketing |
+| `evidence/` | Minh chứng AI và runtime |
 | `submission/Nhom25/` | Hồ sơ nộp được sinh từ nguồn canonical |
 | `source-materials/` | Hai nguồn P0 / CRITICAL, không chỉnh nội dung |
-| `Slide_PDF/` và các file học tập ở root | Tài liệu tham khảo, không phải source-of-truth |
-| `submission/legacy-sales/`, `Code QLBH/`, `sales_management/` và các nhánh bán hàng cũ | `LEGACY`, không phải source của đề tài |
+| `archive/reference/` | Slide, PDF và notebook học tập, `REFERENCE` |
+| `archive/experiments/` | Bài thử nghiệm Python cũ, `LEGACY` |
+| `archive/legacy/` | Dự án/hồ sơ bán hàng cũ, `LEGACY` |
 
 ## Quy tắc trạng thái
 

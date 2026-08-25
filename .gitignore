@@ -11,6 +11,7 @@ __pycache__/
 knowledge_store/
 .rag/
 tmp/
+.local/
 .lo_profile*/
 ~$*.docx
 
@@ -19,7 +20,7 @@ media/
 staticfiles/
 
 # Generated notebook checkpoints remain local; source notebooks and reference PDFs
-# are included in the repository because they are part of the project materials.
+# live under archive/reference/ because they are not application code.
 **/.ipynb_checkpoints/
 
 # Working drafts for the assignment orchestration; final files live under submission/

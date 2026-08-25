@@ -35,7 +35,7 @@
     "id": "RAG-07",
     "query": "không trộn đề tài quản lý bán hàng legacy",
     "expected_paths": ["project.md", "docs/10-priority-policy.md"],
-    "forbidden_paths": ["sales_management/", "Code QLBH/", "prompts/07-RAG/"]
+    "forbidden_paths": ["archive/legacy/", "prompts/07-RAG/"]
   },
   {
     "id": "RAG-08",

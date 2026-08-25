@@ -2,10 +2,9 @@
 # by tools/rag_index.py and docs/rag-corpus.json, so generated/reference files
 # do not belong in the graph.
 
-# Unrelated legacy sales project.
-Code QLBH/
-sales_management/
-submission/legacy-sales/
+# Archived legacy/reference material is not application code.
+archive/
+.local/
 docs/legacy/
 
 # Old sales/prompt exercise folders; the active prompts live in prompts/marketing/.
@@ -26,17 +25,8 @@ prompts/14-Kiem-thu-va-tinh-chinh-prompt/
 prompts/15-Bao-mat-prompt/
 
 # Learning/reference material and notebooks are not application code.
-Slide_PDF/
 *.ipynb
 *.pdf
-func.py
-func1.py
-func2.py
-test_func.py
-test_func2.py
-prompts_code.md
-CreatePrompts.md
-ContextProject.md
 
 # Report-generation helpers create a large, low-value document utility graph.
 tools/build_marketing_report.py

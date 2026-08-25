@@ -45,9 +45,9 @@ kiểm tra được.
 
 ## 4. Ranh giới hiện thực
 
-`marketing_management/` là baseline canonical. Các thư mục `Code QLBH/`,
-`sales_management/`, báo cáo bán hàng và `QLBH demo/` là `LEGACY`, giữ lại để
-không mất lịch sử nhưng không được dùng để chứng minh đề tài marketing.
+`marketing_management/` là baseline canonical. Các artifact bán hàng cũ trong
+`archive/legacy/` là `LEGACY`, giữ lại để không mất lịch sử nhưng không được
+dùng để chứng minh đề tài marketing.
 
 ## 5. Nguồn P0 / CRITICAL
 

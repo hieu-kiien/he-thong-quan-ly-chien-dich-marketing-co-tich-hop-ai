@@ -30,6 +30,7 @@ last_reviewed: 2026-08-25
 | 10 tiêu chí triển khai Bài 2? | [`13-bai-2-implementation.md`](13-bai-2-implementation.md) |
 | Cấp ưu tiên và cấu trúc repo? | [`10-priority-policy.md`](10-priority-policy.md) |
 | Sao lưu, phục hồi và hiệu năng? | [`12-operations-and-backup.md`](12-operations-and-backup.md) |
+| Skill nào dùng cho web/testing/RAG? | [`../skill/README.md`](../skill/README.md) |
 
 ## Trạng thái
 

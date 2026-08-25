@@ -25,6 +25,10 @@ canonical_sources:
     status: CANONICAL
   - path: docs/*.md
     status: CANONICAL_DERIVED
+  - path: docs/reference/*.md
+    status: REFERENCE
+  - path: skill/*.md
+    status: REFERENCE
   - path: marketing_management/**/*.py
     status: IMPLEMENTED_BASELINE
   - path: prompts/marketing/**/*.md
@@ -34,16 +38,16 @@ canonical_sources:
   - path: submission/Nhom25/*.md
     status: SUBMISSION_CANONICAL
 reference_sources:
-  - path: Slide_PDF/**
+  - path: archive/reference/Slide_PDF/**
     priority: P2
     status: REFERENCE
-  - path: Do_an_tot_nghiep_thiet_ke_website_ban_dien_thoai_di_dong.pdf
+  - path: archive/reference/Do_an_tot_nghiep_thiet_ke_website_ban_dien_thoai_di_dong.pdf
     priority: P3
     status: REFERENCE
-  - path: "*.ipynb"
+  - path: archive/reference/notebooks/**
     priority: P3
     status: REFERENCE
-  - path: "func*.py"
+  - path: archive/experiments/prime-utilities/func*.py
     priority: P3
     status: LEGACY
 excluded_from_canonical_retrieval:
@@ -54,9 +58,7 @@ excluded_from_canonical_retrieval:
   - "**/.gitnexus/**"
   - "prompts/**"
   - "!prompts/marketing/**"
-  - "Code QLBH/**"
-  - "sales_management/**"
-  - "../QLBH demo/**"
+  - "archive/legacy/**"
   - "submission/archive/**"
   - "docs/legacy/**"
 status_legend:

@@ -58,10 +58,9 @@ triển khai.
 
 ## Legacy
 
-Các đường dẫn `Code QLBH/`, `sales_management/`, các báo cáo bán hàng cũ và
-`QLBH demo/` là artifact lịch sử của một đề tài khác. Không tham chiếu chúng để
-chứng minh yêu cầu marketing. Không xóa dữ liệu lịch sử nếu chưa có yêu cầu
-riêng; chỉ đánh dấu và loại khỏi manifest canonical.
+Các đường dẫn trong `archive/legacy/` là artifact lịch sử của đề tài bán hàng
+khác. Không tham chiếu chúng để chứng minh yêu cầu marketing. Không xóa dữ liệu
+lịch sử nếu chưa có yêu cầu riêng; chỉ đánh dấu và loại khỏi manifest canonical.
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
