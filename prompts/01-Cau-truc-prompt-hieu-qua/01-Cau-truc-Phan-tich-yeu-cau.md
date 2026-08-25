@@ -6,7 +6,7 @@ Cấu trúc prompt hiệu quả: Instructions, Context, Input Data/Constraints, 
 ## Prompt sử dụng
 
 [Instructions]
-Dựa vào mô tả bài toán : Thông tin dự án: Codes\Bai 03\project.md
+Dựa vào mô tả bài toán : Thông tin dự án: projects\Bai 03\project.md
 Phân tích yêu cầu cho hệ thống quản lý bán hàng có tích hợp AI. Hãy xác định vấn đề nghiệp vụ, mục tiêu, actor, chức năng chính, dữ liệu chính, yêu cầu phi chức năng và các rủi ro cần lưu ý.
 
 [Context]
