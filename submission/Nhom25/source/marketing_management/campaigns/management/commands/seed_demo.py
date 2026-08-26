@@ -44,4 +44,8 @@ class Command(BaseCommand):
                 "status": Content.Status.PENDING_REVIEW,
             },
         )
-        self.stdout.write(self.style.SUCCESS("Đã tạo dữ liệu demo marketing."))
+        # Keep management-command output ASCII-safe on Windows consoles whose
+        # active code page may not be UTF-8. The command's data changes are
+        # already verified separately; this message must not turn a successful
+        # seed into a UnicodeEncodeError.
+        self.stdout.write(self.style.SUCCESS("Demo marketing data is ready."))
