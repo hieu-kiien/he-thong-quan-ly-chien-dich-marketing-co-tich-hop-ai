@@ -1,0 +1,244 @@
+\appendix
+\chapter{PHỤ LỤC -- DDL, CẤU HÌNH VÀ MINH CHỨNG}
+
+\section{Ma trận đối chiếu tiêu chí môn học và minh chứng}
+
+Ma trận này dùng để kiểm toán báo cáo trước khi nộp. Trạng thái ``Đã mô tả'' chỉ có nghĩa là nội dung đã được trình bày trong tài liệu; trạng thái ``Cần minh chứng'' yêu cầu bổ sung ảnh chụp, log, mã nguồn hoặc kết quả chạy thật. Nhóm không ghi ``Đạt'' nếu chưa có bằng chứng tương ứng.
+
+\begingroup
+\scriptsize
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\begin{longtable}{|C{1.0cm}|L{5.0cm}|L{4.7cm}|L{2.3cm}|}
+\caption{Ma trận đối chiếu tiêu chí môn học và minh chứng}\label{tab:criteria-matrix}\\
+\hline
+\textbf{Mã} & \textbf{Tiêu chí} & \textbf{Vị trí hoặc minh chứng} & \textbf{Trạng thái}\\
+\hline\endfirsthead
+\hline
+\textbf{Mã} & \textbf{Tiêu chí} & \textbf{Vị trí hoặc minh chứng} & \textbf{Trạng thái}\\
+\hline\endhead
+KT1-01 & Phân tích bối cảnh, người dùng, dữ liệu và quy trình nghiệp vụ. & Chương 1, mục 1.1--1.4. & Đã mô tả\\\hline
+KT1-02 & Liệt kê chức năng, đầu vào, xử lý và đầu ra. & Chương 1, mục Yêu cầu chức năng. & Đã mô tả\\\hline
+KT1-03 & Yêu cầu phi chức năng: bảo mật, hiệu năng, dễ dùng, sao lưu và RBAC. & Chương 1, mục Yêu cầu phi chức năng; Phụ lục A. & Thiết kế; cần đo\\\hline
+KT1-04 & Xác định actor, Use Case và mô hình tương tác. & Chương 1, ma trận quyền và Hình 1. & Đã mô tả\\\hline
+KT1-05 & Thiết kế CSDL, ERD, bảng, PK, FK và ràng buộc. & Chương 2, DDL, Hình 2--6. & DDL đã chạy\\\hline
+KT1-06 & Thiết kế kiến trúc frontend, backend, database, AI và luồng dữ liệu. & Chương 3, mục 3.1--3.2, Hình 7. & Thiết kế\\\hline
+KT1-07 & Xác định vị trí AI gắn với dữ liệu và nhu cầu thực tế. & Chương 4, mục 4.1, Hình 8. & Đã mô tả\\\hline
+KT1-08 & Thiết kế system prompt, user prompt, input, output và giới hạn. & Chương 4, mục 4.3. & Thiết kế\\\hline
+KT1-09 & Chứng minh AI hỗ trợ phân tích và thiết kế; có nhận xét của nhóm. & Chương 4, mục 4.9 và nhật ký prompt. & Cần lưu prompt gốc\\\hline
+KT1-10 & Tài liệu phân tích, thiết kế và kế hoạch triển khai bước tiếp theo. & Chương 1--5 và checklist Phụ lục A. & Đã mô tả\\\hline
+KT2-01 & Cấu trúc dự án frontend, backend, database, config và docs hợp lý. & Chương 3, mục 3.3; cây thư mục mẫu. & Mẫu; cần source\\\hline
+KT2-02 & Đăng nhập và phân quyền theo vai trò. & Chương 3, mục 3.4; mã Python minh họa. & Cần ảnh/log\\\hline
+KT2-03 & CRUD các nghiệp vụ chính. & Chương 3, mục 3.5; API mẫu. & Cần ảnh/log\\\hline
+KT2-04 & Tìm kiếm, lọc và sắp xếp dữ liệu. & Chương 3, mục 3.6; tham số truy vấn. & Thiết kế; cần chạy\\\hline
+KT2-05 & Thống kê, báo cáo hoặc dashboard phục vụ nghiệp vụ. & Chương 3, mục 3.6 và công thức KPI. & Cần ảnh chạy\\\hline
+KT2-06 & Giao diện rõ ràng, phản hồi lỗi và trạng thái dễ hiểu. & Chương 3, mục 3.7; Bảng giao diện. & Cần ảnh chạy\\\hline
+KT2-07 & CSDL ổn định, dữ liệu mẫu và seed có thể tạo lại. & Chương 2 và Phụ lục A, DDL. & DDL OK; seed cần\\\hline
+KT2-08 & Xử lý input sai, dữ liệu thiếu, lỗi truy vấn và lỗi phân quyền. & Chương 3, mục 3.8 và ma trận lỗi. & Thiết kế; cần test\\\hline
+KT2-09 & Minh chứng AI được dùng khi lập trình. & Chương 4, bảng nhật ký hỗ trợ phát triển. & Cần log thật\\\hline
+KT2-10 & README, hướng dẫn cài đặt, env.example và phiên bản mã nguồn. & Checklist Phụ lục A và hồ sơ bàn giao. & Cần tệp bàn giao\\\hline
+KT3-01 & AI được tích hợp để phục vụ nghiệp vụ trong hệ thống. & Chương 4, mục 4.1--4.2. & Thiết kế; cần chạy\\\hline
+KT3-02 & Kết nối API/model và quản lý API key bằng môi trường. & Chương 4, mục 4.6; env.example. & Cần provider\\\hline
+KT3-03 & Tách system/user prompt, định dạng và kiểm tra output. & Chương 4, mục 4.3. & Đã thiết kế\\\hline
+KT3-04 & Có ít nhất ba vòng thử prompt hoặc so sánh model. & Chương 4, mục 4.8; bảng kế hoạch đo. & Cần log thật\\\hline
+KT3-05 & AI dùng dữ liệu hệ thống qua truy vấn và kiểm soát quyền. & Chương 4, mục 4.4; whitelist context. & Đã thiết kế\\\hline
+KT3-06 & Kết quả AI dễ đọc, đúng định dạng và có cảnh báo. & Chương 4, mục 4.2 và 4.5. & Thiết kế\\\hline
+KT3-07 & Xử lý timeout, rate limit, dữ liệu rỗng, JSON sai và model lỗi. & Chương 4, mục 4.7; ma trận lỗi. & Thiết kế; cần test\\\hline
+KT3-08 & Kiểm thử chức năng quản lý và chức năng AI. & Chương 3, bộ 20 ca; Chương 4. & Chưa chạy\\\hline
+KT3-09 & AI hỗ trợ review code và nhóm kiểm tra lại kết quả. & Chương 4, mục 4.9. & Cần bằng chứng\\\hline
+KT3-10 & AI được tích hợp vào UX hữu ích, không lẫn với quyền quản lý. & Chương 4, mục 4.5; Hình 8. & Thiết kế; cần ảnh\\\hline
+CK-01 & Chức năng hoàn chỉnh, ổn định và dùng được. & Chương 3, Chương 5 và bộ kiểm thử. & Chưa xác nhận\\\hline
+CK-02 & Chất lượng mã nguồn: rõ ràng, module hóa và bảo trì được. & Chương 3, cấu trúc Python và checklist. & Thiết kế\\\hline
+CK-03 & Chất lượng CSDL: nhất quán, ràng buộc, sao lưu và khôi phục. & Chương 2, DDL và Phụ lục A. & DDL OK; cần restore\\\hline
+CK-04 & Chất lượng giao diện và trải nghiệm người dùng. & Chương 3, mục 3.7; ảnh màn hình. & Cần ảnh\\\hline
+CK-05 & Chất lượng AI: đúng context, kiểm soát, cảnh báo và có người duyệt. & Chương 4 toàn bộ. & Thiết kế; cần đo\\\hline
+CK-06 & Bảo mật, quyền riêng tư, phân quyền và bảo vệ API key. & Chương 1, 3, 4 và env.example. & Thiết kế; cần test\\\hline
+CK-07 & Hiệu năng, ổn định, retry, fallback và không mất dữ liệu. & Chương 3--4, NFR và ma trận lỗi. & Thiết kế; cần đo\\\hline
+CK-08 & Triển khai, đóng gói, README, dữ liệu mẫu và demo. & Phụ lục A, checklist bàn giao. & Cần tệp\\\hline
+CK-09 & Báo cáo kỹ thuật đầy đủ về phân tích, thiết kế, triển khai và AI. & Toàn bộ báo cáo, DDL và minh chứng. & Đã trình bày\\\hline
+CK-10 & Thuyết trình và demo mạch lạc, trả lời được câu hỏi. & Chương 5, mục Kịch bản demo và bàn giao. & Cần demo thật\\\hline
+\end{longtable}
+\endgroup
+
+\noindent Các trạng thái trong ma trận là điểm kiểm toán của hồ sơ hiện có, không phải điểm số. Trước khi nộp, nhóm cần thay những mục ``Cần...'' bằng minh chứng thực tế hoặc ghi rõ phần đó là kế hoạch.
+
+\section{Cách chạy DDL và dữ liệu mẫu}
+
+Bản thiết kế và demo mẫu sử dụng Python 3.11 trở lên, FastAPI, Pydantic Settings và SQLite/SQLAlchemy. DDL trong phụ lục là bản đầy đủ tương ứng với Chương 2. Khi chạy thử, tạo database mới hoặc dùng script seed có thể chạy lặp để kết quả không phụ thuộc thứ tự chạy.
+
+\begin{lstlisting}[language={},caption={Các lệnh chạy thử}]
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
+python -m pip install -r requirements.txt
+copy .env.example .env
+python -m app.db.seed
+uvicorn app.main:app --reload
+\end{lstlisting}
+
+\begin{lstlisting}[language={},caption={Tệp .env.example không chứa secret thật}]
+PROJECT_NAME=AI Marketing Campaign Manager
+DATABASE_URL=sqlite:///./marketing_campaigns.db
+JWT_SECRET=replace-with-a-random-secret
+AI_PROVIDER=mock
+AI_API_KEY=replace-in-local-env
+AI_MODEL=model-name
+AI_TIMEOUT_SECONDS=15
+\end{lstlisting}
+
+\noindent Không commit tệp \texttt{.env} thật. Khi bàn giao, README phải giải thích cách tạo secret ngẫu nhiên, cách tạo tài khoản demo, cách chạy DDL, seed và 20 ca kiểm thử.
+
+\section{DDL đầy đủ}
+
+\begin{lstlisting}[language=SQL,caption={DDL đầy đủ của hệ thống marketing}]
+PRAGMA foreign_keys = ON;
+PRAGMA journal_mode = WAL;
+
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    full_name TEXT NOT NULL,
+    role TEXT NOT NULL
+        CHECK (role IN ('MANAGER','MARKETER')),
+    is_active INTEGER NOT NULL DEFAULT 1
+        CHECK (is_active IN (0,1)),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE product_categories (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT
+);
+
+CREATE TABLE products (
+    id INTEGER PRIMARY KEY,
+    category_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    usp TEXT NOT NULL,
+    audience TEXT NOT NULL,
+    price REAL NOT NULL CHECK (price >= 0),
+    status TEXT NOT NULL DEFAULT 'ACTIVE'
+        CHECK (status IN ('ACTIVE','INACTIVE')),
+    FOREIGN KEY (category_id) REFERENCES product_categories(id)
+        ON DELETE RESTRICT
+);
+
+CREATE TABLE marketing_channels (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    format_rules TEXT NOT NULL
+);
+
+CREATE TABLE campaigns (
+    id INTEGER PRIMARY KEY,
+    product_id INTEGER NOT NULL,
+    owner_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    objective TEXT NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    budget REAL NOT NULL CHECK (budget >= 0),
+    status TEXT NOT NULL DEFAULT 'DRAFT'
+        CHECK (status IN ('DRAFT','ACTIVE','PAUSED','DONE')),
+    CHECK (end_date >= start_date),
+    FOREIGN KEY (product_id) REFERENCES products(id),
+    FOREIGN KEY (owner_id) REFERENCES users(id)
+);
+
+CREATE TABLE marketing_contents (
+    id INTEGER PRIMARY KEY,
+    campaign_id INTEGER NOT NULL,
+    channel_id INTEGER NOT NULL,
+    created_by INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    cta TEXT,
+    status TEXT NOT NULL DEFAULT 'DRAFT'
+        CHECK (status IN ('DRAFT','AI_DRAFT','PENDING',
+                          'APPROVED','REJECTED','PUBLISHED')),
+    ai_provider TEXT,
+    prompt_version TEXT,
+    source_ids TEXT,
+    rejection_reason TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (campaign_id) REFERENCES campaigns(id),
+    FOREIGN KEY (channel_id) REFERENCES marketing_channels(id),
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+CREATE TABLE marketing_schedules (
+    id INTEGER PRIMARY KEY,
+    content_id INTEGER NOT NULL,
+    scheduled_at TEXT NOT NULL,
+    timezone TEXT NOT NULL DEFAULT 'Asia/Ho_Chi_Minh',
+    status TEXT NOT NULL DEFAULT 'PLANNED'
+        CHECK (status IN ('PLANNED','CANCELLED','EXECUTED')),
+    FOREIGN KEY (content_id) REFERENCES marketing_contents(id)
+);
+
+CREATE TABLE campaign_metrics (
+    id INTEGER PRIMARY KEY,
+    campaign_id INTEGER NOT NULL,
+    channel_id INTEGER NOT NULL,
+    metric_date TEXT NOT NULL,
+    views INTEGER NOT NULL DEFAULT 0 CHECK (views >= 0),
+    clicks INTEGER NOT NULL DEFAULT 0 CHECK (clicks >= 0),
+    conversions INTEGER NOT NULL DEFAULT 0 CHECK (conversions >= 0),
+    cost REAL NOT NULL DEFAULT 0 CHECK (cost >= 0),
+    revenue REAL NOT NULL DEFAULT 0 CHECK (revenue >= 0),
+    UNIQUE (campaign_id, channel_id, metric_date),
+    FOREIGN KEY (campaign_id) REFERENCES campaigns(id),
+    FOREIGN KEY (channel_id) REFERENCES marketing_channels(id)
+);
+
+CREATE TABLE ai_logs (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER,
+    campaign_id INTEGER,
+    function_name TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT,
+    prompt_version TEXT NOT NULL,
+    input_tokens INTEGER,
+    output_tokens INTEGER,
+    latency_ms INTEGER,
+    result_status TEXT NOT NULL,
+    error_code TEXT,
+    source_ids TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
+);
+\end{lstlisting}
+
+\section{Quy tắc trạng thái và kiểm tra dữ liệu}
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Quy tắc trạng thái phải kiểm tra ở Python và SQL}
+\begin{tabularx}{\textwidth}{|L{3.2cm}|Y|Y|}
+\hline
+\textbf{Đối tượng} & \textbf{Trạng thái hợp lệ} & \textbf{Điều kiện chuyển}\\\hline
+Chiến dịch & DRAFT, ACTIVE, PAUSED, DONE & Kiểm tra mục tiêu, ngày, ngân sách và sản phẩm.\\\hline
+Nội dung & DRAFT, AI\_DRAFT, PENDING, APPROVED, REJECTED, PUBLISHED & Marketer gửi duyệt; Manager duyệt/từ chối có lý do.\\\hline
+Lịch & PLANNED, CANCELLED, EXECUTED & Chỉ tạo từ nội dung APPROVED.\\\hline
+Sản phẩm & ACTIVE, INACTIVE & Không xóa nhóm khi còn sản phẩm tham chiếu.\\\hline
+\end{tabularx}
+\end{table}
+
+\section{Danh sách minh chứng khi nộp}
+
+\begin{enumerate}
+  \item Bìa có đầy đủ trường, học phần, hình thức, mã số 80300, giảng viên hướng dẫn, nhóm và sinh viên.
+  \item Mục lục ghi rõ Chương 1, Chương 2, Chương 3, Chương 4 và Chương 5; mỗi chương bắt đầu trang mới.
+  \item Danh mục yêu cầu nghiệp vụ P01--P26, BFD, Use Case, ERD và bảng phân quyền.
+  \item Lệnh SQL tạo nhóm sản phẩm, sản phẩm và các bảng liên quan; ảnh kết quả chạy DDL.
+  \item Cây thư mục Python, ảnh CRUD, đăng nhập, phân quyền, tìm kiếm, dashboard và mã lỗi.
+  \item Ảnh luồng AI: context từ SQL, bản nháp AI\_DRAFT, nguồn dữ liệu và bước Manager duyệt.
+  \item Log 20 ca kiểm thử, phiên bản mã nguồn, ngày chạy và người xác nhận.
+  \item README, \texttt{.env.example}, DDL và hướng dẫn seed không chứa secret thật.
+\end{enumerate}

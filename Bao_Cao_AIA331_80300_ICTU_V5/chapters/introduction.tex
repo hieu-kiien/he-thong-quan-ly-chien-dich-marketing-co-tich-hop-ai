@@ -1,0 +1,41 @@
+\chapter*{LỜI MỞ ĐẦU}
+\addcontentsline{toc}{chapter}{LỜI MỞ ĐẦU}
+
+\section*{1. Lý do chọn đề tài}
+
+Marketing có nhiều công việc liên quan với nhau: chuẩn bị thông tin sản phẩm, lập chiến dịch, phân công người làm, soạn nội dung, duyệt nội dung, lập lịch, nhập số liệu và đánh giá hiệu quả. Nếu mỗi công việc nằm ở một bảng tính hoặc một ứng dụng khác nhau, người quản lý khó kiểm tra dữ liệu nào là mới nhất, nội dung nào đã được duyệt và chi phí nào thuộc chiến dịch nào.
+
+Đề tài xây dựng hệ thống quản lý tập trung bằng Python và cơ sở dữ liệu quan hệ. Trọng tâm của báo cáo là khảo sát đúng bài toán, xác định rõ người dùng và người quản lý, thiết kế bảng dữ liệu bằng SQL, mô tả chức năng và quy trình kiểm thử. AI chỉ là thành phần hỗ trợ trong một số bước có đầu vào và đầu ra xác định.
+
+\section*{2. Mục tiêu của báo cáo}
+\begin{enumerate}
+  \item Trình bày bối cảnh, người dùng, toàn bộ yêu cầu nghiệp vụ, quy trình và phạm vi của hệ thống.
+  \item Chuyển yêu cầu nghiệp vụ thành sơ đồ BFD, mô hình dữ liệu, DDL SQL và hệ thống Python.
+  \item Chỉ ra chính xác AI nằm ở đâu, nhận dữ liệu gì, làm nhiệm vụ gì, trả kết quả gì và không được làm gì.
+  \item Đưa ra minh chứng bằng bảng, sơ đồ, lệnh SQL, mã Python, ca kiểm thử và tài liệu tham khảo.
+\end{enumerate}
+
+\section*{3. Quy ước đọc báo cáo}
+
+Báo cáo được trình bày như một tài liệu thống nhất. Phần khảo sát cung cấp đầu vào cho phần thiết kế, triển khai và kiểm thử; người đọc có thể truy vết từ từng yêu cầu đến bảng SQL, chức năng Python và mô-đun AI:
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Cấu trúc báo cáo và điểm bắt đầu của từng chương}
+\begin{tabularx}{\textwidth}{|C{1.5cm}|L{5.0cm}|Y|}
+\hline
+\textbf{Chương} & \textbf{Nội dung} & \textbf{Cách sử dụng}\\\hline
+1 & Phân tích bài toán và yêu cầu, người dùng, dữ liệu và quy trình & Xác định phạm vi và tiêu chí hệ thống\\\hline
+2 & Thiết kế CSDL bằng SQL, BFD, ERD và truy vấn nghiệp vụ & Làm rõ bảng, khóa, quan hệ và tính toàn vẹn\\\hline
+3 & Thiết kế và xây dựng hệ thống bằng Python & Chuyển yêu cầu thành module, API, giao diện và kiểm thử\\\hline
+4 & Xác định và tích hợp AI đúng phạm vi & Làm rõ context, prompt, kiểm duyệt, log và giới hạn\\\hline
+5 & Kết luận, hướng phát triển và hồ sơ triển khai & Tổng hợp kết quả, rủi ro và kế hoạch hoàn thiện\\\hline
+\end{tabularx}
+\end{table}
+
+Mỗi chương bắt đầu ở trang mới. Mục lục ghi rõ tên chương và mục con; danh mục bảng và hình được tách riêng. Chương 1 trả lời hệ thống phải giải quyết những yêu cầu nghiệp vụ nào. Chương 2 trả lời dữ liệu được tổ chức và tạo bằng SQL ra sao. Chương 3 trả lời hệ thống được xây dựng bằng Python thế nào. Chương 4 chỉ rõ AI hỗ trợ tại các điểm nào và giới hạn của nó.
+
+\section*{4. Phạm vi hệ thống}
+
+Phạm vi bản báo cáo gồm quản lý tài khoản và vai trò, nhóm sản phẩm, sản phẩm, kênh marketing, chiến dịch, nội dung, phê duyệt, lịch đăng, chỉ số và báo cáo. Hệ thống có hai vai trò nghiệp vụ là \textit{Marketing Manager} và \textit{Marketer}. Phần xuất bản thật lên mạng xã hội được ghi là hướng phát triển; bản demo chỉ mô phỏng trạng thái sau khi có quy trình tích hợp.

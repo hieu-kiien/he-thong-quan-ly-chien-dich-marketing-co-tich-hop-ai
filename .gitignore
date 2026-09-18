@@ -1,0 +1,9 @@
+# Tệp phụ sinh khi biên dịch LaTeX
+**/*.aux
+**/*.log
+**/*.out
+**/*.toc
+**/*.synctex.gz
+
+# Tệp tạm của Microsoft Office
+~$*.docx

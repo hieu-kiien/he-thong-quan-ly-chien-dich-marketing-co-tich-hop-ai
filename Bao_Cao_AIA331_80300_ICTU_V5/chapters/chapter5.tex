@@ -1,0 +1,40 @@
+\chapter{KẾT LUẬN VÀ HƯỚNG PHÁT TRIỂN}
+\enlargethispage{4\baselineskip}
+
+\section{Kết quả đạt được}
+
+Báo cáo đã trình bày toàn bộ yêu cầu của dự án trong một mạch thống nhất. Chương 1 xác định hai actor, các mã yêu cầu nghiệp vụ P01--P26, quy trình marketing, yêu cầu chức năng, yêu cầu phi chức năng và điều kiện hoàn thành. Các chương sau dùng kết quả đó để lập BFD, thiết kế bảng SQL, suy ra ERD, mô tả hệ thống Python và tích hợp AI có kiểm soát.
+
+Phần cơ sở dữ liệu đặt trọng tâm vào lệnh SQL có thể chạy được: nhóm sản phẩm, sản phẩm, kênh, chiến dịch, nội dung, lịch, chỉ số và nhật ký. PK, FK, UNIQUE, CHECK, truy vấn JOIN và truy vấn KPI được trình bày để người đọc kiểm tra trực tiếp. Phần Python mô tả module, API, RBAC, CRUD, tìm kiếm, dashboard, xử lý lỗi và 20 ca kiểm thử.
+
+AI được đặt đúng vị trí: nằm trong \texttt{ai\_service.py}, nhận context được chọn từ SQL, tạo gợi ý/bản nháp/tóm tắt và trả kết quả có schema. AI không cấp quyền, không đổi ngân sách, không tính thay KPI, không tự phê duyệt và không tự xuất bản.
+
+\section{Giới hạn}
+
+\begin{itemize}
+  \item Bản demo chưa kết nối API xuất bản thật của các nền tảng mạng xã hội; trạng thái PUBLISHED chỉ mô phỏng kết quả sau quy trình tích hợp.
+  \item Số liệu dashboard và thử nghiệm prompt là dữ liệu mẫu hoặc phép đo nội bộ, không phải cam kết cho dữ liệu của doanh nghiệp.
+  \item SQLite phù hợp cho bản mẫu trên một máy; nếu cần SQL Server hoặc nhiều người dùng, phải xác nhận hệ quản trị, chuyển DDL và dựng lại sơ đồ trước khi bàn giao.
+  \item Cần bổ sung kiểm thử tải, kiểm thử bảo mật chuyên sâu và đánh giá chất lượng nội dung theo từng kênh khi có dữ liệu thật.
+\end{itemize}
+
+\section{Hướng phát triển}
+
+\begin{enumerate}
+  \item Hoàn thiện connector và hàng đợi xuất bản cho từng kênh, có cơ chế chống tạo bản ghi trùng.
+  \item Bổ sung lịch sử thay đổi nội dung, người duyệt, phiên bản prompt và kết quả đánh giá.
+  \item Chuyển CSDL sang hệ quản trị phù hợp với lưu lượng, thêm giám sát, sao lưu và phục hồi.
+  \item Mở rộng bộ test và tổ chức minh chứng theo từng mã yêu cầu P01--P26.
+\end{enumerate}
+
+Các hướng phát triển vẫn giữ nguyên nguyên tắc của đề tài: nghiệp vụ và dữ liệu là nền tảng; Python điều phối quy trình; SQL bảo đảm tính toàn vẹn; AI hỗ trợ tại điểm phù hợp và luôn có người kiểm tra.
+
+\section{Kịch bản demo và bàn giao}
+
+\begin{enumerate}
+  \item Khởi động CSDL và ứng dụng Python theo README; kiểm tra tài khoản Manager và Marketer.
+  \item Manager tạo nhóm sản phẩm, sản phẩm, kênh, chiến dịch và phân công người phụ trách.
+  \item Marketer tạo nội dung, gọi AI để nhận bản nháp có \texttt{source\_ids}, chỉnh sửa và gửi duyệt.
+  \item Manager duyệt nội dung, lập lịch; sau đó nhập số liệu và mở dashboard KPI.
+  \item Mở log AI, ca kiểm thử, DDL và cấu hình mẫu để chứng minh dữ liệu, quyền, lỗi và kết quả có thể truy vết.
+\end{enumerate}
