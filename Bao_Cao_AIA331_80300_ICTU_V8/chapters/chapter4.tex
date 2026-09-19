@@ -1,0 +1,116 @@
+\chapter{KIẾN TRÚC HỆ THỐNG}
+
+\section{Quan điểm thiết kế}
+
+Một sơ đồ duy nhất không thể vừa mô tả người dùng, các chương trình đang chạy, bảng dữ liệu và thứ tự các thông điệp. Vì vậy, kiến trúc được chia thành các hình có mục đích riêng: bối cảnh ở Chương 1, các khối chạy trong chương này, mô hình dữ liệu ở Chương 5 và luồng AI ở Chương 6. Cách chia này giúp người đọc không phải tìm nhiều loại thông tin trong cùng một hình.
+
+\section{Lựa chọn công nghệ}
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Công nghệ dự kiến cho prototype}
+\label{tab:v8-tech}
+\begin{tabularx}{\textwidth}{L{3.0cm}L{3.2cm}Y}
+\toprule
+\textbf{Phần} & \textbf{Lựa chọn} & \textbf{Lý do và điều kiện xem xét lại}\\
+\midrule
+Backend & FastAPI và Pydantic & Phù hợp ứng dụng API, kiểm tra dữ liệu rõ và có thể sinh tài liệu API.\\
+Frontend & React và TypeScript & Tách màn hình, biểu mẫu và trạng thái; phạm vi giao diện vẫn được giữ nhỏ.\\
+Cơ sở dữ liệu & SQLite ở giai đoạn prototype & Dễ cài đặt và phù hợp dữ liệu học phần; nếu có nhiều người dùng đồng thời sẽ đánh giá PostgreSQL.\\
+Truy cập dữ liệu & SQLAlchemy và Alembic & Tách model khỏi migration, thuận tiện kiểm tra thay đổi schema.\\
+Kết nối AI & Adapter trả về JSON & Có thể thay provider; mỗi lần chạy phải ghi provider, model và phiên bản prompt.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Các khối logic và dòng dữ liệu}
+
+Hình~\ref{fig:v8-container} là sơ đồ khối logic và dòng dữ liệu, không phải sơ đồ triển khai vật lý. Mỗi khối đại diện cho một trách nhiệm có thể tách trong mã nguồn; đường nối ghi loại dữ liệu hoặc giao thức ở mức cần thiết cho việc triển khai. Cách vẽ này tránh nhầm các module bên trong API với những container chạy độc lập.
+
+\begin{figure}[H]
+\centering
+\input{figures/container.tex}
+\caption{Sơ đồ khối logic và dòng dữ liệu của hệ thống}
+\label{fig:v8-container}
+\end{figure}
+
+\section{Trách nhiệm của các thành phần}
+
+\begin{table}[h!]
+\centering
+\scriptsize
+\caption{Trách nhiệm bên trong API và phần xử lý AI}
+\label{tab:v8-components}
+\begin{tabularx}{\textwidth}{L{3.2cm}Y Y}
+\toprule
+\textbf{Thành phần} & \textbf{Trách nhiệm} & \textbf{Yêu cầu liên quan}\\
+\midrule
+Xác thực và phân quyền & Kiểm tra phiên đăng nhập, vai trò và phạm vi chiến dịch. & FR01--FR02, NFR01.\\
+Quản lý chiến dịch & Kiểm tra ngày, ngân sách, người phụ trách và thao tác CRUD. & FR04--FR05.\\
+Quản lý nội dung & Lưu phiên bản, chuyển trạng thái và lý do duyệt. & FR06--FR07.\\
+Quản lý lịch & Kiểm tra nội dung đã duyệt, múi giờ và thao tác hủy. & FR08.\\
+Tổng hợp chỉ số & Kiểm tra khóa ngày/kênh, truy vấn bộ lọc và tính KPI. & FR09--FR10.\\
+Chọn dữ liệu cho AI & Lấy đúng trường dữ liệu mà người dùng có quyền xem. & FR11--FR13, NFR01.\\
+Gọi và kiểm tra AI & Quản lý prompt, gọi provider, kiểm tra cấu trúc kết quả và xử lý lỗi. & FR11--FR14, NFR05.\\
+Ghi nhật ký & Ghi thao tác, nguồn dữ liệu, thời gian, lỗi và quyết định của người dùng. & FR14.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Dòng dữ liệu chính}
+
+\begin{enumerate}
+\item Trình duyệt gửi yêu cầu tới API. API xác thực người dùng và kiểm tra quyền trước khi chuyển cho phần xử lý nghiệp vụ.
+\item Phần xử lý nghiệp vụ đọc hoặc ghi cơ sở dữ liệu trong giao dịch. Những quy tắc như chuyển trạng thái và điều kiện lập lịch không do giao diện tự quyết định.
+\item Khi người dùng yêu cầu AI, phần chọn dữ liệu lấy các trường cần thiết từ chiến dịch, sản phẩm, kênh hoặc chỉ số. Nhà cung cấp AI không truy cập trực tiếp cơ sở dữ liệu.
+\item Kết quả trả về được kiểm tra cấu trúc, độ dài và cảnh báo trước khi lưu thành bản nháp. Nếu không hợp lệ, bản nháp cũ được giữ nguyên.
+\item Việc duyệt và việc lập lịch là hai bước riêng. AI không có quyền đi thẳng từ bản nháp sang xuất bản.
+\end{enumerate}
+
+\section{Ranh giới API}
+
+\begin{table}[h!]
+\centering
+\scriptsize
+\caption{Một số điểm truy cập cần triển khai}
+\label{tab:v8-api}
+\begin{tabularx}{\textwidth}{L{2.0cm}L{5.4cm}Y}
+\toprule
+\textbf{Phương thức} & \textbf{Đường dẫn} & \textbf{Quy tắc}\\
+\midrule
+POST & \texttt{/auth/login} & Đăng nhập; không trả mật khẩu hoặc hash.\\
+GET/POST & \texttt{/campaigns} & Danh sách và tạo chiến dịch theo phạm vi người dùng.\\
+POST & \texttt{/campaigns/\{id\}/members} & Chỉ quản lý; kiểm tra người dùng và vai trò.\\
+POST & \texttt{/contents/\{id\}/submit} & Nhân viên trong chiến dịch; DRAFT hoặc AI\_DRAFT chuyển sang IN\_REVIEW.\\
+POST & \texttt{/contents/\{id\}/approve} & Chỉ quản lý; chỉ nhận nội dung ở IN\_REVIEW.\\
+POST & \texttt{/ai/draft} & Chọn dữ liệu, gọi AI, kiểm tra kết quả và trả cảnh báo.\\
+GET & \texttt{/reports/campaigns/\{id\}} & Tính KPI xác định; phần tóm tắt AI là bổ sung.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{An toàn và các quyết định cần ghi lại}
+
+Thiết kế dự kiến là mật khẩu sẽ được lưu dưới dạng hash bằng thư viện được duy trì. API key và token connector sẽ nằm trong biến môi trường hoặc nơi lưu bí mật, không nằm trong mã nguồn và nhật ký. Quyền phải được kiểm tra ở backend; việc ẩn nút trên giao diện chỉ là hỗ trợ người dùng, không phải biện pháp bảo vệ.
+
+\begin{table}[h!]
+\centering
+\scriptsize
+\caption{Các quyết định kiến trúc và điều kiện xem xét lại}
+\label{tab:v8-adr}
+\begin{tabularx}{\textwidth}{L{1.0cm}L{4.0cm}Y}
+\toprule
+\textbf{Mã} & \textbf{Quyết định} & \textbf{Đánh đổi}\\
+\midrule
+01 & Gọi AI qua backend thay vì từ trình duyệt. & Bảo vệ được key, quyền và nhật ký; đổi lại backend phải có adapter.\\
+02 & Giữ adapter AI độc lập với provider. & Cần một cấu trúc kết quả chung; đổi lại dễ thay provider và kiểm thử.\\
+03 & Dùng SQLite cho prototype. & Cài đặt nhanh; phải đánh giá lại khi có nhiều người dùng ghi đồng thời.\\
+04 & Phê duyệt là trạng thái của nội dung. & Cần bảng lịch sử duyệt; đổi lại quy tắc trước khi lập lịch rõ ràng.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Kết luận chương}
+
+Kiến trúc đề xuất tách giao diện, nghiệp vụ, dữ liệu và phần gọi AI nhưng không tạo quá nhiều dịch vụ cho một prototype nhỏ. Những ranh giới này là cơ sở để mô hình hóa bảng dữ liệu, trạng thái nội dung và luồng phê duyệt trong chương tiếp theo.

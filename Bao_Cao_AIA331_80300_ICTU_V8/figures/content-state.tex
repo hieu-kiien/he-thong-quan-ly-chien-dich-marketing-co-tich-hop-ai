@@ -1,0 +1,22 @@
+\begin{tikzpicture}[scale=0.82,transform shape,
+  font=\sffamily\scriptsize,
+  state/.style={draw=ictunavy,fill=softblue,rounded corners=5pt,minimum width=2.5cm,minimum height=0.72cm,align=center},
+  terminal/.style={state,fill=softteal},
+  fail/.style={state,fill=softamber},
+  rel/.style={-{Latex[length=2mm]},draw=ictunavy,line width=0.7pt},
+  lab/.style={font=\sffamily\scriptsize,fill=white,inner sep=1pt,align=center}
+]
+\node[state] (draft) at (0,0) {DRAFT};
+\node[state] (aiDraft) at (3.2,0) {AI\_DRAFT};
+\node[state] (review) at (6.4,0) {IN\_REVIEW};
+\node[terminal] (approved) at (9.6,0) {APPROVED};
+\node[terminal] (published) at (12.8,0) {PUBLISHED};
+\node[fail] (rejected) at (6.4,-1.55) {REJECTED};
+\draw[rel] (draft) -- node[lab,above]{AI} (aiDraft);
+\draw[rel] (aiDraft) -- node[lab,above]{gửi} (review);
+\draw[rel] (review) -- node[lab,above]{duyệt} (approved);
+\draw[rel] (approved) -- node[lab,above]{đăng} (published);
+\draw[rel] (review) -- node[lab,right]{từ chối} (rejected);
+\draw[rel] (rejected.west) -| node[lab,below]{sửa lại} (draft.south);
+\draw[rel] (draft.south) -- ++(0,-0.65) -| node[lab,below]{gửi thủ công} (review.south);
+\end{tikzpicture}

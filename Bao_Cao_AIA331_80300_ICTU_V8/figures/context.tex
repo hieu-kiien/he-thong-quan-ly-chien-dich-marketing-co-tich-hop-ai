@@ -1,0 +1,20 @@
+\begin{tikzpicture}[
+  font=\sffamily\scriptsize,
+  actor/.style={draw=ictunavy,fill=softblue,rounded corners=3pt,minimum width=3.2cm,minimum height=0.9cm,align=center},
+  system/.style={draw=ictunavy,fill=softteal,rounded corners=5pt,minimum width=5.2cm,minimum height=1.45cm,align=center,line width=0.9pt},
+  external/.style={draw=ictuamber,fill=softamber,rounded corners=3pt,minimum width=3.4cm,minimum height=1.0cm,align=center,dashed},
+  rel/.style={-{Latex[length=2.2mm]},draw=ictunavy,line width=0.7pt},
+  lab/.style={fill=white,inner sep=1.5pt,align=center}
+]
+\node[actor] (manager) at (0,1.55) {\shortstack{Quản lý marketing\\chiến dịch, ngân sách, duyệt}};
+\node[actor] (marketer) at (0,-1.55) {\shortstack{Nhân viên marketing\\nội dung, lịch, chỉ số}};
+\node[system] (system) at (5.4,0) {\shortstack{\textbf{Hệ thống quản lý chiến dịch}\\chiến dịch, nội dung, duyệt, lịch, chỉ số\\và chức năng AI có kiểm soát}};
+\node[external] (ai) at (10.9,1.55) {\shortstack{Nhà cung cấp AI\\API hoặc mô hình cục bộ}};
+\node[external] (channel) at (10.9,-1.55) {\shortstack{Nền tảng truyền thông\\kết nối khi được triển khai}};
+
+\draw[rel] (manager.east) -| (system.north west);
+\draw[rel] (marketer.east) -| (system.south west);
+\draw[rel] (system.north east) -| node[lab,above]{yêu cầu và kết quả có cấu trúc} (ai.west);
+\draw[rel] (system.south east) -| node[lab,below]{kết nối khi được triển khai} (channel.west);
+\node[draw=black!45,rounded corners=4pt,dashed,fit=(system),inner sep=11pt,label={[font=\scriptsize\itshape]below:phạm vi của đề tài}](boundary) {};
+\end{tikzpicture}

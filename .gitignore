@@ -5,5 +5,15 @@
 **/*.toc
 **/*.synctex.gz
 
+# Thư mục build và QA có thể tái tạo
+**/_qa*/
+**/build*/
+**/$build*/
+**/main.pdf
+**/*.fls
+**/*.fdb_latexmk
+**/*.err
+_current_project_inventory.json
+
 # Tệp tạm của Microsoft Office
 ~$*.docx

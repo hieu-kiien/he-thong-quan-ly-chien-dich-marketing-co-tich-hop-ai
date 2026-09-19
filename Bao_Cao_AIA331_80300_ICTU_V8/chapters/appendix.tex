@@ -1,0 +1,82 @@
+\appendix
+\renewcommand{\chaptername}{Phụ lục}
+\chapter{BẢNG ĐỐI CHIẾU VÀ HỒ SƠ AI}
+
+\section{Cách sử dụng phụ lục}
+
+Phụ lục này gom những bảng ngắn giúp nhóm kiểm tra lại sự liên kết giữa yêu cầu, thiết kế và phần cần kiểm thử. Do tại thời điểm lập báo cáo nhóm chưa bắt đầu lập trình, các cột nói về kiểm thử và kết quả được hiểu là việc cần thực hiện sau đó, không phải kết quả đã có.
+
+\begin{longtable}{@{}L{1.6cm}L{3.4cm}L{9.5cm}@{}}
+\caption{Đối chiếu yêu cầu với phần thiết kế và việc cần kiểm tra}\label{tab:v8-traceability}\\
+\toprule
+\textbf{Mã} & \textbf{Phần thiết kế liên quan} & \textbf{Việc cần kiểm tra khi xây dựng}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Mã} & \textbf{Phần thiết kế liên quan} & \textbf{Việc cần kiểm tra khi xây dựng}\\
+\midrule
+\endhead
+FR01 & Đăng nhập, phân quyền và vai trò & kiểm tra quyền của từng vai trò, trường hợp chưa đăng nhập và trường hợp không đủ quyền.\\
+FR02--FR05 & Quản lý dữ liệu nền và chiến dịch & kiểm tra thêm, xem, sửa, xóa; dữ liệu mẫu; và phản hồi khi dữ liệu không hợp lệ.\\
+FR06--FR08 & Nội dung, phê duyệt và lịch đăng & kiểm tra các bước chuyển trạng thái, ghi nhận người duyệt và chặn chuyển trạng thái sai.\\
+FR09--FR10 & Chỉ số và bảng tổng hợp & đối chiếu truy vấn với dữ liệu mẫu, kiểm tra mẫu số bằng không và so sánh kết quả trên giao diện.\\
+FR11 & Các chức năng AI & lưu phiên bản yêu cầu, kiểm tra định dạng kết quả, thời gian phản hồi và cách xử lý lỗi.\\
+NFR01--NFR02 & Bảo mật và toàn vẹn dữ liệu & kiểm tra thông tin bí mật, khóa ngoại, dữ liệu trùng và các yêu cầu truy cập trái phép.\\
+NFR03--NFR05 & Hiệu năng, sử dụng và xử lý lỗi & đo thời gian phản hồi, thử tác vụ với người dùng và mô phỏng lỗi dịch vụ.\\
+NFR06 & Bảo trì và cài đặt lại & kiểm tra hướng dẫn cài đặt, phiên bản thư viện, dữ liệu mẫu và khả năng khôi phục.\\
+\bottomrule
+\end{longtable}
+
+\chapter{PROMPT VÀ NHẬT KÝ SỬ DỤNG AI}
+
+\section{Prompt mẫu}
+
+Prompt dưới đây minh họa cách giới hạn chức năng tạo bản nháp. Khi triển khai, nhóm cần lưu phiên bản prompt thật và ghi rõ những thay đổi giữa các lần thử.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Prompt mẫu cho chức năng tạo nội dung nháp}
+\label{tab:v8-prompt-appendix}
+\begin{tabularx}{\textwidth}{L{2.4cm}Y}
+\toprule
+\textbf{Phần} & \textbf{Nội dung dự kiến}\\
+\midrule
+SYSTEM & Bạn là trợ lý marketing. Chỉ tạo bản nháp để con người xem và sửa.\\
+Giới hạn & Không tự phê duyệt, không tự xuất bản, không thêm số liệu không có trong dữ liệu được cấp.\\
+Định dạng & Trả về JSON gồm \texttt{title}, \texttt{body}, \texttt{cta}, \texttt{assumptions}, \texttt{source\_ids}, \texttt{warnings}.\\
+USER & Chiến dịch: \texttt{\{\{campaign\_id\}\}}; kênh: \texttt{\{\{channel\}\}}; giọng: \texttt{\{\{tone\}\}}; dữ liệu được phép dùng: \texttt{\{\{selected\_records\}\}}.\\
+Yêu cầu & Tạo một caption ngắn, phù hợp với chiến dịch; nếu thiếu dữ liệu thì trả về cảnh báo.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Prompt này không thay thế quy tắc nghiệp vụ. Trước khi gửi yêu cầu, hệ thống vẫn phải kiểm tra người dùng, chiến dịch và phạm vi dữ liệu được phép sử dụng; sau khi nhận kết quả, hệ thống phải kiểm tra định dạng và đưa nội dung về bước người dùng xem xét.
+
+\section{Các trường nên lưu trong nhật ký}
+
+\begin{tabularx}{\textwidth}{L{3.5cm}Y}
+\toprule
+\textbf{Trường} & \textbf{Ý nghĩa}\\
+\midrule
+\texttt{request\_id} & mã của một lần yêu cầu, không chứa khóa bí mật; dùng để nối màn hình, nhật ký và kết quả.\\
+\texttt{provider/model} & dịch vụ và phiên bản mô hình thực tế khi chạy.\\
+\texttt{prompt\_version} & phiên bản của phần hướng dẫn hệ thống và yêu cầu người dùng.\\
+\texttt{source\_ids} & các bản ghi được phép dùng làm dữ liệu đầu vào.\\
+\makecell[l]{\texttt{input/}\\\texttt{output\_tokens}} & thông tin phục vụ ước tính chi phí nếu dịch vụ cung cấp.\\
+\texttt{result\_status} & trạng thái như thành công, sai định dạng, quá thời gian, vượt giới hạn hoặc lỗi dịch vụ.\\
+\texttt{human\_decision} & hành động của người dùng: chỉnh sửa, duyệt, từ chối hoặc bỏ qua.\\
+\bottomrule
+\end{tabularx}
+
+\chapter{THIẾT KẾ CƠ SỞ DỮ LIỆU TÓM TẮT}
+
+\section{Nguyên tắc}
+
+Schema trong báo cáo phục vụ một sản phẩm thử nghiệm nhỏ, trong đó SQLite được chọn để nhóm dễ cài đặt và kiểm tra. Nếu ứng dụng được mở rộng cho nhiều người dùng cùng lúc, nhóm cần đánh giá lại PostgreSQL, giao dịch và xử lý đồng thời trước khi triển khai chính thức.
+
+Các bảng về thành viên, phê duyệt và nhật ký AI được tách riêng vì chúng có trách nhiệm khác nhau: phân công người dùng, ghi nhận quyết định đối với nội dung và lưu lại thông tin của mỗi lần gọi AI. Danh mục chi tiết nằm trong từ điển dữ liệu ở Chương~5; ERD được chia thành Hình~\ref{fig:v8-erd-core} và Hình~\ref{fig:v8-erd-ops}, còn DDL nguồn nằm trong \texttt{design/schema.sql}. Phụ lục này không lặp lại một bảng schema thứ hai.
+
+\section{Ghi chú về phạm vi}
+
+DDL đi kèm báo cáo là bản thiết kế tại thời điểm lập tài liệu, chưa phải cơ sở dữ liệu đã chạy trong ứng dụng. Sau khi viết mã nguồn, nhóm cần tạo migration và dữ liệu mẫu, bật kiểm tra khóa ngoại, chạy các truy vấn chính, rồi cập nhật báo cáo bằng kết quả thực tế.

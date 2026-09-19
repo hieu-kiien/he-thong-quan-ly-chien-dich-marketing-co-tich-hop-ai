@@ -1,0 +1,92 @@
+\chapter{BỐI CẢNH, BÀI TOÁN VÀ PHẠM VI}
+
+\section{Bối cảnh}
+
+Một chiến dịch marketing thường gồm nhiều phần việc liên quan với nhau: xác định mục tiêu, chọn sản phẩm và kênh truyền thông, chuẩn bị nội dung, phân bổ ngân sách, lập lịch đăng và theo dõi kết quả. Khi các thông tin này được lưu ở nhiều nơi, người phụ trách phải tự đối chiếu tên chiến dịch, phiên bản nội dung, lịch đăng và số liệu theo từng kênh. Sai khác giữa các bảng dữ liệu cũng khiến việc tổng hợp báo cáo mất thời gian.
+
+Đề tài của học phần đặt ra yêu cầu xây dựng một hệ thống quản lý tập trung và có tích hợp AI. Nhóm chọn cách tiếp cận trong đó phần quản lý dữ liệu và quy trình được làm rõ trước; AI chỉ hỗ trợ ba công việc có thể kiểm soát: gợi ý ý tưởng, tạo bản nháp theo kênh và tóm tắt kết quả. Bản nháp do AI tạo ra phải được người dùng xem, chỉnh sửa và phê duyệt trước khi sử dụng.
+
+\section{Các bên sử dụng hệ thống}
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Người sử dụng và nhu cầu chính}
+\label{tab:v8-stakeholders}
+\begin{tabularx}{\textwidth}{L{3.0cm}Y Y}
+\toprule
+\textbf{Người sử dụng} & \textbf{Nhu cầu} & \textbf{Điều hệ thống phải bảo đảm}\\
+\midrule
+Giảng viên/người chấm & Đánh giá mức độ hiểu bài toán và chất lượng thiết kế. & Báo cáo có lập luận, sơ đồ đúng ý nghĩa và phân biệt thiết kế với kết quả đã làm.\\
+Quản lý marketing & Quản lý chiến dịch, ngân sách, thành viên, nội dung và kết quả. & Có quyền duyệt, có lịch sử thao tác và có số liệu theo khoảng thời gian/kênh.\\
+Nhân viên marketing & Tạo nội dung, gọi AI, sửa bản nháp, gửi duyệt và nhập số liệu. & Chỉ nhìn thấy phần việc được giao; không thể tự duyệt nội dung của mình.\\
+Nhóm phát triển & Có cơ sở rõ ràng để xây dựng và kiểm thử. & Yêu cầu, mô hình dữ liệu, giao diện và quy tắc được mô tả thống nhất.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Ranh giới của hệ thống}
+
+Hình~\ref{fig:v8-context} mô tả các đối tượng bên ngoài tương tác với hệ thống. Ở mức này, hình chỉ trả lời hai câu hỏi: ai sử dụng và hệ thống trao đổi gì với bên ngoài. Các bảng dữ liệu và module bên trong sẽ được trình bày ở các chương sau.
+
+\begin{figure}[h!]
+\centering
+\input{figures/context.tex}
+\caption{Bối cảnh hệ thống quản lý chiến dịch marketing}
+\label{fig:v8-context}
+\end{figure}
+
+Model provider và nền tảng truyền thông được đặt ngoài ranh giới. Nhóm chưa cam kết một nhà cung cấp cụ thể và cũng chưa có thông tin xác thực để triển khai connector thật. Trong prototype, hệ thống có thể dùng một provider tương thích hoặc dữ liệu giả lập nhưng vẫn giữ nguyên hợp đồng dữ liệu và các bước kiểm tra.
+
+\section{Mục tiêu}
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Mục tiêu và cách kiểm tra sau khi triển khai}
+\label{tab:v8-goals}
+\begin{tabularx}{\textwidth}{C{1.0cm}L{4.2cm}Y}
+\toprule
+\textbf{Mã} & \textbf{Mục tiêu} & \textbf{Cách kiểm tra dự kiến}\\
+\midrule
+M1 & Quản lý tập trung chiến dịch, nội dung, lịch, ngân sách và chỉ số. & Demo đi từ tạo chiến dịch đến xem báo cáo; dữ liệu liên kết đúng và có trạng thái.\\
+M2 & Bảo vệ thao tác bằng đăng nhập và vai trò. & Kiểm tra cả trường hợp được phép và bị từ chối đối với Manager/Marketer.\\
+M3 & Dùng AI như một trợ lý có kiểm soát. & Kiểm tra dữ liệu gửi đi, cấu trúc kết quả, cảnh báo và bước phê duyệt của người dùng.\\
+M4 & Giao diện dễ đọc và dễ theo dõi. & Cho người dùng thực hiện các tác vụ chính và ghi nhận lỗi thao tác, trạng thái chờ và trạng thái lỗi.\\
+M5 & Có thể cài đặt và kiểm tra lại. & README, dữ liệu mẫu, cấu hình và kết quả kiểm thử được lưu cùng mã nguồn.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Phạm vi}
+
+\subsection{Các chức năng thuộc phạm vi}
+
+\begin{itemize}
+\item đăng nhập và phân quyền Manager/Marketer;
+\item quản lý nhóm sản phẩm, sản phẩm, kênh và chiến dịch;
+\item phân công thành viên, tạo nội dung, sửa phiên bản, gửi duyệt và lập lịch;
+\item nhập và tổng hợp views, clicks, conversions, cost và revenue;
+\item tìm kiếm, lọc, xem dashboard và báo cáo theo chiến dịch, kênh và thời gian;
+\item gợi ý ý tưởng, tạo caption/email nháp và tóm tắt kết quả bằng AI;
+\item kiểm thử quy tắc dữ liệu, quyền truy cập, xử lý lỗi AI và hướng dẫn triển khai.
+\end{itemize}
+
+\subsection{Các nội dung chưa đặt ra}
+
+\begin{itemize}
+\item tự động mua quảng cáo hoặc tự thay đổi ngân sách;
+\item phát hành trực tiếp lên tất cả mạng xã hội khi chưa có API và quyền truy cập;
+\item huấn luyện mô hình ngôn ngữ riêng;
+\item thu thập dữ liệu cá nhân nhạy cảm.
+\end{itemize}
+
+\section{Giả định và giới hạn của giai đoạn hiện tại}
+
+Bản báo cáo được lập trước khi nhóm bắt đầu code. Do đó, các lựa chọn FastAPI, React, SQLite và provider AI trong các chương sau là lựa chọn thiết kế để bắt đầu, không phải công nghệ đã được triển khai. Dữ liệu marketing dùng cho prototype sẽ là dữ liệu mẫu có mô tả rõ nguồn; không được dùng để suy ra hiệu quả của một chiến dịch ngoài thực tế.
+
+Nhóm giả định có hai vai trò nghiệp vụ chính. Một chiến dịch có thể có nhiều nhân viên marketing, vì vậy việc phân công cần một bảng liên kết. Các chỉ số được lưu theo chiến dịch, kênh và ngày; công thức KPI được tính bằng logic của hệ thống trước khi AI diễn giải.
+
+\section{Kết luận chương}
+
+Chương này đã xác định người sử dụng, vấn đề cần giải quyết, mục tiêu và giới hạn. Phần tiếp theo nghiên cứu các nguyên tắc liên quan để những lựa chọn thiết kế không chỉ dựa vào cảm tính hoặc vào một mẫu giao diện có sẵn.

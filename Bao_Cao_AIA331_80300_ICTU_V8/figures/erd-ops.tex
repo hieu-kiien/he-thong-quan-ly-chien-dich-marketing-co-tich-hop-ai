@@ -1,0 +1,52 @@
+\begin{tikzpicture}[
+  font=\sffamily\scriptsize,
+  table/.style={matrix of nodes,nodes={draw=ictuteal,fill=softteal,minimum width=4.05cm,minimum height=0.34cm,text width=3.8cm,align=left,inner sep=2pt},row sep=-0.45pt,column sep=0pt},
+  rel/.style={-{Latex[length=1.7mm]},draw=ictuteal,line width=0.55pt},
+  card/.style={font=\sffamily\scriptsize\bfseries,text=ictuteal,fill=white,inner sep=1pt},
+  note/.style={draw=ictuamber,fill=softamber,rounded corners=3pt,align=left,inner sep=4pt,text width=4.05cm}
+]
+\node[note] (scope) at (5.1,4.1) {Đây là view các bảng vận hành, mở rộng ERD lõi ở Hình~\ref{fig:v8-erd-core}. Để tránh đường nối chồng lên nhau, các quan hệ tới ERD lõi không vẽ lại; cột FK trên từng bảng là điểm nối tương ứng.};
+\matrix (contents) [table,row 1/.style={nodes={fill=ictuteal,text=white,font=\bfseries\scriptsize}}] at (0,1.45) {
+marketing\_contents\\
+\texttt{PK id}\\
+\texttt{FK campaign\_id, channel\_id}\\
+\texttt{status, body}\\
+};
+\matrix (reviews) [table,row 1/.style={nodes={fill=ictuteal,text=white,font=\bfseries\scriptsize}}] at (5.1,1.45) {
+content\_reviews\\
+\texttt{PK id}\\
+\texttt{FK content\_id}\\
+\texttt{FK reviewer\_id}\\
+\texttt{decision, reason}\\
+};
+\matrix (schedules) [table,row 1/.style={nodes={fill=ictuteal,text=white,font=\bfseries\scriptsize}}] at (10.2,1.45) {
+marketing\_schedules\\
+\texttt{PK id}\\
+\texttt{FK content\_id}\\
+\texttt{scheduled\_at, timezone}\\
+\texttt{status}\\
+};
+\matrix (members) [table,row 1/.style={nodes={fill=ictuteal,text=white,font=\bfseries\scriptsize}}] at (0,-2.0) {
+campaign\_members\\
+\texttt{PK campaign\_id, user\_id}\\
+\texttt{role}\\
+\texttt{UNIQUE pair}\\
+};
+\matrix (metrics) [table,row 1/.style={nodes={fill=ictuteal,text=white,font=\bfseries\scriptsize}}] at (5.1,-2.0) {
+campaign\_metrics\\
+\texttt{PK id}\\
+\texttt{FK campaign\_id, channel\_id}\\
+\texttt{metric\_date}\\
+\texttt{views, clicks, cost}\\
+};
+\matrix (logs) [table,row 1/.style={nodes={fill=ictuteal,text=white,font=\bfseries\scriptsize}}] at (10.2,-2.0) {
+ai\_logs\\
+\texttt{PK id}\\
+\texttt{FK user\_id, campaign\_id}\\
+\texttt{provider, model}\\
+\texttt{prompt\_version, status}\\
+\texttt{latency\_ms, source\_ids}\\
+};
+\draw[rel] (contents.north) .. controls (1.5,2.8) and (3.6,2.8) .. node[card,above]{1} node[card,below]{0..*} (reviews.north);
+\draw[rel] (contents.south east) .. controls (2.5,0.0) and (8.0,0.0) .. node[card,below]{1} node[card,above]{0..*} (schedules.south west);
+\end{tikzpicture}

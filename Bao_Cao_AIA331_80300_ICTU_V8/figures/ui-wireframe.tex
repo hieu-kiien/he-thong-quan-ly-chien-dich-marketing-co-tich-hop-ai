@@ -1,0 +1,27 @@
+\begin{tikzpicture}[
+  font=\sffamily\scriptsize,
+  panel/.style={draw=black!55,fill=white,rounded corners=2pt},
+  title/.style={font=\sffamily\bfseries\small,text=ictunavy},
+  tag/.style={draw=ictuteal,fill=softteal,rounded corners=2pt,inner sep=3pt,align=center},
+  button/.style={draw=ictunavy,fill=softblue,rounded corners=2pt,inner sep=4pt,align=center}
+]
+\draw[panel,fill=softgray] (0,0) rectangle (14,7.1);
+\draw[panel,fill=ictunavy] (0,6.35) rectangle (14,7.1);
+\node[font=\sffamily\bfseries\small,text=white,anchor=west] at (0.35,6.72) {MARKETING WORKSPACE};
+\node[font=\sffamily\small,text=white,anchor=east] at (13.65,6.72) {Manager · dữ liệu minh họa};
+\draw[panel] (0.35,0.35) rectangle (3.0,6.1);
+\node[title,anchor=west] at (0.65,5.72) {Điều hướng};
+\node[anchor=west] at (0.7,5.15) {Tổng quan};
+\node[anchor=west] at (0.7,4.55) {Chiến dịch};
+\node[anchor=west] at (0.7,3.95) {Nội dung};
+\node[anchor=west] at (0.7,3.35) {Lịch đăng};
+\node[anchor=west] at (0.7,2.75) {Kênh};
+\node[anchor=west] at (0.7,2.15) {Cài đặt};
+\node[title,anchor=west] at (3.45,5.72) {Chiến dịch minh họa};
+\node[button] at (12.5,5.68) {+ Tạo chiến dịch};
+\node[panel] (filter) at (8.55,4.9) {\begin{minipage}{9.6cm}\textbf{Bộ lọc}\\Tên chiến dịch \hfill Trạng thái \hfill Khoảng thời gian\end{minipage}};
+\node[panel] at (5.5,3.2) {\begin{minipage}{3.2cm}\textbf{Ngân sách}\\\Large 48.000.000\\\scriptsize đã dùng / kế hoạch\end{minipage}};
+\node[panel] at (9.2,3.2) {\begin{minipage}{3.2cm}\textbf{Nội dung chờ duyệt}\\\Large 07\\\scriptsize cần xử lý\end{minipage}};
+\node[panel] at (5.5,1.5) {\begin{minipage}{6.9cm}\textbf{Bản nháp AI}\\\small Tiêu đề: Khám phá ưu đãi mùa hè\\\small\textit{Nguồn context: sản phẩm, mục tiêu, kênh}\\[2pt]\fbox{\scriptsize Xem và chỉnh sửa}\end{minipage}};
+\node[tag] at (12.0,1.55) {AI\_DRAFT\\\scriptsize chưa được duyệt};
+\end{tikzpicture}

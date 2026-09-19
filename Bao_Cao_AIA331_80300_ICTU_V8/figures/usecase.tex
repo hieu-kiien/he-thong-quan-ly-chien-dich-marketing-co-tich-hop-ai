@@ -1,0 +1,22 @@
+\begin{tikzpicture}[
+  font=\sffamily\scriptsize,
+  actor/.style={draw=ictunavy,fill=softblue,rounded corners=3pt,minimum width=2.8cm,minimum height=0.8cm,align=center},
+  uc/.style={draw=ictunavy,fill=white,ellipse,minimum width=3.8cm,minimum height=0.68cm,align=center},
+  rel/.style={draw=black!65,line width=0.55pt}
+]
+\node[actor] (manager) at (0,1.5) {Quản lý marketing};
+\node[actor] (marketer) at (0,-2.0) {Nhân viên marketing};
+\node[draw=ictunavy,rounded corners=5pt,dashed,minimum width=8.4cm,minimum height=6.3cm] (boundary) at (5.0,-0.2) {};
+\node[font=\sffamily\bfseries\small,text=ictunavy] at (5.0,2.25) {HỆ THỐNG QUẢN LÝ CHIẾN DỊCH};
+\node[uc] (campaign) at (5.0,1.35) {Quản lý chiến dịch};
+\node[uc] (content) at (5.0,0.25) {Soạn và gửi nội dung duyệt};
+\node[uc] (approve) at (5.0,-0.85) {Duyệt hoặc từ chối};
+\node[uc] (report) at (5.0,-1.95) {Theo dõi chỉ số và báo cáo};
+\node[uc] (ai) at (5.0,-3.05) {Yêu cầu trợ lý AI};
+\draw[rel] (manager.east) -- (campaign.west);
+\draw[rel] (manager.east) -- ++(0.15,0) |- (approve.west);
+\draw[rel] (manager.east) -- ++(0,0) |- (report.west);
+\draw[rel] (marketer.east) -- ++(0.18,0) |- (content.west);
+\draw[rel] (marketer.east) -- ++(0.0,0) |- (report.west);
+\draw[rel] (marketer.east) -- ++(0.35,0) |- (ai.west);
+\end{tikzpicture}

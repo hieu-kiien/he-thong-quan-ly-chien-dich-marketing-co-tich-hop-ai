@@ -1,0 +1,16 @@
+\begin{tikzpicture}[
+  font=\sffamily\scriptsize,
+  node/.style={draw=ictunavy,fill=softblue,rounded corners=4pt,minimum width=3.35cm,minimum height=0.9cm,align=center},
+  infra/.style={draw=black!55,rounded corners=6pt,dashed,inner sep=12pt},
+  ext/.style={draw=ictuamber,fill=softamber,rounded corners=4pt,minimum width=3.35cm,minimum height=0.9cm,align=center,dashed},
+  rel/.style={-{Latex[length=2mm]},draw=ictunavy,line width=0.65pt}
+]
+\node[node] (browser) at (0,0) {\shortstack{Trình duyệt\\React và tài nguyên tĩnh}};
+\node[node] (app) at (5,0) {\shortstack{Ứng dụng API\\FastAPI và nghiệp vụ}};
+\node[node] (db) at (10,0) {\shortstack{Tệp cơ sở dữ liệu\\SQLite prototype}};
+\node[ext] (model) at (5,-2.1) {\shortstack{Provider AI\\hoặc mô hình cục bộ}};
+\draw[rel] (browser) -- node[above,fill=white,inner sep=1pt]{HTTPS/JSON} (app);
+\draw[rel] (app) -- node[above,fill=white,inner sep=1pt]{giao dịch} (db);
+\draw[rel] (app) -- node[right,fill=white,inner sep=1pt]{timeout + JSON} (model);
+\node[infra,fit=(browser)(app)(db),label={[font=\sffamily\scriptsize\itshape]above:phương án triển khai prototype}](boundary) {};
+\end{tikzpicture}

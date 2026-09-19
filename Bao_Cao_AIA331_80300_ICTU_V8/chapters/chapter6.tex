@@ -1,0 +1,110 @@
+\chapter{THIẾT KẾ CHỨC NĂNG AI}
+
+\section{AI được dùng ở đâu}
+
+AI được đặt bên trong quy trình marketing như một công cụ hỗ trợ, không phải một người dùng có quyền nghiệp vụ. Ba chức năng được chọn đúng theo đề bài:
+
+\begin{enumerate}
+\item gợi ý ý tưởng từ mục tiêu, sản phẩm, đối tượng và kênh;
+\item tạo caption hoặc email ở dạng bản nháp;
+\item tóm tắt các chỉ số đã có và gợi ý hướng xem xét.
+\end{enumerate}
+
+Ba chức năng này đủ tạo giá trị để trình diễn nhưng vẫn nằm trong phạm vi có thể kiểm tra. AI không được duyệt nội dung, thay đổi ngân sách, sửa quyền hoặc tự phát hành.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Phạm vi công việc của AI}
+\label{tab:v8-ai-scope}
+\begin{tabularx}{\textwidth}{L{3.0cm}Y Y}
+\toprule
+\textbf{Công việc} & \textbf{AI được làm} & \textbf{AI không được làm}\\
+\midrule
+Gợi ý ý tưởng & Đề xuất góc nội dung dựa trên mục tiêu, sản phẩm, đối tượng và kênh. & Tự tạo cam kết giá, số liệu hoặc chính sách không có trong dữ liệu đầu vào.\\
+Tạo bản nháp & Viết tiêu đề, nội dung và lời kêu gọi theo quy tắc của kênh. & Tự gửi cho khách hàng, tự lập lịch hoặc tự xuất bản.\\
+Tóm tắt chỉ số & Diễn giải views, clicks, conversions, cost và các KPI đã tính. & Tự tính lại bằng suy đoán hoặc khẳng định quan hệ nhân quả khi dữ liệu chưa đủ.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Dữ liệu đưa vào yêu cầu}
+
+Trước khi gọi AI, hệ thống kiểm tra người dùng và chọn một lượng dữ liệu vừa đủ cho công việc. Bản nháp caption có thể cần mục tiêu chiến dịch, thông tin sản phẩm đã xác nhận, đối tượng, kênh và độ dài tối đa; không cần password, token hay toàn bộ cơ sở dữ liệu. Tóm tắt chỉ số cần khoảng thời gian, kênh, các dòng metrics và định nghĩa KPI.
+
+\begin{table}[h!]
+\centering
+\scriptsize
+\caption{Dữ liệu được phép sử dụng cho từng chức năng}
+\label{tab:v8-ai-context}
+\begin{tabularx}{\textwidth}{L{2.7cm}Y Y}
+\toprule
+\textbf{Chức năng} & \textbf{Dữ liệu được đưa vào} & \textbf{Dữ liệu loại trừ}\\
+\midrule
+Ý tưởng & Mục tiêu, đối tượng, tên/đặc tính sản phẩm, kênh, giọng điệu và thời gian. & Mật khẩu, token, thông tin chiến dịch khác và dữ liệu ngoài quyền đọc.\\
+Bản nháp & Ý tưởng đã chọn, thông tin sản phẩm, quy tắc kênh, độ dài và lời kêu gọi. & Sự kiện, giá hoặc số liệu không có trong dữ liệu đã xác nhận.\\
+Tóm tắt & Metrics, công thức KPI, khoảng thời gian, tên kênh và mức độ đầy đủ của dữ liệu. & Dữ liệu cá nhân không cần thiết và dữ liệu ngoài phạm vi người dùng.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Mẫu prompt và cấu trúc kết quả}
+
+Prompt được lưu thành phiên bản riêng để sau này có thể biết một kết quả được tạo bằng chỉ dẫn nào. Phần hướng dẫn chung nêu vai trò và giới hạn; phần yêu cầu của người dùng chứa nhiệm vụ và dữ liệu đã chọn. Provider hoặc model cụ thể chưa được chốt ở giai đoạn tài liệu.
+
+Hợp đồng đầu ra tối thiểu gồm tiêu đề, nội dung, lời kêu gọi, giả định, mã tham chiếu dữ liệu và cảnh báo. Prompt đầy đủ được đặt ở Bảng~\ref{tab:v8-prompt-appendix}; báo cáo chỉ duy trì một bản mẫu, còn phiên bản thật sẽ được lưu cùng nhật ký gọi AI khi triển khai.
+
+Trước khi lưu, chương trình phải kiểm tra các trường bắt buộc, kiểu dữ liệu, độ dài, cảnh báo và mã nguồn. Kết quả không đúng cấu trúc được lưu là một lần gọi lỗi, không được lưu như bản nháp có thể sử dụng.
+
+\section{Luồng xử lý và vai trò của người dùng}
+
+Hình~\ref{fig:v8-ai-flow} cho thấy các bước từ dữ liệu đầu vào đến phê duyệt. Người dùng được tham gia ở ba thời điểm: chọn công việc, xem kết quả cùng cảnh báo, và sửa hoặc phê duyệt trước khi nội dung được dùng.
+
+\begin{figure}[h!]
+\centering
+\input{figures/ai-pipeline.tex}
+\caption{Luồng xử lý một yêu cầu AI}
+\label{fig:v8-ai-flow}
+\end{figure}
+
+Sau khi kết quả hợp lệ, hệ thống lưu thành AI\_DRAFT. Nhân viên marketing có thể sửa và gửi duyệt; quản lý xem nội dung, nguồn, cảnh báo và lịch sử sửa trước khi chấp thuận. Nếu người dùng không muốn dùng kết quả, bản nháp có thể bị bỏ mà không ảnh hưởng đến dữ liệu chiến dịch.
+
+\section{Các trường hợp lỗi}
+
+\begin{table}[h!]
+\centering
+\scriptsize
+\caption{Cách xử lý những lỗi thường gặp khi gọi AI}
+\label{tab:v8-ai-failures}
+\begin{tabularx}{\textwidth}{L{3.0cm}Y Y}
+\toprule
+\textbf{Trường hợp} & \textbf{Phản hồi của hệ thống} & \textbf{Cách kiểm tra}\\
+\midrule
+Quá thời gian & Dừng theo thời hạn; giữ bản nháp cũ và cho phép thử lại. & Giả lập timeout, ghi thời gian và trạng thái.\\
+Giới hạn tốc độ & Thử lại với số lần giới hạn hoặc thông báo thử sau. & Giả lập mã 429 và kiểm tra không lặp vô hạn.\\
+Kết quả sai cấu trúc & Không lưu thành bản nháp dùng được; hiển thị lỗi kiểm tra. & Dùng response thiếu trường hoặc sai kiểu.\\
+Thông tin không có trong dữ liệu & Hiển thị cảnh báo để người dùng sửa hoặc bỏ. & Tạo case có thông tin bị bịa và chấm theo tiêu chí.\\
+Yêu cầu quá dài & Rút gọn theo quy tắc và thông báo phần bị bỏ. & Ghi độ dài trước/sau và danh sách trường đã chọn.\\
+Nhà cung cấp không hoạt động & Thông báo rõ; dùng phương án dự phòng nếu đã cấu hình. & Ngắt provider và kiểm tra dữ liệu cũ vẫn nguyên vẹn.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Đánh giá chất lượng AI}
+
+Không thể kết luận một chức năng AI tốt chỉ vì câu trả lời nghe tự nhiên. Sau khi có implementation, nhóm sẽ chuẩn bị một bộ trường hợp cố định và đánh giá theo các tiêu chí:
+
+\begin{itemize}
+\item kết quả có đúng cấu trúc và đủ trường không;
+\item có đưa thêm thông tin không xuất hiện trong dữ liệu đầu vào không;
+\item có phù hợp mục tiêu, đối tượng và kênh không;
+\item cảnh báo có xuất hiện khi dữ liệu thiếu hoặc có giả định không;
+\item người dùng phải sửa bao nhiêu trước khi quản lý chấp thuận;
+\item thời gian phản hồi, số lần lỗi và chi phí nếu provider cung cấp thông tin.
+\end{itemize}
+
+Ít nhất ba cấu hình prompt hoặc model sẽ được so sánh khi nhóm có đủ điều kiện chạy. Input của từng trường hợp phải giữ nguyên; mỗi vòng chỉ thay đổi một yếu tố. Nếu chỉ dùng bộ giả lập, kết luận chỉ giới hạn ở việc kiểm tra quy trình và bộ phân tích kết quả, không được gọi là đánh giá chất lượng model thật.
+
+\section{Kết luận chương}
+
+Thiết kế AI đã xác định rõ công việc, dữ liệu đầu vào, cấu trúc đầu ra, người duyệt và cách xử lý lỗi. Như vậy, phần AI trở thành một chức năng có thể kiểm thử trong hệ thống quản lý, thay vì một ô nhập câu hỏi và một câu trả lời không có trách nhiệm.

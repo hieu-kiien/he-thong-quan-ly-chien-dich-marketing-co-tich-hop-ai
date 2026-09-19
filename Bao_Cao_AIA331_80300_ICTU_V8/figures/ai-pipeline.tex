@@ -1,0 +1,32 @@
+\begin{tikzpicture}[scale=0.78,transform shape,
+  font=\sffamily\scriptsize,
+  box/.style={draw=ictunavy,fill=softblue,rounded corners=4pt,minimum width=3.2cm,minimum height=0.8cm,align=center},
+  decision/.style={diamond,draw=ictuamber,fill=softamber,aspect=2,inner sep=2pt,align=center},
+  safe/.style={box,draw=ictuteal,fill=softteal},
+  rel/.style={-{Latex[length=2mm]},draw=ictunavy,line width=0.65pt},
+  lab/.style={font=\sffamily\scriptsize,fill=white,inner sep=1pt,align=center}
+]
+\node[box] (input) at (0,0) {\shortstack{Mục tiêu, sản phẩm, kênh\\và dữ liệu được phép}};
+\node[box] (auth) at (4.2,0) {\shortstack{Kiểm tra quyền\\chọn dữ liệu cần thiết}};
+\node[box] (prompt) at (8.4,0) {\shortstack{Prompt theo phiên bản\\nhiệm vụ và khuôn kết quả}};
+\node[box] (provider) at (12.6,0) {\shortstack{Provider AI\\timeout và giới hạn tốc độ}};
+\node[decision] (valid) at (12.6,-2.0) {\shortstack{Kết quả đúng\\cấu trúc?}};
+\node[safe] (draft) at (8.4,-2.0) {\shortstack{Lưu bản nháp AI\\nguồn và cảnh báo}};
+\node[safe] (human) at (4.2,-2.0) {\shortstack{Nhân viên sửa\\quản lý duyệt}};
+\node[box] (log) at (0,-2.0) {\shortstack{Nhật ký\\model, prompt, lỗi}};
+\node[decision] (fail) at (12.6,-4.0) {\shortstack{Có lỗi cần\\thử lại?}};
+\node[box] (retry) at (8.4,-4.0) {\shortstack{Thử lại có giới hạn\\hoặc báo không thành công}};
+\node[box] (stop) at (4.2,-4.0) {\shortstack{Giữ bản nháp cũ\\hiển thị cách xử lý}};
+\draw[rel] (input) -- (auth);
+\draw[rel] (auth) -- (prompt);
+\draw[rel] (prompt) -- (provider);
+\draw[rel] (provider) -- (valid);
+\draw[rel] (valid) -- node[lab,above]{có} (draft);
+\draw[rel] (draft) -- (human);
+\draw[rel] (human) -- (log);
+\draw[rel] (valid) -- node[lab,right]{không} (fail);
+\draw[rel] (fail) -- node[lab,above]{còn lượt} (retry);
+\draw[rel] (fail) -- node[lab,below]{hết lượt} (stop);
+\draw[rel] (retry.east) to[out=0,in=0] node[lab,right]{thử lại} (provider.east);
+\draw[rel] (stop) -- (log);
+\end{tikzpicture}

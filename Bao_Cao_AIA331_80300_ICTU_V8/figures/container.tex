@@ -1,0 +1,25 @@
+\begin{tikzpicture}[
+  font=\sffamily\scriptsize,
+  container/.style={draw=ictunavy,fill=softblue,rounded corners=4pt,minimum width=3.25cm,minimum height=1.15cm,align=center,line width=0.8pt},
+  service/.style={draw=ictuteal,fill=softteal,rounded corners=4pt,minimum width=3.25cm,minimum height=1.15cm,align=center,line width=0.8pt},
+  store/.style={draw=ictuamber,fill=softamber,rounded corners=4pt,minimum width=3.25cm,minimum height=1.05cm,align=center,line width=0.8pt},
+  ext/.style={draw=ictuamber,fill=white,rounded corners=4pt,minimum width=3.0cm,minimum height=1.05cm,align=center,dashed},
+  rel/.style={-{Latex[length=2mm]},draw=ictunavy,line width=0.65pt},
+  lab/.style={fill=white,inner sep=1.5pt,align=center}
+]
+\node[container] (web) at (0,2.45) {\shortstack[c]{\textbf{Ứng dụng web}\\React + TypeScript\\chiến dịch, dashboard, duyệt}};
+\node[container] (api) at (0,0.55) {\shortstack[c]{\textbf{API ứng dụng}\\FastAPI + RBAC\\REST, kiểm tra dữ liệu}};
+\node[service] (domain) at (0,-1.35) {\shortstack[c]{\textbf{Nghiệp vụ}\\chiến dịch, nội dung, chỉ số\\trạng thái và quyền}};
+\node[store] (db) at (5.2,2.45) {\shortstack[c]{\textbf{Cơ sở dữ liệu}\\SQLite giai đoạn đầu\\cân nhắc PostgreSQL}};
+\node[service] (ai) at (5.2,-1.35) {\shortstack[c]{\textbf{Điều phối AI}\\chọn dữ liệu, prompt\\kiểm tra, cảnh báo, nhật ký}};
+\node[ext] (platform) at (10.15,2.45) {\shortstack[c]{\textbf{Nền tảng truyền thông}\\Facebook, TikTok, ...\\ngoài phạm vi hiện tại}};
+\node[ext] (provider) at (10.15,-1.35) {\shortstack[c]{\textbf{Nhà cung cấp AI}\\API tương thích hoặc Ollama\\chốt khi triển khai}};
+
+\draw[rel] (web) -- node[lab,right]{HTTPS/JSON} (api);
+\draw[rel] (api) -- node[lab,right]{gọi nghiệp vụ} (domain);
+\draw[rel] (domain.east) -| node[lab,above]{SQL và giao dịch} (db.south west);
+\draw[rel] (domain.south east) -- node[lab,below]{dữ liệu đã lọc} (ai.south west);
+\draw[rel] (ai.east) -- node[lab,above]{JSON} (provider.west);
+\draw[rel] (api.east) -| node[lab,above]{chỉ sau duyệt} (platform.west);
+\node[draw=black!45,rounded corners=5pt,dashed,fit=(web)(api)(domain)(ai)(db),inner sep=13pt,label={[font=\scriptsize\itshape]above:ranh giới ứng dụng (đề xuất)}](boundary) {};
+\end{tikzpicture}

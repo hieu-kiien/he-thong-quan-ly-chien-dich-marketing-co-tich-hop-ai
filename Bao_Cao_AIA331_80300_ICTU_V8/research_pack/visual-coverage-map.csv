@@ -1,0 +1,11 @@
+chapter,section,question,recommended_visual,evidence_source,status,current_asset,priority,notes
+1,"Bối cảnh và phạm vi","Ai dùng hệ thống, hệ thống nằm ở đâu và giới hạn nào?","System Context","figures/context.tex; SRC-001","EXISTING","figures/context.tex",high,"Một câu hỏi, một context view."
+3,"Actor và use case","Mỗi actor đạt mục tiêu nghiệp vụ nào?","Use Case Diagram","figures/usecase.tex; requirements-traceability.csv","EXISTING","figures/usecase.tex",high,"Use case là goal, không phải danh sách nút bấm."
+4,"Kiến trúc","Runtime gồm những container nào và dữ liệu đi qua đâu?","C4 Container","figures/container.tex; chapters/chapter4.tex","EXISTING","figures/container.tex",high,"Protocol và boundary nằm trong caption/text."
+5,"Dữ liệu lõi","Các parent/child entity và cardinality chính là gì?","Logical/Physical ERD","figures/erd-core.tex; design/schema.sql","EXISTING","figures/erd-core.tex",high,"PK/FK/cardinality được đọc trực tiếp."
+5,"Dữ liệu vận hành","Review, schedule, metrics và AI log nối với core ra sao?","Operational ERD","figures/erd-ops.tex; design/schema.sql","EXISTING","figures/erd-ops.tex",high,"FK cross-view được ghi rõ; không vẽ quan hệ giả."
+5,"Workflow nội dung","Nội dung chuyển trạng thái thế nào và điều kiện nào chặn?","State Machine","figures/content-state.tex; chapter5.tex","EXISTING","figures/content-state.tex",high,"Có nhánh reject/request changes."
+5,"Approval","Ai gọi AI, parser và người duyệt tương tác theo thứ tự nào?","Sequence Diagram","figures/approval-sequence.tex; chapter5.tex","EXISTING","figures/approval-sequence.tex",high,"Có nhánh lỗi provider/schema."
+5,"Giao diện","Người dùng nhìn thấy context, warning và quyền hành động ở đâu?","Wireframe","figures/ui-wireframe.tex; chapter5.tex","EXISTING","figures/ui-wireframe.tex",medium,"Wireframe là design source, không phải screenshot runtime."
+6,"AI workflow","AI được giới hạn, kiểm tra và đưa vào human review ra sao?","AI Pipeline","figures/ai-pipeline.tex; chapter6.tex","EXISTING","figures/ai-pipeline.tex",high,"Whitelist, parser, retry và review."
+7,"Triển khai","Frontend, API, DB và provider được bố trí thế nào?","Deployment View","figures/deployment.tex; chapter7.tex","EXISTING","figures/deployment.tex",medium,"Deployment target, chưa phải môi trường đã chạy."

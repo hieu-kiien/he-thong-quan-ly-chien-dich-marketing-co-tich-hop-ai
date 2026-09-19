@@ -1,0 +1,102 @@
+\chapter{PHÂN TÍCH YÊU CẦU VÀ USE CASE}
+
+\section{Từ đề bài đến yêu cầu}
+
+Đề bài của học phần mô tả cả phần quản lý và phần AI. Nhóm không tách chúng thành những tính năng rời rạc mà đặt trong một quy trình chung: người dùng tạo chiến dịch, chuẩn bị nội dung, gửi duyệt, lập lịch, nhập kết quả rồi xem báo cáo. AI chỉ xuất hiện tại những bước mà nó thực sự giúp giảm công việc, còn quyền và dữ liệu vẫn do phần quản lý kiểm soát.
+
+Mỗi yêu cầu dưới đây được viết theo bốn ý: ai thực hiện, hệ thống nhận thông tin gì, kết quả cần có và điều kiện cần kiểm tra. Các mã FR và NFR giúp đối chiếu với thiết kế, kiểm thử và phần phụ lục khi nhóm bắt đầu lập trình.
+
+\section{Actor và mục tiêu}
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Actor và mục tiêu chính}
+\label{tab:v8-actors}
+\begin{tabularx}{\textwidth}{L{2.8cm}Y Y}
+\toprule
+\textbf{Actor} & \textbf{Mục tiêu} & \textbf{Giới hạn quyền}\\
+\midrule
+Quản lý marketing & Tạo chiến dịch, đặt ngân sách, phân công, duyệt nội dung và xem báo cáo. & Có quyền duyệt; không được sửa nhật ký đã ghi.\\
+Nhân viên marketing & Quản lý phần việc được giao, soạn nội dung, gọi AI, sửa bản nháp và gửi duyệt. & Không được tự duyệt nội dung của mình hoặc thay đổi quyền.\\
+Nhà cung cấp AI & Nhận yêu cầu đã được chọn lọc và trả kết quả theo cấu trúc quy định. & Không truy cập trực tiếp cơ sở dữ liệu và không có quyền nghiệp vụ.\\
+Nền tảng truyền thông & Nhận nội dung đã được duyệt nếu hệ thống có tích hợp thật. & Nằm ngoài phạm vi prototype hiện tại.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Hình~\ref{fig:v8-usecase} chỉ mô tả mục tiêu của người dùng, không mô tả thứ tự thao tác. Thứ tự và điều kiện chuyển trạng thái được trình bày ở Chương 5.
+
+\begin{figure}[h!]
+\centering
+\input{figures/usecase.tex}
+\caption{Các mục tiêu chính của quản lý và nhân viên marketing}
+\label{fig:v8-usecase}
+\end{figure}
+
+\section{Yêu cầu chức năng}
+
+\small
+\begin{longtable}{L{1.0cm}L{2.8cm}L{4.2cm}L{5.1cm}}
+\caption{Danh mục yêu cầu chức năng}\label{tab:v8-functional}\\
+\toprule
+\textbf{Mã} & \textbf{Nhóm} & \textbf{Yêu cầu} & \textbf{Điều kiện nghiệm thu dự kiến}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Mã} & \textbf{Nhóm} & \textbf{Yêu cầu} & \textbf{Điều kiện nghiệm thu dự kiến}\\
+\midrule
+\endhead
+FR01 & Đăng nhập & Người dùng đăng nhập bằng email và mật khẩu. & Thông tin sai bị từ chối; mật khẩu không xuất hiện trong phản hồi hoặc nhật ký.\\
+FR02 & Phân quyền & Backend kiểm tra vai trò ở các thao tác nhạy cảm. & Nhân viên gọi thao tác duyệt bị từ chối; ẩn nút trên giao diện không thay thế kiểm tra backend.\\
+FR03 & Dữ liệu nền & Quản lý nhóm sản phẩm, sản phẩm và kênh. & Dữ liệu bắt buộc được kiểm tra; không tạo bản ghi mồ côi hoặc tên trùng trong cùng phạm vi.\\
+FR04 & Chiến dịch & Tạo/sửa chiến dịch với mục tiêu, sản phẩm, thời gian, ngân sách và người phụ trách. & Ngân sách không âm; ngày kết thúc không trước ngày bắt đầu.\\
+FR05 & Phân công & Quản lý thêm hoặc bỏ nhân viên khỏi chiến dịch. & Người được phân công nhìn thấy đúng chiến dịch; thay đổi được ghi nhận.\\
+FR06 & Nội dung & Tạo bản nháp gắn với chiến dịch, kênh và người tạo. & Bản nháp lưu được; phiên bản và nguồn nội dung có thể truy lại.\\
+FR07 & Phê duyệt & Gửi duyệt, chấp thuận hoặc từ chối nội dung. & Chỉ quản lý được chấp thuận; từ chối phải có lý do.\\
+FR08 & Lịch đăng & Tạo, sửa và hủy lịch cho nội dung đã được chấp thuận. & Nội dung chưa được duyệt không thể lập lịch; múi giờ phải rõ.\\
+FR09 & Chỉ số & Nhập views, clicks, conversions, cost và revenue theo ngày và kênh. & Số liệu không âm; cùng một chiến dịch--kênh--ngày không lặp.\\
+FR10 & Tìm kiếm/báo cáo & Lọc chiến dịch và xem chỉ số theo thời gian, kênh. & Kết quả rỗng được thông báo; công thức KPI xử lý trường hợp mẫu số bằng 0.\\
+FR11 & Gợi ý ý tưởng & Gợi ý ý tưởng dựa trên mục tiêu, đối tượng, sản phẩm và kênh. & Kết quả có cấu trúc, cảnh báo và thông tin nguồn đã dùng.\\
+FR12 & Tạo bản nháp & Tạo caption/email nháp theo quy tắc của kênh. & Bản nháp được đánh dấu do AI tạo; người dùng phải sửa và gửi duyệt trước khi dùng.\\
+FR13 & Tóm tắt kết quả & Tóm tắt KPI và gợi ý cải thiện từ số liệu đã chọn. & Không tạo số liệu mới; phải nêu rõ khi dữ liệu chưa đủ.\\
+FR14 & Nhật ký & Lưu thao tác quan trọng và lần gọi AI. & Có người thực hiện, thời gian, đối tượng và kết quả; không lưu mật khẩu/API key.\\
+\bottomrule
+\end{longtable}
+\normalsize
+
+\section{Yêu cầu phi chức năng}
+
+\begin{table}[h!]
+\centering
+\scriptsize
+\caption{Các yêu cầu chất lượng ưu tiên}
+\label{tab:v8-quality}
+\begin{tabularx}{\textwidth}{L{1.2cm}L{2.3cm}Y Y}
+\toprule
+\textbf{Mã} & \textbf{Thuộc tính} & \textbf{Tình huống cần xử lý} & \textbf{Cách kiểm tra}\\
+\midrule
+NFR01 & An toàn & Nhân viên gọi thao tác duyệt hoặc đọc dữ liệu ngoài phạm vi. & API từ chối; dữ liệu không thay đổi; nhật ký không lộ bí mật.\\
+NFR02 & Toàn vẹn & Nhập ngân sách âm, ngày ngược hoặc khóa ngoại không tồn tại. & Giao dịch bị hủy; không có bản ghi mồ côi.\\
+NFR03 & Hiệu năng & Tìm kiếm chiến dịch trên bộ dữ liệu đã công bố. & Ghi thời gian trung vị, p95, kích thước dữ liệu và môi trường; ngưỡng chấp nhận sẽ được chốt trước khi đo.\\
+NFR04 & Dễ sử dụng & Nhân viên tạo chiến dịch rồi gửi nội dung duyệt. & Ghi tỷ lệ hoàn thành, lỗi thao tác và trạng thái giao diện theo kịch bản; chưa coi là đạt khi chưa thử.\\
+NFR05 & Ổn định & Nhà cung cấp AI timeout, giới hạn tốc độ hoặc trả JSON sai. & Giữ bản nháp cũ; có thông báo và nút thử lại; không lặp vô hạn; số lần thử tối đa sẽ được chốt khi code.\\
+NFR06 & Tái lập & Người khác cài đặt và chạy lại demo. & Có hướng dẫn, dữ liệu mẫu, cấu hình mẫu và nhật ký cài đặt; kết quả phải được ghi sau lần chạy thật.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Quy tắc nghiệp vụ}
+
+\begin{enumerate}
+\item Mỗi nội dung thuộc một chiến dịch và một kênh. Một chiến dịch có thể có nhiều nội dung.
+\item Chỉ nội dung ở trạng thái APPROVED mới được lập lịch. Nội dung bị từ chối phải kèm lý do.
+\item Quản lý là người duyệt. Nhân viên có thể tạo và sửa nội dung nhưng không tự hợp thức hóa nội dung của mình.
+\item Chỉ số được lưu theo chiến dịch, kênh và ngày; một khóa như vậy không được xuất hiện hai lần.
+\item CTR, CVR, CPC và ROI do hệ thống tính từ số liệu; AI chỉ diễn giải kết quả đã tính.
+\item AI không được tự thay đổi ngân sách, vai trò, trạng thái duyệt hoặc hành động xuất bản.
+\end{enumerate}
+
+\section{Kết luận chương}
+
+Các yêu cầu đã được viết thành những điều có thể kiểm tra, thay vì chỉ liệt kê tên chức năng. Chương 4 dùng chúng để phân chia kiến trúc; Chương 5 dùng chúng để xây dựng bảng và quy trình; Chương 6 dùng chúng để giới hạn chức năng AI.

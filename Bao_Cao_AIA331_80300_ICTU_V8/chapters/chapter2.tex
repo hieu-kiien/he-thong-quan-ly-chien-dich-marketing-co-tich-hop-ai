@@ -1,0 +1,82 @@
+\chapter{CƠ SỞ THAM KHẢO VÀ NGUYÊN TẮC THIẾT KẾ}
+
+\section{Cách tiếp cận}
+
+Nhóm sử dụng tư duy của Design Science Research để đi từ một vấn đề thực tế đến một giải pháp có thể xây dựng và đánh giá. Theo Peffers và cộng sự, một quá trình thiết kế cần bắt đầu từ vấn đề, xác định mục tiêu, tạo giải pháp, trình diễn và đánh giá kết quả \cite{peffers2007dsrm}. Trong phạm vi học phần, cách tiếp cận này được dùng như một khung làm việc, không phải để tuyên bố đề tài là một công trình nghiên cứu thuật toán mới.
+
+Yêu cầu được đối chiếu với ISO/IEC/IEEE 29148, kiến trúc được trình bày theo stakeholder và viewpoint của ISO/IEC/IEEE 42010, còn các thuộc tính chất lượng được tham khảo từ ISO/IEC 25010. Những chuẩn này giúp nhóm không bỏ sót các vấn đề như quyền, hiệu năng, khả năng sử dụng và bảo trì; yêu cầu cụ thể của học phần và hướng dẫn của giảng viên vẫn là căn cứ trực tiếp cho dự án.
+
+Các hướng dẫn báo cáo dự án của Cambridge và CMU đều coi mục tiêu, thiết kế, phần đã thực hiện, đánh giá và giới hạn là những phần cần nối với nhau trong một lập luận thống nhất \cite{cambridge-dissertation,cambridge-assessment,cmu-capstone}. Đây cũng là cách tổ chức được chọn cho báo cáo này.
+
+\section{Một số nhận xét từ lĩnh vực marketing analytics}
+
+Marketing analytics không chỉ là đặt một biểu đồ lên màn hình. Dữ liệu cần được gắn với chiến dịch, kênh và khoảng thời gian để người dùng hiểu con số đang nói về điều gì. Wedel và Kannan trình bày marketing analytics trong môi trường nhiều dữ liệu, đồng thời lưu ý đến tối ưu chi tiêu, cá nhân hóa, quyền riêng tư và an toàn dữ liệu \cite{wedel-kannan}.
+
+Huang và Rust phân biệt các vai trò của AI trong marketing, từ tự động hóa thao tác, xử lý dữ liệu đến hỗ trợ tư duy chiến lược \cite{huang-rust}. Với một dự án học phần, phạm vi phù hợp nhất là hỗ trợ viết nháp và diễn giải dữ liệu đã có. Hệ thống không tự đưa ra quyết định ngân sách và không được biến một câu trả lời có vẻ thuyết phục thành sự thật.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Những yêu cầu thiết kế rút ra từ lĩnh vực}
+\label{tab:v8-domain-drivers}
+\begin{tabularx}{\textwidth}{L{3.4cm}Y Y}
+\toprule
+\textbf{Nhu cầu} & \textbf{Vấn đề cần giải quyết} & \textbf{Cách thể hiện trong đề tài}\\
+\midrule
+Lập kế hoạch chiến dịch & mục tiêu, đối tượng, ngân sách và người phụ trách phải nhất quán. & Chiến dịch là đối tượng trung tâm; có ngày bắt đầu/kết thúc và quan hệ phân công.\\
+Vận hành nội dung & một nội dung có thể trải qua nhiều lần sửa và nhiều bước duyệt. & Có trạng thái, lịch sử duyệt và điều kiện trước khi lập lịch.\\
+Đọc chỉ số & số liệu phải biết thuộc kênh nào và ngày nào. & Dùng khóa duy nhất theo chiến dịch--kênh--ngày; KPI do hệ thống tính.\\
+Hỗ trợ bằng AI & người dùng cần biết AI dựa vào dữ liệu nào và phải sửa ở đâu. & Chọn dữ liệu theo quyền, hiển thị cảnh báo và bắt buộc người duyệt.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Nguyên tắc tương tác người--AI}
+
+Các hướng dẫn về Human--AI Interaction của Amershi và cộng sự nhấn mạnh việc làm rõ khả năng, giới hạn và mức độ chính xác của AI, đồng thời hỗ trợ người dùng khi AI sai \cite{amershi2019hax}. NIST AI RMF và hồ sơ dành cho AI tạo sinh đưa thêm góc nhìn về việc nhận diện, quản lý và đo lường rủi ro \cite{nist-airmf,nist-genai-profile}.
+
+Từ các tài liệu này, chức năng AI của đề tài tuân theo bốn nguyên tắc:
+
+\begin{enumerate}
+\item AI nói rõ đó là gợi ý hoặc bản nháp, không phải quyết định đã được phê duyệt;
+\item người dùng nhìn thấy các thông tin chính đã được đưa vào yêu cầu;
+\item người dùng có thể sửa, từ chối hoặc yêu cầu lại;
+\item khi thiếu dữ liệu, trả về lỗi hoặc thông báo thiếu dữ liệu thay vì tự điền.
+\end{enumerate}
+
+\section{Các sản phẩm và công trình được tham khảo}
+
+Các trang sản phẩm của HubSpot và Meta được xem để hiểu cách một hệ thống marketing thường nối campaign, content và analytics; chúng không được dùng làm bằng chứng rằng dự án đã có những chức năng đó \cite{hubspot,meta-insights}. C4 model được dùng để chọn đúng loại sơ đồ cho câu hỏi cần trả lời \cite{c4}.
+
+\begin{table}[h!]
+\centering
+\scriptsize
+\caption{So sánh nguồn tham khảo và cách áp dụng có giới hạn}
+\label{tab:v8-related-work}
+\begin{tabularx}{\textwidth}{L{3.0cm}L{4.0cm}L{3.5cm}Y}
+\toprule
+\textbf{Nguồn} & \textbf{Điều có thể học} & \textbf{Không thể suy ra} & \textbf{Áp dụng cho đề tài}\\
+\midrule
+Wedel--Kannan & Số liệu marketing cần gắn với bối cảnh và vấn đề quyền riêng tư. & Không đưa ra schema hay giao diện cụ thể. & Thiết kế grain của metrics và ghi rõ nguồn dữ liệu.\\
+Huang--Rust & AI có thể hỗ trợ nhiều lớp công việc marketing khác nhau. & Không chứng minh một mô hình cụ thể phù hợp dự án này. & Chỉ chọn gợi ý, bản nháp và tóm tắt có kiểm duyệt.\\
+HubSpot/Meta & Campaign, content, analytics và quyền truy cập là các khái niệm đi cùng nhau. & Không biết cách triển khai bên trong sản phẩm thương mại. & Dùng như gợi ý nghiệp vụ; không sao chép giao diện hay nhận diện.\\
+Amershi và cộng sự & Người dùng cần hiểu, kiểm soát và phục hồi khi AI sai. & Không thay thế việc kiểm thử model và dữ liệu. & Thêm cảnh báo, sửa bản nháp, retry và review.\\
+NIST AI RMF & Rủi ro cần được nhận diện, quản lý và đo lường. & Không phải giấy chứng nhận hệ thống an toàn. & Thêm log, giới hạn dữ liệu và kế hoạch đánh giá.\\
+C4 model & Mỗi sơ đồ nên trả lời một câu hỏi kiến trúc cụ thể. & Không phải một phương pháp đầy đủ cho toàn bộ dự án. & Tách Context, Container, ERD, State và Sequence.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Nguyên tắc thiết kế được lựa chọn}
+
+\begin{enumerate}
+\item Dữ liệu và quyền được xác định trước khi gọi AI.
+\item Phê duyệt là một quy tắc nghiệp vụ, không chỉ là một nút trên giao diện.
+\item Các công thức KPI được tính bằng logic xác định; AI chỉ giải thích và gợi ý câu hỏi tiếp theo.
+\item Mỗi sơ đồ chỉ tập trung vào một câu hỏi; chi tiết quá dày được tách thành view khác.
+\item Những gì chưa chạy được phải được viết ở dạng đề xuất hoặc kế hoạch, không viết như kết quả.
+\end{enumerate}
+
+\section{Kết luận chương}
+
+Các nguồn tham khảo không được dùng để trang trí danh mục tài liệu mà để giải thích quyết định thiết kế. Chương tiếp theo chuyển những nguyên tắc này thành actor, yêu cầu, tiêu chí nghiệm thu và quy tắc nghiệp vụ cụ thể.

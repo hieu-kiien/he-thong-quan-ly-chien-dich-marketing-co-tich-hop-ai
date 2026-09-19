@@ -1,0 +1,23 @@
+\begin{tikzpicture}[
+  font=\sffamily\scriptsize,
+  participant/.style={draw=ictunavy,fill=softblue,rounded corners=3pt,minimum width=2.25cm,minimum height=0.55cm,align=center},
+  line/.style={draw=black!55,dashed},
+  msg/.style={-{Latex[length=1.8mm]},draw=ictunavy,line width=0.6pt},
+  lab/.style={font=\sffamily\scriptsize,fill=white,inner sep=1pt,align=center}
+]
+\node[participant] (m) at (0,0) {Nhân viên};
+\node[participant] (ui) at (3.2,0) {Giao diện};
+\node[participant] (api) at (6.4,0) {API/nghiệp vụ};
+\node[participant] (ai) at (9.6,0) {Bộ gọi AI};
+\node[participant] (db) at (12.8,0) {Cơ sở dữ liệu};
+\foreach \x in {0,3.2,6.4,9.6,12.8}{\draw[line] (\x,-0.35) -- (\x,-5.4);}
+\draw[msg] (0,-0.8) -- node[lab,above]{yêu cầu tạo ý tưởng/bản nháp} (3.2,-0.8);
+\draw[msg] (3.2,-1.35) -- node[lab,above]{POST + mã chiến dịch} (6.4,-1.35);
+\draw[msg] (6.4,-1.9) -- node[lab,above]{chọn dữ liệu theo quyền} (12.8,-1.9);
+\draw[msg] (12.8,-2.45) -- node[lab,above]{gói dữ liệu đã chọn} (9.6,-2.45);
+\draw[msg] (9.6,-3.15) -- node[lab,above]{yêu cầu JSON} (6.4,-3.15);
+\draw[msg] (6.4,-3.7) -- node[lab,above]{bản nháp hoặc lỗi} (3.2,-3.7);
+\draw[msg] (6.4,-4.25) -- node[lab,above]{lưu bản nháp và nhật ký} (12.8,-4.25);
+\draw[msg] (3.2,-4.8) -- node[lab,above]{hiển thị nguồn và cảnh báo} (0,-4.8);
+\node[draw=ictuamber,fill=softamber,rounded corners=3pt,align=center,minimum width=5.0cm] at (9.5,-4.8) {Nếu timeout, giới hạn tốc độ hoặc JSON sai:\\không ghi đè bản nháp cũ; ghi lỗi và cho thử lại};
+\end{tikzpicture}

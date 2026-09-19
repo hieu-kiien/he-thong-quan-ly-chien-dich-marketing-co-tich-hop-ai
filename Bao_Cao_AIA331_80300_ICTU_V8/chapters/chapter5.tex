@@ -1,0 +1,127 @@
+\chapter{THIẾT KẾ DỮ LIỆU VÀ QUY TRÌNH}
+
+\section{Từ nghiệp vụ đến cơ sở dữ liệu}
+
+Mô hình dữ liệu được xây dựng theo ba bước. Trước hết là các đối tượng mà người dùng nhìn thấy: người dùng, sản phẩm, chiến dịch, kênh, nội dung và kết quả. Sau đó là các quan hệ, khóa, trạng thái và quy tắc nghiệp vụ. Cuối cùng là tên bảng, kiểu dữ liệu, khóa ngoại và ràng buộc có thể triển khai trong SQLite.
+
+Ở giai đoạn hiện tại, DDL và ERD là thiết kế để nhóm bắt đầu lập trình. Chúng chưa chứng minh rằng cơ sở dữ liệu đã được tích hợp vào một ứng dụng chạy thật.
+
+\section{Mô hình dữ liệu cốt lõi}
+
+Hình~\ref{fig:v8-erd-core} tập trung vào các bảng nền và quan hệ chính. Tên bảng dùng tiếng Anh vì đây là phần sẽ được dùng trong mã nguồn; mô tả và quy tắc được giải thích bằng tiếng Việt trong báo cáo.
+
+\begin{figure}[h!]
+\centering
+\input{figures/erd-core.tex}
+\caption{Mô hình dữ liệu cốt lõi của hệ thống}
+\label{fig:v8-erd-core}
+\end{figure}
+
+\section{Các bảng phục vụ vận hành}
+
+Những thông tin như phân công, lịch sử duyệt, lịch đăng, số liệu và lần gọi AI được tách khỏi hình cốt lõi để sơ đồ không quá dày. Hình~\ref{fig:v8-erd-ops} cho thấy các bảng mở rộng và các điểm nối khóa ngoại quan trọng; các bảng lõi được tham chiếu bằng tên thay vì vẽ lặp lại.
+
+\begin{figure}[h!]
+\centering
+\input{figures/erd-ops.tex}
+\caption{Các bảng vận hành và điểm nối tới ERD lõi}
+\label{fig:v8-erd-ops}
+\end{figure}
+
+\section{Từ điển dữ liệu rút gọn}
+
+\small
+\begin{longtable}{@{}L{2.3cm}L{2.5cm}L{2.8cm}L{6.4cm}@{}}
+\caption{Các bảng và quy tắc cần giữ khi triển khai}\label{tab:v8-data-dictionary}\\
+\toprule
+\textbf{Bảng} & \textbf{Vai trò} & \textbf{Khóa} & \textbf{Quy tắc chính}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Bảng} & \textbf{Vai trò} & \textbf{Khóa} & \textbf{Quy tắc chính}\\
+\midrule
+\endhead
+\texttt{users} & Tài khoản và vai trò & PK \texttt{id} & Email duy nhất; vai trò chỉ gồm Manager/Marketer; không trả hash mật khẩu.\\
+\makecell[l]{\texttt{product\_}\\\texttt{categories}} & Nhóm sản phẩm & PK \texttt{id} & Tên duy nhất.\\
+\texttt{products} & Sản phẩm & PK; FK category & Không xóa nhóm khi còn sản phẩm tham chiếu.\\
+\texttt{campaigns} & Mục tiêu, thời gian, ngân sách & PK; FK product/owner & Ngân sách không âm; ngày kết thúc không trước ngày bắt đầu.\\
+\makecell[l]{\texttt{campaign\_}\\\texttt{members}} & Phân công & PK campaign/user & Không lặp cặp chiến dịch--người dùng.\\
+\makecell[l]{\texttt{marketing\_}\\\texttt{contents}} & Bản nội dung & \makecell[l]{PK; FK\\campaign,\\channel,\\user} & Trạng thái phải hợp lệ; có nguồn và cảnh báo nếu do AI tạo.\\
+\makecell[l]{\texttt{content\_}\\\texttt{reviews}} & Lịch sử duyệt & PK; FK content/reviewer & Quyết định và lý do bắt buộc.\\
+\makecell[l]{\texttt{marketing\_}\\\texttt{schedules}} & Lịch đăng & PK; FK content & Chỉ nội dung APPROVED; múi giờ bắt buộc.\\
+\makecell[l]{\texttt{campaign\_}\\\texttt{metrics}} & Số liệu theo ngày/kênh & PK; FK campaign/channel & Duy nhất theo campaign--channel--date; số liệu không âm.\\
+\texttt{ai\_logs} & Nhật ký gọi AI & PK; FK user/campaign & Ghi provider, model, prompt version, trạng thái và thời gian; không lưu bí mật.\\
+\bottomrule
+\end{longtable}
+\normalsize
+
+\section{Toàn vẹn dữ liệu và cách tính KPI}
+
+Các ràng buộc nên được kiểm tra ở hai lớp. Cơ sở dữ liệu ngăn các trường hợp chắc chắn sai như khóa ngoại không tồn tại, số âm hoặc bản ghi trùng. Phần nghiệp vụ chuyển lỗi kỹ thuật thành thông báo dễ hiểu và kiểm tra những quy tắc phụ thuộc trạng thái, chẳng hạn nội dung phải APPROVED trước khi lập lịch.
+
+Các chỉ số được tính bằng công thức xác định:
+\[
+\mathrm{CTR} =
+\begin{cases}
+\dfrac{\mathrm{clicks}}{\mathrm{views}}\times100, & \mathrm{views}>0,\\
+0, & \mathrm{views}=0,
+\end{cases}
+\qquad
+\mathrm{CVR} =
+\begin{cases}
+\dfrac{\mathrm{conversions}}{\mathrm{clicks}}\times100, & \mathrm{clicks}>0,\\
+0, & \mathrm{clicks}=0.
+\end{cases}
+\]
+\[
+\mathrm{CPC} =
+\begin{cases}
+\dfrac{\mathrm{cost}}{\mathrm{clicks}}, & \mathrm{clicks}>0,\\
+0, & \mathrm{clicks}=0,
+\end{cases}
+\qquad
+\mathrm{ROI} =
+\begin{cases}
+\dfrac{\mathrm{revenue}-\mathrm{cost}}{\mathrm{cost}}\times100, & \mathrm{cost}>0,\\
+\text{chưa xác định}, & \mathrm{cost}=0.
+\end{cases}
+\]
+
+Nếu chưa có số liệu, giao diện phải ghi “chưa đủ dữ liệu”. AI chỉ được diễn giải các giá trị đã tính; nó không được tự tạo con số thay cho phép tính của hệ thống.
+
+\section{Vòng đời của nội dung}
+
+Một bản nội dung không đi thẳng từ tạo đến xuất bản. Hình~\ref{fig:v8-state} mô tả các trạng thái và điều kiện chuyển. \texttt{AI\_DRAFT} là bản nháp do AI tạo; trạng thái của lịch đăng được quản lý riêng trong bảng \texttt{marketing\_schedules}, không phải một trạng thái của nội dung. Mỗi mũi tên sẽ có ít nhất một trường hợp hợp lệ và một trường hợp bị từ chối khi kiểm thử.
+
+\begin{figure}[h!]
+\centering
+\input{figures/content-state.tex}
+\caption{Vòng đời dự kiến của một bản nội dung}
+\label{fig:v8-state}
+\end{figure}
+
+\section{Trình tự tạo và phê duyệt bản nháp AI}
+
+Khi người dùng yêu cầu AI, hệ thống trước hết xác định người dùng là ai và được đọc dữ liệu nào. Sau đó mới chọn dữ liệu, gọi provider, kiểm tra kết quả và lưu bản nháp. Người dùng nhận được bản nháp cùng nguồn và cảnh báo trước khi gửi quản lý. Hình~\ref{fig:v8-sequence} chỉ mô tả trình tự tạo bản nháp; quyết định chấp thuận hoặc từ chối nằm trong state machine ở Hình~\ref{fig:v8-state}.
+
+\begin{figure}[h!]
+\centering
+\input{figures/approval-sequence.tex}
+\caption{Trình tự tạo bản nháp AI}
+\label{fig:v8-sequence}
+\end{figure}
+
+\section{Giao diện dự kiến}
+
+Wireframe trong Hình~\ref{fig:v8-wireframe} không phải ảnh chụp sản phẩm đã chạy. Nó dùng để kiểm tra sớm ba điều: người dùng có nhìn thấy trạng thái nội dung không, có biết dữ liệu nào được dùng để tạo bản nháp không, và nút sửa/duyệt có bị lẫn với nút xuất bản không.
+
+\begin{figure}[h!]
+\centering
+\input{figures/ui-wireframe.tex}
+\caption{Bố cục dự kiến của màn hình làm việc với chiến dịch (dữ liệu minh họa)}
+\label{fig:v8-wireframe}
+\end{figure}
+
+\section{Kết luận chương}
+
+Mô hình dữ liệu đã nối các yêu cầu với khóa, ràng buộc, công thức và trạng thái. Khi bắt đầu code, nhóm có thể dùng DDL, ERD và state machine làm cơ sở viết migration, API và test. Chức năng AI ở chương sau sẽ tuân theo những giới hạn dữ liệu và quy trình duyệt được xác định ở đây.

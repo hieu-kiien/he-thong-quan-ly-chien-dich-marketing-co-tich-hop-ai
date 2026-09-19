@@ -1,0 +1,76 @@
+\chapter{KẾT LUẬN VÀ HƯỚNG HOÀN THIỆN}
+
+\section{Kết luận}
+
+Đề tài ``Hệ thống quản lý chiến dịch marketing có tích hợp AI'' được hình thành từ một nhu cầu khá cụ thể: người làm marketing cần theo dõi chiến dịch, nội dung, lịch đăng và chỉ số trong cùng một nơi, đồng thời muốn có công cụ hỗ trợ khi phải lên ý tưởng hoặc đọc số liệu. Từ nhu cầu đó, báo cáo đã đi qua các bước phân tích bài toán, xác định yêu cầu, thiết kế dữ liệu, tổ chức kiến trúc và đặt AI vào những vị trí phù hợp trong quy trình nghiệp vụ.
+
+Điểm quan trọng nhất của thiết kế là AI chỉ đóng vai trò hỗ trợ. AI có thể đề xuất bản nháp, tóm tắt số liệu và gợi ý hướng cải thiện; quyết định sử dụng nội dung, chỉnh sửa, duyệt hay xuất bản vẫn thuộc về người dùng. Cách đặt AI này giúp chức năng mới gắn với dữ liệu của chiến dịch, có giới hạn rõ ràng và có thể kiểm tra khi câu trả lời không phù hợp.
+
+Qua các chương, báo cáo đã làm rõ các nội dung chính sau:
+
+\begin{itemize}
+\item bối cảnh sử dụng, người dùng, phạm vi và các giả định của hệ thống;
+\item yêu cầu chức năng, yêu cầu phi chức năng, tác nhân và các ca sử dụng chính;
+\item kiến trúc gồm giao diện web, máy chủ ứng dụng, cơ sở dữ liệu và lớp kết nối AI;
+\item mô hình dữ liệu cho chiến dịch, nội dung, lịch đăng, chỉ số, phê duyệt và nhật ký sử dụng AI;
+\item luồng xử lý nội dung AI, cách chọn dữ liệu đưa vào yêu cầu, định dạng kết quả và bước người dùng kiểm tra;
+\item kế hoạch xây dựng, kiểm thử, đánh giá và triển khai ở các giai đoạn tiếp theo.
+\end{itemize}
+
+Báo cáo này là tài liệu phân tích và thiết kế ở thời điểm nhóm chưa bắt đầu lập trình. Vì vậy, báo cáo không khẳng định ứng dụng đã chạy, chất lượng mô hình đã được đo hay hiệu quả chiến dịch đã được cải thiện. Những nội dung đó chỉ được bổ sung sau khi nhóm có mã nguồn, dữ liệu thử nghiệm và kết quả kiểm tra thực tế.
+
+\section{Những điểm còn giới hạn}
+
+Việc ghi rõ giới hạn giúp người đọc phân biệt phần đã hoàn thành trong tài liệu với phần cần thực hiện khi xây dựng sản phẩm.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Phạm vi đã thiết kế và phần cần kiểm tra ở giai đoạn triển khai}\label{tab:v8-limitations}
+\begin{tabularx}{\textwidth}{L{4.0cm}L{3.1cm}Y}
+\toprule
+\textbf{Hạng mục} & \textbf{Hiện trạng} & \textbf{Việc cần làm tiếp theo}\\
+\midrule
+Giao diện và máy chủ & chưa lập trình & xây dựng màn hình, API và kiểm tra các luồng nghiệp vụ.\\
+Cơ sở dữ liệu & đã có thiết kế và DDL dự kiến & tạo cơ sở dữ liệu thật, thêm dữ liệu mẫu và kiểm tra các ràng buộc.\\
+Mô hình và dịch vụ AI & chưa chốt và chưa chạy & chọn dịch vụ phù hợp, thử với các trường hợp đại diện và ghi nhận chi phí, thời gian phản hồi.\\
+Dữ liệu marketing & mới dừng ở mô hình dữ liệu & chuẩn bị dữ liệu mẫu có cấu trúc, đồng thời tách rõ dữ liệu minh họa với dữ liệu thực tế.\\
+Hiệu năng và độ ổn định & chưa đo & kiểm tra thời gian phản hồi, lỗi kết nối, giới hạn gọi dịch vụ và khả năng khôi phục.\\
+Bảo mật và triển khai & mới có phương án thiết kế & kiểm tra quyền truy cập, biến môi trường, sao lưu và cách cài đặt trên môi trường chạy.\\
+Trải nghiệm người dùng & mới có wireframe & cho người dùng thử các tác vụ chính và ghi nhận những chỗ khó hiểu hoặc dễ thao tác nhầm.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Các giới hạn trên không làm thay đổi giá trị của tài liệu hiện tại, nhưng giới hạn cách diễn giải kết quả. Một thiết kế hợp lý vẫn cần được kiểm tra bằng chương trình chạy thật; ngược lại, một chức năng chạy được cũng cần được đối chiếu với yêu cầu ban đầu để biết nó có giải quyết đúng bài toán hay không.
+
+\section{Hướng hoàn thiện báo cáo}
+
+Khi bắt đầu xây dựng, nhóm nên cập nhật báo cáo song song với sản phẩm. Mỗi phần thiết kế trong báo cáo cần được đối chiếu với một phần cụ thể trong mã nguồn, dữ liệu hoặc kết quả kiểm thử. Làm theo cách này sẽ tránh tình trạng đến cuối kỳ mới nhớ lại quy trình đã làm hoặc đưa vào báo cáo những kết quả chưa từng kiểm tra.
+
+\begin{table}[h!]
+\centering
+\scriptsize
+\caption{Cách cập nhật một số nội dung sau khi có sản phẩm chạy thử}\label{tab:v8-update-protocol}
+\begin{tabularx}{\textwidth}{L{4.0cm}L{4.0cm}Y}
+\toprule
+\textbf{Nội dung trong thiết kế} & \textbf{Tài liệu cần bổ sung} & \textbf{Cách trình bày ở báo cáo cuối}\\
+\midrule
+Các API và chức năng quản lý & mã nguồn, dữ liệu mẫu, kết quả gọi API và kiểm thử & nêu luồng thành công, trường hợp lỗi và cách hệ thống phản hồi.\\
+Mô hình dữ liệu & lệnh tạo bảng, dữ liệu mẫu, kiểm tra khóa và truy vấn & đối chiếu sơ đồ với cơ sở dữ liệu thật, chỉ ra những điều chỉnh nếu có.\\
+Chức năng AI & phiên bản prompt, bản ghi gọi dịch vụ và ảnh chụp luồng duyệt & ghi rõ dịch vụ, phiên bản, dữ liệu đầu vào, kết quả và trường hợp AI trả lời không hợp lệ.\\
+Chất lượng gợi ý & bộ trường hợp thử, tiêu chí chấm và kết quả từng trường hợp & trình bày cả kết quả tốt lẫn kết quả chưa đạt, không chỉ chọn ví dụ đẹp.\\
+Khả năng cài đặt lại & hướng dẫn chạy, phiên bản thư viện, tệp cấu hình mẫu và cách khôi phục & để người đọc có thể làm theo hoặc biết chính xác bước nào còn phụ thuộc môi trường.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Giá trị của báo cáo đối với học phần}
+
+Ở thời điểm hiện tại, báo cáo đã đặt nền tảng cho các yêu cầu của học phần: phân tích bài toán, mô tả chức năng và ràng buộc, thiết kế tác nhân và ca sử dụng, cơ sở dữ liệu, kiến trúc, giao diện, chức năng AI, kiểm thử và kế hoạch triển khai. Ba bài kiểm tra thường xuyên và bài thi cuối được dùng như các tiêu chí kiểm tra trong quá trình thực hiện, chứ không tách thành các báo cáo rời nhau.
+
+Một số nguyên tắc được giữ xuyên suốt thiết kế là: AI không tự xuất bản nội dung; dữ liệu đưa vào AI phải được chọn trong phạm vi cần thiết; số liệu minh họa không được trình bày như số liệu thật; và mọi kết luận về chất lượng phải dựa trên kết quả chạy hoặc kiểm thử có thể xem lại. Những nguyên tắc này vừa phù hợp với bài toán marketing, vừa giúp nhóm trình bày sản phẩm một cách có trách nhiệm.
+
+\section{Lời kết}
+
+Tài liệu hiện tại trả lời ba câu hỏi nền tảng của đề tài: hệ thống phục vụ ai, hệ thống cần làm gì và AI nên tham gia ở đâu. Bước tiếp theo là biến thiết kế thành một sản phẩm nhỏ nhưng chạy ổn định, sau đó quay lại bổ sung các kết quả thực tế vào báo cáo. Khi đó, bản báo cáo cuối cùng sẽ không chỉ mô tả một ý tưởng mà còn cho thấy rõ cách nhóm đã xây dựng, kiểm tra và đánh giá hệ thống.

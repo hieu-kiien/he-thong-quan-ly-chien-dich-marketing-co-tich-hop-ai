@@ -1,0 +1,52 @@
+\begin{tikzpicture}[
+  font=\sffamily\scriptsize,
+  table/.style={matrix of nodes,nodes={draw=ictunavy,fill=white,minimum width=3.6cm,minimum height=0.34cm,text width=3.35cm,align=left,inner sep=2pt},row sep=-0.45pt,column sep=0pt},
+  header/.style={nodes={fill=ictunavy,text=white,font=\bfseries\scriptsize}},
+  rel/.style={-{Latex[length=1.7mm]},draw=ictunavy,line width=0.55pt},
+  card/.style={font=\sffamily\scriptsize\bfseries,text=ictunavy,fill=white,inner sep=1pt}
+]
+\matrix (users) [table,header/.style={nodes={fill=ictunavy,text=white,font=\bfseries\scriptsize}},row 1/.style={nodes={fill=ictunavy,text=white,font=\bfseries\scriptsize}}] at (0,2.1) {
+users\\
+\texttt{PK id}\\
+\texttt{email UNIQUE}\\
+\texttt{role}\\
+};
+\matrix (cats) [table,row 1/.style={nodes={fill=ictunavy,text=white,font=\bfseries\scriptsize}}] at (4.8,2.1) {
+product\_categories\\
+\texttt{PK id}\\
+\texttt{name UNIQUE}\\
+};
+\matrix (products) [table,row 1/.style={nodes={fill=ictunavy,text=white,font=\bfseries\scriptsize}}] at (9.6,2.1) {
+products\\
+\texttt{PK id}\\
+\texttt{FK category\_id}\\
+\texttt{name, price, status}\\
+};
+\matrix (campaigns) [table,row 1/.style={nodes={fill=ictunavy,text=white,font=\bfseries\scriptsize}}] at (2.4,-0.8) {
+campaigns\\
+\texttt{PK id}\\
+\texttt{FK product\_id}\\
+\texttt{FK owner\_id}\\
+\texttt{objective, dates, budget}\\
+};
+\matrix (channels) [table,row 1/.style={nodes={fill=ictunavy,text=white,font=\bfseries\scriptsize}}] at (7.2,-0.8) {
+marketing\_channels\\
+\texttt{PK id}\\
+\texttt{name UNIQUE}\\
+\texttt{format\_rules}\\
+};
+\matrix (contents) [table,row 1/.style={nodes={fill=ictunavy,text=white,font=\bfseries\scriptsize}}] at (4.8,-3.9) {
+marketing\_contents\\
+\texttt{PK id}\\
+\texttt{FK campaign\_id}\\
+\texttt{FK channel\_id}\\
+\texttt{FK created\_by}\\
+\texttt{status, body, source\_ids}\\
+};
+\draw[rel] (cats) -- node[card,above]{1} node[card,below]{0..*} (products);
+\draw[rel] (products) -- node[card,above]{1} node[card,below]{0..*} (campaigns);
+\draw[rel] (users) -- node[card,left]{1} node[card,right]{0..*} (campaigns);
+\draw[rel] (users.south west) .. controls (-1.0,0.2) and (2.3,-3.0) .. node[pos=0.25,card,left]{1} node[pos=0.78,card,left]{0..*} (contents.north west);
+\draw[rel] (campaigns) -- node[card,left]{1} node[card,right]{0..*} (contents);
+\draw[rel] (channels) -- node[card,left]{1} node[card,right]{0..*} (contents);
+\end{tikzpicture}
