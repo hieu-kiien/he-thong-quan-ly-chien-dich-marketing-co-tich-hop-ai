@@ -1,0 +1,41 @@
+@startuml
+hide footbox
+title AI-assisted content generation — sequence view
+actor Marketer
+participant "Web/API" as API
+participant "AI Service" as AIS
+participant "AI Provider" as AIP
+participant "Database" as DB
+actor Manager
+
+Marketer -> API: Request draft
+activate API
+API -> DB: Load authorized context
+DB --> API: Context records
+API -> AIS: Generate(context, channel rules)
+activate AIS
+AIS -> AIP: Prompt + structured schema
+AIP --> AIS: Candidate JSON
+alt Valid schema and allowed content
+  AIS --> API: Validated draft
+  API -> DB: Save AI_DRAFT + source ids
+  API --> Marketer: Show editable draft
+else Invalid output / timeout
+  AIS --> API: Error
+  API -> DB: Write audit/error log
+  API --> Marketer: Preserve old draft + retry option
+end
+deactivate AIS
+deactivate API
+
+opt Human review
+  Marketer -> API: Submit for approval
+  API -> DB: State -> PENDING
+  Manager -> API: Approve or reject
+  alt Approved
+    API -> DB: State -> APPROVED
+  else Rejected
+    API -> DB: State -> REJECTED + reason
+  end
+end
+@enduml

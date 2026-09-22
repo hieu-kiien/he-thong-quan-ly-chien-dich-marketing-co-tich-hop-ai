@@ -17,6 +17,7 @@ Hình~\ref{fig:v8-erd-core} tập trung vào các bảng nền và quan hệ ch�
 \label{fig:v8-erd-core}
 \end{figure}
 
+\clearpage
 \section{Các bảng phục vụ vận hành}
 
 Những thông tin như phân công, lịch sử duyệt, lịch đăng, số liệu và lần gọi AI được tách khỏi hình cốt lõi để sơ đồ không quá dày. Hình~\ref{fig:v8-erd-ops} cho thấy các bảng mở rộng và các điểm nối khóa ngoại quan trọng; các bảng lõi được tham chiếu bằng tên thay vì vẽ lặp lại.
@@ -28,32 +29,39 @@ Những thông tin như phân công, lịch sử duyệt, lịch đăng, số li
 \label{fig:v8-erd-ops}
 \end{figure}
 
+\clearpage
 \section{Từ điển dữ liệu rút gọn}
 
+\begin{table}[!htbp]
+\centering
 \small
-\begin{longtable}{@{}L{2.3cm}L{2.5cm}L{2.8cm}L{6.4cm}@{}}
-\caption{Các bảng và quy tắc cần giữ khi triển khai}\label{tab:v8-data-dictionary}\\
-\toprule
-\textbf{Bảng} & \textbf{Vai trò} & \textbf{Khóa} & \textbf{Quy tắc chính}\\
-\midrule
-\endfirsthead
-\toprule
-\textbf{Bảng} & \textbf{Vai trò} & \textbf{Khóa} & \textbf{Quy tắc chính}\\
-\midrule
-\endhead
+\caption{Các bảng và quy tắc cần giữ khi triển khai}\label{tab:v8-data-dictionary}
+\begin{tabularx}{\textwidth}{|L{3.6cm}|L{2.5cm}|L{2.6cm}|Y|}
+\hline
+\thead{Bảng} & \thead{Vai trò} & \thead{Khóa} & \thead{Quy tắc chính}\\
+\hline
 \texttt{users} & Tài khoản và vai trò & PK \texttt{id} & Email duy nhất; vai trò chỉ gồm Manager/Marketer; không trả hash mật khẩu.\\
-\makecell[l]{\texttt{product\_}\\\texttt{categories}} & Nhóm sản phẩm & PK \texttt{id} & Tên duy nhất.\\
+\hline
+\texttt{product\_categories} & Nhóm sản phẩm & PK \texttt{id} & Tên duy nhất.\\
+\hline
 \texttt{products} & Sản phẩm & PK; FK category & Không xóa nhóm khi còn sản phẩm tham chiếu.\\
+\hline
 \texttt{campaigns} & Mục tiêu, thời gian, ngân sách & PK; FK product/owner & Ngân sách không âm; ngày kết thúc không trước ngày bắt đầu.\\
-\makecell[l]{\texttt{campaign\_}\\\texttt{members}} & Phân công & PK campaign/user & Không lặp cặp chiến dịch--người dùng.\\
-\makecell[l]{\texttt{marketing\_}\\\texttt{contents}} & Bản nội dung & \makecell[l]{PK; FK\\campaign,\\channel,\\user} & Trạng thái phải hợp lệ; có nguồn và cảnh báo nếu do AI tạo.\\
-\makecell[l]{\texttt{content\_}\\\texttt{reviews}} & Lịch sử duyệt & PK; FK content/reviewer & Quyết định và lý do bắt buộc.\\
-\makecell[l]{\texttt{marketing\_}\\\texttt{schedules}} & Lịch đăng & PK; FK content & Chỉ nội dung APPROVED; múi giờ bắt buộc.\\
-\makecell[l]{\texttt{campaign\_}\\\texttt{metrics}} & Số liệu theo ngày/kênh & PK; FK campaign/channel & Duy nhất theo campaign--channel--date; số liệu không âm.\\
+\hline
+\texttt{campaign\_members} & Phân công & PK campaign/user & Không lặp cặp chiến dịch--người dùng.\\
+\hline
+\texttt{marketing\_contents} & Bản nội dung & PK; FK campaign, channel, user & Trạng thái phải hợp lệ; có nguồn và cảnh báo nếu do AI tạo.\\
+\hline
+\texttt{content\_reviews} & Lịch sử duyệt & PK; FK content/reviewer & Quyết định và lý do bắt buộc.\\
+\hline
+\texttt{marketing\_schedules} & Lịch đăng & PK; FK content & Chỉ nội dung APPROVED; múi giờ bắt buộc.\\
+\hline
+\texttt{campaign\_metrics} & Số liệu theo ngày/kênh & PK; FK campaign/channel & Duy nhất theo campaign--channel--date; số liệu không âm.\\
+\hline
 \texttt{ai\_logs} & Nhật ký gọi AI & PK; FK user/campaign & Ghi provider, model, prompt version, trạng thái và thời gian; không lưu bí mật.\\
-\bottomrule
-\end{longtable}
-\normalsize
+\hline
+\end{tabularx}
+\end{table}
 
 \section{Toàn vẹn dữ liệu và cách tính KPI}
 
@@ -100,6 +108,7 @@ Một bản nội dung không đi thẳng từ tạo đến xuất bản. Hình~
 \label{fig:v8-state}
 \end{figure}
 
+\clearpage
 \section{Trình tự tạo và phê duyệt bản nháp AI}
 
 Khi người dùng yêu cầu AI, hệ thống trước hết xác định người dùng là ai và được đọc dữ liệu nào. Sau đó mới chọn dữ liệu, gọi provider, kiểm tra kết quả và lưu bản nháp. Người dùng nhận được bản nháp cùng nguồn và cảnh báo trước khi gửi quản lý. Hình~\ref{fig:v8-sequence} chỉ mô tả trình tự tạo bản nháp; quyết định chấp thuận hoặc từ chối nằm trong state machine ở Hình~\ref{fig:v8-state}.
@@ -111,6 +120,7 @@ Khi người dùng yêu cầu AI, hệ thống trước hết xác định ngư�
 \label{fig:v8-sequence}
 \end{figure}
 
+\clearpage
 \section{Giao diện dự kiến}
 
 Wireframe trong Hình~\ref{fig:v8-wireframe} không phải ảnh chụp sản phẩm đã chạy. Nó dùng để kiểm tra sớm ba điều: người dùng có nhìn thấy trạng thái nội dung không, có biết dữ liệu nào được dùng để tạo bản nháp không, và nút sửa/duyệt có bị lẫn với nút xuất bản không.

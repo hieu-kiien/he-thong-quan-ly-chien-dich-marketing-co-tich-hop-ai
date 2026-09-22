@@ -11,16 +11,20 @@ Một sơ đồ duy nhất không thể vừa mô tả người dùng, các chư
 \small
 \caption{Công nghệ dự kiến cho prototype}
 \label{tab:v8-tech}
-\begin{tabularx}{\textwidth}{L{3.0cm}L{3.2cm}Y}
-\toprule
-\textbf{Phần} & \textbf{Lựa chọn} & \textbf{Lý do và điều kiện xem xét lại}\\
-\midrule
+\begin{tabularx}{\textwidth}{|L{3.0cm}|L{3.5cm}|Y|}
+\hline
+\thead{Phần} & \thead{Lựa chọn} & \thead{Lý do và điều kiện xem xét lại}\\
+\hline
 Backend & FastAPI và Pydantic & Phù hợp ứng dụng API, kiểm tra dữ liệu rõ và có thể sinh tài liệu API.\\
+\hline
 Frontend & React và TypeScript & Tách màn hình, biểu mẫu và trạng thái; phạm vi giao diện vẫn được giữ nhỏ.\\
+\hline
 Cơ sở dữ liệu & SQLite ở giai đoạn prototype & Dễ cài đặt và phù hợp dữ liệu học phần; nếu có nhiều người dùng đồng thời sẽ đánh giá PostgreSQL.\\
+\hline
 Truy cập dữ liệu & SQLAlchemy và Alembic & Tách model khỏi migration, thuận tiện kiểm tra thay đổi schema.\\
+\hline
 Kết nối AI & Adapter trả về JSON & Có thể thay provider; mỗi lần chạy phải ghi provider, model và phiên bản prompt.\\
-\bottomrule
+\hline
 \end{tabularx}
 \end{table}
 
@@ -39,22 +43,29 @@ Hình~\ref{fig:v8-container} là sơ đồ khối logic và dòng dữ liệu, k
 
 \begin{table}[h!]
 \centering
-\scriptsize
+\small
 \caption{Trách nhiệm bên trong API và phần xử lý AI}
 \label{tab:v8-components}
-\begin{tabularx}{\textwidth}{L{3.2cm}Y Y}
-\toprule
-\textbf{Thành phần} & \textbf{Trách nhiệm} & \textbf{Yêu cầu liên quan}\\
-\midrule
+\begin{tabularx}{\textwidth}{|L{3.4cm}|Y|L{3.2cm}|}
+\hline
+\thead{Thành phần} & \thead{Trách nhiệm} & \thead{Yêu cầu liên quan}\\
+\hline
 Xác thực và phân quyền & Kiểm tra phiên đăng nhập, vai trò và phạm vi chiến dịch. & FR01--FR02, NFR01.\\
+\hline
 Quản lý chiến dịch & Kiểm tra ngày, ngân sách, người phụ trách và thao tác CRUD. & FR04--FR05.\\
+\hline
 Quản lý nội dung & Lưu phiên bản, chuyển trạng thái và lý do duyệt. & FR06--FR07.\\
+\hline
 Quản lý lịch & Kiểm tra nội dung đã duyệt, múi giờ và thao tác hủy. & FR08.\\
+\hline
 Tổng hợp chỉ số & Kiểm tra khóa ngày/kênh, truy vấn bộ lọc và tính KPI. & FR09--FR10.\\
+\hline
 Chọn dữ liệu cho AI & Lấy đúng trường dữ liệu mà người dùng có quyền xem. & FR11--FR13, NFR01.\\
+\hline
 Gọi và kiểm tra AI & Quản lý prompt, gọi provider, kiểm tra cấu trúc kết quả và xử lý lỗi. & FR11--FR14, NFR05.\\
+\hline
 Ghi nhật ký & Ghi thao tác, nguồn dữ liệu, thời gian, lỗi và quyết định của người dùng. & FR14.\\
-\bottomrule
+\hline
 \end{tabularx}
 \end{table}
 
@@ -72,21 +83,27 @@ Ghi nhật ký & Ghi thao tác, nguồn dữ liệu, thời gian, lỗi và quy�
 
 \begin{table}[h!]
 \centering
-\scriptsize
+\small
 \caption{Một số điểm truy cập cần triển khai}
 \label{tab:v8-api}
-\begin{tabularx}{\textwidth}{L{2.0cm}L{5.4cm}Y}
-\toprule
-\textbf{Phương thức} & \textbf{Đường dẫn} & \textbf{Quy tắc}\\
-\midrule
+\begin{tabularx}{\textwidth}{|C{2.5cm}|L{5.0cm}|Y|}
+\hline
+\thead{Phương thức} & \thead{Đường dẫn} & \thead{Quy tắc}\\
+\hline
 POST & \texttt{/auth/login} & Đăng nhập; không trả mật khẩu hoặc hash.\\
+\hline
 GET/POST & \texttt{/campaigns} & Danh sách và tạo chiến dịch theo phạm vi người dùng.\\
+\hline
 POST & \texttt{/campaigns/\{id\}/members} & Chỉ quản lý; kiểm tra người dùng và vai trò.\\
+\hline
 POST & \texttt{/contents/\{id\}/submit} & Nhân viên trong chiến dịch; DRAFT hoặc AI\_DRAFT chuyển sang IN\_REVIEW.\\
+\hline
 POST & \texttt{/contents/\{id\}/approve} & Chỉ quản lý; chỉ nhận nội dung ở IN\_REVIEW.\\
+\hline
 POST & \texttt{/ai/draft} & Chọn dữ liệu, gọi AI, kiểm tra kết quả và trả cảnh báo.\\
+\hline
 GET & \texttt{/reports/campaigns/\{id\}} & Tính KPI xác định; phần tóm tắt AI là bổ sung.\\
-\bottomrule
+\hline
 \end{tabularx}
 \end{table}
 
@@ -96,18 +113,21 @@ Thiết kế dự kiến là mật khẩu sẽ được lưu dưới dạng hash
 
 \begin{table}[h!]
 \centering
-\scriptsize
+\small
 \caption{Các quyết định kiến trúc và điều kiện xem xét lại}
 \label{tab:v8-adr}
-\begin{tabularx}{\textwidth}{L{1.0cm}L{4.0cm}Y}
-\toprule
-\textbf{Mã} & \textbf{Quyết định} & \textbf{Đánh đổi}\\
-\midrule
+\begin{tabularx}{\textwidth}{|C{1.0cm}|L{4.2cm}|Y|}
+\hline
+\thead{Mã} & \thead{Quyết định} & \thead{Đánh đổi}\\
+\hline
 01 & Gọi AI qua backend thay vì từ trình duyệt. & Bảo vệ được key, quyền và nhật ký; đổi lại backend phải có adapter.\\
+\hline
 02 & Giữ adapter AI độc lập với provider. & Cần một cấu trúc kết quả chung; đổi lại dễ thay provider và kiểm thử.\\
+\hline
 03 & Dùng SQLite cho prototype. & Cài đặt nhanh; phải đánh giá lại khi có nhiều người dùng ghi đồng thời.\\
+\hline
 04 & Phê duyệt là trạng thái của nội dung. & Cần bảng lịch sử duyệt; đổi lại quy tắc trước khi lập lịch rõ ràng.\\
-\bottomrule
+\hline
 \end{tabularx}
 \end{table}
 

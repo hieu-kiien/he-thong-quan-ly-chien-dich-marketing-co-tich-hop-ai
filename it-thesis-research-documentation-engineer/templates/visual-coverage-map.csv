@@ -1,0 +1,3 @@
+chapter,section,question,recommended_visual,evidence_source,status,current_asset,priority,notes
+3,Architecture,What runtime containers make up the system?,C4 Container,"source tree; config",planned,,high,
+4,AI workflow,How is AI output validated and approved?,UML Sequence,"service code; requirements",planned,,high,

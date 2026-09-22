@@ -13,15 +13,18 @@ Một chiến dịch marketing thường gồm nhiều phần việc liên quan 
 \small
 \caption{Người sử dụng và nhu cầu chính}
 \label{tab:v8-stakeholders}
-\begin{tabularx}{\textwidth}{L{3.0cm}Y Y}
-\toprule
-\textbf{Người sử dụng} & \textbf{Nhu cầu} & \textbf{Điều hệ thống phải bảo đảm}\\
-\midrule
+\begin{tabularx}{\textwidth}{|L{3.2cm}|Y|Y|}
+\hline
+\thead{Người sử dụng} & \thead{Nhu cầu} & \thead{Điều hệ thống phải bảo đảm}\\
+\hline
 Giảng viên/người chấm & Đánh giá mức độ hiểu bài toán và chất lượng thiết kế. & Báo cáo có lập luận, sơ đồ đúng ý nghĩa và phân biệt thiết kế với kết quả đã làm.\\
+\hline
 Quản lý marketing & Quản lý chiến dịch, ngân sách, thành viên, nội dung và kết quả. & Có quyền duyệt, có lịch sử thao tác và có số liệu theo khoảng thời gian/kênh.\\
+\hline
 Nhân viên marketing & Tạo nội dung, gọi AI, sửa bản nháp, gửi duyệt và nhập số liệu. & Chỉ nhìn thấy phần việc được giao; không thể tự duyệt nội dung của mình.\\
+\hline
 Nhóm phát triển & Có cơ sở rõ ràng để xây dựng và kiểm thử. & Yêu cầu, mô hình dữ liệu, giao diện và quy tắc được mô tả thống nhất.\\
-\bottomrule
+\hline
 \end{tabularx}
 \end{table}
 
@@ -45,16 +48,20 @@ Model provider và nền tảng truyền thông được đặt ngoài ranh gi�
 \small
 \caption{Mục tiêu và cách kiểm tra sau khi triển khai}
 \label{tab:v8-goals}
-\begin{tabularx}{\textwidth}{C{1.0cm}L{4.2cm}Y}
-\toprule
-\textbf{Mã} & \textbf{Mục tiêu} & \textbf{Cách kiểm tra dự kiến}\\
-\midrule
+\begin{tabularx}{\textwidth}{|C{1.0cm}|L{4.2cm}|Y|}
+\hline
+\thead{Mã} & \thead{Mục tiêu} & \thead{Cách kiểm tra dự kiến}\\
+\hline
 M1 & Quản lý tập trung chiến dịch, nội dung, lịch, ngân sách và chỉ số. & Demo đi từ tạo chiến dịch đến xem báo cáo; dữ liệu liên kết đúng và có trạng thái.\\
+\hline
 M2 & Bảo vệ thao tác bằng đăng nhập và vai trò. & Kiểm tra cả trường hợp được phép và bị từ chối đối với Manager/Marketer.\\
+\hline
 M3 & Dùng AI như một trợ lý có kiểm soát. & Kiểm tra dữ liệu gửi đi, cấu trúc kết quả, cảnh báo và bước phê duyệt của người dùng.\\
+\hline
 M4 & Giao diện dễ đọc và dễ theo dõi. & Cho người dùng thực hiện các tác vụ chính và ghi nhận lỗi thao tác, trạng thái chờ và trạng thái lỗi.\\
+\hline
 M5 & Có thể cài đặt và kiểm tra lại. & README, dữ liệu mẫu, cấu hình và kết quả kiểm thử được lưu cùng mã nguồn.\\
-\bottomrule
+\hline
 \end{tabularx}
 \end{table}
 
@@ -81,12 +88,17 @@ M5 & Có thể cài đặt và kiểm tra lại. & README, dữ liệu mẫu, c�
 \item thu thập dữ liệu cá nhân nhạy cảm.
 \end{itemize}
 
-\section{Giả định và giới hạn của giai đoạn hiện tại}
+\section{Giả định và giới hạn kỹ thuật của giai đoạn hiện tại}
 
-Bản báo cáo được lập trước khi nhóm bắt đầu code. Do đó, các lựa chọn FastAPI, React, SQLite và provider AI trong các chương sau là lựa chọn thiết kế để bắt đầu, không phải công nghệ đã được triển khai. Dữ liệu marketing dùng cho prototype sẽ là dữ liệu mẫu có mô tả rõ nguồn; không được dùng để suy ra hiệu quả của một chiến dịch ngoài thực tế.
+Bản báo cáo được lập trước khi nhóm bắt đầu bước vào chu kỳ lập trình mã nguồn. Do đó, các lựa chọn về stack công nghệ (FastAPI, React, SQLite, Adapter LLM) trong các chương sau là các quyết định thiết kế kiến trúc chuẩn mực để bắt đầu, định hình rõ ranh giới trách nhiệm của từng thành phần. Dữ liệu marketing sử dụng cho giai đoạn thử nghiệm prototype là bộ dữ liệu mẫu có cấu trúc chuẩn hóa, được sinh có kiểm soát và ghi rõ xuất xứ, phục vụ mục đích kiểm chứng giải thuật và quy trình vận hành thay vì suy diễn về hiệu quả kinh doanh thực tế.
 
-Nhóm giả định có hai vai trò nghiệp vụ chính. Một chiến dịch có thể có nhiều nhân viên marketing, vì vậy việc phân công cần một bảng liên kết. Các chỉ số được lưu theo chiến dịch, kênh và ngày; công thức KPI được tính bằng logic của hệ thống trước khi AI diễn giải.
+Để đảm bảo tính khả thi cao nhất trong thời gian thực hiện học phần, hệ thống đặt ra các giả định kỹ thuật cụ thể:
+\begin{itemize}
+\item \textbf{Tải trọng và đồng thời}: Hệ thống hướng tới quy mô vận hành nhóm nội bộ (5--20 tài khoản cùng thao tác, dung lượng dữ liệu ở mức hàng chục nghìn bản ghi chỉ số), do đó cơ sở dữ liệu SQLite là giải pháp tối ưu về tính gọn nhẹ và tốc độ triển khai cục bộ, trong khi cấu trúc schema vẫn sẵn sàng di chuyển sang PostgreSQL khi cần.
+\item \textbf{Kết nối dịch vụ ngoài}: Các dịch vụ AI (Gemini/OpenAI) và nền tảng mạng xã hội được giao tiếp hoàn toàn qua giao thức HTTPS/REST; thời gian chờ tối đa cho một yêu cầu sinh văn bản là 10 giây; hệ thống luôn chủ động dự phòng kịch bản mất kết nối hoặc hết hạn ngạch truy cập.
+\item \textbf{An toàn thông tin}: Tuyệt đối không lưu trữ khóa bí mật (API key, mật khẩu người dùng dạng plain text) trong mã nguồn hoặc nhật ký kiểm toán; dữ liệu đưa vào prompt của AI chỉ bao gồm thông tin sản phẩm và chỉ số công khai của chiến dịch hiện hành.
+\end{itemize}
 
 \section{Kết luận chương}
 
-Chương này đã xác định người sử dụng, vấn đề cần giải quyết, mục tiêu và giới hạn. Phần tiếp theo nghiên cứu các nguyên tắc liên quan để những lựa chọn thiết kế không chỉ dựa vào cảm tính hoặc vào một mẫu giao diện có sẵn.
+Chương~1 đã làm rõ bối cảnh ứng dụng, bài toán phân mảnh dữ liệu marketing, các mục tiêu cốt lõi và ranh giới chức năng của hệ thống. Việc xác định dứt khoát các nội dung nằm trong và ngoài phạm vi giúp nhóm tập trung tối đa nguồn lực vào việc xây dựng một kiến trúc phần mềm mạch lạc, bảo đảm mọi yêu cầu đặt ra đều có thể chuyển giao thành mã nguồn thực thi ổn định. Chương tiếp theo sẽ nghiên cứu cơ sở lý luận, các bài học từ hệ thống thực tế và bộ nguyên tắc thiết kế làm nền tảng cho các quyết định kỹ thuật của dự án.

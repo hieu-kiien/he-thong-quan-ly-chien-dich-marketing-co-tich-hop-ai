@@ -1,27 +1,100 @@
 \begin{tikzpicture}[
   font=\sffamily\scriptsize,
-  panel/.style={draw=black!55,fill=white,rounded corners=2pt},
-  title/.style={font=\sffamily\bfseries\small,text=ictunavy},
-  tag/.style={draw=ictuteal,fill=softteal,rounded corners=2pt,inner sep=3pt,align=center},
-  button/.style={draw=ictunavy,fill=softblue,rounded corners=2pt,inner sep=4pt,align=center}
+  >=Latex,
+  frame/.style={draw=black!70,fill=white,rounded corners=3pt,line width=0.8pt},
+  panel/.style={draw=black!50,fill=white,rounded corners=2pt},
+  card/.style={draw=black!40,fill=black!3,rounded corners=2pt},
+  btn/.style={draw=black!80,fill=black!8,rounded corners=2pt,inner sep=3pt,font=\sffamily\bfseries\tiny},
+  btn_dark/.style={draw=ictunavy,fill=ictunavy,text=white,rounded corners=2pt,inner sep=3pt,font=\sffamily\bfseries\tiny}
 ]
-\draw[panel,fill=softgray] (0,0) rectangle (14,7.1);
-\draw[panel,fill=ictunavy] (0,6.35) rectangle (14,7.1);
-\node[font=\sffamily\bfseries\small,text=white,anchor=west] at (0.35,6.72) {MARKETING WORKSPACE};
-\node[font=\sffamily\small,text=white,anchor=east] at (13.65,6.72) {Manager · dữ liệu minh họa};
-\draw[panel] (0.35,0.35) rectangle (3.0,6.1);
-\node[title,anchor=west] at (0.65,5.72) {Điều hướng};
-\node[anchor=west] at (0.7,5.15) {Tổng quan};
-\node[anchor=west] at (0.7,4.55) {Chiến dịch};
-\node[anchor=west] at (0.7,3.95) {Nội dung};
-\node[anchor=west] at (0.7,3.35) {Lịch đăng};
-\node[anchor=west] at (0.7,2.75) {Kênh};
-\node[anchor=west] at (0.7,2.15) {Cài đặt};
-\node[title,anchor=west] at (3.45,5.72) {Chiến dịch minh họa};
-\node[button] at (12.5,5.68) {+ Tạo chiến dịch};
-\node[panel] (filter) at (8.55,4.9) {\begin{minipage}{9.6cm}\textbf{Bộ lọc}\\Tên chiến dịch \hfill Trạng thái \hfill Khoảng thời gian\end{minipage}};
-\node[panel] at (5.5,3.2) {\begin{minipage}{3.2cm}\textbf{Ngân sách}\\\Large 48.000.000\\\scriptsize đã dùng / kế hoạch\end{minipage}};
-\node[panel] at (9.2,3.2) {\begin{minipage}{3.2cm}\textbf{Nội dung chờ duyệt}\\\Large 07\\\scriptsize cần xử lý\end{minipage}};
-\node[panel] at (5.5,1.5) {\begin{minipage}{6.9cm}\textbf{Bản nháp AI}\\\small Tiêu đề: Khám phá ưu đãi mùa hè\\\small\textit{Nguồn context: sản phẩm, mục tiêu, kênh}\\[2pt]\fbox{\scriptsize Xem và chỉnh sửa}\end{minipage}};
-\node[tag] at (12.0,1.55) {AI\_DRAFT\\\scriptsize chưa được duyệt};
+
+% 1. Khung bao tổng thể (Rộng 14.2cm x Cao 8.2cm)
+\draw[draw=black!75,fill=black!2,rounded corners=4pt,line width=0.9pt] (0, 0) rectangle (14.2, 8.2);
+
+% 2. Thanh tiêu đề Workspace
+\draw[draw=none,fill=ictunavy,rounded corners=3pt] (0, 7.55) rectangle (14.2, 8.2);
+\node[font=\sffamily\bfseries\scriptsize,text=white,anchor=west] at (0.3, 7.88) {MARKETING AI WORKSPACE};
+\node[font=\sffamily\tiny,text=white,anchor=east] at (13.9, 7.88) {Người dùng: Vũ Hiếu Kiên (Vai trò: Quản lý)};
+
+% 3. Menu Sidebar bên trái (x: 0.25 -> 3.2cm)
+\draw[frame] (0.25, 0.25) rectangle (3.2, 7.35);
+\node[font=\sffamily\bfseries\tiny,text=ictunavy,anchor=west] at (0.4, 7.05) {ĐIỀU HƯỚNG CHÍNH};
+\node[anchor=west,font=\sffamily\tiny] at (0.4, 6.55) {$\bullet$ Tổng quan (Dashboard)};
+\node[anchor=west,font=\sffamily\bfseries\tiny,text=ictunavy] at (0.4, 6.10) {$\blacktriangleright$ Chiến dịch Marketing};
+\node[anchor=west,font=\sffamily\tiny] at (0.4, 5.65) {$\circ$ Sản phẩm \& Danh mục};
+\node[anchor=west,font=\sffamily\tiny] at (0.4, 5.20) {$\circ$ Nội dung \& Duyệt (07)};
+\node[anchor=west,font=\sffamily\tiny] at (0.4, 4.75) {$\circ$ Lịch xuất bản bài};
+\node[anchor=west,font=\sffamily\tiny] at (0.4, 4.30) {$\circ$ Kênh truyền thông};
+\node[anchor=west,font=\sffamily\tiny] at (0.4, 3.85) {$\circ$ Báo cáo \& Chỉ số KPI};
+\node[anchor=west,font=\sffamily\tiny] at (0.4, 3.40) {$\circ$ Thiết lập Trợ lý AI};
+\draw[draw=black!25,line width=0.5pt] (0.4, 2.9) -- (3.05, 2.9);
+\node[anchor=west,font=\sffamily\tiny,text=black!60] at (0.4, 2.5) {Hệ thống AIA331};
+\node[anchor=west,font=\sffamily\tiny,text=black!60] at (0.4, 2.1) {Backend: FastAPI};
+\node[anchor=west,font=\sffamily\tiny,text=black!60] at (0.4, 1.7) {Engine: Gemini / Ollama};
+
+% 4. Tiêu đề khu vực làm việc (Bên phải)
+\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=west] at (3.5, 7.05) {Chiến dịch: "Khuyến mãi Mùa Hè 2026"};
+\node[btn_dark,anchor=east] at (13.95, 7.05) {+ Tạo nội dung mới};
+
+% 5. 4 Thẻ KPI độc lập (Rộng 2.45cm, cách nhau 0.15cm hoàn toàn tách biệt, không tràn viền)
+\node[card, minimum width=2.45cm, minimum height=1.15cm, align=left, inner sep=4pt] at (4.72, 6.08) {
+  {\tiny\color{black!60} NGÂN SÁCH ĐÃ DÙNG}\\[4pt]
+  \textbf{\scriptsize 48.0M / 60M} {\tiny VNĐ}
+};
+
+\node[card, minimum width=2.45cm, minimum height=1.15cm, align=left, inner sep=4pt] at (7.32, 6.08) {
+  {\tiny\color{black!60} NỘI DUNG CHỜ DUYỆT}\\[4pt]
+  \textbf{\scriptsize 07 bài viết}
+};
+
+\node[card, minimum width=2.45cm, minimum height=1.15cm, align=left, inner sep=4pt] at (9.92, 6.08) {
+  {\tiny\color{black!60} LƯỢT TIẾP CẬN}\\[4pt]
+  \textbf{\scriptsize 124.5K} {\tiny (+18\%)}
+};
+
+\node[card, minimum width=2.45cm, minimum height=1.15cm, align=left, inner sep=4pt] at (12.52, 6.08) {
+  {\tiny\color{black!60} CHUYỂN ĐỔI (CTR)}\\[4pt]
+  \textbf{\scriptsize 3.42\%} {\tiny (Mục tiêu: 3\%)}
+};
+
+% 6. Bảng danh sách nội dung (Bên trái: x: 3.5 -> 8.6, rộng 5.1cm)
+\draw[panel] (3.5, 0.25) rectangle (8.6, 5.35);
+\node[font=\sffamily\bfseries\tiny,text=ictunavy,anchor=west] at (3.65, 5.1) {DANH SÁCH NỘI DUNG};
+\draw[draw=black!25,line width=0.5pt] (3.5, 4.9) -- (8.6, 4.9);
+
+\node[font=\sffamily\tiny,anchor=west] at (3.65, 4.5) {\textbf{1. Ưu đãi giải nhiệt mùa hè}};
+\node[font=\sffamily\tiny,text=black!70,anchor=west] at (3.65, 4.15) {Kênh: Facebook · Trạng thái: \fbox{IN\_REVIEW}};
+\draw[draw=black!15,line width=0.4pt] (3.65, 3.9) -- (8.45, 3.9);
+
+\node[font=\sffamily\tiny,anchor=west] at (3.65, 3.5) {\textbf{2. Tính năng máy lọc không khí}};
+\node[font=\sffamily\tiny,text=black!70,anchor=west] at (3.65, 3.15) {Kênh: TikTok · Trạng thái: \fbox{AI\_DRAFT}};
+\draw[draw=black!15,line width=0.4pt] (3.65, 2.9) -- (8.45, 2.9);
+
+\node[font=\sffamily\tiny,anchor=west] at (3.65, 2.5) {\textbf{3. Email tri ân khách hàng}};
+\node[font=\sffamily\tiny,text=black!70,anchor=west] at (3.65, 2.15) {Kênh: Email · Trạng thái: \fbox{APPROVED}};
+\draw[draw=black!15,line width=0.4pt] (3.65, 1.9) -- (8.45, 1.9);
+
+\node[font=\sffamily\tiny,anchor=west] at (3.65, 1.5) {\textbf{4. Giới thiệu dòng ProAir}};
+\node[font=\sffamily\tiny,text=black!70,anchor=west] at (3.65, 1.15) {Kênh: Facebook · Trạng thái: \fbox{DRAFT}};
+
+% 7. Panel Xem trước & Trợ lý AI (Bên phải: x: 8.8 -> 13.95, rộng 5.15cm)
+\draw[panel,fill=black!1] (8.8, 0.25) rectangle (13.95, 5.35);
+\node[font=\sffamily\bfseries\tiny,text=ictunavy,anchor=west] at (8.95, 5.1) {TRỢ LÝ AI \& CHI TIẾT BẢN NHÁP};
+\draw[draw=black!25,line width=0.5pt] (8.8, 4.9) -- (13.95, 4.9);
+
+\node[font=\sffamily\tiny,anchor=west] at (8.95, 4.6) {Kênh: Facebook | SP: Máy lọc ProAir};
+\node[font=\sffamily\tiny,anchor=west] at (8.95, 4.25) {Ngữ cảnh: Tăng nhận diện thương hiệu};
+
+\draw[draw=black!35,fill=white,rounded corners=2pt] (8.95, 1.25) rectangle (13.8, 4.0);
+\node[font=\sffamily\tiny,anchor=north west] at (9.05, 3.9) {\textbf{Bản nháp do AI đề xuất (v1.2):}};
+\node[font=\sffamily\tiny,anchor=north west,text width=4.5cm] at (9.05, 3.55) {
+  \textit{"Mùa hè trong lành, trọn vẹn yêu thương! Giảm 25\% cho ProAir thế hệ mới. Đặt hàng ngay hôm nay!"}
+};
+\node[font=\sffamily\tiny,text=black!60,anchor=south west] at (9.05, 1.35) {Tokens: 320 · Latency: 1.4s · Cần duyệt};
+
+% Các nút thao tác
+\node[btn_dark,anchor=west] at (8.95, 0.7) {Duyệt bài};
+\node[btn,anchor=west] at (10.6, 0.7) {Chỉnh sửa};
+\node[btn,anchor=east] at (13.8, 0.7) {Từ chối};
+
 \end{tikzpicture}

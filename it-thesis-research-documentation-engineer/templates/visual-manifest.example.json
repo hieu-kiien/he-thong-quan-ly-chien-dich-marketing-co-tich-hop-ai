@@ -1,0 +1,47 @@
+{
+  "figure_id": "fig:system-architecture",
+  "question": "What runtime containers make up the system and how do they communicate?",
+  "diagram_type": "c4-container",
+  "scope": "System under study",
+  "evidence_status": "IMPLEMENTED",
+  "sources": [
+    "main source tree",
+    "dependency configuration",
+    "database schema"
+  ],
+  "elements": [
+    {
+      "id": "web",
+      "name": "Web Application",
+      "type": "Container",
+      "responsibility": "User interface",
+      "technology": "HTML/JavaScript"
+    },
+    {
+      "id": "api",
+      "name": "API",
+      "type": "Container",
+      "responsibility": "Authentication and application orchestration",
+      "technology": "FastAPI"
+    }
+  ],
+  "relationships": [
+    {
+      "from": "web",
+      "to": "api",
+      "label": "Calls API",
+      "technology": "HTTPS/JSON"
+    }
+  ],
+  "assumptions": [],
+  "print": {
+    "target_width_cm": 15.5,
+    "min_font_pt": 9.0,
+    "vector_output": true,
+    "grayscale_checked": false
+  },
+  "outputs": {
+    "editable_source": "fig-system-architecture.tex",
+    "pdf": "fig-system-architecture.pdf"
+  }
+}

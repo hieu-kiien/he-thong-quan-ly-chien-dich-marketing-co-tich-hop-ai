@@ -3,6 +3,8 @@
 **/*.log
 **/*.out
 **/*.toc
+**/*.lof
+**/*.lot
 **/*.synctex.gz
 
 # Thư mục build và QA có thể tái tạo

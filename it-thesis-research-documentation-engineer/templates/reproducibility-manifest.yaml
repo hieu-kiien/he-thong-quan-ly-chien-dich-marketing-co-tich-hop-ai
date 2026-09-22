@@ -1,0 +1,29 @@
+project:
+  name: ""
+  repository: ""
+  commit: ""
+  report_version: ""
+environment:
+  os: ""
+  hardware: ""
+  runtime_versions: {}
+  dependency_lockfile: ""
+data:
+  source: ""
+  seed_or_snapshot: ""
+  preprocessing: []
+ai:
+  provider: ""
+  model: ""
+  model_version_or_date: ""
+  prompt_version: ""
+  parameters: {}
+commands:
+  setup: []
+  test: []
+  evaluation: []
+artifacts:
+  raw_results: []
+  processed_results: []
+  figures: []
+limitations: []

@@ -1,0 +1,22 @@
+% Requires pgfplots. Replace sample values with measured data only.
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.92\linewidth,
+  height=0.55\linewidth,
+  xlabel={Epoch},
+  ylabel={Accuracy (\%)},
+  grid=major,
+  legend pos=south east,
+  mark options={solid}
+]
+\addplot+[mark=*] coordinates {(1,82.1) (2,86.3) (3,89.7) (4,92.1)};
+\addlegendentry{Method A}
+\addplot+[dashed,mark=square*] coordinates {(1,80.4) (2,84.8) (3,87.9) (4,90.0)};
+\addlegendentry{Method B}
+\end{axis}
+\end{tikzpicture}
+\caption{Example only. Replace all values with measured results.}
+\label{fig:example-results}
+\end{figure}

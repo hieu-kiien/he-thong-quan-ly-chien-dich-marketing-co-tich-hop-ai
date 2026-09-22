@@ -6,26 +6,32 @@
 
 Phụ lục này gom những bảng ngắn giúp nhóm kiểm tra lại sự liên kết giữa yêu cầu, thiết kế và phần cần kiểm thử. Do tại thời điểm lập báo cáo nhóm chưa bắt đầu lập trình, các cột nói về kiểm thử và kết quả được hiểu là việc cần thực hiện sau đó, không phải kết quả đã có.
 
-\begin{longtable}{@{}L{1.6cm}L{3.4cm}L{9.5cm}@{}}
-\caption{Đối chiếu yêu cầu với phần thiết kế và việc cần kiểm tra}\label{tab:v8-traceability}\\
-\toprule
-\textbf{Mã} & \textbf{Phần thiết kế liên quan} & \textbf{Việc cần kiểm tra khi xây dựng}\\
-\midrule
-\endfirsthead
-\toprule
-\textbf{Mã} & \textbf{Phần thiết kế liên quan} & \textbf{Việc cần kiểm tra khi xây dựng}\\
-\midrule
-\endhead
+\begin{table}[!htbp]
+\centering
+\small
+\caption{Đối chiếu yêu cầu với phần thiết kế và việc cần kiểm tra}\label{tab:v8-traceability}
+\begin{tabularx}{\textwidth}{|C{2.6cm}|L{3.8cm}|Y|}
+\hline
+\thead{Mã} & \thead{Phần thiết kế liên quan} & \thead{Việc cần kiểm tra khi xây dựng}\\
+\hline
 FR01 & Đăng nhập, phân quyền và vai trò & kiểm tra quyền của từng vai trò, trường hợp chưa đăng nhập và trường hợp không đủ quyền.\\
+\hline
 FR02--FR05 & Quản lý dữ liệu nền và chiến dịch & kiểm tra thêm, xem, sửa, xóa; dữ liệu mẫu; và phản hồi khi dữ liệu không hợp lệ.\\
+\hline
 FR06--FR08 & Nội dung, phê duyệt và lịch đăng & kiểm tra các bước chuyển trạng thái, ghi nhận người duyệt và chặn chuyển trạng thái sai.\\
+\hline
 FR09--FR10 & Chỉ số và bảng tổng hợp & đối chiếu truy vấn với dữ liệu mẫu, kiểm tra mẫu số bằng không và so sánh kết quả trên giao diện.\\
+\hline
 FR11 & Các chức năng AI & lưu phiên bản yêu cầu, kiểm tra định dạng kết quả, thời gian phản hồi và cách xử lý lỗi.\\
+\hline
 NFR01--NFR02 & Bảo mật và toàn vẹn dữ liệu & kiểm tra thông tin bí mật, khóa ngoại, dữ liệu trùng và các yêu cầu truy cập trái phép.\\
+\hline
 NFR03--NFR05 & Hiệu năng, sử dụng và xử lý lỗi & đo thời gian phản hồi, thử tác vụ với người dùng và mô phỏng lỗi dịch vụ.\\
+\hline
 NFR06 & Bảo trì và cài đặt lại & kiểm tra hướng dẫn cài đặt, phiên bản thư viện, dữ liệu mẫu và khả năng khôi phục.\\
-\bottomrule
-\end{longtable}
+\hline
+\end{tabularx}
+\end{table}
 
 \chapter{PROMPT VÀ NHẬT KÝ SỬ DỤNG AI}
 
@@ -38,16 +44,20 @@ Prompt dưới đây minh họa cách giới hạn chức năng tạo bản nhá
 \small
 \caption{Prompt mẫu cho chức năng tạo nội dung nháp}
 \label{tab:v8-prompt-appendix}
-\begin{tabularx}{\textwidth}{L{2.4cm}Y}
-\toprule
-\textbf{Phần} & \textbf{Nội dung dự kiến}\\
-\midrule
+\begin{tabularx}{\textwidth}{|L{2.4cm}|Y|}
+\hline
+\thead{Phần} & \thead{Nội dung dự kiến}\\
+\hline
 SYSTEM & Bạn là trợ lý marketing. Chỉ tạo bản nháp để con người xem và sửa.\\
+\hline
 Giới hạn & Không tự phê duyệt, không tự xuất bản, không thêm số liệu không có trong dữ liệu được cấp.\\
+\hline
 Định dạng & Trả về JSON gồm \texttt{title}, \texttt{body}, \texttt{cta}, \texttt{assumptions}, \texttt{source\_ids}, \texttt{warnings}.\\
+\hline
 USER & Chiến dịch: \texttt{\{\{campaign\_id\}\}}; kênh: \texttt{\{\{channel\}\}}; giọng: \texttt{\{\{tone\}\}}; dữ liệu được phép dùng: \texttt{\{\{selected\_records\}\}}.\\
+\hline
 Yêu cầu & Tạo một caption ngắn, phù hợp với chiến dịch; nếu thiếu dữ liệu thì trả về cảnh báo.\\
-\bottomrule
+\hline
 \end{tabularx}
 \end{table}
 
@@ -55,28 +65,83 @@ Prompt này không thay thế quy tắc nghiệp vụ. Trước khi gửi yêu c
 
 \section{Các trường nên lưu trong nhật ký}
 
-\begin{tabularx}{\textwidth}{L{3.5cm}Y}
-\toprule
-\textbf{Trường} & \textbf{Ý nghĩa}\\
-\midrule
+\begin{table}[h!]
+\centering
+\small
+\caption{Các trường dữ liệu lưu vết trong nhật ký AI}
+\label{tab:v8-audit-fields}
+\begin{tabularx}{\textwidth}{|L{4.2cm}|Y|}
+\hline
+\thead{Trường} & \thead{Ý nghĩa}\\
+\hline
 \texttt{request\_id} & mã của một lần yêu cầu, không chứa khóa bí mật; dùng để nối màn hình, nhật ký và kết quả.\\
+\hline
 \texttt{provider/model} & dịch vụ và phiên bản mô hình thực tế khi chạy.\\
+\hline
 \texttt{prompt\_version} & phiên bản của phần hướng dẫn hệ thống và yêu cầu người dùng.\\
+\hline
 \texttt{source\_ids} & các bản ghi được phép dùng làm dữ liệu đầu vào.\\
-\makecell[l]{\texttt{input/}\\\texttt{output\_tokens}} & thông tin phục vụ ước tính chi phí nếu dịch vụ cung cấp.\\
+\hline
+\texttt{input/output\_tokens} & thông tin phục vụ ước tính chi phí nếu dịch vụ cung cấp.\\
+\hline
 \texttt{result\_status} & trạng thái như thành công, sai định dạng, quá thời gian, vượt giới hạn hoặc lỗi dịch vụ.\\
+\hline
 \texttt{human\_decision} & hành động của người dùng: chỉnh sửa, duyệt, từ chối hoặc bỏ qua.\\
-\bottomrule
+\hline
 \end{tabularx}
+\end{table}
 
-\chapter{THIẾT KẾ CƠ SỞ DỮ LIỆU TÓM TẮT}
+\chapter{THIẾT KẾ DỮ LIỆU VÀ CẤU TRÚC MÃ NGUỒN}
 
-\section{Nguyên tắc}
+\section{Nguyên tắc thiết kế CSDL và quản lý di chuyển (Migrations)}
 
-Schema trong báo cáo phục vụ một sản phẩm thử nghiệm nhỏ, trong đó SQLite được chọn để nhóm dễ cài đặt và kiểm tra. Nếu ứng dụng được mở rộng cho nhiều người dùng cùng lúc, nhóm cần đánh giá lại PostgreSQL, giao dịch và xử lý đồng thời trước khi triển khai chính thức.
+Hệ thống sử dụng kiến trúc dữ liệu phân tầng do SQLAlchemy 2.0 (ORM) và Alembic quản lý. Giai đoạn thử nghiệm prototype dùng SQLite (\texttt{marketing\_ai.db}) bảo đảm tính gọn nhẹ; định nghĩa kiểu dữ liệu tuân thủ chuẩn ANSI SQL giúp chuyển đổi sang PostgreSQL trong suốt. Toàn bộ mã DDL nguồn lưu tại \texttt{design/schema.sql}.
 
-Các bảng về thành viên, phê duyệt và nhật ký AI được tách riêng vì chúng có trách nhiệm khác nhau: phân công người dùng, ghi nhận quyết định đối với nội dung và lưu lại thông tin của mỗi lần gọi AI. Danh mục chi tiết nằm trong từ điển dữ liệu ở Chương~5; ERD được chia thành Hình~\ref{fig:v8-erd-core} và Hình~\ref{fig:v8-erd-ops}, còn DDL nguồn nằm trong \texttt{design/schema.sql}. Phụ lục này không lặp lại một bảng schema thứ hai.
+\section{Cấu trúc thư mục mã nguồn chuẩn hóa}
 
-\section{Ghi chú về phạm vi}
+Để nhóm phát triển có thể xây dựng ứng dụng ngay lập tức, cấu trúc mã nguồn được tổ chức:
 
-DDL đi kèm báo cáo là bản thiết kế tại thời điểm lập tài liệu, chưa phải cơ sở dữ liệu đã chạy trong ứng dụng. Sau khi viết mã nguồn, nhóm cần tạo migration và dữ liệu mẫu, bật kiểm tra khóa ngoại, chạy các truy vấn chính, rồi cập nhật báo cáo bằng kết quả thực tế.
+\begin{footnotesize}
+\begin{verbatim}
+marketing-ai-system/
+|-- backend/
+|   |-- app/api/v1/endpoints/    # auth.py, campaigns.py, contents.py, metrics.py, ai.py
+|   |-- app/core/                # config.py, security.py (JWT), database.py (Session)
+|   |-- app/models/              # SQLAlchemy ORM: user, campaign, content, metrics, etc.
+|   |-- app/schemas/             # Pydantic v2: user, campaign, ai_io (JSON schema)
+|   |-- app/services/            # ai_engine.py, campaign_service.py, kpi_calc.py
+|   |-- alembic/ & scripts/      # Schema migrations & script nạp dữ liệu mẫu seed_data.py
+|   `-- requirements.txt         # fastapi, uvicorn, sqlalchemy, alembic, pydantic, httpx
+|-- frontend/
+|   |-- src/components/ & pages/ # Sidebar, Dashboard, CampaignCard, AIEditor, Approval
+|   |-- src/services/ & types/   # API client (Axios), Auth state, TypeScript interfaces
+|   `-- package.json             # react, vite, typescript, tailwindcss, lucide-react
+`-- design/schema.sql            # Bản thiết kế DDL 11 bảng CSDL quan hệ chuẩn
+\end{verbatim}
+\end{footnotesize}
+
+\section{Tập lệnh thiết lập và khởi chạy nhanh (Quickstart CLI)}
+
+\begin{footnotesize}
+\begin{verbatim}
+# 1. Khởi tạo Backend: tạo venv, cài thư viện, migrate schema, nạp seed data và chạy server
+cd backend && python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt && alembic upgrade head
+python -m scripts.seed_data && uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+
+# 2. Khởi tạo Frontend & Thực thi kiểm thử tự động
+cd frontend && npm install && npm run dev
+pytest tests/ -v --cov=app        # Chạy toàn bộ 15 kịch bản kiểm thử T01-T15
+\end{verbatim}
+\end{footnotesize}
+
+\section{Cấu hình biến môi trường mẫu (\texttt{.env.example})}
+
+\begin{footnotesize}
+\begin{verbatim}
+DATABASE_URL=sqlite:///./marketing_ai.db          SECRET_KEY=secure_random_jwt_key_32bytes
+ALGORITHM=HS256                                  ACCESS_TOKEN_EXPIRE_MINUTES=120
+AI_PROVIDER=gemini                               AI_API_KEY=your_gemini_api_key_here
+AI_TIMEOUT_SECONDS=10                            CORS_ORIGINS=http://localhost:5173
+\end{verbatim}
+\end{footnotesize}

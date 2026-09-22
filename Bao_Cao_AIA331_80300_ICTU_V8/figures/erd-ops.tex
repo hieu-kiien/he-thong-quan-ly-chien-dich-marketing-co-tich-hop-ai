@@ -1,52 +1,105 @@
 \begin{tikzpicture}[
-  font=\sffamily\scriptsize,
-  table/.style={matrix of nodes,nodes={draw=ictuteal,fill=softteal,minimum width=4.05cm,minimum height=0.34cm,text width=3.8cm,align=left,inner sep=2pt},row sep=-0.45pt,column sep=0pt},
-  rel/.style={-{Latex[length=1.7mm]},draw=ictuteal,line width=0.55pt},
-  card/.style={font=\sffamily\scriptsize\bfseries,text=ictuteal,fill=white,inner sep=1pt},
-  note/.style={draw=ictuamber,fill=softamber,rounded corners=3pt,align=left,inner sep=4pt,text width=4.05cm}
+  font=\sffamily\footnotesize,
+  >=Latex,
+  entity/.style={
+    matrix of nodes,
+    nodes={
+      draw=black!70,
+      fill=white,
+      minimum width=4.0cm,
+      minimum height=0.40cm,
+      text width=3.7cm,
+      align=left,
+      inner sep=2pt,
+      font=\sffamily\scriptsize
+    },
+    row sep=-0.5pt,
+    column sep=0pt
+  },
+  header/.style={nodes={fill=black!85,text=white,font=\sffamily\bfseries\scriptsize,align=center,minimum height=0.52cm}},
+  header_core/.style={nodes={fill=ictunavy,text=white,font=\sffamily\bfseries\scriptsize,align=center,minimum height=0.52cm}},
+  rel/.style={draw=black!85,line width=0.75pt,-{Latex[length=2mm]}},
+  card/.style={font=\sffamily\bfseries\tiny,text=black,fill=white,inner sep=1.2pt}
 ]
-\node[note] (scope) at (5.1,4.1) {Đây là view các bảng vận hành, mở rộng ERD lõi ở Hình~\ref{fig:v8-erd-core}. Để tránh đường nối chồng lên nhau, các quan hệ tới ERD lõi không vẽ lại; cột FK trên từng bảng là điểm nối tương ứng.};
-\matrix (contents) [table,row 1/.style={nodes={fill=ictuteal,text=white,font=\bfseries\scriptsize}}] at (0,1.45) {
-marketing\_contents\\
-\texttt{PK id}\\
-\texttt{FK campaign\_id, channel\_id}\\
-\texttt{status, body}\\
+
+% 1. Hàng 1 (y = 2.3): Liên quan tới marketing_contents
+\matrix (reviews) [entity,row 1/.style={header}] at (2.1, 2.3) {
+  content\_reviews [Lịch sử duyệt]\\
+  \textbf{PK} id : INTEGER\\
+  \textbf{FK} content\_id : INT\\
+  \textbf{FK} reviewer\_id : INT\\
+  decision : VARCHAR(20)\\
+  reason : TEXT\\
+  reviewed\_at : TIMESTAMP\\
 };
-\matrix (reviews) [table,row 1/.style={nodes={fill=ictuteal,text=white,font=\bfseries\scriptsize}}] at (5.1,1.45) {
-content\_reviews\\
-\texttt{PK id}\\
-\texttt{FK content\_id}\\
-\texttt{FK reviewer\_id}\\
-\texttt{decision, reason}\\
+
+\matrix (contents) [entity,row 1/.style={header_core}] at (7.0, 2.3) {
+  marketing\_contents [Bảng Lõi]\\
+  \textbf{PK} id : INTEGER\\
+  \textbf{FK} campaign\_id : INT\\
+  \textbf{FK} channel\_id : INT\\
+  status : VARCHAR(20)\\
+  title, body : TEXT\\
 };
-\matrix (schedules) [table,row 1/.style={nodes={fill=ictuteal,text=white,font=\bfseries\scriptsize}}] at (10.2,1.45) {
-marketing\_schedules\\
-\texttt{PK id}\\
-\texttt{FK content\_id}\\
-\texttt{scheduled\_at, timezone}\\
-\texttt{status}\\
+
+\matrix (schedules) [entity,row 1/.style={header}] at (11.9, 2.3) {
+  marketing\_schedules (Lịch đăng)\\
+  \textbf{PK} id : INTEGER\\
+  \textbf{FK} content\_id : INT\\
+  scheduled\_at : TIMESTAMP\\
+  timezone : VARCHAR(50)\\
+  status : VARCHAR(20)\\
 };
-\matrix (members) [table,row 1/.style={nodes={fill=ictuteal,text=white,font=\bfseries\scriptsize}}] at (0,-2.0) {
-campaign\_members\\
-\texttt{PK campaign\_id, user\_id}\\
-\texttt{role}\\
-\texttt{UNIQUE pair}\\
+
+% 2. Hàng 2 (y = -1.3): Liên quan tới campaigns
+\matrix (members) [entity,row 1/.style={header}] at (2.1, -1.3) {
+  campaign\_members (Phân công)\\
+  \textbf{PK, FK} campaign\_id : INT\\
+  \textbf{PK, FK} user\_id : INT\\
+  role : VARCHAR(30)\\
+  assigned\_at : TIMESTAMP\\
 };
-\matrix (metrics) [table,row 1/.style={nodes={fill=ictuteal,text=white,font=\bfseries\scriptsize}}] at (5.1,-2.0) {
-campaign\_metrics\\
-\texttt{PK id}\\
-\texttt{FK campaign\_id, channel\_id}\\
-\texttt{metric\_date}\\
-\texttt{views, clicks, cost}\\
+
+\matrix (campaigns) [entity,row 1/.style={header_core}] at (7.0, -1.3) {
+  campaigns [Bảng Lõi]\\
+  \textbf{PK} id : INTEGER\\
+  \textbf{FK} product\_id : INT\\
+  title : VARCHAR(200)\\
+  budget : NUMERIC(15,2)\\
 };
-\matrix (logs) [table,row 1/.style={nodes={fill=ictuteal,text=white,font=\bfseries\scriptsize}}] at (10.2,-2.0) {
-ai\_logs\\
-\texttt{PK id}\\
-\texttt{FK user\_id, campaign\_id}\\
-\texttt{provider, model}\\
-\texttt{prompt\_version, status}\\
-\texttt{latency\_ms, source\_ids}\\
+
+\matrix (metrics) [entity,row 1/.style={header}] at (11.9, -1.3) {
+  campaign\_metrics (Chỉ số)\\
+  \textbf{PK} id : INTEGER\\
+  \textbf{FK} campaign\_id : INT\\
+  \textbf{FK} channel\_id : INT\\
+  metric\_date : DATE\\
+  views, clicks : INT\\
+  cost, rev : NUMERIC(12,2)\\
 };
-\draw[rel] (contents.north) .. controls (1.5,2.8) and (3.6,2.8) .. node[card,above]{1} node[card,below]{0..*} (reviews.north);
-\draw[rel] (contents.south east) .. controls (2.5,0.0) and (8.0,0.0) .. node[card,below]{1} node[card,above]{0..*} (schedules.south west);
+
+% 3. Hàng 3: AI Audit Logs (Định vị tương đối cách đáy campaigns đúng 1.2cm bằng anchor=north)
+\matrix (ailogs) [entity, anchor=north, row 1/.style={header}] at ([yshift=-1.2cm]campaigns.south) {
+  ai\_logs (Nhật ký kiểm toán AI)\\
+  \textbf{PK} id : INTEGER\\
+  \textbf{FK} user\_id, campaign\_id : INT\\
+  provider, model : TEXT\\
+  prompt\_version : TEXT\\
+  status : VARCHAR(20)\\
+  latency\_ms, tokens\_used : INT\\
+  created\_at : TIMESTAMP\\
+};
+
+% Liên kết quan hệ
+% Contents -> Reviews & Schedules
+\draw[rel] (contents) -- node[card,above,pos=0.2]{1} node[card,above,pos=0.8]{0..*} (reviews);
+\draw[rel] (contents) -- node[card,above,pos=0.2]{1} node[card,above,pos=0.8]{0..*} (schedules);
+
+% Campaigns -> Members & Metrics
+\draw[rel] (campaigns) -- node[card,above,pos=0.2]{1} node[card,above,pos=0.8]{0..*} (members);
+\draw[rel] (campaigns) -- node[card,above,pos=0.2]{1} node[card,above,pos=0.8]{0..*} (metrics);
+
+% Campaigns -> AI Logs (đoạn nối thẳng tuyệt đối dài 1.2cm)
+\draw[rel] (campaigns.south) -- node[card,right,pos=0.25]{1} node[card,right,pos=0.75]{0..*} (ailogs.north);
+
 \end{tikzpicture}

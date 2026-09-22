@@ -1,23 +1,85 @@
 \begin{tikzpicture}[
-  font=\sffamily\scriptsize,
-  participant/.style={draw=ictunavy,fill=softblue,rounded corners=3pt,minimum width=2.25cm,minimum height=0.55cm,align=center},
-  line/.style={draw=black!55,dashed},
-  msg/.style={-{Latex[length=1.8mm]},draw=ictunavy,line width=0.6pt},
-  lab/.style={font=\sffamily\scriptsize,fill=white,inner sep=1pt,align=center}
+  font=\sffamily\footnotesize,
+  >=Latex,
+  part/.style={
+    draw=ictunavy,
+    fill=white,
+    rounded corners=3pt,
+    minimum width=2.4cm,
+    minimum height=0.7cm,
+    align=center,
+    line width=0.85pt,
+    font=\sffamily\bfseries\scriptsize
+  },
+  act/.style={draw=ictunavy,fill=black!5,line width=0.6pt},
+  lifeline/.style={draw=black!40,dashed,line width=0.5pt},
+  msg/.style={-{Latex[length=1.8mm]},draw=black!90,line width=0.65pt},
+  ret/.style={-{Latex[length=1.8mm]},draw=black!80,dashed,line width=0.65pt},
+  lab/.style={font=\sffamily\tiny,fill=white,inner sep=1.2pt,align=center,text=black}
 ]
-\node[participant] (m) at (0,0) {Nhân viên};
-\node[participant] (ui) at (3.2,0) {Giao diện};
-\node[participant] (api) at (6.4,0) {API/nghiệp vụ};
-\node[participant] (ai) at (9.6,0) {Bộ gọi AI};
-\node[participant] (db) at (12.8,0) {Cơ sở dữ liệu};
-\foreach \x in {0,3.2,6.4,9.6,12.8}{\draw[line] (\x,-0.35) -- (\x,-5.4);}
-\draw[msg] (0,-0.8) -- node[lab,above]{yêu cầu tạo ý tưởng/bản nháp} (3.2,-0.8);
-\draw[msg] (3.2,-1.35) -- node[lab,above]{POST + mã chiến dịch} (6.4,-1.35);
-\draw[msg] (6.4,-1.9) -- node[lab,above]{chọn dữ liệu theo quyền} (12.8,-1.9);
-\draw[msg] (12.8,-2.45) -- node[lab,above]{gói dữ liệu đã chọn} (9.6,-2.45);
-\draw[msg] (9.6,-3.15) -- node[lab,above]{yêu cầu JSON} (6.4,-3.15);
-\draw[msg] (6.4,-3.7) -- node[lab,above]{bản nháp hoặc lỗi} (3.2,-3.7);
-\draw[msg] (6.4,-4.25) -- node[lab,above]{lưu bản nháp và nhật ký} (12.8,-4.25);
-\draw[msg] (3.2,-4.8) -- node[lab,above]{hiển thị nguồn và cảnh báo} (0,-4.8);
-\node[draw=ictuamber,fill=softamber,rounded corners=3pt,align=center,minimum width=5.0cm] at (9.5,-4.8) {Nếu timeout, giới hạn tốc độ hoặc JSON sai:\\không ghi đè bản nháp cũ; ghi lỗi và cho thử lại};
+
+% Các bên tham gia (5 Lifelines dàn đều từ x = 0.8 đến 13.2)
+\node[part] (p_stf) at (0.8, 0) {Nhân viên};
+\node[part] (p_ui)  at (3.8, 0) {Giao diện Web};
+\node[part] (p_api) at (7.0, 0) {API Backend};
+\node[part] (p_ai)  at (10.2, 0) {Điều phối AI};
+\node[part] (p_db)  at (13.2, 0) {Cơ sở Dữ liệu};
+
+% Đường gióng (Lifelines)
+\foreach \x in {0.8, 3.8, 7.0, 10.2, 13.2} {
+  \draw[lifeline] (\x, -0.42) -- (\x, -12.4);
+}
+
+% Thanh kích hoạt (Activation Bars)
+\draw[act] (3.73, -1.0) rectangle (3.87, -10.5);
+\draw[act] (6.93, -1.6) rectangle (7.07, -11.8);
+\draw[act] (10.13, -3.5) rectangle (10.27, -8.0);
+\draw[act] (13.13, -2.2) rectangle (13.27, -2.9);
+\draw[act] (13.13, -6.1) rectangle (13.27, -6.6);
+\draw[act] (13.13, -11.1) rectangle (13.27, -11.9);
+
+% 1. Yêu cầu tạo nháp (cách actor 0.65cm thông thoáng)
+\draw[msg] (0.8, -1.0) -- node[lab,above]{1: Yêu cầu sinh nháp} (3.73, -1.0);
+
+% 2. Gọi API
+\draw[msg] (3.87, -1.6) -- node[lab,above]{2: POST /api/v1/ai/draft} (6.93, -1.6);
+
+% 3 & 4. Truy vấn context
+\draw[msg] (7.07, -2.2) -- node[lab,above]{3: Đọc context chiến dịch} (13.13, -2.2);
+\draw[ret] (13.13, -2.8) -- node[lab,above]{4: Dữ liệu hợp lệ} (7.07, -2.8);
+
+% 5. Ghép Prompt
+\draw[msg] (7.07, -3.5) -- node[lab,above]{5: Ghép Prompt theo mẫu} (10.13, -3.5);
+
+% 6. Gọi Provider ngoài
+\draw[msg] (10.27, -4.0) -- ++(0.9, 0) -- ++(0, -0.45) node[lab,right]{6: Gọi LLM (Timeout 10s)} -- (10.27, -4.45);
+
+% Khung tương tác Alt: Thành công vs Lỗi (chiều cao 3.8cm, từ -4.9 đến -8.7)
+\draw[draw=black!70,line width=0.7pt,rounded corners=3pt,fill=black!1] (6.1, -4.9) rectangle (13.8, -8.7);
+\node[font=\sffamily\bfseries\tiny,text=black,anchor=north west] at (6.2, -4.95) {alt [Phản hồi hợp lệ]};
+
+% 7a & 8a: Nhánh Thành công
+\draw[msg] (10.13, -5.6) -- node[lab,above]{7a: Trả JSON hợp lệ} (7.07, -5.6);
+\draw[msg] (10.27, -6.3) -- node[lab,above]{8a: Ghi AI Audit Log} (13.13, -6.3);
+
+% Vạch phân cách Alt
+\draw[line width=0.5pt,dashed,draw=black!50] (6.1, -6.9) -- (13.8, -6.9);
+\node[font=\sffamily\tiny\itshape,text=black!70,anchor=north west] at (6.2, -7.0) {[Timeout / Lỗi Schema]: Fallback};
+
+% 7b: Nhánh Lỗi (thông thoáng trong khung)
+\draw[ret] (10.13, -7.8) -- node[lab,above]{7b: Trả cảnh báo lỗi \& gợi ý thử lại} (7.07, -7.8);
+
+% 9. Trả kết quả về giao diện
+\draw[ret] (6.93, -9.3) -- node[lab,above]{9: Hiển thị nháp kèm cảnh báo} (3.87, -9.3);
+
+% 10. Người dùng sửa và gửi duyệt
+\draw[msg] (0.8, -10.0) -- node[lab,above]{10: Sửa nội dung \& Gửi duyệt} (3.73, -10.0);
+
+% 11. Gửi duyệt lên API
+\draw[msg] (3.87, -10.6) -- node[lab,above]{11: PUT /contents/\{id\}/review} (6.93, -10.6);
+
+% 12 & 13. Cập nhật trạng thái và phản hồi
+\draw[msg] (7.07, -11.2) -- node[lab,above]{12: Lưu trạng thái IN\_REVIEW} (13.13, -11.2);
+\draw[ret] (13.13, -11.8) -- node[lab,above]{13: Xác nhận lưu trữ thành công} (7.07, -11.8);
+
 \end{tikzpicture}

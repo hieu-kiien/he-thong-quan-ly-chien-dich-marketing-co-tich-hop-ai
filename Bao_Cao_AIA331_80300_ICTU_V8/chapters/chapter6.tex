@@ -17,14 +17,16 @@ Ba chức năng này đủ tạo giá trị để trình diễn nhưng vẫn n�
 \small
 \caption{Phạm vi công việc của AI}
 \label{tab:v8-ai-scope}
-\begin{tabularx}{\textwidth}{L{3.0cm}Y Y}
-\toprule
-\textbf{Công việc} & \textbf{AI được làm} & \textbf{AI không được làm}\\
-\midrule
+\begin{tabularx}{\textwidth}{|L{3.0cm}|Y|Y|}
+\hline
+\thead{Công việc} & \thead{AI được làm} & \thead{AI không được làm}\\
+\hline
 Gợi ý ý tưởng & Đề xuất góc nội dung dựa trên mục tiêu, sản phẩm, đối tượng và kênh. & Tự tạo cam kết giá, số liệu hoặc chính sách không có trong dữ liệu đầu vào.\\
+\hline
 Tạo bản nháp & Viết tiêu đề, nội dung và lời kêu gọi theo quy tắc của kênh. & Tự gửi cho khách hàng, tự lập lịch hoặc tự xuất bản.\\
+\hline
 Tóm tắt chỉ số & Diễn giải views, clicks, conversions, cost và các KPI đã tính. & Tự tính lại bằng suy đoán hoặc khẳng định quan hệ nhân quả khi dữ liệu chưa đủ.\\
-\bottomrule
+\hline
 \end{tabularx}
 \end{table}
 
@@ -34,17 +36,19 @@ Trước khi gọi AI, hệ thống kiểm tra người dùng và chọn một l
 
 \begin{table}[h!]
 \centering
-\scriptsize
+\small
 \caption{Dữ liệu được phép sử dụng cho từng chức năng}
 \label{tab:v8-ai-context}
-\begin{tabularx}{\textwidth}{L{2.7cm}Y Y}
-\toprule
-\textbf{Chức năng} & \textbf{Dữ liệu được đưa vào} & \textbf{Dữ liệu loại trừ}\\
-\midrule
+\begin{tabularx}{\textwidth}{|L{2.8cm}|Y|Y|}
+\hline
+\thead{Chức năng} & \thead{Dữ liệu được đưa vào} & \thead{Dữ liệu loại trừ}\\
+\hline
 Ý tưởng & Mục tiêu, đối tượng, tên/đặc tính sản phẩm, kênh, giọng điệu và thời gian. & Mật khẩu, token, thông tin chiến dịch khác và dữ liệu ngoài quyền đọc.\\
+\hline
 Bản nháp & Ý tưởng đã chọn, thông tin sản phẩm, quy tắc kênh, độ dài và lời kêu gọi. & Sự kiện, giá hoặc số liệu không có trong dữ liệu đã xác nhận.\\
+\hline
 Tóm tắt & Metrics, công thức KPI, khoảng thời gian, tên kênh và mức độ đầy đủ của dữ liệu. & Dữ liệu cá nhân không cần thiết và dữ liệu ngoài phạm vi người dùng.\\
-\bottomrule
+\hline
 \end{tabularx}
 \end{table}
 
@@ -73,20 +77,25 @@ Sau khi kết quả hợp lệ, hệ thống lưu thành AI\_DRAFT. Nhân viên 
 
 \begin{table}[h!]
 \centering
-\scriptsize
+\small
 \caption{Cách xử lý những lỗi thường gặp khi gọi AI}
 \label{tab:v8-ai-failures}
-\begin{tabularx}{\textwidth}{L{3.0cm}Y Y}
-\toprule
-\textbf{Trường hợp} & \textbf{Phản hồi của hệ thống} & \textbf{Cách kiểm tra}\\
-\midrule
-Quá thời gian & Dừng theo thời hạn; giữ bản nháp cũ và cho phép thử lại. & Giả lập timeout, ghi thời gian và trạng thái.\\
-Giới hạn tốc độ & Thử lại với số lần giới hạn hoặc thông báo thử sau. & Giả lập mã 429 và kiểm tra không lặp vô hạn.\\
-Kết quả sai cấu trúc & Không lưu thành bản nháp dùng được; hiển thị lỗi kiểm tra. & Dùng response thiếu trường hoặc sai kiểu.\\
-Thông tin không có trong dữ liệu & Hiển thị cảnh báo để người dùng sửa hoặc bỏ. & Tạo case có thông tin bị bịa và chấm theo tiêu chí.\\
-Yêu cầu quá dài & Rút gọn theo quy tắc và thông báo phần bị bỏ. & Ghi độ dài trước/sau và danh sách trường đã chọn.\\
-Nhà cung cấp không hoạt động & Thông báo rõ; dùng phương án dự phòng nếu đã cấu hình. & Ngắt provider và kiểm tra dữ liệu cũ vẫn nguyên vẹn.\\
-\bottomrule
+\begin{tabularx}{\textwidth}{|L{3.5cm}|Y|Y|}
+\hline
+\thead{Trường hợp} & \thead{Phản hồi của hệ thống} & \thead{Cách kiểm tra}\\
+\hline
+Quá thời gian (Timeout) & Dừng theo thời hạn (10s); giữ bản nháp cũ và cho phép thử lại. & Giả lập timeout, ghi thời gian và trạng thái.\\
+\hline
+Giới hạn tốc độ (429) & Thử lại tối đa 2 lần hoặc thông báo thử sau có thời gian chờ. & Giả lập mã 429 và kiểm tra không lặp vô hạn.\\
+\hline
+Kết quả sai cấu trúc JSON & Không lưu thành bản nháp dùng được; hiển thị lỗi kiểm tra. & Dùng response thiếu trường hoặc sai kiểu dữ liệu.\\
+\hline
+Thông tin không có trong context & Hiển thị cảnh báo để người dùng phát hiện ảo giác/sửa đổi. & Tạo case có thông tin bị bịa và chấm theo tiêu chí.\\
+\hline
+Yêu cầu quá dài (Context Length) & Rút gọn theo quy tắc ưu tiên và thông báo phần bị cắt ngắn. & Ghi độ dài trước/sau và danh sách trường đã chọn.\\
+\hline
+Provider ngừng hoạt động & Bật Circuit Breaker, chuyển sang fallback hoặc báo lỗi rõ ràng. & Ngắt provider và kiểm tra dữ liệu cũ vẫn nguyên vẹn.\\
+\hline
 \end{tabularx}
 \end{table}
 

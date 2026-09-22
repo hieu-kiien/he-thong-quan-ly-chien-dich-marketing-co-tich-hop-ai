@@ -19,15 +19,18 @@ Huang và Rust phân biệt các vai trò của AI trong marketing, từ tự đ
 \small
 \caption{Những yêu cầu thiết kế rút ra từ lĩnh vực}
 \label{tab:v8-domain-drivers}
-\begin{tabularx}{\textwidth}{L{3.4cm}Y Y}
-\toprule
-\textbf{Nhu cầu} & \textbf{Vấn đề cần giải quyết} & \textbf{Cách thể hiện trong đề tài}\\
-\midrule
+\begin{tabularx}{\textwidth}{|L{3.4cm}|Y|Y|}
+\hline
+\thead{Nhu cầu} & \thead{Vấn đề cần giải quyết} & \thead{Cách thể hiện trong đề tài}\\
+\hline
 Lập kế hoạch chiến dịch & mục tiêu, đối tượng, ngân sách và người phụ trách phải nhất quán. & Chiến dịch là đối tượng trung tâm; có ngày bắt đầu/kết thúc và quan hệ phân công.\\
+\hline
 Vận hành nội dung & một nội dung có thể trải qua nhiều lần sửa và nhiều bước duyệt. & Có trạng thái, lịch sử duyệt và điều kiện trước khi lập lịch.\\
+\hline
 Đọc chỉ số & số liệu phải biết thuộc kênh nào và ngày nào. & Dùng khóa duy nhất theo chiến dịch--kênh--ngày; KPI do hệ thống tính.\\
+\hline
 Hỗ trợ bằng AI & người dùng cần biết AI dựa vào dữ liệu nào và phải sửa ở đâu. & Chọn dữ liệu theo quyền, hiển thị cảnh báo và bắt buộc người duyệt.\\
-\bottomrule
+\hline
 \end{tabularx}
 \end{table}
 
@@ -50,33 +53,40 @@ Các trang sản phẩm của HubSpot và Meta được xem để hiểu cách m
 
 \begin{table}[h!]
 \centering
-\scriptsize
+\small
 \caption{So sánh nguồn tham khảo và cách áp dụng có giới hạn}
 \label{tab:v8-related-work}
-\begin{tabularx}{\textwidth}{L{3.0cm}L{4.0cm}L{3.5cm}Y}
-\toprule
-\textbf{Nguồn} & \textbf{Điều có thể học} & \textbf{Không thể suy ra} & \textbf{Áp dụng cho đề tài}\\
-\midrule
+\begin{tabularx}{\textwidth}{|L{2.6cm}|L{3.8cm}|L{3.6cm}|Y|}
+\hline
+\thead{Nguồn} & \thead{Điều có thể học} & \thead{Không thể suy ra} & \thead{Áp dụng cho đề tài}\\
+\hline
 Wedel--Kannan & Số liệu marketing cần gắn với bối cảnh và vấn đề quyền riêng tư. & Không đưa ra schema hay giao diện cụ thể. & Thiết kế grain của metrics và ghi rõ nguồn dữ liệu.\\
+\hline
 Huang--Rust & AI có thể hỗ trợ nhiều lớp công việc marketing khác nhau. & Không chứng minh một mô hình cụ thể phù hợp dự án này. & Chỉ chọn gợi ý, bản nháp và tóm tắt có kiểm duyệt.\\
+\hline
 HubSpot/Meta & Campaign, content, analytics và quyền truy cập là các khái niệm đi cùng nhau. & Không biết cách triển khai bên trong sản phẩm thương mại. & Dùng như gợi ý nghiệp vụ; không sao chép giao diện hay nhận diện.\\
+\hline
 Amershi và cộng sự & Người dùng cần hiểu, kiểm soát và phục hồi khi AI sai. & Không thay thế việc kiểm thử model và dữ liệu. & Thêm cảnh báo, sửa bản nháp, retry và review.\\
+\hline
 NIST AI RMF & Rủi ro cần được nhận diện, quản lý và đo lường. & Không phải giấy chứng nhận hệ thống an toàn. & Thêm log, giới hạn dữ liệu và kế hoạch đánh giá.\\
+\hline
 C4 model & Mỗi sơ đồ nên trả lời một câu hỏi kiến trúc cụ thể. & Không phải một phương pháp đầy đủ cho toàn bộ dự án. & Tách Context, Container, ERD, State và Sequence.\\
-\bottomrule
+\hline
 \end{tabularx}
 \end{table}
 
 \section{Nguyên tắc thiết kế được lựa chọn}
 
+Từ các cơ sở lý luận và kinh nghiệm thực tiễn tổng hợp ở trên, nhóm đề xuất bộ năm nguyên tắc thiết kế kỹ thuật xuyên suốt làm kim chỉ nam cho toàn bộ hệ thống:
+
 \begin{enumerate}
-\item Dữ liệu và quyền được xác định trước khi gọi AI.
-\item Phê duyệt là một quy tắc nghiệp vụ, không chỉ là một nút trên giao diện.
-\item Các công thức KPI được tính bằng logic xác định; AI chỉ giải thích và gợi ý câu hỏi tiếp theo.
-\item Mỗi sơ đồ chỉ tập trung vào một câu hỏi; chi tiết quá dày được tách thành view khác.
-\item Những gì chưa chạy được phải được viết ở dạng đề xuất hoặc kế hoạch, không viết như kết quả.
+\item \textbf{Kiểm soát quyền truy cập và lọc dữ liệu tiền xử lý}: Hệ thống luôn thực thi kiểm tra quyền hạn (RBAC) của người dùng tại tầng Backend API trước khi truy xuất dữ liệu từ CSDL. Tuyệt đối không cấp quyền truy cập trực tiếp CSDL cho mô hình AI; dữ liệu truyền cho mô hình ngôn ngữ lớn chỉ bao gồm các trường thông tin tối thiểu được phép đọc bởi vai trò của người dùng hiện hành.
+\item \textbf{Quy trình phê duyệt có trạng thái nghiệp vụ bất biến}: Việc phê duyệt nội dung được quản lý chặt chẽ như một máy trạng thái hữu hạn (\textit{Finite State Machine}) trên máy chủ, không chỉ là sự thay đổi cờ trạng thái đơn giản trên giao diện web. Một bài viết tạo bởi AI bắt buộc phải mang trạng thái nháp (\texttt{AI\_DRAFT}) và phải qua bước kiểm duyệt của Quản lý trước khi được phép chuyển sang trạng thái lập lịch hoặc xuất bản.
+\item \textbf{Tính toán chỉ số bằng logic tất định}: Toàn bộ các phép tính toán tài chính và chỉ số hiệu năng marketing (như CTR, CVR, CPC, ROI) được lập trình bằng logic toán học xác định tại Backend. Hệ thống tuyệt đối không giao việc tính toán số học cho LLM nhằm triệt tiêu hoàn toàn rủi ro ảo giác số liệu (\textit{hallucination}); vai trò của AI chỉ là phân tích định tính ngữ cảnh, giải thích biến động và gợi ý các hành động tối ưu tiếp theo.
+\item \textbf{Phân tách mối quan tâm trong biểu diễn kiến trúc}: Áp dụng triệt để tư tưởng C4 Model và chuẩn ISO/IEC 42010. Mỗi sơ đồ trong tài liệu chỉ tập trung giải quyết một câu hỏi kiến trúc duy nhất: Hình~1.1 giải quyết bối cảnh và ranh giới; Hình~4.1 giải quyết các khối logic và giao thức; Hình~5.1 và 5.2 giải quyết cấu trúc dữ liệu; Hình~5.3 và 5.4 giải quyết trạng thái và trình tự tương tác.
+\item \textbf{Minh bạch nguồn gốc và lưu vết kiểm toán toàn diện}: Mọi kết quả sinh bởi AI đều phải hiển thị nhãn nhận diện rõ ràng trên giao diện người dùng, đi kèm các cảnh báo biên tập nếu có. Mọi giao dịch gọi AI đều được ghi vết độc lập vào bảng nhật ký kiểm toán (\texttt{ai\_logs}) gồm mã định danh, mô hình, phiên bản prompt, thời gian đáp ứng và quyết định cuối cùng của con người.
 \end{enumerate}
 
 \section{Kết luận chương}
 
-Các nguồn tham khảo không được dùng để trang trí danh mục tài liệu mà để giải thích quyết định thiết kế. Chương tiếp theo chuyển những nguyên tắc này thành actor, yêu cầu, tiêu chí nghiệm thu và quy tắc nghiệp vụ cụ thể.
+Các tài liệu tham khảo và nghiên cứu liên quan được phân tích trong chương này không nhằm mục đích liệt kê lý thuyết chung chung, mà là cơ sở khoa học trực tiếp biện minh cho từng lựa chọn công nghệ và ranh giới hệ thống. Bộ năm nguyên tắc thiết kế trên là cầu nối chuyển tiếp sang Chương~3, nơi các nguyên tắc này được cụ thể hóa thành danh mục 14 yêu cầu chức năng, 6 yêu cầu phi chức năng và ma trận phân quyền người dùng chi tiết.

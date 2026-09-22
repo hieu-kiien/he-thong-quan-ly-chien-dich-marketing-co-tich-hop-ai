@@ -1,0 +1,21 @@
+% Generic academic architecture template. Adapt semantics before use.
+% Requires: \usetikzlibrary{positioning,fit,arrows.meta}
+\begin{tikzpicture}[
+  font=\small,
+  box/.style={draw,rounded corners=1.5pt,align=center,minimum height=10mm,text width=34mm},
+  ext/.style={box,dashed},
+  db/.style={box},
+  rel/.style={-{Latex[length=2mm]},thick},
+  node distance=13mm and 16mm
+]
+\node[ext] (user) {\textbf{User}\\[1mm]\footnotesize Person};
+\node[box,right=of user] (web) {\textbf{Web Application}\\[1mm]\footnotesize Container\\HTML/JavaScript};
+\node[box,right=of web] (api) {\textbf{Application API}\\[1mm]\footnotesize Container\\FastAPI};
+\node[db,below=of api] (db) {\textbf{Database}\\[1mm]\footnotesize Container\\Relational DBMS};
+\node[ext,right=of api] (external) {\textbf{External Service}\\[1mm]\footnotesize Software System};
+
+\draw[rel] (user) -- node[above,fill=white,inner sep=1pt]{\footnotesize Uses} (web);
+\draw[rel] (web) -- node[above,fill=white,inner sep=1pt]{\footnotesize HTTPS/JSON} (api);
+\draw[rel] (api) -- node[right,fill=white,inner sep=1pt]{\footnotesize SQL} (db);
+\draw[rel] (api) -- node[above,fill=white,inner sep=1pt]{\footnotesize HTTPS/JSON} (external);
+\end{tikzpicture}

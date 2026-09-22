@@ -13,76 +13,98 @@ Mỗi yêu cầu dưới đây được viết theo bốn ý: ai thực hiện, 
 \small
 \caption{Actor và mục tiêu chính}
 \label{tab:v8-actors}
-\begin{tabularx}{\textwidth}{L{2.8cm}Y Y}
-\toprule
-\textbf{Actor} & \textbf{Mục tiêu} & \textbf{Giới hạn quyền}\\
-\midrule
+\begin{tabularx}{\textwidth}{|L{3.0cm}|Y|Y|}
+\hline
+\thead{Actor} & \thead{Mục tiêu} & \thead{Giới hạn quyền}\\
+\hline
 Quản lý marketing & Tạo chiến dịch, đặt ngân sách, phân công, duyệt nội dung và xem báo cáo. & Có quyền duyệt; không được sửa nhật ký đã ghi.\\
+\hline
 Nhân viên marketing & Quản lý phần việc được giao, soạn nội dung, gọi AI, sửa bản nháp và gửi duyệt. & Không được tự duyệt nội dung của mình hoặc thay đổi quyền.\\
+\hline
 Nhà cung cấp AI & Nhận yêu cầu đã được chọn lọc và trả kết quả theo cấu trúc quy định. & Không truy cập trực tiếp cơ sở dữ liệu và không có quyền nghiệp vụ.\\
+\hline
 Nền tảng truyền thông & Nhận nội dung đã được duyệt nếu hệ thống có tích hợp thật. & Nằm ngoài phạm vi prototype hiện tại.\\
-\bottomrule
+\hline
 \end{tabularx}
 \end{table}
 
 Hình~\ref{fig:v8-usecase} chỉ mô tả mục tiêu của người dùng, không mô tả thứ tự thao tác. Thứ tự và điều kiện chuyển trạng thái được trình bày ở Chương 5.
 
-\begin{figure}[h!]
+\clearpage
+\begin{figure}[p]
 \centering
 \input{figures/usecase.tex}
 \caption{Các mục tiêu chính của quản lý và nhân viên marketing}
 \label{fig:v8-usecase}
 \end{figure}
 
+\clearpage
 \section{Yêu cầu chức năng}
 
+\begin{table}[!htbp]
+\centering
 \small
-\begin{longtable}{L{1.0cm}L{2.8cm}L{4.2cm}L{5.1cm}}
-\caption{Danh mục yêu cầu chức năng}\label{tab:v8-functional}\\
-\toprule
-\textbf{Mã} & \textbf{Nhóm} & \textbf{Yêu cầu} & \textbf{Điều kiện nghiệm thu dự kiến}\\
-\midrule
-\endfirsthead
-\toprule
-\textbf{Mã} & \textbf{Nhóm} & \textbf{Yêu cầu} & \textbf{Điều kiện nghiệm thu dự kiến}\\
-\midrule
-\endhead
+\caption{Danh mục yêu cầu chức năng}\label{tab:v8-functional}
+\renewcommand{\arraystretch}{1.04}
+\begin{tabularx}{\textwidth}{|C{1.1cm}|L{2.2cm}|L{4.5cm}|Y|}
+\hline
+\thead{Mã} & \thead{Nhóm} & \thead{Yêu cầu} & \thead{Điều kiện nghiệm thu dự kiến}\\
+\hline
 FR01 & Đăng nhập & Người dùng đăng nhập bằng email và mật khẩu. & Thông tin sai bị từ chối; mật khẩu không xuất hiện trong phản hồi hoặc nhật ký.\\
+\hline
 FR02 & Phân quyền & Backend kiểm tra vai trò ở các thao tác nhạy cảm. & Nhân viên gọi thao tác duyệt bị từ chối; ẩn nút trên giao diện không thay thế kiểm tra backend.\\
+\hline
 FR03 & Dữ liệu nền & Quản lý nhóm sản phẩm, sản phẩm và kênh. & Dữ liệu bắt buộc được kiểm tra; không tạo bản ghi mồ côi hoặc tên trùng trong cùng phạm vi.\\
+\hline
 FR04 & Chiến dịch & Tạo/sửa chiến dịch với mục tiêu, sản phẩm, thời gian, ngân sách và người phụ trách. & Ngân sách không âm; ngày kết thúc không trước ngày bắt đầu.\\
+\hline
 FR05 & Phân công & Quản lý thêm hoặc bỏ nhân viên khỏi chiến dịch. & Người được phân công nhìn thấy đúng chiến dịch; thay đổi được ghi nhận.\\
+\hline
 FR06 & Nội dung & Tạo bản nháp gắn với chiến dịch, kênh và người tạo. & Bản nháp lưu được; phiên bản và nguồn nội dung có thể truy lại.\\
+\hline
 FR07 & Phê duyệt & Gửi duyệt, chấp thuận hoặc từ chối nội dung. & Chỉ quản lý được chấp thuận; từ chối phải có lý do.\\
+\hline
 FR08 & Lịch đăng & Tạo, sửa và hủy lịch cho nội dung đã được chấp thuận. & Nội dung chưa được duyệt không thể lập lịch; múi giờ phải rõ.\\
+\hline
 FR09 & Chỉ số & Nhập views, clicks, conversions, cost và revenue theo ngày và kênh. & Số liệu không âm; cùng một chiến dịch--kênh--ngày không lặp.\\
+\hline
 FR10 & Tìm kiếm/báo cáo & Lọc chiến dịch và xem chỉ số theo thời gian, kênh. & Kết quả rỗng được thông báo; công thức KPI xử lý trường hợp mẫu số bằng 0.\\
+\hline
 FR11 & Gợi ý ý tưởng & Gợi ý ý tưởng dựa trên mục tiêu, đối tượng, sản phẩm và kênh. & Kết quả có cấu trúc, cảnh báo và thông tin nguồn đã dùng.\\
+\hline
 FR12 & Tạo bản nháp & Tạo caption/email nháp theo quy tắc của kênh. & Bản nháp được đánh dấu do AI tạo; người dùng phải sửa và gửi duyệt trước khi dùng.\\
+\hline
 FR13 & Tóm tắt kết quả & Tóm tắt KPI và gợi ý cải thiện từ số liệu đã chọn. & Không tạo số liệu mới; phải nêu rõ khi dữ liệu chưa đủ.\\
+\hline
 FR14 & Nhật ký & Lưu thao tác quan trọng và lần gọi AI. & Có người thực hiện, thời gian, đối tượng và kết quả; không lưu mật khẩu/API key.\\
-\bottomrule
-\end{longtable}
-\normalsize
+\hline
+\end{tabularx}
+\end{table}
 
+\clearpage
 \section{Yêu cầu phi chức năng}
 
 \begin{table}[h!]
 \centering
-\scriptsize
+\small
 \caption{Các yêu cầu chất lượng ưu tiên}
 \label{tab:v8-quality}
-\begin{tabularx}{\textwidth}{L{1.2cm}L{2.3cm}Y Y}
-\toprule
-\textbf{Mã} & \textbf{Thuộc tính} & \textbf{Tình huống cần xử lý} & \textbf{Cách kiểm tra}\\
-\midrule
+\begin{tabularx}{\textwidth}{|C{1.3cm}|L{2.2cm}|Y|Y|}
+\hline
+\thead{Mã} & \thead{Thuộc tính} & \thead{Tình huống cần xử lý} & \thead{Cách kiểm tra}\\
+\hline
 NFR01 & An toàn & Nhân viên gọi thao tác duyệt hoặc đọc dữ liệu ngoài phạm vi. & API từ chối; dữ liệu không thay đổi; nhật ký không lộ bí mật.\\
+\hline
 NFR02 & Toàn vẹn & Nhập ngân sách âm, ngày ngược hoặc khóa ngoại không tồn tại. & Giao dịch bị hủy; không có bản ghi mồ côi.\\
+\hline
 NFR03 & Hiệu năng & Tìm kiếm chiến dịch trên bộ dữ liệu đã công bố. & Ghi thời gian trung vị, p95, kích thước dữ liệu và môi trường; ngưỡng chấp nhận sẽ được chốt trước khi đo.\\
+\hline
 NFR04 & Dễ sử dụng & Nhân viên tạo chiến dịch rồi gửi nội dung duyệt. & Ghi tỷ lệ hoàn thành, lỗi thao tác và trạng thái giao diện theo kịch bản; chưa coi là đạt khi chưa thử.\\
+\hline
 NFR05 & Ổn định & Nhà cung cấp AI timeout, giới hạn tốc độ hoặc trả JSON sai. & Giữ bản nháp cũ; có thông báo và nút thử lại; không lặp vô hạn; số lần thử tối đa sẽ được chốt khi code.\\
+\hline
 NFR06 & Tái lập & Người khác cài đặt và chạy lại demo. & Có hướng dẫn, dữ liệu mẫu, cấu hình mẫu và nhật ký cài đặt; kết quả phải được ghi sau lần chạy thật.\\
-\bottomrule
+\hline
 \end{tabularx}
 \end{table}
 

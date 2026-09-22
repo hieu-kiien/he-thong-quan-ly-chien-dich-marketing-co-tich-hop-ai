@@ -1,16 +1,77 @@
 \begin{tikzpicture}[
-  font=\sffamily\scriptsize,
-  node/.style={draw=ictunavy,fill=softblue,rounded corners=4pt,minimum width=3.35cm,minimum height=0.9cm,align=center},
-  infra/.style={draw=black!55,rounded corners=6pt,dashed,inner sep=12pt},
-  ext/.style={draw=ictuamber,fill=softamber,rounded corners=4pt,minimum width=3.35cm,minimum height=0.9cm,align=center,dashed},
-  rel/.style={-{Latex[length=2mm]},draw=ictunavy,line width=0.65pt}
+  font=\sffamily\footnotesize,
+  >=Latex,
+  node_box/.style={
+    draw=ictunavy,
+    fill=white,
+    rounded corners=4pt,
+    minimum width=3.6cm,
+    minimum height=1.7cm,
+    align=center,
+    line width=0.85pt,
+    text width=3.4cm,
+    inner sep=4pt
+  },
+  cloud_box/.style={
+    draw=black!70,
+    fill=black!2,
+    rounded corners=4pt,
+    minimum width=3.3cm,
+    minimum height=1.6cm,
+    align=center,
+    line width=0.8pt,
+    dashed,
+    text width=3.1cm,
+    inner sep=4pt
+  },
+  rel/.style={draw=black!85,line width=0.75pt,-{Latex[length=2.2mm]}},
+  comm/.style={font=\sffamily\tiny,fill=white,inner sep=1.5pt,text=black,align=center}
 ]
-\node[node] (browser) at (0,0) {\shortstack{Trình duyệt\\React và tài nguyên tĩnh}};
-\node[node] (app) at (5,0) {\shortstack{Ứng dụng API\\FastAPI và nghiệp vụ}};
-\node[node] (db) at (10,0) {\shortstack{Tệp cơ sở dữ liệu\\SQLite prototype}};
-\node[ext] (model) at (5,-2.1) {\shortstack{Provider AI\\hoặc mô hình cục bộ}};
-\draw[rel] (browser) -- node[above,fill=white,inner sep=1pt]{HTTPS/JSON} (app);
-\draw[rel] (app) -- node[above,fill=white,inner sep=1pt]{giao dịch} (db);
-\draw[rel] (app) -- node[right,fill=white,inner sep=1pt]{timeout + JSON} (model);
-\node[infra,fit=(browser)(app)(db),label={[font=\sffamily\scriptsize\itshape]above:phương án triển khai prototype}](boundary) {};
+
+% Cột 1: Client Node (x = 1.9cm, y = 0)
+\node[node_box] (client) at (1.9, 0) {
+  \textbf{$\ll$device$\gg$ Máy trạm Client}\\[2pt]
+  {\tiny [Web Browser / PC / Mobile]}\\[4pt]
+  \fbox{\tiny React SPA Bundle}
+};
+
+% Cột 2: Máy chủ Backend (x = 7.0cm, y = 1.5) & Cơ sở dữ liệu (x = 7.0cm, y = -1.5)
+\node[node_box] (server) at (7.0, 1.5) {
+  \textbf{$\ll$device$\gg$ Máy chủ Backend}\\[2pt]
+  {\tiny [Docker Container / Linux]}\\[4pt]
+  \fbox{\tiny FastAPI Engine / Python}
+};
+
+\node[node_box] (database) at (7.0, -1.5) {
+  \textbf{$\ll$device$\gg$ Máy chủ CSDL}\\[2pt]
+  {\tiny [Dedicated Storage Server]}\\[4pt]
+  \fbox{\tiny PostgreSQL / SQLite}
+};
+
+% Cột 3: Dịch vụ ngoài (x = 12.1cm)
+\node[cloud_box] (ai_cloud) at (12.1, 1.5) {
+  \textbf{$\ll$cloud service$\gg$ Dịch vụ AI}\\[2pt]
+  {\tiny [OpenAI / Gemini API]}\\[2pt]
+  {\tiny Xử lý prompt, sinh JSON nháp}
+};
+
+\node[cloud_box] (soc_cloud) at (12.1, -1.5) {
+  \textbf{$\ll$cloud service$\gg$ Mạng Xã hội}\\[2pt]
+  {\tiny [Meta / TikTok / Google API]}\\[2pt]
+  {\tiny Xuất bản bài viết sau duyệt}
+};
+
+% Kết nối rõ ràng, thẳng hàng, không chéo đè chữ
+% 1. Client -> Server
+\draw[rel] (client.east) -- node[comm,above,sloped]{HTTPS / TLS 1.3} (server.west);
+
+% 2. Server -> Database (kết nối dọc)
+\draw[rel] (server.south) -- node[comm,right=2pt]{TCP 5432 / SQL} (database.north);
+
+% 3. Server -> AI Cloud (kết nối ngang)
+\draw[rel] (server.east) -- node[comm,above=2pt]{HTTPS / JSON} (ai_cloud.west);
+
+% 4. Server -> Social Cloud (kết nối xiên)
+\draw[rel] (server.south east) -- node[comm,above,sloped]{OAuth 2.0 / REST} (soc_cloud.north west);
+
 \end{tikzpicture}

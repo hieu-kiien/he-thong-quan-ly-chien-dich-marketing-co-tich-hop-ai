@@ -15,18 +15,24 @@ Một chức năng chỉ được xem là sẵn sàng khi có mô tả nghiệp 
 \small
 \caption{Cấu trúc thư mục dự kiến}
 \label{tab:v8-repository}
-\begin{tabularx}{\textwidth}{L{4.0cm}Y Y}
-\toprule
-\textbf{Thư mục} & \textbf{Nội dung} & \textbf{Tài liệu/kết quả đi kèm}\\
-\midrule
+\begin{tabularx}{\textwidth}{|L{4.2cm}|Y|Y|}
+\hline
+\thead{Thư mục} & \thead{Nội dung} & \thead{Tài liệu/kết quả đi kèm}\\
+\hline
 \texttt{backend/app/api} & Đường dẫn API và dữ liệu vào/ra. & Tài liệu API và kiểm thử API.\\
+\hline
 \texttt{backend/app/domain} & Quy tắc chiến dịch, nội dung, chỉ số và quyền. & Kiểm thử nghiệp vụ và lịch sử quyết định.\\
+\hline
 \texttt{backend/app/ai} & Chọn dữ liệu, prompt, gọi provider và kiểm tra kết quả. & Prompt, nhật ký gọi AI và kiểm thử lỗi.\\
+\hline
 \texttt{backend/tests} & Kiểm thử đơn vị, tích hợp và API. & Báo cáo chạy test và dữ liệu kiểm thử.\\
+\hline
 \texttt{frontend/src} & Màn hình, biểu mẫu, tìm kiếm, dashboard và trạng thái lỗi. & Kịch bản demo và kiểm tra giao diện.\\
-\texttt{db/migrations} và \texttt{db/seed} & Thay đổi schema và dữ liệu mẫu. & Cách tạo lại cơ sở dữ liệu.\\
+\hline
+\texttt{db/migrations, seed} & Thay đổi schema và dữ liệu mẫu. & Cách tạo lại cơ sở dữ liệu.\\
+\hline
 \texttt{docs} & Hướng dẫn chạy, bảo mật, API và đánh giá. & README, runbook và báo cáo.\\
-\bottomrule
+\hline
 \end{tabularx}
 \end{table}
 
@@ -37,105 +43,123 @@ Một chức năng chỉ được xem là sẵn sàng khi có mô tả nghiệp 
 \small
 \caption{Các giai đoạn từ thiết kế đến bản trình diễn}
 \label{tab:v8-roadmap}
-\begin{tabularx}{\textwidth}{L{1.5cm}L{3.2cm}Y Y}
-\toprule
-\textbf{Giai đoạn} & \textbf{Mục tiêu} & \textbf{Phạm vi} & \textbf{Điều kiện chuyển bước}\\
-\midrule
+\begin{tabularx}{\textwidth}{|C{1.5cm}|L{3.0cm}|Y|Y|}
+\hline
+\thead{Giai đoạn} & \thead{Mục tiêu} & \thead{Phạm vi} & \thead{Điều kiện chuyển bước}\\
+\hline
 1 & Nền tảng & Đăng nhập, vai trò, sản phẩm, kênh và chiến dịch. & CRUD, kiểm tra quyền và dữ liệu mẫu chạy ổn định.\\
+\hline
 2 & Nội dung & Bản nháp, tìm kiếm, lịch đăng, trạng thái và phê duyệt. & Có kiểm tra chuyển trạng thái đúng/sai.\\
+\hline
 3 & Chỉ số & Nhập metrics, tính KPI và dashboard. & Công thức khớp dữ liệu mẫu, xử lý đủ dữ liệu rỗng.\\
+\hline
 4 & AI & Gợi ý, tạo bản nháp, tóm tắt và nhật ký. & Có kiểm tra cấu trúc, quyền, cảnh báo và lỗi provider.\\
+\hline
 5 & Hoàn thiện & Bảo mật, kiểm thử lại, hướng dẫn chạy, backup và demo. & Người khác có thể làm theo hướng dẫn hoặc blocker được ghi rõ.\\
-\bottomrule
+\hline
 \end{tabularx}
 \end{table}
 
+\clearpage
 \section{Kế hoạch kiểm thử}
 
-\begin{table}[h!]
+\begin{table}[!htbp]
 \centering
-\scriptsize
+\small
 \caption{Các nhóm kiểm thử bắt buộc}
 \label{tab:v8-test-plan}
-\begin{tabularx}{\textwidth}{L{1.0cm}L{4.0cm}Y Y}
-\toprule
-\textbf{Mã} & \textbf{Trường hợp} & \textbf{Kết quả cần có} & \textbf{Dạng kiểm thử}\\
-\midrule
+\renewcommand{\arraystretch}{1.03}
+\begin{tabularx}{\textwidth}{|C{1.0cm}|L{3.6cm}|Y|L{2.6cm}|}
+\hline
+\thead{Mã} & \thead{Trường hợp} & \thead{Kết quả cần có} & \thead{Dạng kiểm thử}\\
+\hline
 T01 & Đăng nhập đúng/sai và truy cập theo vai trò. & Phiên đúng được tạo; phiên sai và thao tác trái quyền bị từ chối. & API và quyền.\\
+\hline
 T02 & Tạo chiến dịch thiếu trường, ngân sách âm hoặc ngày sai. & Không tạo bản ghi; lỗi chỉ rõ trường sai. & API và nghiệp vụ.\\
+\hline
 T03 & Khóa ngoại không tồn tại hoặc bản ghi trùng. & Giao dịch bị hủy; không có dữ liệu mồ côi. & Cơ sở dữ liệu.\\
+\hline
 T04 & Tìm kiếm, lọc và sắp xếp chiến dịch. & Kết quả đúng với dữ liệu mẫu và bộ lọc. & Tích hợp.\\
+\hline
 T05 & Gửi duyệt, từ chối, chấp thuận và lập lịch. & Chỉ chuyển trạng thái hợp lệ; từ chối có lý do. & Quy trình và giao diện.\\
+\hline
 T06 & Nhập metrics, trùng ngày/kênh và mẫu số bằng 0. & KPI đúng; không chia cho 0 hoặc nhân đôi số liệu. & Dữ liệu và truy vấn.\\
+\hline
 T07 & AI nhận dữ liệu ngoài quyền hoặc context quá dài. & Dữ liệu bị loại hoặc rút gọn có thông báo. & Quyền và chọn dữ liệu.\\
+\hline
 T08 & AI trả JSON đúng/sai cấu trúc. & Chỉ JSON hợp lệ mới tạo bản nháp dùng được. & Hợp đồng dữ liệu.\\
+\hline
 T09 & AI timeout, giới hạn tốc độ hoặc provider ngừng hoạt động. & Có thời hạn, thử lại giới hạn và giữ bản nháp cũ. & Giả lập lỗi.\\
+\hline
 T10 & Kết quả AI có thông tin không được cung cấp. & Có cảnh báo; không tự chấp thuận hoặc xuất bản. & Kiểm tra nội dung.\\
+\hline
 T11 & Log chứa token, mật khẩu hoặc thông tin thừa. & Bí mật bị loại hoặc che; không trả ra giao diện. & Bảo mật.\\
+\hline
 T12 & Cài đặt mới, seed, backup và khôi phục. & Làm lại được theo README; sai khác được ghi lại. & Tái lập.\\
+\hline
 T13 & Người dùng hoàn thành luồng tạo chiến dịch và gửi nội dung duyệt. & Giao diện có loading/empty/error state; thao tác sai được giải thích. & Kịch bản sử dụng.\\
+\hline
 T14 & Đo truy vấn dashboard và gọi AI trên fixture cố định. & Ghi p50/p95, error rate, môi trường và kích thước dữ liệu; chưa có ngưỡng trước khi đo. & Đo hiệu năng.\\
+\hline
 T15 & Người khác dựng lại dự án từ repository sạch. & README, migration/seed và backup/restore cho kết quả có thể đối chiếu. & Tái lập.\\
-\bottomrule
+\hline
 \end{tabularx}
 \end{table}
+
+\clearpage
 
 \section{Cách đánh giá}
 
-Nhóm sẽ đánh giá ba khía cạnh riêng và đối chiếu chúng với các tiêu chí của bài thi cuối:
-
+Nhóm tiến hành đánh giá hệ thống trên ba khía cạnh độc lập, bám sát các tiêu chí nghiệm thu của học phần:
 \begin{enumerate}
-\item \textbf{Tính đúng của phần quản lý:} tỷ lệ kiểm thử đạt, tính toàn vẹn của dữ liệu và việc thực hiện đúng quyền/trạng thái.
-\item \textbf{Chất lượng chức năng AI:} tỷ lệ kết quả đúng cấu trúc, mức bám sát dữ liệu, mức phù hợp với mục tiêu/kênh, cảnh báo và lượng chỉnh sửa của người dùng.
-\item \textbf{Khả năng sử dụng lại:} thời gian cài đặt, dữ liệu mẫu, phiên bản mã nguồn, môi trường, câu lệnh và kết quả chạy lại.
+\item \textbf{Mức độ hoàn thiện chức năng và an toàn dữ liệu}: Kiểm thử đối chiếu trực tiếp theo 14 yêu cầu chức năng (FR01--FR14) tại Chương~3. Tiêu chí đạt yêu cầu bao gồm: 100\% các thao tác CRUD cơ bản hoạt động đúng; phân quyền người dùng chặt chẽ; các ràng buộc khóa ngoại, tính duy nhất được CSDL thực thi nghiêm ngặt; mọi ngoại lệ và dữ liệu đầu vào sai đều được bắt và phản hồi mã lỗi HTTP rõ ràng.
+\item \textbf{Độ tin cậy và kiểm soát chất lượng AI}: Đo lường trên tập dữ liệu kiểm thử chuẩn gồm 20 kịch bản tạo nội dung và 10 kịch bản tóm tắt chỉ số. Đánh giá tỷ lệ tuân thủ schema JSON đầu ra (kỳ vọng $\ge 95\%$), khả năng bắt lỗi timeout/lỗi kết nối của lớp Adapter, và tính toàn vẹn của nhật ký kiểm toán (\texttt{ai\_logs}) sau mỗi lần gọi.
+\item \textbf{Tính độc lập và khả năng tái lập môi trường}: Người ngoài nhóm có thể làm theo tài liệu hướng dẫn (\texttt{README.md}), thực thi các câu lệnh di chuyển CSDL (\texttt{alembic upgrade head}) và nạp dữ liệu mẫu (\texttt{seed data}) trên một máy tính sạch trong thời gian dưới 10 phút mà không phát sinh xung đột thư viện.
 \end{enumerate}
 
-Với AI, một bộ trường hợp cố định sẽ được dùng cho ít nhất ba lần thử. Mỗi lần chỉ thay đổi prompt, model hoặc tham số đang so sánh. Kết quả tốt và kết quả lỗi đều phải được lưu; không chỉ chọn những câu trả lời đẹp để đưa vào báo cáo. Nếu chưa kết nối được provider thật, nhóm chỉ đánh giá được quy trình và phần kiểm tra kết quả, không kết luận về chất lượng mô hình.
+\section{Sơ đồ triển khai và kịch bản trình diễn}
 
-\section{Phương án triển khai}
+Hình~\ref{fig:v8-deployment} mô tả kiến trúc phân bổ vật lý của các thành phần hệ thống tại môi trường thử nghiệm và vận hành dự kiến.
 
-Hình~\ref{fig:v8-deployment} là phương án triển khai nhỏ nhất cho prototype. Đây là thiết kế để chuẩn bị môi trường, chưa phải mô tả của hệ thống đã chạy.
-
-\begin{figure}[h!]
+\begin{figure}[H]
 \centering
 \input{figures/deployment.tex}
-\caption{Phương án triển khai prototype}
+\caption{Sơ đồ triển khai hệ thống}
 \label{fig:v8-deployment}
 \end{figure}
 
-README cuối kỳ cần ghi phiên bản Python/Node, cách tạo môi trường, biến trong \texttt{.env.example}, cách chạy migration/seed, lệnh khởi động frontend/backend, tài khoản demo, lệnh chạy kiểm thử và cách backup/restore. Key thật không được đưa vào mã nguồn, ảnh chụp hoặc nhật ký.
-
-\section{Kịch bản trình diễn}
-
+Kịch bản buổi báo cáo và trình diễn (demo) hệ thống được thiết kế theo luồng nghiệp vụ thực tế gồm 4 bước nối tiếp:
 \begin{enumerate}
-\item Quản lý đăng nhập, tạo sản phẩm và tạo một chiến dịch mùa hè với mục tiêu, đối tượng, ngân sách và thời gian.
-\item Quản lý thêm kênh Facebook và Email, phân công nhân viên; nhân viên mở chiến dịch và yêu cầu gợi ý ý tưởng.
-\item Nhân viên chọn một ý tưởng, tạo bản nháp theo kênh, xem nguồn dữ liệu và sửa nội dung.
-\item Nhân viên gửi duyệt. Quản lý xem, chấp thuận hoặc từ chối có lý do; chỉ nội dung được chấp thuận mới được lập lịch.
-\item Người dùng nhập số liệu mẫu theo ngày/kênh và xem CTR, CVR, CPC trên dashboard.
-\item Quản lý yêu cầu tóm tắt. Kịch bản cũng phải cho thấy trường hợp provider lỗi hoặc kết quả sai cấu trúc mà không làm mất dữ liệu cũ.
+\item \textbf{Thiết lập và phân quyền}: Quản lý đăng nhập, khởi tạo chiến dịch marketing mới, nhập ngân sách dự kiến và phân công tài khoản nhân viên phụ trách.
+\item \textbf{Soạn thảo và điều phối AI}: Nhân viên đăng nhập, chọn chiến dịch, gửi yêu cầu AI sinh bản nháp nội dung. Hệ thống minh bạch hiển thị dữ liệu đầu vào, cảnh báo giới hạn (nếu có) và cho phép nhân viên biên tập hoàn thiện trước khi bấm gửi duyệt.
+\item \textbf{Phê duyệt và lập lịch}: Quản lý tiếp nhận thông báo duyệt, xem lại lịch sử phiên bản, phê duyệt nội dung và kích hoạt lịch đăng bài. Kiểm tra ràng buộc: bài viết chưa duyệt tuyệt đối không thể lập lịch xuất bản.
+\item \textbf{Theo dõi chỉ số và xử lý sự cố}: Nhập số liệu tương tác mẫu theo ngày/kênh; kiểm tra biểu đồ KPI trên Dashboard; giả lập trường hợp AI timeout hoặc sai JSON để chứng minh hệ thống vẫn bảo toàn nguyên vẹn dữ liệu cũ.
 \end{enumerate}
 
 \section{Rủi ro cần theo dõi}
 
 \begin{table}[h!]
 \centering
-\scriptsize
+\small
 \caption{Rủi ro và hướng xử lý}
 \label{tab:v8-risks}
-\begin{tabularx}{\textwidth}{L{3.4cm}L{2.0cm}Y}
-\toprule
-\textbf{Rủi ro} & \textbf{Mức} & \textbf{Hướng xử lý}\\
-\midrule
+\begin{tabularx}{\textwidth}{|L{3.8cm}|C{2.0cm}|Y|}
+\hline
+\thead{Rủi ro} & \thead{Mức độ} & \thead{Hướng xử lý}\\
+\hline
 Phần AI mở rộng quá nhiều & Cao & Giữ ba chức năng trong đề bài; hoàn thiện phần quản lý trước.\\
+\hline
 Provider không ổn định hoặc hết quota & Cao & Có lớp adapter, dữ liệu giả lập và xử lý lỗi; không để AI chặn phần CRUD.\\
+\hline
 Thiếu dữ liệu thật & Trung bình & Dùng dữ liệu mẫu có ghi rõ; chỉ kết luận về quy trình và công thức.\\
+\hline
 SQLite không phù hợp khi nhiều người dùng & Trung bình & Giữ lớp truy cập dữ liệu độc lập; đánh giá PostgreSQL trước khi mở rộng.\\
+\hline
 Thiếu thời gian kiểm thử & Cao & Kiểm thử ngay sau từng giai đoạn, ưu tiên quyền, trạng thái, dữ liệu và lỗi AI.\\
-\bottomrule
+\hline
 \end{tabularx}
 \end{table}
 
 \section{Kết luận chương}
 
-Kế hoạch này biến tiêu chí của học phần thành những phần việc và phép kiểm tra cụ thể. Sau khi có mã nguồn, các ô kế hoạch phải được thay bằng kết quả thật, kèm môi trường và cách chạy; không giữ nguyên các con số dự kiến như thể đã đo.
+Kế hoạch xây dựng và kiểm thử trong chương này đóng vai trò cầu nối chuyển giao toàn bộ các đặc tả phân tích, kiến trúc và mô hình dữ liệu thành các đầu việc kỹ thuật có thể thực thi độc lập. Thay vì phát triển tự do, nhóm áp dụng chiến lược phân tách ba lớp nghiêm ngặt: hoàn thiện phần quản lý dữ liệu nền tảng trước, kiểm thử lớp tích hợp AI sau, và luôn duy trì cơ chế dự phòng khi dịch vụ ngoài gặp sự cố. Toàn bộ 15 nhóm ca kiểm thử và 4 kịch bản trình diễn được thiết kế để kiểm chứng độ tin cậy của hệ thống ngay từ phiên bản prototype đầu tiên, đảm bảo dự án sẵn sàng bước vào giai đoạn cài đặt mã nguồn với độ rủi ro thấp nhất.

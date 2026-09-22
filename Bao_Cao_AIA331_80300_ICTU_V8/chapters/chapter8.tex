@@ -27,18 +27,24 @@ Việc ghi rõ giới hạn giúp người đọc phân biệt phần đã hoàn
 \centering
 \small
 \caption{Phạm vi đã thiết kế và phần cần kiểm tra ở giai đoạn triển khai}\label{tab:v8-limitations}
-\begin{tabularx}{\textwidth}{L{4.0cm}L{3.1cm}Y}
-\toprule
-\textbf{Hạng mục} & \textbf{Hiện trạng} & \textbf{Việc cần làm tiếp theo}\\
-\midrule
+\begin{tabularx}{\textwidth}{|L{4.0cm}|L{3.2cm}|Y|}
+\hline
+\thead{Hạng mục} & \thead{Hiện trạng} & \thead{Việc cần làm tiếp theo}\\
+\hline
 Giao diện và máy chủ & chưa lập trình & xây dựng màn hình, API và kiểm tra các luồng nghiệp vụ.\\
+\hline
 Cơ sở dữ liệu & đã có thiết kế và DDL dự kiến & tạo cơ sở dữ liệu thật, thêm dữ liệu mẫu và kiểm tra các ràng buộc.\\
+\hline
 Mô hình và dịch vụ AI & chưa chốt và chưa chạy & chọn dịch vụ phù hợp, thử với các trường hợp đại diện và ghi nhận chi phí, thời gian phản hồi.\\
+\hline
 Dữ liệu marketing & mới dừng ở mô hình dữ liệu & chuẩn bị dữ liệu mẫu có cấu trúc, đồng thời tách rõ dữ liệu minh họa với dữ liệu thực tế.\\
+\hline
 Hiệu năng và độ ổn định & chưa đo & kiểm tra thời gian phản hồi, lỗi kết nối, giới hạn gọi dịch vụ và khả năng khôi phục.\\
+\hline
 Bảo mật và triển khai & mới có phương án thiết kế & kiểm tra quyền truy cập, biến môi trường, sao lưu và cách cài đặt trên môi trường chạy.\\
+\hline
 Trải nghiệm người dùng & mới có wireframe & cho người dùng thử các tác vụ chính và ghi nhận những chỗ khó hiểu hoặc dễ thao tác nhầm.\\
-\bottomrule
+\hline
 \end{tabularx}
 \end{table}
 
@@ -50,18 +56,22 @@ Khi bắt đầu xây dựng, nhóm nên cập nhật báo cáo song song với 
 
 \begin{table}[h!]
 \centering
-\scriptsize
+\small
 \caption{Cách cập nhật một số nội dung sau khi có sản phẩm chạy thử}\label{tab:v8-update-protocol}
-\begin{tabularx}{\textwidth}{L{4.0cm}L{4.0cm}Y}
-\toprule
-\textbf{Nội dung trong thiết kế} & \textbf{Tài liệu cần bổ sung} & \textbf{Cách trình bày ở báo cáo cuối}\\
-\midrule
+\begin{tabularx}{\textwidth}{|L{4.0cm}|L{4.0cm}|Y|}
+\hline
+\thead{Nội dung trong thiết kế} & \thead{Tài liệu cần bổ sung} & \thead{Cách trình bày ở báo cáo cuối}\\
+\hline
 Các API và chức năng quản lý & mã nguồn, dữ liệu mẫu, kết quả gọi API và kiểm thử & nêu luồng thành công, trường hợp lỗi và cách hệ thống phản hồi.\\
+\hline
 Mô hình dữ liệu & lệnh tạo bảng, dữ liệu mẫu, kiểm tra khóa và truy vấn & đối chiếu sơ đồ với cơ sở dữ liệu thật, chỉ ra những điều chỉnh nếu có.\\
+\hline
 Chức năng AI & phiên bản prompt, bản ghi gọi dịch vụ và ảnh chụp luồng duyệt & ghi rõ dịch vụ, phiên bản, dữ liệu đầu vào, kết quả và trường hợp AI trả lời không hợp lệ.\\
+\hline
 Chất lượng gợi ý & bộ trường hợp thử, tiêu chí chấm và kết quả từng trường hợp & trình bày cả kết quả tốt lẫn kết quả chưa đạt, không chỉ chọn ví dụ đẹp.\\
+\hline
 Khả năng cài đặt lại & hướng dẫn chạy, phiên bản thư viện, tệp cấu hình mẫu và cách khôi phục & để người đọc có thể làm theo hoặc biết chính xác bước nào còn phụ thuộc môi trường.\\
-\bottomrule
+\hline
 \end{tabularx}
 \end{table}
 
