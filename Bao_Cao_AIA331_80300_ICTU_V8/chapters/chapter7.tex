@@ -108,7 +108,55 @@ T15 & Người khác dựng lại dự án từ repository sạch. & README, mig
 
 \clearpage
 
-\section{Cách đánh giá}
+\section{Đặc tả ca kiểm thử chi tiết theo chuẩn IEEE 829}\label{sec:v8-ieee829-testcases}
+
+Ma trận 14 ca kiểm thử chi tiết theo chuẩn quốc tế IEEE 829 tại Bảng~\ref{tab:v8-testcases-detail} hiện thực hóa kế hoạch kiểm thử tổng quát (Bảng~\ref{tab:v8-test-plan}), bao phủ toàn diện 8 chức năng quản lý cốt lõi (FR01--FR10) và 3 chức năng AI (FR11--FR13) qua ba nhóm kỹ thuật: Trường hợp Đúng (Positive/Normal), Trường hợp Sai (Negative/Abnormal) và Trường hợp Biên (Boundary/Edge Cases).
+
+\begin{table}[H]
+\centering
+\setstretch{1.0}
+\fontsize{8.8pt}{10.8pt}\selectfont
+\caption{Đặc tả chi tiết các ca kiểm thử hệ thống theo chuẩn IEEE 829}
+\label{tab:v8-testcases-detail}
+\renewcommand{\arraystretch}{1.02}
+\begin{tabularx}{\textwidth}{|C{1.6cm}|C{1.1cm}|L{2.0cm}|Y|Y|}
+\hline
+\thead{Mã TC} & \thead{Nhóm} & \thead{Chức năng} & \thead{Đầu vào \& Thao tác} & \thead{Kết quả kỳ vọng (Chuẩn IEEE 829)}\\
+\hline
+\texttt{TC\_POS\_01} & Đúng & Đăng nhập (FR01) & Email, mật khẩu chính xác của tài khoản Manager/Marketer. & HTTP 200 OK, trả JWT access token hợp lệ, lưu phiên an toàn, chuyển hướng Dashboard.\\
+\hline
+\texttt{TC\_POS\_02} & Đúng & Chiến dịch (FR04, FR05) & Tạo chiến dịch: ngày hợp lệ (\texttt{start < end}), budget > 0, gán nhân viên. & HTTP 201 Created, lưu CSDL thành công (PLANNING), liên kết nhân sự chính xác.\\
+\hline
+\texttt{TC\_POS\_03} & Đúng & AI Ideas (FR11) & Nhập brief hợp lệ (\texttt{\{\{campaign\_brief\}\}}), yêu cầu gợi ý 5 ý tưởng Facebook. & HTTP 200 OK, trả JSON đúng 5 ý tưởng tuân thủ 100\% Schema, lưu nháp \texttt{AI\_DRAFT}.\\
+\hline
+\texttt{TC\_POS\_04} & Đúng & Duyệt bài (FR07, FR08) & Quản lý (Manager) duyệt bài viết đang ở trạng thái IN\_REVIEW. & HTTP 200 OK, chuyển trạng thái APPROVED, ghi nhận nhật ký duyệt, mở khóa lịch đăng.\\
+\hline
+\texttt{TC\_POS\_05} & Đúng & Tính KPI (FR09, FR10) & Nhập tương tác hợp lệ: views = 1.000, clicks = 50, chi phí = 200.000đ. & CTR = 5.0\%, CPC = 4.000đ, công thức chuẩn xác, cập nhật số liệu lên Dashboard.\\
+\hline
+\texttt{TC\_NEG\_01} & Sai & Xác thực (FR01) & Người dùng nhập sai mật khẩu liên tiếp 5 lần cho một tài khoản. & HTTP 401 Unauthorized, kích hoạt khóa tạm thời 15 phút, không làm lộ hash mật khẩu.\\
+\hline
+\texttt{TC\_NEG\_02} & Sai & Chiến dịch (FR03, FR04) & Tạo chiến dịch có ngày kết thúc trước ngày bắt đầu (\texttt{end\_date < start\_date}). & HTTP 422 Unprocessable Entity, transaction bị hủy, báo lỗi rõ ràng trường ngày.\\
+\hline
+\texttt{TC\_NEG\_03} & Sai & Phân quyền (FR02) & Marketer gửi yêu cầu xóa chiến dịch (DELETE) hoặc tự duyệt bài. & HTTP 403 Forbidden, từ chối thao tác trái quyền, ghi nhật ký vào \texttt{audit\_logs}.\\
+\hline
+\texttt{TC\_NEG\_04} & Sai & AI Timeout (FR12) & AI Provider không phản hồi vượt quá thời hạn quy định (timeout 10s). & HTTP 504 Gateway Timeout, ngắt kết nối an toàn, giữ nguyên bản nháp cũ, báo lỗi UI.\\
+\hline
+\texttt{TC\_NEG\_05} & Sai & AI Schema (FR11, FR12) & AI trả về chuỗi JSON hỏng cú pháp hoặc thiếu các trường bắt buộc. & HTTP 422/502, bắt lỗi ValidationError, không ghi đè CSDL, lưu vết \texttt{ai\_logs}.\\
+\hline
+\texttt{TC\_BOU\_01} & Biên & Tên CD (FR04) & Tên chiến dịch đạt độ dài biên 255 ký tự (và thử nghiệm 256 ký tự). & 255 ký tự lưu HTTP 201 thành công; 256 ký tự bị từ chối với HTTP 422 (chống tràn).\\
+\hline
+\texttt{TC\_BOU\_02} & Biên & Ngân sách (FR04) & Đặt ngân sách chiến dịch bằng 0 đồng (\texttt{budget = 0}) cho truyền thông tự nhiên. & HTTP 201 Created hợp lệ (chiến dịch organic), không coi 0 là thiếu dữ liệu.\\
+\hline
+\texttt{TC\_BOU\_03} & Biên & Mẫu số 0 (FR09, FR10) & Tính chỉ số CTR khi chiến dịch chưa có lượt hiển thị nào (\texttt{views = 0}). & Hàm tính trả về CTR = 0.0\% an toàn, không phát sinh lỗi \texttt{ZeroDivisionError}.\\
+\hline
+\texttt{TC\_BOU\_04} & Biên & Token AI (FR11, FR13) & Ngữ cảnh brief và lịch sử tích lũy chạm ngưỡng trần 4.096 tokens. & Tự động tóm tắt cắt tỉa dữ liệu lịch sử, giữ context cốt lõi, gọi AI thành công an toàn.\\
+\hline
+\end{tabularx}
+\end{table}
+
+\clearpage
+
+\section{Cách đánh giá}\label{sec:v8-evaluation}
 
 Nhóm tiến hành đánh giá hệ thống trên ba khía cạnh độc lập, bám sát các tiêu chí nghiệm thu của học phần:
 \begin{enumerate}
@@ -117,7 +165,7 @@ Nhóm tiến hành đánh giá hệ thống trên ba khía cạnh độc lập, 
 \item \textbf{Tính độc lập và khả năng tái lập môi trường}: Người ngoài nhóm có thể làm theo tài liệu hướng dẫn (\texttt{README.md}), thực thi các câu lệnh di chuyển CSDL (\texttt{alembic upgrade head}) và nạp dữ liệu mẫu (\texttt{seed data}) trên một máy tính sạch trong thời gian dưới 10 phút mà không phát sinh xung đột thư viện.
 \end{enumerate}
 
-\section{Sơ đồ triển khai và kịch bản trình diễn}
+\section{Sơ đồ triển khai và kịch bản trình diễn}\label{sec:v8-deployment}
 
 Hình~\ref{fig:v8-deployment} mô tả kiến trúc phân bổ vật lý của các thành phần hệ thống tại môi trường thử nghiệm và vận hành dự kiến.
 
@@ -136,7 +184,7 @@ Kịch bản buổi báo cáo và trình diễn (demo) hệ thống được thi
 \item \textbf{Theo dõi chỉ số và xử lý sự cố}: Nhập số liệu tương tác mẫu theo ngày/kênh; kiểm tra biểu đồ KPI trên Dashboard; giả lập trường hợp AI timeout hoặc sai JSON để chứng minh hệ thống vẫn bảo toàn nguyên vẹn dữ liệu cũ.
 \end{enumerate}
 
-\section{Rủi ro cần theo dõi}
+\section{Rủi ro cần theo dõi}\label{sec:v8-risks}
 
 \begin{table}[h!]
 \centering
@@ -160,6 +208,7 @@ Thiếu thời gian kiểm thử & Cao & Kiểm thử ngay sau từng giai đo�
 \end{tabularx}
 \end{table}
 
-\section{Kết luận chương}
+\section{Kết luận chương 7}\label{sec:v8-conclusion-ch7}
 
-Kế hoạch xây dựng và kiểm thử trong chương này đóng vai trò cầu nối chuyển giao toàn bộ các đặc tả phân tích, kiến trúc và mô hình dữ liệu thành các đầu việc kỹ thuật có thể thực thi độc lập. Thay vì phát triển tự do, nhóm áp dụng chiến lược phân tách ba lớp nghiêm ngặt: hoàn thiện phần quản lý dữ liệu nền tảng trước, kiểm thử lớp tích hợp AI sau, và luôn duy trì cơ chế dự phòng khi dịch vụ ngoài gặp sự cố. Toàn bộ 15 nhóm ca kiểm thử và 4 kịch bản trình diễn được thiết kế để kiểm chứng độ tin cậy của hệ thống ngay từ phiên bản prototype đầu tiên, đảm bảo dự án sẵn sàng bước vào giai đoạn cài đặt mã nguồn với độ rủi ro thấp nhất.
+Kế hoạch xây dựng và kiểm thử trong chương này đóng vai trò cầu nối chuyển giao toàn bộ các đặc tả phân tích, kiến trúc và mô hình dữ liệu thành các đầu việc kỹ thuật có thể thực thi độc lập. Thay vì phát triển tự do, nhóm áp dụng chiến lược phân tách ba lớp nghiêm ngặt: hoàn thiện phần quản lý dữ liệu nền tảng trước, kiểm thử lớp tích hợp AI sau, và luôn duy trì cơ chế dự phòng khi dịch vụ ngoài gặp sự cố. Toàn bộ 15 nhóm kiểm thử tổng quát, bộ 14 ca kiểm thử chi tiết theo chuẩn IEEE 829 (Đúng -- Sai -- Biên) và 4 kịch bản trình diễn được thiết kế để kiểm chứng độ tin cậy của hệ thống ngay từ phiên bản prototype đầu tiên, đảm bảo dự án sẵn sàng bước vào giai đoạn cài đặt mã nguồn với độ rủi ro thấp nhất.
+

@@ -1,0 +1,44 @@
+{
+  "idea_generation": {
+    "v1": {
+      "system": "Bạn là chuyên viên marketing. Hãy trả lời hoàn toàn bằng Tiếng Việt.",
+      "user": "Hãy cho tôi ý tưởng marketing bằng Tiếng Việt cho chiến dịch {{campaign_name}} với mục tiêu {{objective}}."
+    },
+    "v2": {
+      "system": "Bạn là trợ lý marketing. Tạo nội dung nháp bằng Tiếng Việt để con người duyệt, không đưa cam kết sai sự thật.",
+      "user": "Chiến dịch: {{campaign_brief}}. Hãy đề xuất 5 ý tưởng nội dung bằng Tiếng Việt cho kênh Facebook, giọng văn trẻ trung theo định dạng JSON: id, angle, headline, concept, target_emotion."
+    },
+    "v3": {
+      "system": "Bạn là trợ lý marketing chuyên sâu trong hệ thống quản lý chiến dịch. Tạo nội dung nháp có cấu trúc bằng TIẾNG VIỆT để con người duyệt. Tuyệt đối không tự ý đưa ra cam kết sai sự thật hoặc thông tin khuyến mại không có trong dữ liệu đầu vào. Bắt buộc toàn bộ tiêu đề, nội dung và phản hồi phải bằng 100% TIẾNG VIỆT tự nhiên. Trả về định dạng JSON hợp lệ duy nhất.",
+      "user": "Chiến dịch: {{campaign_name}}\nMục tiêu: {{objective}}\nĐối tượng: {{audience}}\nSản phẩm: {{product_name}}\nĐặc tính nổi bật (USP): {{product_usp}}\nKênh triển khai: {{channel_name}}\nGiọng văn yêu cầu: {{tone}}\n\nYêu cầu nghiệp vụ:\n1. BẮT BUỘC TOÀN BỘ NỘI DUNG LÀ 100% TIẾNG VIỆT.\n2. Đề xuất chính xác 5 ý tưởng nội dung độc đáo, đúng ngữ cảnh sản phẩm.\n3. Nếu thiếu dữ liệu để khẳng định, hãy bổ sung vào mảng assumptions.\n4. Nếu có rủi ro về ngữ cảnh, hãy đưa vào mảng warnings.\n\nTrả về đúng cấu trúc JSON:\n{\n  \"ideas\": [\n    {\n      \"id\": 1,\n      \"angle\": \"Góc nhìn tiếp cận\",\n      \"headline\": \"Tiêu đề ý tưởng\",\n      \"concept\": \"Nội dung ý tưởng ngắn gọn\",\n      \"target_emotion\": \"Cảm xúc mục tiêu\"\n    }\n  ],\n  \"warnings\": [],\n  \"assumptions\": []\n}"
+    }
+  },
+  "content_draft": {
+    "v1": {
+      "system": "Bạn là người viết content bằng Tiếng Việt.",
+      "user": "Viết bài Facebook bằng Tiếng Việt dựa trên ý tưởng: {{selected_idea}}."
+    },
+    "v2": {
+      "system": "Bạn là chuyên viên viết nội dung quảng cáo bằng Tiếng Việt. Viết bài nháp cho kênh truyền thông.",
+      "user": "Sản phẩm: {{product_name}}\nUSP: {{product_usp}}\nKênh: {{channel_name}}\nÝ tưởng: {{selected_idea}}\nHãy viết bài nháp bằng Tiếng Việt gồm title, body và cta dạng JSON."
+    },
+    "v3": {
+      "system": "Bạn là trợ lý copywriting marketing chuyên nghiệp. Tạo nội dung nháp tuân thủ quy chuẩn kênh truyền thông và hỗ trợ người dùng biên tập. Bắt buộc 100% TIẾNG VIỆT. Không tự ý bịa đặt số liệu hay cam kết vượt quá USP. Trả về JSON duy nhất.",
+      "user": "Chiến dịch: {{campaign_name}}\nSản phẩm: {{product_name}}\nUSP: {{product_usp}}\nKênh: {{channel_name}}\nQuy chuẩn định dạng kênh: {{channel_rules}}\nÝ tưởng đã chọn: {{selected_idea}}\n\nYêu cầu:\n1. BẮT BUỘC 100% TIẾNG VIỆT thuần thục, hấp dẫn.\n2. Title: Giật tít cuốn hút, phù hợp kênh.\n3. Body: Đoạn văn triển khai súc tích, ngắt đoạn rõ ràng, kèm hashtag phù hợp.\n4. CTA: Lời kêu gọi hành động sắc bén.\n5. Trả về đúng JSON:\n{\n  \"title\": \"...\",\n  \"body\": \"...\",\n  \"cta\": \"...\",\n  \"warnings\": [],\n  \"assumptions\": []\n}"
+    }
+  },
+  "performance_summary": {
+    "v1": {
+      "system": "Bạn là chuyên viên phân tích dữ liệu bằng Tiếng Việt.",
+      "user": "Tóm tắt hiệu quả chiến dịch bằng Tiếng Việt với các số liệu sau: {{metrics_summary}}."
+    },
+    "v2": {
+      "system": "Bạn là chuyên gia phân tích hiệu quả chiến dịch marketing bằng Tiếng Việt.",
+      "user": "Chiến dịch: {{campaign_name}}\nChỉ số: {{metrics_summary}}\nĐánh giá ưu nhược điểm và đề xuất cải thiện bằng Tiếng Việt dạng JSON."
+    },
+    "v3": {
+      "system": "Bạn là chuyên gia cố vấn chiến lược marketing (Marketing Analytics Advisor). Phân tích hiệu quả bằng TIẾNG VIỆT dựa trên dữ liệu thực tế từ hệ thống. Không suy đoán quan hệ nhân quả khi thiếu số liệu. Cảnh báo rõ ràng nếu dữ liệu chưa đủ.",
+      "user": "Chiến dịch: {{campaign_name}}\nMục tiêu: {{objective}}\nNgân sách: {{budget}} VNĐ\nTổng hợp chỉ số ghi nhận:\n- Tổng lượt xem: {{total_views}}\n- Tổng lượt click: {{total_clicks}} (CTR: {{ctr}}%)\n- Tổng chuyển đổi: {{total_conversions}} (CVR: {{cvr}}%)\n- Chi phí thực tế: {{total_cost}} VNĐ (CPC trung bình: {{cpc}} VNĐ)\n- Doanh thu ghi nhận: {{total_revenue}} VNĐ (ROI: {{roi}}%)\n\nHãy phân tích bằng 100% TIẾNG VIỆT và trả về cấu trúc JSON:\n{\n  \"executive_summary\": \"Tóm tắt đánh giá ngắn gọn\",\n  \"strengths\": [\"Điểm mạnh 1\", \"...\"],\n  \"weaknesses\": [\"Điểm yếu 1\", \"...\"],\n  \"recommendations\": [\"Khuyến nghị tối ưu 1\", \"...\"],\n  \"warnings\": []\n}"
+    }
+  }
+}

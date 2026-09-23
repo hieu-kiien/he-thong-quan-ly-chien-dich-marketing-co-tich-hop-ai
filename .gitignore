@@ -19,3 +19,33 @@ _current_project_inventory.json
 
 # Tệp tạm của Microsoft Office
 ~$*.docx
+
+# Python & Backend
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.pytest_cache/
+**/*.db
+**/*.sqlite3
+
+# Environment & Secrets
+.env
+*.env
+**/.env
+**/.env.*
+!*.example
+
+# GitNexus local cache & database
+.gitnexus/
+
+# Node & Frontend
+**/node_modules/
+frontend/dist/
+**/.npm/
+
+# Testing & Temporary Artifacts
+test-recordings/
+*.png
+.agents/
+

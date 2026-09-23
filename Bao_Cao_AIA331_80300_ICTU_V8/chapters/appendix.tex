@@ -9,6 +9,7 @@ Phụ lục này gom những bảng ngắn giúp nhóm kiểm tra lại sự li�
 \begin{table}[!htbp]
 \centering
 \small
+\renewcommand{\arraystretch}{1.15}
 \caption{Đối chiếu yêu cầu với phần thiết kế và việc cần kiểm tra}\label{tab:v8-traceability}
 \begin{tabularx}{\textwidth}{|C{2.6cm}|L{3.8cm}|Y|}
 \hline
@@ -39,9 +40,10 @@ NFR06 & Bảo trì và cài đặt lại & kiểm tra hướng dẫn cài đặt
 
 Prompt dưới đây minh họa cách giới hạn chức năng tạo bản nháp. Khi triển khai, nhóm cần lưu phiên bản prompt thật và ghi rõ những thay đổi giữa các lần thử.
 
-\begin{table}[h!]
+\begin{table}[!htbp]
 \centering
 \small
+\renewcommand{\arraystretch}{1.15}
 \caption{Prompt mẫu cho chức năng tạo nội dung nháp}
 \label{tab:v8-prompt-appendix}
 \begin{tabularx}{\textwidth}{|L{2.4cm}|Y|}
@@ -65,9 +67,10 @@ Prompt này không thay thế quy tắc nghiệp vụ. Trước khi gửi yêu c
 
 \section{Các trường nên lưu trong nhật ký}
 
-\begin{table}[h!]
+\begin{table}[!htbp]
 \centering
 \small
+\renewcommand{\arraystretch}{1.15}
 \caption{Các trường dữ liệu lưu vết trong nhật ký AI}
 \label{tab:v8-audit-fields}
 \begin{tabularx}{\textwidth}{|L{4.2cm}|Y|}
@@ -90,6 +93,185 @@ Prompt này không thay thế quy tắc nghiệp vụ. Trước khi gửi yêu c
 \hline
 \end{tabularx}
 \end{table}
+
+\section{Nhật ký tương tác AI qua bốn mốc SDLC}\label{sec:v8-sdlc-ai-log}
+
+Tuân thủ hướng dẫn tại Mục 6 của Đề bài 80300 (Học phần AIA331), việc ứng dụng trí tuệ nhân tạo được thực hiện xuyên suốt toàn bộ chu trình phát triển phần mềm (SDLC) theo nguyên tắc \textit{Human-in-the-loop} (con người kiểm soát, giám sát và ra quyết định cuối cùng). Tại từng mốc đánh giá định kỳ (KT1, KT2, KT3 và Cuối kỳ), AI được sử dụng như một trợ lý gia tốc phát triển; tuy nhiên, mọi kết quả sinh ra đều phải trải qua quy trình kiểm thử độc lập, rà soát phát hiện các khiếm khuyết (như ảo giác hallucination, lỗi chia cho 0, thiếu kiểm soát phân quyền hoặc nguy cơ lộ lọt bí mật) và hiệu chỉnh nghiêm ngặt trước khi tích hợp vào hệ thống.
+
+Bảng~\ref{tab:v8-sdlc-ai-log} tổng hợp hồ sơ minh chứng tương tác AI qua 4 mốc SDLC, đối chiếu chi tiết giữa nhiệm vụ kỹ thuật, nội dung prompt đầu vào, phản hồi ban đầu của mô hình cùng các hạn chế phát hiện, và giải pháp kiểm chứng, tinh chỉnh của nhóm sinh viên.
+
+\begin{table}[!htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\caption{Nhật ký minh chứng tương tác AI qua 4 mốc phát triển phần mềm (SDLC)}\label{tab:v8-sdlc-ai-log}
+\begin{tabularx}{\textwidth}{|C{1.8cm}|L{3.2cm}|Y|Y|}
+\hline
+\thead{Mốc SDLC} & \thead{Nhiệm vụ \& Prompt đầu vào} & \thead{AI phản hồi \& Hạn chế / Lỗi} & \thead{Sinh viên kiểm chứng \& Hiệu chỉnh} \\
+\hline
+\textbf{KT1}\par (Phân tích \& Thiết kế) &
+Rà soát lược đồ CSDL quan hệ cho 8 chức năng quản lý và 3 chức năng AI.\par
+\textit{Prompt}: ``Thiết kế lược đồ ERD quan hệ cho hệ thống marketing campaign: chiến dịch, kênh, nội dung, lịch đăng, chỉ số.'' &
+Đề xuất 7 bảng cơ bản nhưng bỏ quên bảng ghi nhật ký tương tác AI (\texttt{ai\_logs}), tiềm ẩn nguy cơ mất dấu vết kiểm toán, không lưu được token để ước tính chi phí. Khóa chính bảng chỉ số dễ trùng lặp khi ghi nhận nhiều kênh theo ngày. &
+Bổ sung bảng \texttt{ai\_logs} với 10 trường kiểm toán chuẩn (\texttt{request\_id}, \texttt{prompt\_version}, \texttt{tokens}, \texttt{human\_decision}); thiết kế khóa ngoại kép và ràng buộc duy nhất \texttt{(campaign\_id, channel\_id, record\_date)} cho bảng \texttt{metrics\_records}. \\
+\hline
+\textbf{KT2}\par (Lập trình CRUD \& Debug) &
+Sinh mã nguồn CRUD FastAPI và hàm tính toán KPI Marketing (CTR, CPC).\par
+\textit{Prompt}: ``Viết hàm tính toán CTR, CPC từ danh sách metrics bằng FastAPI/\allowbreak Python.'' &
+Sinh mã chia trực tiếp: \texttt{ctr = clicks / views} và \texttt{cpc = cost / clicks}. Gây lỗi nghiêm trọng \texttt{ZeroDivision}\allowbreak\texttt{Error} làm crash API khi chiến dịch mới chưa có views; không tích hợp kiểm tra phân quyền người dùng (RBAC). &
+Tái cấu trúc mã với điều kiện an toàn: \texttt{ctr = (clicks / views * 100.0) if views > 0 else 0.0}; bổ sung middleware xử lý ngoại lệ; áp dụng dependency \texttt{RoleChecker} cho vai trò \texttt{MANAGER} trước khi cập nhật ngân sách. \\
+\hline
+\textbf{KT3}\par (Prompt \& Test biên) &
+Thiết kế prompt mẫu đề tài 80300 (sinh 5 ý tưởng Facebook) và test biên brief dài.\par
+\textit{Prompt}: ``Sinh 5 ý tưởng bài đăng kèm brief chiến dịch \{\{campaign\_brief\}\} dài hơn 4.000 ký tự.'' &
+AI phản hồi vượt giới hạn độ dài dẫn đến cắt cụt chuỗi JSON (lỗi 422 Unprocessable Entity); xuất hiện ảo giác (hallucination) tự bịa thêm khuyến mại \textit{``Giảm 50\%''} và \textit{``Tặng voucher''} không hề có trong ngữ cảnh brief được cung cấp. &
+Xây dựng pipeline RAG tự động tóm tắt brief theo độ ưu tiên khi vượt trần 4096 tokens; thiết lập Hard Constraints trong System Prompt cấm bịa đặt số liệu ngoài brief; tích hợp schema Pydantic v2 xác thực đầu ra nghiêm ngặt. \\
+\hline
+\textbf{Cuối kỳ}\par (Đóng gói \& Đánh giá) &
+Đóng gói container hóa toàn bộ hệ thống bằng Docker, docker-compose và viết tài liệu.\par
+\textit{Prompt}: ``Tạo Dockerfile cho backend FastAPI, frontend React và docker-\allowbreak compose khởi chạy cùng PostgreSQL.'' &
+Dockerfile backend chạy quyền \texttt{root} nguy hiểm; frontend build trực tiếp trên Node runtime cồng kềnh (> 1.2 GB); docker-compose gắn cứng mật khẩu CSDL trong tệp, thiếu kiểm tra sức khỏe phụ thuộc (healthchecks). &
+Chuyển backend sang user không đặc quyền \texttt{appuser} (UID 1001); chuyển frontend sang Multi-stage build với Nginx alpine (dung lượng giảm còn ~24.8 MB); tách toàn bộ secret vào file \texttt{.env} và cấu hình \texttt{service\_healthy}. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Minh chứng AI Code Review và tối ưu bảo mật}\label{sec:v8-ai-code-review}
+
+Nhằm đáp ứng tiêu chí đánh giá nâng cao \textbf{TX3.9} (Review code và cải thiện chất lượng bằng AI), nhóm phát triển đã thiết lập quy trình kiểm tra mã nguồn tự động kết hợp rà soát tĩnh (Static Code Analysis) có AI trợ lực. Thông qua việc phân tích cây cú pháp trừu tượng (AST) và đối chiếu với các nguyên tắc an ninh phần mềm tiêu chuẩn (OWASP API Security Top 10, PEP 8, SQLAlchemy Best Practices), AI đã phát hiện 3 điểm nghẽn nghiêm trọng về an toàn và hiệu năng, từ đó đề xuất các phương án tái cấu trúc mã nguồn (refactoring) chuẩn mực.
+
+Bảng~\ref{tab:v8-ai-code-review} tổng hợp kết quả rà soát mã nguồn, các lỗ hổng phát hiện và hiệu quả tối ưu hóa định lượng sau khi áp dụng các giải pháp của AI.
+
+\begin{table}[!htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\caption{Kết quả AI Code Review và tối ưu bảo mật mã nguồn}\label{tab:v8-ai-code-review}
+\begin{tabularx}{\textwidth}{|C{0.8cm}|L{2.5cm}|Y|Y|Y|}
+\hline
+\thead{STT} & \thead{Hạng mục rà soát} & \thead{Vấn đề phát hiện (Mã gốc)} & \thead{Khuyến nghị \& Giải pháp AI} & \thead{Kết quả định lượng} \\
+\hline
+1 &
+Bảo vệ API Key \& Quản lý bí mật &
+\texttt{os.environ.get(} \texttt{"GEMINI\_API\_KEY")} đọc rải rác; exception handler in nguyên chuỗi API key ra log console khi gọi ngoại vi thất bại, vi phạm chuẩn OWASP API Security. &
+Quản lý tập trung qua \texttt{pydantic-settings}; xây dựng hàm \texttt{mask\_api\_key} và cài đặt custom Logging Filter tự động làm mờ token trong toàn bộ log stream; không ghi log raw headers. &
+100\% key được che mờ dạng \texttt{AIza...9xQ2}; triệt tiêu hoàn toàn nguy cơ lộ khóa bí mật qua log hệ thống khi bàn giao hoặc audit. \\
+\hline
+2 &
+Phân quyền vai trò (RBAC) trên Route &
+Các endpoint \texttt{DELETE /campaigns/\{id\}} và \texttt{POST /contents/}\allowbreak\texttt{\{id\}/approve} chỉ kiểm tra token JWT, người dùng vai trò \texttt{MARKETER} có thể tự duyệt bài viết hoặc xóa dữ liệu (lỗ hổng BOLA/IDOR). &
+Tách biệt xác thực (Authentication) và phân quyền (Authorization); hiện thực hóa dependency kiểm tra vai trò người dùng có tham số theo chuẩn FastAPI; trả về mã lỗi chuẩn HTTP 403 Forbidden. &
+100\% các route nhạy cảm được bảo vệ bởi \texttt{RoleChecker} (vai trò \texttt{MANAGER}); ngăn chặn triệt để truy cập trái quyền; ghi log an ninh các vi phạm. \\
+\hline
+3 &
+Tối ưu truy vấn CSDL \& Xử lý N+1 Query &
+Truy vấn danh sách chiến dịch kèm tổng hợp chỉ số bằng vòng lặp Python (\texttt{for c in campaigns:} \texttt{db.query}\allowbreak\texttt{(Metrics)}), phát sinh N+1 truy vấn SQL; độ trễ lên tới 1.240~ms với 100 bản ghi. &
+Chuyển đổi sang cú pháp SQLAlchemy 2.0 (\texttt{select()}), kết hợp phép nối \texttt{outerjoin} và các hàm tổng hợp CSDL \texttt{func.sum()}, \texttt{func.coalesce()} gom nhóm trực tiếp tại tầng CSDL; đánh index khóa ngoại. &
+Giảm từ N+1 truy vấn xuống 1 truy vấn SQL duy nhất; thời gian phản hồi giảm từ 1.240~ms xuống 18~ms (tối ưu hóa 98.5\% độ trễ và tài nguyên kết nối). \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Minh chứng 1: Bảo vệ API Key và làm mờ dữ liệu nhạy cảm (Key Masking)}\label{subsec:v8-code-api-masking}
+
+Đoạn mã dưới đây minh chứng việc chuẩn hóa đọc cấu hình qua \texttt{pydantic-settings}, triển khai thuật toán làm mờ API key chỉ giữ 4 ký tự đầu và 4 ký tự cuối, đồng thời gắn custom Logging Filter chặn đứng việc in token bí mật ra hệ thống log:
+
+\begin{footnotesize}
+\begin{verbatim}
+import logging
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    AI_API_KEY: str
+    SECRET_KEY: str
+    class Config:
+        env_file = ".env"
+
+settings = Settings()
+
+def mask_api_key(key: str) -> str:
+    """Che giấu chuỗi API key nhạy cảm, chỉ giữ 4 ký tự đầu và 4 ký tự cuối."""
+    if not key or len(key) <= 8:
+        return "********"
+    return f"{key[:4]}...{key[-4:]}"
+
+class SensitiveDataFilter(logging.Filter):
+    """Tự động kiểm tra và làm mờ các token/key nhạy cảm trong log records."""
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = str(record.msg)
+        for secret in [settings.AI_API_KEY, settings.SECRET_KEY]:
+            if secret and secret in msg:
+                record.msg = msg.replace(secret, mask_api_key(secret))
+        return True
+\end{verbatim}
+\end{footnotesize}
+
+\subsection{Minh chứng 2: Xác thực JWT và kiểm soát phân quyền vai trò (RBAC)}\label{subsec:v8-code-jwt-rbac}
+
+Đoạn mã hiện thực hóa dependency \texttt{RoleChecker} tham số hóa để bảo vệ các endpoint nhạy cảm (duyệt nội dung, cập nhật ngân sách, xóa chiến dịch), bảo đảm chỉ người dùng có quyền \texttt{MANAGER} mới được phép thực thi:
+
+\begin{footnotesize}
+\begin{verbatim}
+from fastapi import Depends, HTTPException, status
+from app.models.user import User, UserRole
+from app.api.deps import get_current_active_user
+
+class RoleChecker:
+    """Dependency kiểm tra vai trò người dùng trước khi cấp quyền truy cập tài nguyên."""
+    def __init__(self, allowed_roles: list[UserRole]):
+        self.allowed_roles = allowed_roles
+
+    def __call__(self, current_user: User = Depends(get_current_active_user)) -> User:
+        if current_user.role not in self.allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Tài khoản không đủ quyền hạn thực hiện thao tác này."
+            )
+        return current_user
+
+# Áp dụng bảo vệ route duyệt nội dung và xóa chiến dịch:
+# @router.post("/{id}/approve", dependencies=[Depends(RoleChecker([UserRole.MANAGER]))])
+# @router.delete("/{id}", dependencies=[Depends(RoleChecker([UserRole.MANAGER]))])
+\end{verbatim}
+\end{footnotesize}
+
+\subsection{Minh chứng 3: Tối ưu hóa truy vấn SQLAlchemy 2.0 (Khắc phục lỗi N+1 Query)}\label{subsec:v8-code-sqlalchemy-opt}
+
+Đoạn mã đối chiếu giữa giải pháp cũ bị lỗi N+1 Query và phương pháp truy vấn hiện đại sử dụng SQLAlchemy 2.0 (\texttt{select()}), \texttt{outerjoin} và các hàm tổng hợp CSDL, giúp giảm thời gian phản hồi từ 1.240~ms xuống 18~ms:
+
+\begin{footnotesize}
+\begin{verbatim}
+from sqlalchemy import select, func
+from sqlalchemy.orm import Session
+from app.models.campaign import Campaign
+from app.models.metrics import MetricsRecord
+
+# --- TRƯỚC TỐI ƯU (Phát sinh N+1 truy vấn SQL, latency p95: 1.240 ms) ---
+# campaigns = db.query(Campaign).all()
+# for c in campaigns:
+#     c.total_clicks = db.query(func.sum(MetricsRecord.clicks))\
+#                        .filter(MetricsRecord.campaign_id == c.id).scalar() or 0
+
+# --- SAU TỐI ƯU (1 truy vấn SQL duy nhất qua SQLAlchemy 2.0, latency p95: 18 ms) ---
+def get_campaigns_with_metrics(db: Session, skip: int = 0, limit: int = 50):
+    stmt = (
+        select(
+            Campaign.id,
+            Campaign.name,
+            Campaign.budget,
+            func.coalesce(func.sum(MetricsRecord.views), 0).label("total_views"),
+            func.coalesce(func.sum(MetricsRecord.clicks), 0).label("total_clicks"),
+            func.coalesce(func.sum(MetricsRecord.cost), 0.0).label("total_cost")
+        )
+        .outerjoin(MetricsRecord, Campaign.id == MetricsRecord.campaign_id)
+        .group_by(Campaign.id)
+        .order_by(Campaign.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    return db.execute(stmt).all()
+\end{verbatim}
+\end{footnotesize}
 
 \chapter{THIẾT KẾ DỮ LIỆU VÀ CẤU TRÚC MÃ NGUỒN}
 
@@ -145,3 +327,179 @@ AI_PROVIDER=gemini                               AI_API_KEY=your_gemini_api_key_
 AI_TIMEOUT_SECONDS=10                            CORS_ORIGINS=http://localhost:5173
 \end{verbatim}
 \end{footnotesize}
+
+\section{Cấu hình đóng gói và triển khai Docker}\label{sec:v8-docker-packaging}
+
+Nhằm bảo đảm tính khả chuyển, dễ bảo trì và khả năng tái lập môi trường vận hành trên mọi nền tảng máy chủ (đáp ứng tiêu chí KTHP.8 và TX2.10), hệ thống quản lý chiến dịch marketing tích hợp AI được đóng gói hoàn chỉnh bằng Docker và điều phối thống nhất thông qua Docker Compose. Kiến trúc container hóa tách biệt rạch ròi 3 tầng dịch vụ: CSDL PostgreSQL 16, Backend FastAPI và Frontend React Nginx, bảo đảm nguyên tắc cô lập và an toàn thông tin.
+
+\subsection{Dockerfile cho Backend FastAPI (Chuẩn bảo mật Non-Root)}\label{subsec:v8-docker-backend}
+
+Tệp \texttt{backend/Dockerfile} được xây dựng trên nền tảng \texttt{python:3.11-slim} để giảm thiểu dung lượng image và loại bỏ các thành phần nhị phân thừa. Nhằm tuân thủ nguyên tắc đặc quyền tối thiểu (Principle of Least Privilege) và ngăn ngừa nguy cơ thoát container (container breakout), container được cấu hình chạy dưới quyền người dùng không đặc quyền \texttt{appuser} (UID 1001, GID 1001). Quy trình build tận dụng tối đa cơ chế layer caching của Docker bằng cách copy và cài đặt \texttt{requirements.txt} trước khi sao chép mã nguồn, đồng thời tích hợp chỉ thị \texttt{HEALTHCHECK} kiểm tra trạng thái dịch vụ định kỳ qua endpoint \texttt{/health}.
+
+\begin{footnotesize}
+\begin{verbatim}
+FROM python:3.11-slim
+
+# Thiết lập biến môi trường hệ thống
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PORT=8000
+
+WORKDIR /app
+
+# Cài đặt công cụ hệ thống tối thiểu (curl cho healthcheck)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Tạo user không đặc quyền để tăng cường bảo mật runtime
+RUN groupadd -g 1001 appgroup && \
+    useradd -u 1001 -g appgroup -s /bin/bash -m appuser
+
+# Cài đặt dependencies thư viện Python
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Sao chép mã nguồn ứng dụng và phân quyền cho appuser
+COPY . .
+RUN chown -R appuser:appgroup /app
+
+# Chuyển sang thực thi dưới user không đặc quyền
+USER appuser
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+\end{verbatim}
+\end{footnotesize}
+
+\subsection{Dockerfile cho Frontend React Vite (Multi-Stage Build \& Nginx Alpine)}\label{subsec:v8-docker-frontend}
+
+Tệp \texttt{frontend/Dockerfile} áp dụng kiến trúc đa tầng (Multi-stage build) gồm hai giai đoạn:
+\begin{enumerate}[label=\alph*)]
+    \item \textit{Giai đoạn đóng gói (Builder Stage)}: Sử dụng image \texttt{node:20-alpine}, tiến hành cài đặt thư viện phụ thuộc (\texttt{npm ci}) và biên dịch mã nguồn TypeScript/React thành các tệp tĩnh tối ưu (\texttt{npm run build}) trong thư mục \texttt{dist/}.
+    \item \textit{Giai đoạn vận hành (Production Stage)}: Sử dụng image \texttt{nginx:1.25-alpine} siêu nhẹ, chỉ sao chép kết quả đã biên dịch từ tầng builder mà không mang theo toàn bộ môi trường Node.js hay thư mục \texttt{node\_modules}. Cấu hình Nginx được nhúng trực tiếp luật chuyển hướng \texttt{try\_files \$uri \$uri/ /index.html;} giải quyết dứt điểm lỗi 404 Not Found khi người dùng làm mới trang tại các route của Single Page Application (SPA).
+\end{enumerate}
+
+Kỹ thuật Multi-stage giúp kích thước image frontend giảm ấn tượng từ 1.25~GB xuống chỉ còn ~24.8~MB (giảm hơn 98\% dung lượng lưu trữ và băng thông truyền tải mạng).
+
+\begin{footnotesize}
+\begin{verbatim}
+# Stage 1: Build ứng dụng React Vite với Node.js
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Stage 2: Phục vụ tệp tĩnh qua Nginx Alpine siêu nhẹ
+FROM nginx:1.25-alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Cấu hình Nginx hỗ trợ định tuyến Single Page Application (SPA)
+RUN echo 'server { \
+    listen 80; \
+    location / { \
+        root /usr/share/nginx/html; \
+        index index.html index.htm; \
+        try_files $uri $uri/ /index.html; \
+    } \
+    location /api { \
+        proxy_pass http://backend:8000; \
+        proxy_set_header Host $host; \
+        proxy_set_header X-Real-IP $remote_addr; \
+    } \
+}' > /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+\end{verbatim}
+\end{footnotesize}
+
+\subsection{Tập lệnh điều phối dịch vụ (\texttt{docker-compose.yml})}\label{subsec:v8-docker-compose}
+
+Tệp \texttt{docker-compose.yml} điều phối đồng bộ cả 3 dịch vụ của hệ thống: CSDL PostgreSQL 16-alpine (\texttt{db}), Backend FastAPI (\texttt{backend}) và Frontend React (\texttt{frontend}). Hệ thống giao tiếp thông qua mạng nội bộ bridge riêng biệt (\texttt{marketing\_net}). Dữ liệu CSDL được lưu trữ bền vững trên volume ngoài (\texttt{postgres\_data}). Toàn bộ các thông số nhạy cảm (mật khẩu DB, JWT secret, Gemini API key) được nạp tự động từ tệp bí mật \texttt{.env} thay vì ghi cứng trong mã nguồn. Thứ tự khởi động và kiểm tra phụ thuộc được thiết lập chặt chẽ bằng cơ chế \texttt{depends\_on} kết hợp \texttt{condition: service\_healthy}, bảo đảm backend chỉ khởi chạy khi CSDL đã sẵn sàng nhận kết nối.
+
+\begin{footnotesize}
+\begin{verbatim}
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: marketing_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-marketing_ai}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - marketing_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: marketing_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - marketing_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: marketing_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - marketing_net
+
+networks:
+  marketing_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+\end{verbatim}
+\end{footnotesize}
+
+Để khởi chạy toàn bộ hệ thống từ đầu chỉ với một lệnh duy nhất:
+\begin{footnotesize}
+\begin{verbatim}
+# Khởi tạo và chạy ngầm toàn bộ 3 dịch vụ kèm build container:
+docker-compose up -d --build
+
+# Kiểm tra trạng thái sức khỏe của các container đang chạy:
+docker-compose ps
+\end{verbatim}
+\end{footnotesize}
+

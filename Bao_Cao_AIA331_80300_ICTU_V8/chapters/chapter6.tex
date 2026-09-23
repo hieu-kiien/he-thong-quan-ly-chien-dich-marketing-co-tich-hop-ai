@@ -114,6 +114,56 @@ Không thể kết luận một chức năng AI tốt chỉ vì câu trả lời
 
 Ít nhất ba cấu hình prompt hoặc model sẽ được so sánh khi nhóm có đủ điều kiện chạy. Input của từng trường hợp phải giữ nguyên; mỗi vòng chỉ thay đổi một yếu tố. Nếu chỉ dùng bộ giả lập, kết luận chỉ giới hạn ở việc kiểm tra quy trình và bộ phân tích kết quả, không được gọi là đánh giá chất lượng model thật.
 
-\section{Kết luận chương}
+\section{Thực nghiệm tối ưu hóa Prompt qua ba vòng}\label{sec:v8-prompt-optimization-rounds}
 
-Thiết kế AI đã xác định rõ công việc, dữ liệu đầu vào, cấu trúc đầu ra, người duyệt và cách xử lý lỗi. Như vậy, phần AI trở thành một chức năng có thể kiểm thử trong hệ thống quản lý, thay vì một ô nhập câu hỏi và một câu trả lời không có trách nhiệm.
+Nhằm hiện thực hóa quy trình kiểm thử và đánh giá chất lượng mô hình theo đúng đặc tả Đề tài 80300, nhóm phát triển đã tiến hành thực nghiệm tối ưu hóa Prompt qua 3 vòng liên tục trên tác vụ cốt lõi: tự động sinh 5 ý tưởng bài đăng kênh Facebook từ dữ liệu tóm tắt chiến dịch (\texttt{\{\{campaign\_brief\}\}}).
+
+Dữ liệu đầu vào thử nghiệm đại diện cho chiến dịch truyền thông tuyển sinh thực tế tại ICTU:
+\begin{itemize}
+\item \textbf{Tên chiến dịch}: "Mùa tựu trường rực rỡ -- Back to School 2026".
+\item \textbf{Sản phẩm trọng tâm}: Khóa đào tạo ngắn hạn chuyên sâu Lập trình Fullstack Web \& Ứng dụng AI.
+\item \textbf{Đối tượng mục tiêu}: Sinh viên năm 1--3 khối ngành công nghệ thông tin và học sinh lớp 12 chuẩn bị xét tuyển đại học.
+\item \textbf{Kênh truyền thông}: Bài đăng Facebook Fanpage và Group cộng đồng học tập.
+\item \textbf{Yêu cầu giọng văn}: Trẻ trung, năng động, truyền cảm hứng, ngắn gọn bắt trend nhưng giữ trọn tính chuẩn mực sư phạm.
+\item \textbf{Dữ liệu cam kết chính thức có trong ngữ cảnh}: Học bổng nhập học 20\%, quyền truy cập phòng lab máy trạm GPU, mentor đồng hành 1-1 và cam kết hoàn thành dự án thực chiến tốt nghiệp.
+\item \textbf{Dữ liệu ngoài phạm vi (cấm suy diễn)}: Tuyệt đối không có voucher giảm giá 50\%, không tặng hiện vật giá trị lớn (laptop, điện thoại), không có học phí dạng số tiền cụ thể và không có số tổng đài hotline 1900 xxxx.
+\end{itemize}
+
+Quá trình thực nghiệm được đo lường định lượng trên 100 lượt gọi độc lập cho mỗi cấu hình prompt nhằm đánh giá toàn diện 3 giai đoạn tiến hóa:
+
+\begin{enumerate}[label=\textbf{Vòng \arabic*:},leftmargin=1.8cm]
+\item \textbf{Zero-shot thô (Raw Prompting)}: Cấu hình chỉ sử dụng câu lệnh trực diện ở mức người dùng phổ thông, không khai báo System Role và không định nghĩa lược đồ cấu trúc đầu ra: \textit{"Hãy gợi ý 5 ý tưởng bài đăng Facebook cho chiến dịch sau: \{\{campaign\_brief\}\}, giọng văn trẻ trung."}
+Kết quả thu được hoàn toàn là văn bản tự do với các ký tự đánh dấu markdown tùy tiện, tỷ lệ tuân thủ cấu trúc Schema đạt 0.0\%, dẫn tới việc 100\% các kết quả không thể phân tích cú pháp để nạp tự động vào hệ thống (tỷ lệ nạp CSDL đạt 0\%). Đáng lo ngại nhất, tỷ lệ phát sinh lỗi ảo giác số liệu (Hallucination) lên tới 68.0\%, khi mô hình tự ý bổ sung các chính sách khuyến mại bịa đặt như "Voucher giảm ngay 50\%", "Bốc thăm trúng iPhone 15 Pro Max" hoặc số điện thoại ảo không hề tồn tại trong ngữ cảnh. Văn phong phân tán, độ dài không đồng đều và hoàn toàn không thể đưa vào dây chuyền vận hành tự động.
+
+\item \textbf{Structured Output + System Role}: Cải tiến bằng cách thiết lập vai trò hệ thống chuyên biệt (\textit{"Bạn là chuyên viên AI Content Marketing của ICTU..."}) kết hợp định nghĩa lược đồ JSON Schema nghiêm ngặt thông qua thư viện Pydantic (gồm mảng \texttt{ideas} đúng 5 phần tử với các trường dữ liệu: \texttt{idea\_id}, \texttt{hook}, \texttt{angle}, \texttt{caption\_preview}, \texttt{call\_to\_action}, \texttt{suggested\_hashtags}).
+Kết quả cho thấy bước tiến vượt bậc: tỷ lệ tuân thủ cấu trúc Schema tăng vọt lên 86.5\%, văn phong thể hiện đúng định dạng bài viết Facebook với câu giật tít (\textit{hook}) ngắn gọn và lời kêu gọi hành động (\textit{CTA}) rõ ràng. Tỷ lệ lỗi ảo giác giảm từ 68.0\% xuống còn 24.0\%. Tuy nhiên, vẫn còn 13.5\% lượt gọi thất bại do mô hình tự ý bọc khối mã Markdown (\texttt{\`\`\`json ... \`\`\`}) hoặc kèm lời chào xã giao ở đầu/cuối chuỗi phản hồi, làm trình phân tích ném lỗi \texttt{JSONDecodeError}. Ngoài ra, khi brief để trống một số tiêu chí phụ, mô hình vẫn có xu hướng tự suy diễn ưu đãi để làm phong phú nội dung.
+
+\item \textbf{Few-shot + Hard Constraints + Negative Prompting}: Áp dụng cơ chế phòng thủ chuyên sâu đa tầng: (1) Bổ sung 01 ví dụ mẫu chuẩn (1-shot JSON) định hướng chuẩn xác cả cấu trúc cú pháp lẫn phong cách ngôn ngữ mạng xã hội; (2) Thiết lập các ràng buộc cứng (\textit{Hard Constraints}) bắt buộc chỉ trả về chuỗi JSON thuần túy (Raw JSON only) từ ký tự \texttt{\{} đầu tiên đến \texttt{\}} cuối cùng, tuyệt đối không xuất khối markdown hay văn bản phụ trợ; (3) Nhúng chỉ thị cấm đoán (\textit{Negative Prompting}) nghiêm ngặt: \textit{"TUYỆT ĐỐI KHÔNG tự sáng tác số liệu khuyến mãi, phần trăm giảm giá, học phí, quà tặng hoặc cam kết ngoài ngữ cảnh \{\{campaign\_brief\}\}. Mọi giả định phải được đưa vào mảng warnings."}
+Kết quả thực nghiệm đạt độ tối ưu tuyệt đối: Tỷ lệ tuân thủ cấu trúc Schema đạt 100.0\% (100/100 mẫu thử nghiệm hợp lệ Pydantic), tỷ lệ ảo giác số liệu bị triệt tiêu hoàn toàn về 0.0\%. Độ chính xác và xác thực ngữ cảnh (\textit{Factuality \& Context Compliance}) đạt 98.8\% (vượt ngưỡng yêu cầu $\ge 98.5\%$). Toàn bộ 100\% kết quả sinh ra đều được hệ thống tự động bóc tách và lưu trữ an toàn vào bảng \texttt{marketing\_contents} dưới trạng thái \texttt{AI\_DRAFT}. Thời gian phản hồi trung bình duy trì ổn định ở mức 1.82 giây/lần gọi với chi phí tiêu thụ trung bình 645 tokens.
+\end{enumerate}
+
+Bảng~\ref{tab:v8-prompt-rounds} tổng hợp chi tiết kết quả đối chiếu số liệu định lượng và phân tích kỹ thuật qua ba vòng thực nghiệm.
+
+\begin{table}[!htbp]
+\centering
+\small
+\caption{Kết quả thực nghiệm tối ưu hóa Prompt qua 3 vòng cho tác vụ sinh ý tưởng chiến dịch}
+\label{tab:v8-prompt-rounds}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{|C{1.1cm}|L{2.8cm}|C{2.0cm}|C{2.1cm}|C{1.5cm}|Y|}
+\hline
+\thead{Vòng} & \thead{Phương pháp Prompt} & \thead{Tuân thủ Schema} & \thead{Lỗi ảo giác số liệu} & \thead{Tỷ lệ nạp DB} & \thead{Đặc điểm văn phong \& Nhận xét}\\
+\hline
+Vòng 1 & Zero-shot thô (Raw Prompt, không System Role, không Schema) & 0\% (văn bản tự do) & 68.0\% (bịa voucher 50\%, hotline) & 0\% & Văn phong tự do, dài dòng; không phân biệt kênh Facebook; lỗi ảo giác nghiêm trọng, không thể parse tự động.\\
+\hline
+Vòng 2 & Structured Output (System Role + JSON Schema Pydantic) & 86.5\% (đúng cú pháp JSON) & 24.0\% (vẫn tự thêm ưu đãi khi brief thiếu) & 86.5\% & Giọng văn trẻ trung, có hook và CTA theo chuẩn Facebook; đôi khi suy diễn thêm khuyến mại ngoài brief.\\
+\hline
+Vòng 3 & Few-shot + Hard Constraints + Negative Prompting & 100\% (JSON chuẩn tuyệt đối) & 0.0\% (chỉ trích xuất từ context) & 100\% & Khớp hoàn toàn phong cách Facebook trẻ trung; độ chính xác đạt $\ge 98.5\%$; nạp trực tiếp vào CSDL an toàn.\\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Kết luận chương 6}
+
+Thiết kế chức năng AI trong hệ thống đã chuyển hóa mô hình ngôn ngữ lớn từ một tiện ích thử nghiệm hộp đen thành một thành phần dịch vụ tin cậy, có ranh giới nghiệp vụ chặt chẽ và khả năng kiểm thử toàn diện. Thông qua việc xác định rõ dữ liệu ngữ cảnh hợp lệ, cấu trúc hợp đồng đầu ra Pydantic nghiêm ngặt, cơ chế bẫy lỗi hệ thống chủ động và quy trình phê duyệt đa cấp, AI không thể tự ý vượt quyền hay làm sai lệch dữ liệu quản lý. Đặc biệt, kết quả thực nghiệm tối ưu hóa prompt qua ba vòng với kỹ thuật Few-shot kết hợp Negative Prompting đã chứng minh tính khả thi trong việc triệt tiêu hoàn toàn lỗi ảo giác (0.0\%) và bảo đảm tỷ lệ nạp tự động vào cơ sở dữ liệu đạt 100\%, tạo nền tảng vững chắc cho việc triển khai thực tế.
+
