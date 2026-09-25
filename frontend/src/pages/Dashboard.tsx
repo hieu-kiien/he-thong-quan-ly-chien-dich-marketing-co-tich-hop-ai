@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { MetricCard } from '../components/MetricCard';
 import { CampaignTable } from '../components/CampaignTable';
+import { KPIGrid9, AttributionTrendChart, AIDoctorWidget } from '../components/analytics';
 import { Campaign, MarketingContent, KPISummary } from '../types';
 import { campaignApi, contentApi, analyticsApi, getApiErrorMessage } from '../services/api';
 import { useToast } from '../components/Toast';
@@ -57,8 +58,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         setDashboardKpi(kpiData.kpi);
       }
     } catch (e) {
-      console.error(e);
-      toast.error(getApiErrorMessage(e), 'Lỗi khi tải dữ liệu tổng quan');
+      console.warn('Lỗi khi tải dữ liệu tổng quan:', e);
     } finally {
       setLoading(false);
     }
@@ -225,105 +225,55 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Row 1: KPI Metric Cards (Bento Top) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {loading ? (
-          <>
-            <MetricCardSkeleton />
-            <MetricCardSkeleton />
-            <MetricCardSkeleton />
-            <MetricCardSkeleton />
-          </>
-        ) : (
-          <>
-            <MetricCard
-              title="Tổng lượt xem (Views)"
-              value={dashboardKpi ? `${(dashboardKpi.total_views).toLocaleString('vi-VN')}` : '0'}
-              subtext="Toàn bộ kênh Facebook & Email"
-              trend={14.8}
-              sparklineColor="#3B82F6"
-            />
-            <MetricCard
-              title="Tỷ lệ nhấp (CTR)"
-              value={dashboardKpi ? `${dashboardKpi.ctr_percent}%` : '0%'}
-              subtext="Trung bình ngành: 2.5%"
-              trend={22.4}
-              sparklineColor="#22C55E"
-            />
-            <MetricCard
-              title="Chuyển đổi (Conversions)"
-              value={dashboardKpi ? `${dashboardKpi.total_conversions}` : '0'}
-              subtext="Tỷ lệ CVR: 4.76%"
-              trend={8.2}
-              sparklineColor="#A855F7"
-            />
-            <MetricCard
-              title="Ước tính Tỷ suất ROI"
-              value={dashboardKpi ? `+${dashboardKpi.roi_percent}%` : '0%'}
-              subtext="Chi phí tối ưu • Doanh thu tăng"
-              trend={35.1}
-              sparklineColor="#EAB308"
-            />
-          </>
-        )}
-      </div>
+      {/* Row 1: 9-KPI Grid (Bento Top) */}
+      <KPIGrid9 kpi={dashboardKpi} loading={loading} />
 
-      {/* Row 2: Bento Grid Layout (70% Table + 30% AI Strategic Insight) */}
+      {/* Row 2: Bento Grid Layout (70% Table & Analytics + 30% AI Strategic Insight & Doctor) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Left Column (8/12 - 67%): Scannable Campaign Table */}
-        <div className="lg:col-span-8 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Danh sách Chiến dịch</h3>
-            <span className="text-xs text-indigo-600 font-semibold cursor-pointer hover:underline">Xem tất cả</span>
-          </div>
+        {/* Left Column (8/12 - 67%): Attribution Analytics & Scannable Campaign Table */}
+        <div className="lg:col-span-8 space-y-6">
+          {/* Multi-Channel Attribution Analytics Trend Chart */}
+          <AttributionTrendChart
+            channels={dashboardKpi?.channel_metrics || []}
+            totalCost={dashboardKpi?.total_cost}
+            totalRevenue={dashboardKpi?.total_revenue}
+          />
 
-          {loading ? (
-            <CampaignTableSkeleton rows={4} />
-          ) : (
-            <CampaignTable
-              campaigns={campaigns}
-              onSelectCampaign={onSelectCampaign}
-              onOpenWorkflow={onOpenWorkflow}
-              onOpenAIForCampaign={onOpenAI}
-              onDeleteCampaign={handleDeleteCampaign}
-              userRole={userRole}
-            />
-          )}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Danh sách Chiến dịch</h3>
+              <span className="text-xs text-indigo-600 font-semibold cursor-pointer hover:underline">Xem tất cả</span>
+            </div>
+
+            {loading ? (
+              <CampaignTableSkeleton rows={4} />
+            ) : (
+              <CampaignTable
+                campaigns={campaigns}
+                onSelectCampaign={onSelectCampaign}
+                onOpenWorkflow={onOpenWorkflow}
+                onOpenAIForCampaign={onOpenAI}
+                onDeleteCampaign={handleDeleteCampaign}
+                userRole={userRole}
+              />
+            )}
+          </div>
         </div>
 
-        {/* Right Column (4/12 - 33%): Bento AI Strategic Insight Hub */}
+        {/* Right Column (4/12 - 33%): Bento AI Strategic Insight & Doctor Hub */}
         <div className="lg:col-span-4 space-y-5">
           <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
             <Sparkles className="w-4 h-4 text-violet-600" />
-            <span>AI Strategic Insights</span>
+            <span>AI Doctor & Chiến Lược</span>
           </h3>
 
-          {/* AI Banner Card */}
-          <div className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white rounded-xl p-5 shadow-lg relative overflow-hidden">
-            <div className="w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl absolute -top-10 -right-10"></div>
-            
-            <div className="flex items-center gap-2 text-violet-300 text-xs font-bold mb-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-              Phân tích tự động hôm nay
-            </div>
-
-            <h4 className="text-sm font-bold text-white mb-2 leading-snug">
-              Kênh Facebook đang đạt tỷ lệ chuyển đổi cao vượt trội (+24%)
-            </h4>
-
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Chiến dịch "Khóa học AI K25" có chi phí trên mỗi lượt nhấp (CPC) tối ưu nhất vào khung giờ 20h00. Hệ thống đề xuất tăng 15% ngân sách cho kênh này.
-            </p>
-
-            <button
-              onClick={handleOpenAICopilot}
-              className="mt-4 w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5"
-            >
-              <span>Xem chi tiết đề xuất AI</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          {/* Actionable AI Doctor Widget (Compact Mode) */}
+          <AIDoctorWidget
+            campaignId={campaigns.length > 0 ? campaigns[0].id : undefined}
+            compact={true}
+            onOpenAIStudio={handleOpenAICopilot}
+          />
 
           {/* Review Queue Snippet */}
           <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs">

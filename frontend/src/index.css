@@ -60,3 +60,48 @@
   animation-duration: 250ms;
 }
 
+/* ==========================================================================
+   FEAT-FE-14: Standard @media print rules for PDF export & campaign printing
+   ========================================================================== */
+@media print {
+  /* Ẩn các thành phần giao diện web khi in */
+  nav, aside, header, .no-print, button, input, select, textarea,
+  [role="navigation"], .export-actions, .review-actions {
+    display: none !important;
+  }
+  
+  /* Cấu hình trang in A4 chuẩn */
+  @page {
+    size: A4 portrait;
+    margin: 15mm;
+  }
+  
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt !important;
+    line-height: 1.5 !important;
+  }
+  
+  /* Thẻ nội dung in trang trọng, chống ngắt trang dở dang */
+  .print-card, .social-preview-container, .review-item-card {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 24px !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    padding: 16px !important;
+    border-radius: 8px !important;
+  }
+  
+  /* Hiển thị tiêu đề in kế hoạch chiến dịch */
+  .print-header {
+    display: block !important;
+    margin-bottom: 20px !important;
+    border-bottom: 2px solid #0f172a !important;
+    padding-bottom: 10px !important;
+  }
+}
+
+

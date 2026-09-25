@@ -48,4 +48,5 @@ frontend/dist/
 test-recordings/
 *.png
 .agents/
+.wrangler/
 

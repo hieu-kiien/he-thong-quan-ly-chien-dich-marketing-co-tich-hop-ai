@@ -1,0 +1,61 @@
+=== PAGE 31 ===
+4.4.1. Đặc tả hợp đồng dữ liệu chuẩn hóa (Data Contract Specification)
+Prompt Engine thiết lập các hợp đồng dữ liệu đầu ra bắt buộc thông qua mô hình Pydantic
+v2 nhằm bảo đảm tính xác thực cấu trúc (Structural Validity) trước khi chuyển giao dữ liệu
+sangtầngứngdụng. Bảng 4.3đặctảchitiếtcấutrúcdữliệuchobatácvụAIcốtlõi.
+Bảng 4.3: Đặc tả hợp đồng dữ liệu Pydantic Schema cho các tác vụ AI
+Tác vụ Trường dữ liệu Kiểu dữ liệu Bắt buộc Ý nghĩa nghiệp vụ
+IDEA
+task Literal["IDEA"] Bắtbuộc Địnhdanhloạitácvụ
+gợiýýtưởng.
+campaign_name str Bắtbuộc Tênchiếndịchngữcảnh.
+ideas List[IdeaItem] Bắtbuộc Danhsáchcácgóctiếp
+cậnýtưởng.
+ideas[i] Dict[str,
+str]
+Bắtbuộc Baogồm: angle,
+concept,và
+target_hook.
+DRAFT
+task Literal["DRAFT"] Bắtbuộc Địnhdanhloạitácvụ
+viếtbảnnháp.
+channel ChannelEnum Bắtbuộc Kênhtruyềnthôngmục
+tiêu(Facebook,Email,
+Ads).
+title, body str Bắtbuộc Tiêuđềvàthânbàiviết
+địnhdạngchuẩntheo
+kênh.
+cta str Bắtbuộc Lờikêugọihànhđộng
+cụthể(CallToAction).
+SUMMARY
+task Literal["SUMMARY"]Bắtbuộc Địnhdanhloạitácvụ
+tómtắtchỉsố.
+kpi_overview Dict[str,
+float]
+Bắtbuộc Tổnghợpsốhọc: views,
+clicks,cost,revenue,
+ROI.
+insights, recs List[str] Bắtbuộc Nhậnđịnhbámsátsố
+liệuthựcvàđềxuấttối
+ưuhóa.
+4.4.2. Cơ chế khử ảo giác (De-hallucination Smart Fallback)
+TrongtrườnghợpnhàcungcấpGeminigặpsựcốkếtnối,quáthờigianchờ(10s)hoặcphản
+hồi không thể phân tích cú pháp JSON, hệ thống chuyển hướng tự động sang bộ sinh dự
+phòng _generate_fallback:
+• Đốivớitácvụýtưởngvàbảnnháp: Tổnghợpnộidungdựatrênbộkhungmẫu(tem-
+plates)chuẩncôngnghiệpgắnliềnvớithôngsốsảnphẩmvàkênhthựctế.
+• Đốivớitácvụtómtắtchỉsố: Tínhtoánchínhxáccácchỉsốtàichínhtừdữliệumảng
+metricstruyềnvào; loại bỏ hoàn toàn các nhận định ảo giác (nhưtựsuydiễnkhung
+giờvàng19h–21hhaykhuyếnnghịđăngbàicuốituầnkhidữliệuđầuvàochỉcócác
+consốthốngkêtổngthể).
+20
+=== PAGE 32 ===
+• Hệ thống đánh dấu cờis_fallback = True , ghi nhận rõ ràng vàoai_logsvà thông
+báominhbạchchongườidùngtrêngiaodiện.
+4.5. Kết luận chương
+Chương 4 đã trình bày thiết kế kiến trúc toàn diện của MarketFlow AI từ sơ đồ khối logic,
+mô hình dữ liệu quan hệ chặt chẽ đến cơ chế tương tác an toàn với mô hình ngôn ngữ lớn
+qua Prompt Engine. Thiết kế này bảo đảm hệ thống có tính chịu lỗi cao, bảo mật nhiều lớp
+và luôn duy trì tính toàn vẹn dữ liệu. Chương tiếp theo sẽ mô tả chi tiết quá trình hiện thực
+hóamãnguồntrongthựctế.
+21

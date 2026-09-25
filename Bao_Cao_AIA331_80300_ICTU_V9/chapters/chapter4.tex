@@ -1,0 +1,165 @@
+\chapter{THIẾT KẾ KIẾN TRÚC VÀ MÔ HÌNH DỮ LIỆU}
+
+\section{Quan điểm thiết kế kiến trúc tổng thể}
+
+Kiến trúc hệ thống MarketFlow AI được thiết kế theo mô hình phân tầng hướng dịch vụ (Layered Service-Oriented Architecture), kết hợp các nguyên lý Clean Architecture và Domain-Driven Design (DDD). Việc tách bạch rõ ràng giữa tầng Giao diện (Presentation Layer), tầng Điều hướng API (API Routing Layer), tầng Nghiệp vụ cốt lõi (Domain Service Layer), tầng Truy xuất dữ liệu (Data Access Layer) và tầng Tích hợp ngoại vi (AI Integration Adapter) bảo đảm hệ thống có tính mở cao, dễ bảo trì và có thể kiểm thử độc lập từng thành phần.
+
+Hệ thống được mô hình hóa theo chuẩn C4 Container tại Hình~\ref{fig:v9-container}.
+
+\begin{figure}[h!]
+\centering
+\input{figures/container.tex}
+\caption{Sơ đồ kiến trúc Container và luồng dữ liệu hệ thống}
+\label{fig:v9-container}
+\end{figure}
+
+\section{Các khối thành phần và phân định trách nhiệm}
+
+Máy chủ ứng dụng FastAPI được cấu trúc thành các module chức năng độc lập trong thư mục \texttt{backend/app/api/v1/}, mỗi module chịu trách nhiệm thực thi một ranh giới nghiệp vụ cụ thể được mô tả trong Bảng~\ref{tab:v9-components}.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Phân định trách nhiệm của các module trong hệ thống}
+\label{tab:v9-components}
+\begin{tabularx}{\textwidth}{|L{3.2cm}|Y|L{2.8cm}|}
+\hline
+\thead{Module backend} & \thead{Trách nhiệm kỹ thuật và nghiệp vụ} & \thead{Yêu cầu đáp ứng}\\
+\hline
+\texttt{auth.py} \& \texttt{security.py} & Quản lý phiên xác thực JWT, băm mật khẩu bằng thuật toán Bcrypt, kiểm tra trạng thái kích hoạt tài khoản (\texttt{user.status == 'ACTIVE'}) và phân quyền vai trò.\\
+\hline
+\texttt{campaigns.py} & Xử lý vòng đời chiến dịch; xác thực khoảng thời gian (\texttt{start\_date} $\le$ \texttt{end\_date}); kiểm tra ngân sách hợp lệ; kiểm soát phân quyền mức bản ghi theo \texttt{owner\_id} và \texttt{CampaignMember}.\\
+\hline
+\texttt{contents.py} & Quản lý máy trạng thái nội dung HITL; cấm tạo/sửa trực tiếp trạng thái duyệt; điều phối quy trình gửi duyệt (\texttt{/submit}), phê duyệt (\texttt{/approve}), từ chối (\texttt{/reject}) và xuất bản (\texttt{/publish}); tự động hạ cấp về \texttt{AI\_DRAFT} khi nội dung đã duyệt bị sửa đổi.\\
+\hline
+\texttt{schedules.py} & Quản lý lịch phát hành bài viết; kiểm tra điều kiện tiên quyết (chỉ lập lịch cho nội dung \texttt{APPROVED}); xử lý múi giờ quốc tế; ngăn ngừa xung đột thời gian phát hành.\\
+\hline
+\texttt{metrics.py} & Quản lý chỉ số hiệu quả đa kênh theo bộ ba duy nhất (\texttt{campaign}, \texttt{channel}, \texttt{date}); tính toán tự động các chỉ số tài chính (CTR, CPC, CPA, ROI) với cơ chế bảo vệ chia cho 0; tổng hợp dữ liệu bảng điều khiển (Dashboard) phân quyền theo người dùng.\\
+\hline
+\texttt{ai.py} \& \texttt{ai\_service.py} & Cổng giao tiếp AI đa tác vụ; kiểm soát phạm vi truy cập dữ liệu trước khi sinh prompt; điều phối gọi Google Gemini API; tự động kích hoạt Smart Fallback khi gặp sự cố; lưu trữ nhật ký kiểm toán vào \texttt{ai\_logs}.\\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Thiết kế mô hình dữ liệu quan hệ (ERD)}
+
+Mô hình dữ liệu được thiết kế tuân thủ dạng chuẩn 3 (3NF), bảo đảm tính toàn vẹn dữ liệu, tối ưu hóa tốc độ truy vấn và loại bỏ hiện tượng dư thừa thông tin.
+
+\subsection{Mô hình dữ liệu hạt nhân (Core ERD)}
+Hình~\ref{fig:v9-erd-core} thể hiện các thực thể nghiệp vụ trung tâm và các mối quan hệ quan trọng.
+
+\begin{figure}[h!]
+\centering
+\input{figures/erd-core.tex}
+\caption{Mô hình dữ liệu hạt nhân của MarketFlow AI}
+\label{fig:v9-erd-core}
+\end{figure}
+
+\subsection{Mô hình các bảng vận hành và nhật ký kiểm toán (Operations ERD)}
+Hình~\ref{fig:v9-erd-ops} thể hiện các bảng phụ trợ phục vụ quy trình phân công, phê duyệt, lập lịch, số liệu hiệu quả và kiểm toán AI.
+
+\begin{figure}[h!]
+\centering
+\input{figures/erd-ops.tex}
+\caption{Mô hình các bảng vận hành và liên kết khóa ngoại}
+\label{fig:v9-erd-ops}
+\end{figure}
+
+\subsection{Từ điển dữ liệu và các ràng buộc toàn vẹn}
+Bảng~\ref{tab:v9-data-dictionary} đặc tả chi tiết cấu trúc các bảng dữ liệu, khóa chính, khóa ngoại và ràng buộc toàn vẹn đã được hiện thực hóa trong SQLite và SQLAlchemy.
+
+\begin{table}[!htbp]
+\centering
+\small
+\caption{Từ điển dữ liệu và các ràng buộc toàn vẹn}\label{tab:v9-data-dictionary}
+\begin{tabularx}{\textwidth}{|L{3.4cm}|L{2.5cm}|L{2.8cm}|Y|}
+\hline
+\thead{Tên bảng} & \thead{Mục đích} & \thead{Cơ chế khóa} & \thead{Ràng buộc và quy tắc nghiệp vụ}\\
+\hline
+\texttt{users} & Quản lý tài khoản & PK: \texttt{id} & \texttt{email} duy nhất (Unique); \texttt{role} thuộc \{MANAGER, MARKETER\}; \texttt{status} thuộc \{ACTIVE, INACTIVE\}; mật khẩu lưu dạng hash Bcrypt.\\
+\hline
+\texttt{product\_categories} & Danh mục ngành hàng & PK: \texttt{id} & \texttt{name} duy nhất; bảo vệ toàn vẹn danh mục.\\
+\hline
+\texttt{products} & Sản phẩm & PK: \texttt{id}; FK: \texttt{category\_id} & Khóa ngoại liên kết danh mục; giá tiền không âm (\texttt{price} $\ge$ 0).\\
+\hline
+\texttt{marketing\_channels} & Kênh truyền thông & PK: \texttt{id} & \texttt{code} duy nhất thuộc \{FACEBOOK, EMAIL, GOOGLE\_ADS, TIKTOK\}.\\
+\hline
+\texttt{campaigns} & Chiến dịch tiếp thị & PK: \texttt{id}; FK: \texttt{product\_id}, \texttt{owner\_id} & \texttt{budget} $\ge$ 0; \texttt{start\_date} $\le$ \texttt{end\_date}; xóa cascade các nội dung và chỉ số liên quan.\\
+\hline
+\texttt{campaign\_members} & Phân công nhân sự & PK kép: (\texttt{campaign\_id}, \texttt{user\_id}) & Khóa chính phức hợp ngăn ngừa gán trùng lặp một nhân viên vào cùng chiến dịch.\\
+\hline
+\texttt{marketing\_contents} & Nội dung truyền thông & PK: \texttt{id}; FK: \texttt{campaign\_id}, \texttt{channel\_id}, \texttt{creator\_id} & \texttt{status} tuân thủ máy trạng thái; cờ \texttt{is\_ai\_generated} xác định nguồn gốc.\\
+\hline
+\texttt{content\_reviews} & Nhật ký kiểm duyệt & PK: \texttt{id}; FK: \texttt{content\_id}, \texttt{reviewer\_id} & Ghi nhận quyết định (APPROVED/REJECTED), lý do duyệt và mốc thời gian bất biến.\\
+\hline
+\texttt{marketing\_schedules} & Lịch xuất bản & PK: \texttt{id}; FK: \texttt{content\_id} & Chỉ tạo cho nội dung \texttt{APPROVED}; lưu trữ múi giờ quốc tế (\texttt{timezone}).\\
+\hline
+\texttt{campaign\_metrics} & Chỉ số định lượng kênh & PK: \texttt{id}; FK: \texttt{campaign\_id}, \texttt{channel\_id} & Ràng buộc Unique phức hợp (\texttt{campaign\_id}, \texttt{channel\_id}, \texttt{metric\_date}); các chỉ số views, clicks, conversions, cost, revenue không âm.\\
+\hline
+\texttt{ai\_logs} & Nhật ký kiểm toán AI & PK: \texttt{id}; FK: \texttt{user\_id} & Ghi nhận \texttt{task\_type}, \texttt{model\_provider}, \texttt{model\_name}, \texttt{latency\_ms}, \texttt{status}, cờ \texttt{is\_fallback}.\\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Thiết kế Prompt Engine và Kiểm soát ngữ cảnh an toàn}
+
+Luồng tương tác với mô hình trí tuệ nhân tạo được quản lý tập trung thông qua Động cơ Xây dựng Chỉ dẫn (Prompt Engine) và Dịch vụ Điều phối Trí tuệ Nhân tạo (AI Service) theo quy trình khép kín tại Hình~\ref{fig:v9-ai-pipeline}.
+
+\begin{figure}[h!]
+\centering
+\input{figures/ai-pipeline.tex}
+\caption{Quy trình xử lý yêu cầu AI với Prompt Engine và Smart Fallback}
+\label{fig:v9-ai-pipeline}
+\end{figure}
+
+\subsection{Nguyên tắc lọc sạch ngữ cảnh (Context Whitelisting)}
+Để tuân thủ tiêu chuẩn an toàn dữ liệu, hệ thống áp dụng kỹ thuật Whitelisting nghiêm ngặt:
+\begin{itemize}
+  \item \textbf{Dữ liệu cho phép đưa vào Prompt}: Tên sản phẩm, mô tả tính năng, mục tiêu chiến dịch, đối tượng khách hàng mục tiêu, giọng văn (tone of voice), và mảng dữ liệu chỉ số chiến dịch đã được lọc theo quyền của người dùng.
+  \item \textbf{Dữ liệu tuyệt đối cấm đưa vào Prompt}: Thông tin nhận dạng cá nhân (PII), mật khẩu, token JWT, mã băm, khóa API, số dư tài khoản ngân hàng hoặc dữ liệu của các chiến dịch khác ngoài phạm vi được phân công.
+\end{itemize}
+
+\subsection{Đặc tả hợp đồng dữ liệu chuẩn hóa (Data Contract Specification)}
+Prompt Engine thiết lập các hợp đồng dữ liệu đầu ra bắt buộc thông qua Pydantic v2 nhằm bảo đảm tính toàn vẹn cấu trúc trước khi chuyển sang tầng ứng dụng. Bảng~\ref{tab:v9-ai-schemas} đặc tả cấu trúc dữ liệu cho ba tác vụ AI cốt lõi (100\% các trường bắt buộc).
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Đặc tả hợp đồng dữ liệu Pydantic Schema cho các tác vụ AI (Bắt buộc 100\%)}
+\label{tab:v9-ai-schemas}
+\begin{tabularx}{\textwidth}{|C{1.8cm}|L{2.8cm}|L{3.3cm}|Y|}
+\hline
+\thead{Tác vụ} & \thead{Trường dữ liệu} & \thead{Kiểu dữ liệu} & \thead{Ý nghĩa nghiệp vụ \& Ràng buộc}\\
+\hline
+\multirow{4}{*}{\textbf{IDEA}} & \texttt{task} & \texttt{Literal["IDEA"]} & Định danh loại tác vụ gợi ý ý tưởng.\\
+\cline{2-4}
+& \texttt{campaign\_name} & \texttt{str} & Tên chiến dịch ngữ cảnh mục tiêu.\\
+\cline{2-4}
+& \texttt{ideas} & \texttt{List[IdeaItem]} & Danh sách các góc tiếp cận ý tưởng.\\
+\cline{2-4}
+& \texttt{ideas[i]} & \texttt{Dict[str, str]} & Gồm 3 khóa: \texttt{angle}, \texttt{concept}, \texttt{target\_hook}.\\
+\hline
+\multirow{4}{*}{\textbf{DRAFT}} & \texttt{task} & \texttt{Literal["DRAFT"]} & Định danh loại tác vụ viết bản nháp.\\
+\cline{2-4}
+& \texttt{channel} & \texttt{ChannelEnum} & Kênh truyền thông mục tiêu (Facebook, Email, Ads).\\
+\cline{2-4}
+& \texttt{title, body} & \texttt{str} & Tiêu đề và thân bài viết chuẩn hóa theo kênh.\\
+\cline{2-4}
+& \texttt{cta} & \texttt{str} & Lời kêu gọi hành động cụ thể (\texttt{CTA}).\\
+\hline
+\multirow{3}{*}{\textbf{SUMMARY}} & \texttt{task} & \texttt{Literal["SUMMARY"]} & Định danh loại tác vụ tóm tắt chỉ số.\\
+\cline{2-4}
+& \texttt{kpi\_overview} & \texttt{Dict[str, float]} & Tổng hợp số học: views, clicks, cost, revenue, ROI.\\
+\cline{2-4}
+& \texttt{insights, recs} & \texttt{List[str]} & Nhận định bám sát số liệu thực và đề xuất tối ưu.\\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Cơ chế khử ảo giác (De-hallucination Smart Fallback)}
+Trong trường hợp gặp sự cố kết nối LLM hoặc quá thời gian chờ (10s), hệ thống tự động kích hoạt bộ sinh dự phòng \texttt{\_generate\_fallback}: (1) Ý tưởng và bản nháp: Tổng hợp nội dung theo khung mẫu công nghiệp gắn liền với sản phẩm và kênh thực tế; (2) Tóm tắt chỉ số: Tính toán chính xác các chỉ số tài chính từ mảng metrics, \textbf{loại bỏ hoàn toàn các nhận định ảo giác} (như tự suy diễn khung giờ vàng hay khuyến nghị cuối tuần khi đầu vào chỉ có số liệu tổng); (3) Minh bạch thông tin: Gắn cờ \texttt{is\_fallback = True}, ghi nhận vào \texttt{ai\_logs} và thông báo minh bạch cho người dùng trên giao diện.
+
+\section{Kết luận chương}
+
+Chương 4 đã trình bày thiết kế kiến trúc toàn diện của MarketFlow AI từ sơ đồ khối logic, mô hình dữ liệu quan hệ chặt chẽ đến cơ chế tương tác an toàn với mô hình ngôn ngữ lớn qua Prompt Engine. Thiết kế này bảo đảm hệ thống có tính chịu lỗi cao, bảo mật nhiều lớp và luôn duy trì tính toàn vẹn dữ liệu, làm tiền đề vững chắc cho việc hiện thực hóa mã nguồn trong thực tế.
+

@@ -10,19 +10,21 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
 from datetime import datetime
-from app.core.database import engine, SessionLocal, Base
+from app.core.database import engine, SessionLocal, Base, ensure_sqlite_schema_compatibility
 from app.core.security import hash_password
 from app.models.entities import (
     User, ProductCategory, Product, MarketingChannel,
     Campaign, CampaignMember, MarketingContent, ContentReview,
-    MarketingSchedule, CampaignMetric, AILog
+    MarketingSchedule, CampaignMetric, AILog,
+    Workspace, WorkspaceMember, BrandKit
 )
 
 def init_db():
     print("[*] Dang khoi tao cac bang co so du lieu...")
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
-    print("[OK] Da tao thanh cong 11 bang co so du lieu!")
+    ensure_sqlite_schema_compatibility(engine)
+    print("[OK] Da tao thanh cong cac bang co so du lieu!")
 
 def seed_data(session=None):
     should_close = False
@@ -49,11 +51,49 @@ def seed_data(session=None):
             role="MARKETER",
             status="ACTIVE"
         )
-        db.add_all([manager, marketer])
+        approver = User(
+            email="approver@ictu.edu.vn",
+            full_name="Đại Diện Khách Hàng (Approver)",
+            password_hash=hash_password("Approver@123"),
+            role="CLIENT_APPROVER",
+            status="ACTIVE"
+        )
+        db.add_all([manager, marketer, approver])
         db.commit()
         db.refresh(manager)
         db.refresh(marketer)
-        print(f"   + Đã tạo 2 tài khoản: {manager.email} (MANAGER) & {marketer.email} (MARKETER)")
+        db.refresh(approver)
+        print(f"   + Đã tạo 3 tài khoản: {manager.email} (MANAGER), {marketer.email} (MARKETER), {approver.email} (CLIENT_APPROVER)")
+
+        # 1.5. Khởi tạo Default Workspace & Brand Kit
+        default_ws = Workspace(
+            id=1,
+            name="Default Agency Workspace",
+            slug="default-agency",
+            description="Không gian làm việc mặc định của hệ thống MarketFlow AI",
+            owner_id=manager.id,
+            status="ACTIVE"
+        )
+        db.add(default_ws)
+        db.commit()
+        db.refresh(default_ws)
+
+        ws_mem_mgr = WorkspaceMember(workspace_id=default_ws.id, user_id=manager.id, role="AGENCY_MANAGER")
+        ws_mem_mkt = WorkspaceMember(workspace_id=default_ws.id, user_id=marketer.id, role="MARKETER")
+        ws_mem_app = WorkspaceMember(workspace_id=default_ws.id, user_id=approver.id, role="CLIENT_APPROVER")
+        db.add_all([ws_mem_mgr, ws_mem_mkt, ws_mem_app])
+
+        default_brand_kit = BrandKit(
+            workspace_id=default_ws.id,
+            brand_name="MarketFlow AI",
+            usp="Nền tảng điều phối chiến dịch tiếp thị thông minh tích hợp AI đa kênh",
+            tone_of_voice="Chuyên nghiệp, hiện đại, tin cậy, thúc đẩy hành động",
+            banned_keywords_json='["cam kết 100%", "chữa dứt điểm", "làm giàu nhanh", "đa cấp", "hoàn tiền không lý do", "bán phá giá", "trắng da cấp tốc"]'
+        )
+        db.add(default_brand_kit)
+        db.commit()
+        print("   + Đã tạo Workspace mặc định (ID=1) và Brand Kit tích hợp.")
+
 
         # 2. Product Categories & Products
         cat_edtech = ProductCategory(
@@ -90,14 +130,16 @@ def seed_data(session=None):
             MarketingChannel(code="facebook", name="Facebook Ads & Fanpage", format_rules="Dưới 300 từ, có icon, hashtag và CTA rõ ràng"),
             MarketingChannel(code="email", name="Email Marketing Newsletter", format_rules="Tiêu đề dưới 60 ký tự, có lời chào và nút CTA trung tâm"),
             MarketingChannel(code="blog", name="Blog SEO & Website", format_rules="Bài viết chuyên sâu chuẩn SEO từ 1000-1500 từ"),
-            MarketingChannel(code="google_ads", name="Google Search Ads", format_rules="Tiêu đề 30 ký tự, mô tả 90 ký tự, từ khóa chính xác")
+            MarketingChannel(code="google_ads", name="Google Search Ads", format_rules="Tiêu đề 30 ký tự, mô tả 90 ký tự, từ khóa chính xác"),
+            MarketingChannel(code="tiktok", name="TikTok Short Video & Reels", format_rules="Kịch bản video ngắn phân cảnh chi tiết có Hook 3s, Visual action, Voiceover lời thoại và gợi ý âm thanh")
         ]
         db.add_all(channels)
         db.commit()
-        print("   + Đã tạo 4 kênh truyền thông mẫu (Facebook, Email, Blog, Google Ads).")
+        print("   + Đã tạo 5 kênh truyền thông mẫu (Facebook, Email, Blog, Google Ads, TikTok).")
 
         # 4. Campaigns
         campaign_1 = Campaign(
+            workspace_id=default_ws.id,
             product_id=prod_ai_course.id,
             owner_id=marketer.id,
             name="Chiến dịch Tuyển sinh Khóa học AI K25",
@@ -109,6 +151,7 @@ def seed_data(session=None):
             status="ACTIVE"
         )
         campaign_2 = Campaign(
+            workspace_id=default_ws.id,
             product_id=prod_crm.id,
             owner_id=manager.id,
             name="Chiến dịch Ra mắt Bản thử nghiệm Mini CRM",
@@ -133,12 +176,14 @@ def seed_data(session=None):
         ch_mail = next(c for c in channels if c.code == "email")
 
         content_1 = MarketingContent(
+            workspace_id=default_ws.id,
             campaign_id=campaign_1.id,
             channel_id=ch_fb.id,
             created_by=marketer.id,
             title="🚀 Đột phá sự nghiệp cùng Khóa học Lập trình AI 2026!",
             body="Bạn muốn làm chủ công nghệ GenAI thay vì lo lắng bị thay thế?\nKhóa học Lập trình AI Ứng Dụng tại ICTU sẽ trang bị cho bạn kiến thức từ nền tảng đến dự án thực tế.\n\nƯu đãi giảm 30% cho 20 bạn đăng ký đầu tiên!",
             cta="Đăng ký ngay hôm nay",
+            image_url="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&auto=format&fit=crop&q=80",
             status="IN_REVIEW",
             source_ids_json='["product_usp", "campaign_brief"]',
             warnings_json='["Nội dung cần Manager phê duyệt trước khi lập lịch"]',
@@ -146,6 +191,7 @@ def seed_data(session=None):
         )
         db.add(content_1)
         db.commit()
+
 
         # 6. Campaign Metrics
         metrics = [

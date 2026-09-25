@@ -841,10 +841,10 @@ class TestDeepMetricsAndFinancialMath:
 
     def test_kpi_zero_division_immunity_and_exact_math(self, client, db_session):
         """52. Bảo đảm miễn nhiễm lỗi chia cho 0 khi chưa có số liệu và tính toán công thức KPI chuẩn xác tuyệt đối."""
-        mkt_headers = get_marketer_headers(client)
+        mgr_headers = get_manager_headers(client)
 
         # 52.1 Kiểm tra chiến dịch 2 ban đầu chưa có metric nào
-        kpi_zero = client.get("/api/v1/campaigns/2/kpi", headers=mkt_headers).json()
+        kpi_zero = client.get("/api/v1/campaigns/2/kpi", headers=mgr_headers).json()
         assert kpi_zero["total_views"] == 0
         assert kpi_zero["total_clicks"] == 0
         assert kpi_zero["ctr_percent"] == 0.0
@@ -863,9 +863,9 @@ class TestDeepMetricsAndFinancialMath:
             "conversions": 10,
             "cost": 500.0,
             "revenue": 1500.0
-        }, headers=mkt_headers)
+        }, headers=mgr_headers)
 
-        kpi_calc = client.get("/api/v1/campaigns/2/kpi", headers=mkt_headers).json()
+        kpi_calc = client.get("/api/v1/campaigns/2/kpi", headers=mgr_headers).json()
         assert kpi_calc["total_views"] == 1000
         assert kpi_calc["total_clicks"] == 100
         assert kpi_calc["total_conversions"] == 10

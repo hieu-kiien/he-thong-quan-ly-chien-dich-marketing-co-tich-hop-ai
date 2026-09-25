@@ -369,11 +369,11 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => onOpenWorkflow(c)}
-                    title="Mở sơ đồ luồng Canvas"
+                    title="Mở Trung tâm Điều phối & Pipeline"
                     className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors"
                   >
                     <GitBranch className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Canvas</span>
+                    <span>Điều phối & Pipeline</span>
                   </button>
                   <button
                     onClick={() => onOpenAI(c)}
@@ -381,7 +381,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                     className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>AI Viết</span>
+                    <span>AI Copilot</span>
                   </button>
                 </div>
 
@@ -441,17 +441,19 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                     <div className="flex items-center justify-end gap-1.5">
                       <button
                         onClick={() => onOpenWorkflow(c)}
-                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-medium flex items-center gap-1 transition-colors"
+                        title="Mở Trung tâm Điều phối & Pipeline"
+                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors"
                       >
                         <GitBranch className="w-3.5 h-3.5 text-indigo-600" />
-                        <span>Canvas</span>
+                        <span>Điều phối & Pipeline</span>
                       </button>
                       <button
                         onClick={() => onOpenAI(c)}
+                        title="Mở AI Copilot cho chiến dịch này"
                         className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors"
                       >
                         <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                        <span>AI Viết</span>
+                        <span>AI Copilot</span>
                       </button>
                       {userRole === 'MANAGER' && (
                         <button

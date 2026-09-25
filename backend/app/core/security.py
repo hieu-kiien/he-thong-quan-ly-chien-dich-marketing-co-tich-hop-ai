@@ -39,11 +39,19 @@ def decode_access_token(token: str) -> dict:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+from sqlalchemy.orm import Session
+from app.core.database import get_db, SessionLocal
+from app.models.entities import User
+
 class RoleChecker:
     def __init__(self, allowed_roles: List[str]):
         self.allowed_roles = allowed_roles
 
-    def __call__(self, credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer)):
+    def __call__(
+        self,
+        credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer),
+        db: Optional[Session] = Depends(get_db)
+    ):
         if not credentials:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -58,11 +66,31 @@ class RoleChecker:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Thao tác trái quyền. Quyền yêu cầu: {', '.join(self.allowed_roles)}, quyền hiện tại: {user_role}",
             )
-        return payload
 
-from sqlalchemy.orm import Session
-from app.core.database import get_db
-from app.models.entities import User
+        # Kiểm tra trạng thái tài khoản người dùng trong CSDL: user.status == 'ACTIVE'
+        sub = payload.get("sub")
+        if sub is not None:
+            try:
+                user_id = int(sub)
+                user = None
+                if db is not None:
+                    user = db.query(User).filter(User.id == user_id).first()
+                else:
+                    temp_db = SessionLocal()
+                    try:
+                        user = temp_db.query(User).filter(User.id == user_id).first()
+                    finally:
+                        temp_db.close()
+
+                if user and user.status != "ACTIVE":
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="User account is inactive or suspended (Tài khoản đã bị vô hiệu hóa)"
+                    )
+            except (ValueError, TypeError):
+                pass
+
+        return payload
 
 def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer),
@@ -102,7 +130,7 @@ def get_current_user(
     if user.status != "ACTIVE":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Tài khoản đã bị vô hiệu hóa"
+            detail="User account is inactive or suspended (Tài khoản đã bị vô hiệu hóa)"
         )
 
     return user

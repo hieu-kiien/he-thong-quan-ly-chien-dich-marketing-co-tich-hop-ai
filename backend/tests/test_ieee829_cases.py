@@ -175,8 +175,8 @@ def test_tc_neg_03_marketer_delete_campaign_forbidden(client):
 def test_tc_bnd_01_zero_division_protection(client):
     """TC_BND_01: Chiến dịch 0 views và 0 clicks không crash ZeroDivisionError."""
     login_resp = client.post("/api/v1/auth/login", json={
-        "email": "marketer@ictu.edu.vn",
-        "password": "Marketer@123"
+        "email": "manager@ictu.edu.vn",
+        "password": "Manager@123"
     })
     token = login_resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}

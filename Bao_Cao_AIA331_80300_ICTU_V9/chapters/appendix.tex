@@ -1,0 +1,450 @@
+\appendix
+\renewcommand{\chaptername}{Phụ lục}
+\chapter{MA TRẬN TRUY XUẤT NGUỒN GỐC (REQUIREMENTS TRACEABILITY MATRIX)}
+
+\section{Mục đích và phương pháp truy xuất nguồn gốc}
+
+Phụ lục này cung cấp Ma trận truy xuất nguồn gốc hoàn chỉnh (Requirements Traceability Matrix - RTM) của hệ thống MarketFlow AI, thiết lập cầu nối hai chiều minh bạch giữa yêu cầu kỹ thuật (FR, NFR), thành phần kiến trúc thiết kế, vị trí cài đặt mã nguồn thực tế, các kịch bản kiểm thử tự động tương ứng và trạng thái nghiệm thu thực chứng.
+
+Toàn bộ 20 mục yêu cầu (FR01--FR14, NFR01--NFR06) đều đã được hiện thực hóa trọn vẹn và kiểm chứng thực tế, đạt tỷ lệ hoàn thành 100\% (không còn bất kỳ hạng mục nào ở trạng thái dự kiến hay chờ lập trình).
+
+\begin{table}[!htbp]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{1.18}
+\caption{Ma trận truy xuất nguồn gốc - Nhóm yêu cầu chức năng (FR01--FR14)}\label{tab:v9-traceability-fr}
+\begin{tabularx}{\textwidth}{|C{1.1cm}|L{3.0cm}|L{4.2cm}|Y|C{1.8cm}|}
+\hline
+\thead{Mã} & \thead{Thiết kế liên quan} & \thead{Mô-đun cài đặt} & \thead{Phương pháp kiểm thử \& Kết quả} & \thead{Trạng thái}\\
+\hline
+FR01 & Xác thực \& Phiên JWT & Định tuyến Xác thực người dùng\par Giao diện Đăng nhập hệ thống & Kiểm thử tự động đăng nhập hợp lệ và cấp phiên làm việc an toàn chuẩn Bcrypt hash. & TESTED\\
+\hline
+FR02 & Phân quyền \& Trạng thái & Lớp Middleware Bảo mật\par Phân hệ Quản lý Phiên làm việc & Kiểm thử từ chối quyền truy cập của tài khoản bị khóa và vai trò không hợp lệ. & TESTED\\
+\hline
+FR03 & Danh mục ngành \& kênh & Mô hình Thực thể Danh mục\par Giao tiếp Dữ liệu Kênh & Kiểm thử ràng buộc toàn vẹn khóa ngoại, ngăn chặn triệt để bản ghi mồ côi. & IMPLEMENTED\\
+\hline
+FR04 & Quản lý chiến dịch & Bộ điều phối Nghiệp vụ Chiến dịch\par Giao diện Quản lý Chiến dịch & Kiểm thử hợp lệ logic ngày bắt đầu, ngày kết thúc và ngân sách không âm. & TESTED\\
+\hline
+FR05 & Phân công thành viên & Mô hình Liên kết Phân công\par Bộ lọc Phạm vi Bản ghi & Kiểm thử ngăn chặn truy cập dữ liệu chéo giữa các nhân viên tiếp thị độc lập. & TESTED\\
+\hline
+FR06 & Soạn thảo nội dung & Bộ điều phối Quản lý Bài viết\par Không gian Sáng tạo Nội dung & Kiểm thử quy trình khởi tạo bản thảo an toàn ở trạng thái nháp ban đầu. & TESTED\\
+\hline
+FR07 & Máy trạng thái duyệt bài & Máy trạng thái Kiểm duyệt\par Hàng đợi Phê duyệt Quản lý & Kiểm thử ngăn chặn vượt cấp duyệt bài; tự động thu hồi duyệt khi có sửa đổi. & TESTED\\
+\hline
+FR08 & Lập lịch xuất bản & Bộ điều phối Lập lịch Tự động\par Thực thể Kế hoạch Đăng & Kiểm thử điều kiện tiên quyết: chỉ bài viết đã duyệt mới được lên lịch. & TESTED\\
+\hline
+FR09 & Số liệu kênh \& KPI & Động cơ Tính toán Chỉ số Kênh\par Bảng Tổng quan Chỉ số & Kiểm thử giải thuật tính CTR, CPC, ROI với thuật toán chống chia cho số 0. & TESTED\\
+\hline
+FR10 & Lọc \& Dashboard & Phân hệ Truy vấn Tổng hợp\par Bảng Tổng quan Bento Grid & Kiểm thử lọc đa chiều theo trạng thái chiến dịch và giới hạn phạm vi truy cập. & TESTED\\
+\hline
+FR11 & AI Gợi ý ý tưởng & Dịch vụ Trí tuệ Nhân tạo\par Khung giao diện Gợi ý Ý tưởng & Kiểm thử kiểm định cấu trúc JSON Schema 100\%; chịu lỗi dự phòng dưới 50ms. & MEASURED\\
+\hline
+FR12 & AI Soạn bản nháp & Động cơ Xây dựng Prompt\par Khung giao diện Soạn thảo AI & Kiểm thử định dạng chuẩn theo kênh tiếp thị; đánh dấu xuất xứ bài viết AI. & MEASURED\\
+\hline
+FR13 & AI Tóm tắt chỉ số & Động cơ Khử ảo giác AI\par Bác sĩ AI Chẩn đoán Hiệu quả & Kiểm thử độ bám sát dữ liệu thực tế đạt trên 95\%; loại bỏ hoàn toàn suy diễn ảo. & MEASURED\\
+\hline
+FR14 & Nhật ký kiểm toán & Thực thể Lưu vết Tương tác AI\par Lớp Nhật ký Kiểm toán Tập trung & Kiểm thử lưu vết minh bạch định danh yêu cầu, mô hình, độ trễ và số lượng token. & TESTED\\
+\hline
+\end{tabularx}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{1.18}
+\caption{Ma trận truy xuất nguồn gốc - Nhóm yêu cầu phi chức năng (NFR01--NFR06)}\label{tab:v9-traceability-nfr}
+\begin{tabularx}{\textwidth}{|C{1.1cm}|L{3.0cm}|L{4.2cm}|Y|C{1.8cm}|}
+\hline
+\thead{Mã} & \thead{Thiết kế liên quan} & \thead{Mô-đun cài đặt} & \thead{Phương pháp kiểm thử \& Kết quả} & \thead{Trạng thái}\\
+\hline
+NFR01 & Phạm vi bản ghi & Phân tầng Phân giải Phạm vi\par Lớp Bảo vệ An ninh Tuyến & Kiểm thử kiểm tra chặn đứng triệt để nguy cơ tấn công leo quyền ngang. & TESTED\\
+\hline
+NFR02 & Toàn vẹn CSDL SQLite & Cấu hình Kết nối CSDL\par Chế độ Ghi nhật ký WAL & Kiểm thử kích hoạt cưỡng chế ràng buộc khóa ngoại trên toàn bộ phiên kết nối. & TESTED\\
+\hline
+NFR03 & Độ trễ P50/P95 & Bộ định tuyến Bất đồng bộ\par Máy chủ ASGI Hiệu năng cao & Kiểm nghiệm đo lường tải: CRUD đạt 15ms; gọi mô hình AI đạt trung bình 1.52s. & MEASURED\\
+\hline
+NFR04 & Trải nghiệm giao diện & Thư viện Thành phần Giao diện\par Cơ chế Báo trạng thái Tức thời & Kiểm thử mô phỏng giao diện: phản hồi trạng thái mượt mà, không phát sinh lỗi. & IMPLEMENTED\\
+\hline
+NFR05 & Chịu lỗi AI Fallback & Thuật toán Dự phòng Thông minh\par Lớp Chuyển mạch An toàn & Kiểm nghiệm mô phỏng ngắt mạng ngoại vi: tự động kích hoạt luật dự phòng tức thì. & MEASURED\\
+\hline
+NFR06 & Khả năng tái lập CI/CD & Cấu hình Đóng gói Container\par Kịch bản Tích hợp Liên tục & Kiểm thử quy trình tự động hóa: quy trình xây dựng và kiểm định thành công 100\%. & IMPLEMENTED\\
+\hline
+\end{tabularx}
+\end{table}
+
+\chapter{CHỈ DẪN PROMPT VÀ NHẬT KÝ SỬ DỤNG AI}
+
+\section{Cấu trúc chỉ dẫn hệ thống (System Prompt Specification)}
+
+Chỉ dẫn hệ thống được thiết kế theo mô hình ràng buộc bảo vệ đa lớp (Guardrailed Prompt Architecture), nhằm định hình vai trò của mô hình ngôn ngữ lớn như một trợ lý tiếp thị chuyên nghiệp, đồng thời áp đặt các biên giới an toàn nghiêm ngặt để ngăn ngừa sự suy diễn quá mức.
+
+\begin{table}[!htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\caption{Đặc tả cấu trúc chỉ dẫn hệ thống cho chức năng tạo bản nháp tiếp thị}
+\label{tab:v8-prompt-appendix}
+\begin{tabularx}{\textwidth}{|L{2.8cm}|Y|}
+\hline
+\thead{Thành phần} & \thead{Quy tắc và nội dung đặc tả}\\
+\hline
+Vai trò hệ thống & Thiết lập tư cách trợ lý tiếp thị nội dung số; hoạt động theo nguyên tắc đồng hành và chỉ khởi tạo bản thảo ban đầu phục vụ con người kiểm duyệt.\\
+\hline
+Ràng buộc an toàn & Tuyệt đối không tự động phê duyệt bài viết, không tự động xuất bản lên kênh, và không được bổ sung bất kỳ số liệu khuyến mãi nào ngoài phạm vi ngữ cảnh được cấp.\\
+\hline
+Cấu trúc phản hồi & Định dạng chuẩn JSON bao gồm các trường: Tiêu đề gợi ý, Thân bài tiếp thị, Lời kêu gọi hành động, Giả định nghiệp vụ, Danh mục dữ liệu gốc và Cảnh báo an toàn.\\
+\hline
+Dữ liệu ngữ cảnh & Tiếp nhận tham số chiến dịch: Định danh chiến dịch, Kênh truyền thông chỉ định, Giọng điệu thương hiệu và Tập hợp các đặc tính sản phẩm được phép sử dụng.\\
+\hline
+Kiểm định hợp lệ & Yêu cầu tạo thông điệp súc tích phù hợp đặc thù kênh; trong trường hợp dữ liệu đầu vào không đầy đủ, bắt buộc phát tín hiệu cảnh báo thay vì phỏng đoán.\\
+\hline
+\end{tabularx}
+\end{table}
+
+Chỉ dẫn trên đóng vai trò lớp lọc định hướng nhưng không thay thế các quy tắc nghiệp vụ tại máy chủ. Trước khi yêu cầu được chuyển tới mô hình trí tuệ nhân tạo, hệ thống tiến hành thẩm định quyền hạn của người dùng và phạm vi dữ liệu; sau khi nhận phản hồi, hệ thống xác thực tính toàn vẹn của cấu trúc dữ liệu trước khi đưa bài viết vào hàng đợi xem xét của con người.
+
+\section{Đặc tả cấu trúc dữ liệu nhật ký kiểm toán AI}
+
+Nhằm đáp ứng yêu cầu giám sát minh bạch và bảo đảm tính giải trình trong các hệ thống phần mềm ứng dụng AI, mọi phiên tương tác giữa người dùng và mô hình đều được ghi nhận vào nhật ký kiểm toán theo các trường dữ liệu tiêu chuẩn (Bảng~\ref{tab:v8-audit-fields}).
+
+\begin{table}[!htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\caption{Danh mục các trường dữ liệu kiểm toán tương tác AI}\label{tab:v8-audit-fields}
+\begin{tabularx}{\textwidth}{|L{4.2cm}|Y|}
+\hline
+\thead{Trường dữ liệu} & \thead{Ý nghĩa và mục đích kiểm soát}\\
+\hline
+Mã định danh yêu cầu & Chuỗi định danh duy nhất của từng phiên tương tác, không chứa thông tin nhạy cảm; phục vụ liên kết vết giữa màn hình thao tác và dữ liệu lưu vết.\\
+\hline
+Nhà cung cấp \& Phiên bản mô hình & Tên định danh dịch vụ và phiên bản mô hình thực tế vận hành tại thời điểm gửi yêu cầu.\\
+\hline
+Phiên bản chỉ dẫn & Phiên bản của tài liệu quy định chỉ dẫn hệ thống và khuôn mẫu yêu cầu người dùng.\\
+\hline
+Danh mục bản ghi ngữ cảnh & Danh sách các bản ghi dữ liệu được trích xuất hợp lệ làm căn cứ đầu vào cho mô hình.\\
+\hline
+Đo lường dung lượng xử lý & Số lượng thẻ từ đầu vào và đầu ra phục vụ công tác giám sát hiệu năng và kiểm soát hạn ngạch.\\
+\hline
+Trạng thái phản hồi & Kết quả xử lý phiên gọi: Thành công, Sai định dạng cấu trúc, Vượt thời gian chờ, hoặc Kích hoạt chế độ dự phòng.\\
+\hline
+Quyết định phê duyệt con người & Hành động can thiệp của chuyên viên quản trị: Chỉnh sửa trực tiếp, Phê duyệt, Từ chối kèm lý do hoặc Hủy bỏ.\\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Nhật ký tương tác AI qua bốn mốc chu trình phát triển}\label{sec:v8-sdlc-ai-log}
+
+Tuân thủ định hướng của Đề tài 80300 (Học phần AIA331), việc ứng dụng trí tuệ nhân tạo được triển khai xuyên suốt toàn bộ chu trình phát triển phần mềm (SDLC) theo phương châm con người giữ quyền quyết định tối hậu (\textit{Human-in-the-loop}). Tại mỗi giai đoạn kiểm tra định kỳ (KT1, KT2, KT3 và Nghiệm thu cuối kỳ), mô hình AI được sử dụng nhằm gia tốc quá trình thiết kế và tối ưu hóa; tuy nhiên, mọi phương án do AI đề xuất đều phải trải qua quy trình phản biện, đối chứng thực nghiệm và hiệu chỉnh chặt chẽ bởi nhóm nghiên cứu.
+
+Bảng~\ref{tab:v8-sdlc-ai-log} tổng hợp quá trình tương tác, đối sánh giữa đề xuất ban đầu của mô hình, các hạn chế kỹ thuật phát hiện và phương án tinh chỉnh thực tế của sinh viên.
+
+\begin{table}[!htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\caption{Nhật ký minh chứng tương tác AI qua 4 mốc phát triển phần mềm (SDLC)}\label{tab:v8-sdlc-ai-log}
+\begin{tabularx}{\textwidth}{|C{1.8cm}|L{3.2cm}|Y|Y|}
+\hline
+\thead{Mốc SDLC} & \thead{Nhiệm vụ \& Chỉ dẫn đầu vào} & \thead{Đề xuất của AI \& Khiếm khuyết phát hiện} & \thead{Quy trình kiểm chứng \& Hiệu chỉnh thực tế} \\
+\hline
+\textbf{KT1}\par (Phân tích \& Thiết kế) &
+Thiết kế lược đồ quan hệ cho các phân hệ nghiệp vụ quản lý chiến dịch và tương tác AI.\par
+\textit{Chỉ dẫn}: Yêu cầu thiết kế mô hình dữ liệu quan hệ hoàn chỉnh cho quản trị chiến dịch đa kênh. &
+Mô hình đề xuất thiếu bảng lưu vết kiểm toán tương tác AI, tiềm ẩn nguy cơ mất dấu vết phục vụ hậu kiểm. Khóa chính bảng chỉ số dễ trùng lặp khi ghi nhận dữ liệu nhiều kênh trong cùng một ngày. &
+Bổ sung bảng lưu vết kiểm toán với đầy đủ các trường thông tin nhận dạng, phiên bản chỉ dẫn và phản hồi con người; thiết lập khóa ngoại kép và ràng buộc duy nhất trên tập thuộc tính định danh.\\
+\hline
+\textbf{KT2}\par (Hiện thực hóa \& Xử lý lỗi) &
+Xây dựng thuật toán tính toán chỉ số hiệu quả chuyển đổi và tỷ lệ hoàn vốn tiếp thị.\par
+\textit{Chỉ dẫn}: Thiết lập giải thuật tổng hợp chỉ số hiệu suất từ tập dữ liệu đa kênh. &
+Mô hình đưa ra công thức chia trực tiếp giữa lượt tương tác và lượt hiển thị, dẫn đến lỗi gián đoạn hệ thống khi chiến dịch mới chưa phát sinh tương tác; thiếu cơ chế kiểm tra quyền hạn thực thi. &
+Bổ sung điều kiện kiểm tra biên an toàn trước khi thực hiện phép chia; chuẩn hóa tỷ lệ hiển thị và tích hợp cơ chế bảo vệ phân quyền theo vai trò quản lý trước khi cho phép hiệu chỉnh dữ liệu.\\
+\hline
+\textbf{KT3}\par (Chỉ dẫn \& Kiểm thử biên) &
+Thiết kế mẫu chỉ dẫn trích xuất ý tưởng và kiểm thử với các bản tóm tắt chiến dịch có độ dài lớn.\par
+\textit{Chỉ dẫn}: Yêu cầu trích xuất 5 góc tiếp cận độc lập từ bản tóm tắt nghiệp vụ chi tiết. &
+Phản hồi của AI vượt ngưỡng độ dài dẫn đến đứt gãy cấu trúc dữ liệu; xuất hiện hiện tượng tự suy diễn các chương trình khuyến mãi không hề có trong ngữ cảnh tài liệu ban đầu. &
+Áp dụng cơ chế tóm lược dữ liệu theo trọng số ưu tiên khi tài liệu vượt trần dung lượng; thiết lập các quy tắc cứng cấm suy đoán ngoài dữ liệu; bổ sung bộ kiểm định cấu trúc đầu ra nghiêm ngặt.\\
+\hline
+\textbf{Cuối kỳ}\par (Đóng gói \& Vận hành) &
+Đóng gói container hóa toàn bộ hệ thống phục vụ triển khai trên môi trường máy chủ phân tán.\par
+\textit{Chỉ dẫn}: Xây dựng cấu hình đóng gói cho các thành phần dịch vụ và điều phối hợp nhất. &
+Cấu hình đóng gói mặc định sử dụng quyền quản trị hệ thống mức cao nhất, tiềm ẩn nguy cơ mất an toàn; kích thước gói phân phối giao diện quá lớn do chứa cả môi trường biên dịch mã nguồn. &
+Chuyển đổi dịch vụ sang tài khoản người dùng phi đặc quyền; áp dụng kỹ thuật đóng gói đa tầng để loại bỏ môi trường biên dịch, giúp tối ưu hóa trên 98\% dung lượng gói phân phối tĩnh.\\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Đánh giá chất lượng mã nguồn và tối ưu hóa an ninh}\label{sec:v8-ai-code-review}
+
+Nhằm nâng cao chất lượng phần mềm theo tiêu chuẩn kiểm định nghiêm ngặt, nhóm phát triển đã áp dụng quy trình rà soát mã nguồn tự động kết hợp phân tích tĩnh có sự trợ giúp của AI. Quy trình này tập trung nhận diện các nguy cơ tiềm ẩn về bảo mật dữ liệu, kiểm soát truy cập và độ trễ truy vấn CSDL theo các tiêu chuẩn công nghiệp (OWASP API Security, ANSI SQL Optimization).
+
+Bảng~\ref{tab:v8-ai-code-review} tổng hợp kết quả rà soát, các điểm nghẽn kiến trúc và hiệu quả tối ưu hóa định lượng đạt được.
+
+\begin{table}[!htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\caption{Kết quả đánh giá chất lượng mã nguồn và tối ưu hóa an ninh}\label{tab:v8-ai-code-review}
+\begin{tabularx}{\textwidth}{|C{0.8cm}|L{2.5cm}|Y|Y|Y|}
+\hline
+\thead{STT} & \thead{Hạng mục} & \thead{Khiếm khuyết ban đầu} & \thead{Giải pháp kiến trúc chuẩn mực} & \thead{Hiệu quả đạt được} \\
+\hline
+1 &
+Bảo vệ khóa bí mật \& Quản lý cấu hình &
+Khóa kết nối dịch vụ ngoại vi được đọc phân tán tại nhiều mô-đun; cơ chế bắt lỗi in toàn bộ thông tin nhạy cảm ra màn hình điều khiển khi phát sinh sự cố mạng. &
+Quy hoạch quản lý cấu hình tập trung qua lớp mô hình môi trường chuyên biệt; cài đặt bộ lọc nhật ký an toàn tự động che giấu các chuỗi nhạy cảm trước khi lưu vết. &
+Bảo vệ toàn diện 100\% các chuỗi khóa bí mật; loại trừ hoàn toàn nguy cơ rò rỉ thông tin an ninh qua tệp nhật ký kiểm toán hệ thống.\\
+\hline
+2 &
+Phân quyền vai trò trên tuyến API &
+Các tuyến hủy bỏ dữ liệu chiến dịch và phê duyệt nội dung chỉ kiểm tra chữ ký số danh tính mà chưa đối soát vai trò quản lý của người thực hiện. &
+Phân tách rõ ràng giữa tầng xác thực danh tính và tầng thẩm định quyền hạn; xây dựng lớp kiểm soát phân quyền có tham số bảo vệ toàn diện các tuyến nhạy cảm. &
+100\% các tác vụ trọng yếu được bảo vệ theo đúng chức năng quyền hạn; ngăn chặn triệt để hành vi can thiệp trái phép và ghi nhận nhật ký vi phạm.\\
+\hline
+3 &
+Tối ưu hóa truy vấn CSDL quan hệ &
+Thuật toán lấy danh sách chiến dịch kèm chỉ số hiệu suất sử dụng vòng lặp duyệt tuần tự, làm phát sinh hiện tượng truy vấn lặp lại nhiều lần (N+1 Query). &
+Tái cấu trúc sang phép kết nối ngoài (Outer Join) kết hợp các hàm gom nhóm và tính toán tổng hợp trực tiếp tại tầng động cơ CSDL; đánh chỉ mục khóa ngoại. &
+Giảm thiểu từ hàng chục câu lệnh truy vấn xuống đúng 1 truy vấn duy nhất; thời gian phản hồi giảm từ 1.240~ms xuống 18~ms (tối ưu hóa 98.5\% độ trễ).\\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Minh chứng 1: Cơ chế làm mờ và bảo vệ chuỗi bảo mật}\label{subsec:v8-code-api-masking}
+
+Nhằm triệt tiêu nguy cơ lộ lọt thông tin an ninh qua luồng nhật ký vận hành, hệ thống chuẩn hóa cơ chế quản lý tham số tập trung, đồng thời triển khai thuật toán che giấu chuỗi nhạy cảm và áp dụng bộ lọc tự động trên toàn bộ luồng ghi vết dữ liệu (Bảng~\ref{tab:v9-app-keymask}).
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Đặc tả kỹ thuật bảo vệ chuỗi bí mật và cơ chế lọc nhật ký an toàn}
+\label{tab:v9-app-keymask}
+\begin{tabularx}{\textwidth}{|L{3.2cm}|L{3.4cm}|Y|C{2.0cm}|}
+\hline
+\thead{Thành phần} & \thead{Cơ chế hiện thực hóa} & \thead{Quy tắc xử lý / Thuật toán} & \thead{Mức bảo vệ}\\
+\hline
+Quản lý cấu hình & Mô hình tham số cô lập & Tải tham số từ tệp môi trường bảo mật; tự động thẩm định kiểu dữ liệu ngay tại thời điểm khởi động máy chủ. & Bảo vệ thời gian chạy\\
+\hline
+Thuật toán che giấu & Bộ biến đổi chuỗi an toàn & Nếu chuỗi có độ dài ngắn, thay thế bằng chuỗi ký tự cố định; nếu độ dài hợp lệ, chỉ giữ lại 4 ký tự đầu và cuối, che toàn bộ phần thân. & Che giấu 100\% nội dung\\
+\hline
+Bộ lọc dòng dữ liệu & Lớp đánh chặn nhật ký & Đánh chặn mọi thông điệp trước khi xuất ra thiết bị ngoại vi; rà soát và mã hóa tự động các chuỗi trùng khớp khóa định danh. & Khử rò rỉ vết an toàn\\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Minh chứng 2: Cơ chế xác thực phiên và phân quyền vai trò}\label{subsec:v8-code-jwt-rbac}
+
+Phân hệ an ninh triển khai cơ chế thẩm tra danh tính đa tầng, tích hợp kiểm tra chéo trạng thái hoạt động của tài khoản trong cơ sở dữ liệu và áp dụng ma trận kiểm soát truy cập trên từng nhóm tác vụ (Bảng~\ref{tab:v9-app-rbac-spec}).
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Đặc tả chính sách phân quyền vai trò người dùng (RBAC Policy Specification)}
+\label{tab:v9-app-rbac-spec}
+\begin{tabularx}{\textwidth}{|L{3.4cm}|L{2.8cm}|Y|C{2.0cm}|}
+\hline
+\thead{Nhóm tác vụ nghiệp vụ} & \thead{Vai trò thẩm quyền} & \thead{Quy tắc thẩm định an ninh} & \thead{Mã trạng thái phản hồi}\\
+\hline
+Phê duyệt \& Từ chối nội dung tiếp thị & Cấp Quản lý (Manager) & Xác thực chữ ký số danh tính, đối soát tài khoản đang hoạt động, thẩm tra vai trò thuộc nhóm quản trị hợp lệ. & 401 / 403\\
+\hline
+Xóa \& Hủy bỏ chiến dịch tiếp thị & Cấp Quản lý (Manager) & Ngăn chặn tuyệt đối vai trò nhân viên thừa hành; kiểm tra ràng buộc toàn vẹn dữ liệu liên quan. & 403 Từ chối\\
+\hline
+Nộp nội dung vào hàng đợi kiểm duyệt & Nhân viên (Marketer), Quản lý & Xác thực quyền sở hữu bài viết hoặc phân công trách nhiệm trong chiến dịch liên kết. & 403 Từ chối\\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Minh chứng 3: Tối ưu hóa truy vấn CSDL quan hệ}\label{subsec:v8-code-sqlalchemy-opt}
+
+Hệ thống đã nâng cấp toàn diện các phép toán truy vấn dữ liệu sang cấu trúc tối ưu hóa gom nhóm tầng CSDL, kết hợp phép nối ngoài và xử lý giá trị mặc định trực tiếp bằng động cơ CSDL (Bảng~\ref{tab:v9-app-query-opt}).
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Đối chiếu giải pháp tối ưu hóa truy vấn CSDL và kết quả đo lường}
+\label{tab:v9-app-query-opt}
+\begin{tabularx}{\textwidth}{|L{2.8cm}|Y|Y|C{2.0cm}|}
+\hline
+\thead{Tiêu chí} & \thead{Trước tối ưu (Truy vấn lặp N+1)} & \thead{Sau tối ưu (Kết nối ngoài \& Gom nhóm CSDL)} & \thead{Hiệu quả}\\
+\hline
+Số lượng truy vấn & Phát sinh 1 câu lệnh chính kèm $N$ câu lệnh phụ duyệt lặp theo từng chiến dịch & Thực thi duy nhất 1 câu lệnh tổng hợp với mệnh đề gom nhóm theo mã chiến dịch & Giảm thiểu $N$ lần\\
+\hline
+Địa điểm tổng hợp & Xử lý lặp tuần tự trong bộ nhớ ứng dụng máy chủ & Gom nhóm và tính toán tổng số trực tiếp bằng động cơ tối ưu hóa CSDL & Tiết kiệm I/O\\
+\hline
+Thời gian phản hồi P95 & Đạt 1.240~ms khi danh sách thử nghiệm có 50 chiến dịch & Giảm còn 18~ms (hoàn tất thực thi và trả kết quả tổng hợp về giao diện) & Nhanh hơn 68.8 lần\\
+\hline
+Tính toàn vẹn dữ liệu & Tiềm ẩn giá trị rỗng khi chiến dịch mới chưa phát sinh tương tác & Hàm chuẩn hóa giá trị mặc định thiết lập kết quả an toàn bằng 0 & Chống lỗi gián đoạn\\
+\hline
+\end{tabularx}
+\end{table}
+
+\chapter{THIẾT KẾ KIẾN TRÚC VÀ QUY TRÌNH VẬN HÀNH HỆ THỐNG}
+
+\section{Nguyên tắc thiết kế CSDL và quản lý di trú lược đồ}
+
+Hệ thống áp dụng kiến trúc dữ liệu phân tầng hiện đại, phân tách độc lập giữa mô hình logic nghiệp vụ và tầng lưu trữ vật lý. Quá trình phát triển và kiểm định prototype sử dụng hệ quản trị CSDL nhúng SQLite với cơ chế ghi trước nhật ký WAL (Write-Ahead Logging) bảo đảm tính gọn nhẹ và an toàn dữ liệu; toàn bộ định nghĩa kiểu dữ liệu tuân thủ nghiêm ngặt chuẩn ANSI SQL, cho phép chuyển đổi trong suốt sang các hệ quản trị CSDL phân tán quy mô lớn như PostgreSQL khi vận hành thực tế. Quá trình cập nhật và đồng bộ cấu trúc bảng được quản lý tự động thông qua công cụ di trú lược đồ chuyên dụng.
+
+\section{Cấu trúc phân tầng các thành phần hệ thống}
+
+Nhằm bảo đảm tính mô-đun hóa cao, sự phân tách trách nhiệm rõ ràng và tính sẵn sàng mở rộng, cấu trúc thành phần của hệ thống MarketFlow AI được tổ chức thành các tầng chức năng mạch lạc theo Bảng~\ref{tab:v9-app-structure}.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Phân tầng cấu trúc thành phần và trách nhiệm nghiệp vụ các gói mô-đun}
+\label{tab:v9-app-structure}
+\begin{tabularx}{\textwidth}{|L{3.2cm}|L{2.8cm}|Y|L{2.8cm}|}
+\hline
+\thead{Gói mô-đun} & \thead{Phân tầng} & \thead{Trách nhiệm nghiệp vụ} & \thead{Nền tảng công nghệ}\\
+\hline
+Bộ định tuyến API & Tầng Định tuyến (Routing) & Tiếp nhận yêu cầu mạng, giải mã danh tính, phân quyền vai trò và giải quyết phạm vi bản ghi. & FastAPI Gateway, ASGI\\
+\hline
+Mô hình Thực thể & Tầng Thực thể (Entity ORM) & Khai báo 11 thực thể dữ liệu quan hệ, ràng buộc khóa ngoại liên bảng và chỉ mục tối ưu hóa. & SQLAlchemy 2.0 Declarative\\
+\hline
+Hợp đồng Dữ liệu & Tầng Dữ liệu (DTO Contracts) & Đặc tả cấu trúc thông điệp đầu vào và đầu ra, xác thực kiểu dữ liệu và kiểm tra ràng buộc logic. & Pydantic Schema Validator\\
+\hline
+Dịch vụ Nghiệp vụ \& AI & Tầng Dịch vụ (Core Services) & Điều phối chu trình chiến dịch, kết nối mô hình Gemini, quản lý chỉ dẫn và chuyển mạch dự phòng. & Google Gemini, HTTP Client\\
+\hline
+Màn hình Ứng dụng & Tầng Giao diện (Presentation) & Cung cấp các phân hệ tương tác: Bảng điều khiển, Quản lý chiến dịch, Hàng đợi duyệt, Xưởng AI. & React, TypeScript\\
+\hline
+Thành phần Giao diện & Tầng Trình bày (UI Components) & Khối giao diện Bento Grid tái sử dụng: Ngăn kéo trợ lý, Khung tải dữ liệu, Báo trạng thái tức thì. & Tailwind CSS, Icon Engine\\
+\hline
+Bộ kiểm thử Tự động & Tầng Đảm bảo Chất lượng & 205 kịch bản kiểm thử độc lập bao phủ toàn diện: Đơn vị, Tích hợp, Máy trạng thái và Bảo mật đối kháng. & Khung kiểm thử Pytest\\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Quy trình thiết lập và vận hành hệ thống tiêu chuẩn}
+
+Quy trình khởi tạo và đưa hệ thống vào trạng thái sẵn sàng phục vụ được chuẩn hóa thành 4 giai đoạn tuần tự chặt chẽ trong Bảng~\ref{tab:v9-app-lifecycle}.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Quy trình 4 giai đoạn thiết lập và vận hành hệ thống tiêu chuẩn}
+\label{tab:v9-app-lifecycle}
+\begin{tabularx}{\textwidth}{|C{1.0cm}|L{3.2cm}|L{4.6cm}|Y|}
+\hline
+\thead{Giai đoạn} & \thead{Phân hệ} & \thead{Tác vụ thực hiện tiêu chuẩn} & \thead{Mục tiêu đạt được}\\
+\hline
+1 & Môi trường Dịch vụ Backend & Khởi tạo môi trường thông dịch cô lập và cài đặt các gói thư viện phụ thuộc của máy chủ API. & Thiết lập nền tảng tính toán đồng nhất, loại bỏ xung đột phiên bản thư viện.\\
+\hline
+2 & Cơ sở Dữ liệu \& Dữ liệu mẫu & Di trú lược đồ CSDL lên phiên bản mới nhất và nạp tập dữ liệu mẫu ban đầu gồm 4 chiến dịch, 14 nội dung, 60 chỉ số. & Sẵn sàng cấu trúc lưu trữ quan hệ và dữ liệu khởi tạo phục vụ kiểm thử nghiệm thu.\\
+\hline
+3 & Khởi chạy Cổng giao tiếp API & Kích hoạt máy chủ ứng dụng bất đồng bộ lắng nghe tại cổng nội bộ với cơ chế giám sát nhịp tim. & Máy chủ tiếp nhận các yêu cầu HTTP/RESTful với năng lực xử lý bất đồng bộ cao.\\
+\hline
+4 & Phục vụ Giao diện Người dùng & Biên dịch các tài nguyên giao diện phía máy trạm và khởi chạy máy chủ phân phối ứng dụng tĩnh. & Người dùng có thể truy cập hệ thống qua trình duyệt với giao diện tương tác tức thì.\\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Danh mục tham số cấu hình và môi trường vận hành}
+
+Hệ thống quản lý toàn bộ các thông số môi trường nhạy cảm thông qua tệp cấu hình bảo mật cô lập, được đặc tả chi tiết trong Bảng~\ref{tab:v9-app-env-vars}.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Đặc tả danh mục tham số cấu hình và chính sách an ninh hệ thống}
+\label{tab:v9-app-env-vars}
+\begin{tabularx}{\textwidth}{|L{3.6cm}|L{4.2cm}|Y|C{2.0cm}|}
+\hline
+\thead{Tên tham số cấu hình} & \thead{Ý nghĩa kỹ thuật} & \thead{Quy chuẩn cấu hình khuyến nghị} & \thead{Cấp độ an ninh}\\
+\hline
+Địa chỉ kết nối CSDL & Chuỗi chỉ dẫn kết nối tới kho lưu trữ quan hệ & Đường dẫn tệp cơ sở dữ liệu nội bộ bảo vệ & Lưu trữ nội bộ\\
+\hline
+Khóa bí mật ký số & Chuỗi nhị phân phục vụ mã hóa chữ ký số phiên & Chuỗi ký tự sinh ngẫu nhiên an toàn độ dài 256 bits & Tối mật\\
+\hline
+Thuật toán ký số danh tính & Tiêu chuẩn mã hóa phiên đăng nhập & Thuật toán mã hóa băm khóa công khai đối xứng chuẩn & Tiêu chuẩn an ninh\\
+\hline
+Thời hạn hiệu lực phiên & Khoảng thời gian tồn tại tối đa của phiên làm việc & Thiết lập mặc định 120 phút bảo đảm an toàn tài khoản & Chính sách phiên\\
+\hline
+Định danh dịch vụ AI & Nhà cung cấp dịch vụ trí tuệ nhân tạo & Lựa chọn hệ sinh thái mô hình Google Gemini & Định tuyến dịch vụ\\
+\hline
+Khóa truy cập dịch vụ AI & Khóa xác thực kết nối đám mây AI Studio & Khóa bảo mật cá nhân (hạn ngạch miễn phí 0 VNĐ) & Tối mật\\
+\hline
+Thời gian chờ tối đa AI & Ngưỡng thời gian ngắt kết nối an toàn & Giới hạn tối đa 10 giây để chống nghẽn luồng xử lý & An toàn đường truyền\\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Triển khai hạ tầng Tên miền Phân hiệu và Đóng gói Container}\label{sec:v8-docker-packaging}
+
+Nhằm đáp ứng yêu cầu khả chuyển, tính sẵn sàng cao và tiêu chuẩn bàn giao thực tế tại môi trường giáo dục đào tạo (đáp ứng tiêu chí nghiệm thu chuyên nghiệp), hệ thống được cấu hình chính thức trên tên miền phân hiệu: \textbf{https://marketflow.ictu.edu.vn} (thuộc dải mạng phân hiệu Trường Đại học Công nghệ Thông tin và Truyền thông - ICTU), đồng thời được đóng gói container hóa hoàn chỉnh theo kiến trúc 3 tầng dịch vụ độc lập: CSDL quan hệ, Máy chủ ứng dụng Backend và Cổng phân phối tĩnh Frontend Nginx.
+
+\subsection{Tiêu chuẩn an ninh Container hóa cho Dịch vụ Backend}\label{subsec:v8-docker-backend}
+
+Gói container hóa cho máy chủ ứng dụng Backend được xây dựng trên nền tảng Linux rút gọn nhằm tối thiểu hóa diện tích tấn công tiềm ẩn. Hệ thống áp dụng nghiêm ngặt nguyên tắc đặc quyền tối thiểu, bảo đảm dịch vụ chỉ vận hành dưới quyền tài khoản người dùng phi đặc quyền (Bảng~\ref{tab:v9-app-docker-backend}).
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Đặc tả các lớp bảo vệ và tiêu chuẩn an ninh Container Backend}
+\label{tab:v9-app-docker-backend}
+\begin{tabularx}{\textwidth}{|L{3.2cm}|L{3.8cm}|Y|}
+\hline
+\thead{Lớp bảo vệ} & \thead{Quy chuẩn kỹ thuật áp dụng} & \thead{Mục tiêu an toàn \& Ý nghĩa vận hành}\\
+\hline
+Hệ điều hành cơ sở & Bản phân phối Linux tối giản & Loại bỏ hoàn toàn các gói nhị phân thừa, giảm thiểu tối đa các lỗ hổng bảo mật phổ biến.\\
+\hline
+Môi trường thời gian chạy & Cơ chế vô hiệu hóa tệp tạm \& đệm xuất & Ngăn chặn sinh các tệp mã máy phụ trợ thừa và đẩy trực tiếp luồng nhật ký ra hệ thống giám sát.\\
+\hline
+Tài khoản phi đặc quyền & Tài khoản định danh an toàn (UID 1001) & Ngăn ngừa nguy cơ vượt thoát khỏi không gian cô lập của container ra hệ điều hành máy chủ.\\
+\hline
+Tối ưu hóa dung lượng & Loại trừ bộ nhớ đệm phụ trợ khi cài đặt & Tận dụng cơ chế lưu trữ phân tầng; loại bỏ toàn bộ dữ liệu tải xuống trung gian để thu nhỏ gói phân phối.\\
+\hline
+Giám sát nhịp tim định kỳ & Cơ chế kiểm tra sức khỏe tự động nội bộ & Tần suất kiểm tra định kỳ 30 giây; tự động thông báo trạng thái vận hành của tiến trình máy chủ.\\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Quy trình đóng gói Đa tầng và Phân phối tĩnh Frontend qua Nginx}\label{subsec:v8-docker-frontend}
+
+Quá trình đóng gói giao diện người dùng ứng dụng kiến trúc đa tầng (Multi-stage build) gồm hai giai đoạn phân tách rõ rệt: Giai đoạn 1 đảm nhiệm việc phân tích cú pháp và biên dịch các tệp nguồn; Giai đoạn 2 chuyển giao toàn bộ tệp tĩnh đã tối ưu hóa sang máy chủ phân phối Nginx siêu nhẹ (Bảng~\ref{tab:v9-app-docker-frontend}).
+
+Kỹ thuật này cho phép loại bỏ hoàn toàn môi trường biên dịch mã cồng kềnh, giảm dung lượng gói phân phối từ 1.25~GB xuống chỉ còn ~24.8~MB (tối ưu hóa hơn 98\% dung lượng lưu trữ máy chủ).
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Quy trình đóng gói Đa tầng và phân phối tĩnh qua Nginx Reverse Proxy}
+\label{tab:v9-app-docker-frontend}
+\begin{tabularx}{\textwidth}{|L{3.0cm}|L{3.6cm}|Y|}
+\hline
+\thead{Giai đoạn / Thành phần} & \thead{Môi trường thực thi} & \thead{Mục tiêu tối ưu hóa \& Năng lực vận hành}\\
+\hline
+Giai đoạn 1: Biên dịch & Môi trường xây dựng tĩnh tạm thời & Cài đặt chính xác các thư viện phụ thuộc và biên dịch toàn bộ mã nguồn sang gói tệp tĩnh.\\
+\hline
+Giai đoạn 2: Phục vụ & Máy chủ web phân phối Nginx tối giản & Chỉ tiếp nhận và phân phối các tệp tĩnh đã biên dịch; loại bỏ hoàn toàn các trình thông dịch phụ trợ.\\
+\hline
+Điều hướng ứng dụng đơn trang & Dự phòng điều hướng máy trạm & Tự động chuyển tiếp mọi yêu cầu định tuyến hợp lệ về trang chủ tài liệu, triệt tiêu lỗi không tìm thấy trang.\\
+\hline
+Cổng kết nối Reverse Proxy & Chuyển tiếp yêu cầu nội bộ bảo vệ & Đóng vai trò cổng đệm chuyển hướng các yêu cầu API sang backend trong mạng nội bộ cô lập, giải quyết bài toán cùng nguồn gốc.\\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Ma trận điều phối dịch vụ và ràng buộc mạng Production}\label{subsec:v8-docker-compose}
+
+Mô hình điều phối phân tán liên kết đồng bộ cả 3 dịch vụ của hệ thống: Cơ sở dữ liệu, Máy chủ ứng dụng Backend và Cổng giao diện Frontend Nginx thông qua mạng nội bộ bắc cầu độc lập, sẵn sàng phục vụ lưu lượng người dùng tại địa chỉ phân hiệu chính thức (Bảng~\ref{tab:v9-app-compose-matrix}).
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Ma trận điều phối dịch vụ và ràng buộc mạng trong môi trường vận hành}
+\label{tab:v9-app-compose-matrix}
+\begin{tabularx}{\textwidth}{|L{2.0cm}|L{3.2cm}|C{2.0cm}|Y|C{2.2cm}|}
+\hline
+\thead{Dịch vụ} & \thead{Đặc tính thành phần} & \thead{Cổng liên kết} & \thead{Ràng buộc phụ thuộc \& Kiểm soát sức khỏe} & \thead{Chính sách lưu trữ}\\
+\hline
+Cơ sở Dữ liệu & Động cơ CSDL quan hệ tối ưu & Cổng nội bộ & Tự động kiểm tra trạng thái sẵn sàng kết nối trước khi tiếp nhận truy vấn. & Ổ lưu trữ bền vững\\
+\hline
+Máy chủ Backend & Cổng API RESTful bất đồng bộ & 8000 & Phụ thuộc cơ sở dữ liệu với điều kiện khỏe mạnh; kiểm tra định kỳ cổng sức khỏe. & Tách biệt mã nguồn\\
+\hline
+Cổng Frontend & Nginx phân phối tĩnh \& Proxy & 80 / 443 & Phụ thuộc backend với điều kiện sẵn sàng; phục vụ chính thức tại tên miền phân hiệu. & Không lưu trạng thái\\
+\hline
+\end{tabularx}
+\end{table}
+
+Toàn bộ chu trình khởi tạo, kiểm tra sức khỏe phụ thuộc và thiết lập kênh truyền thông nội bộ được tự động hóa hoàn toàn, bảo đảm hệ thống có thể tái lập tức thì trên mọi hạ tầng máy chủ đạt chuẩn mà không đòi hỏi bất kỳ thao tác can thiệp thủ công phức tạp nào.

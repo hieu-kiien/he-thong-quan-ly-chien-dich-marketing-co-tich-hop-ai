@@ -1,0 +1,143 @@
+=== PAGE 39 ===
+Bảng 6.2: Ma trận kiểm thử đối kháng và tỷ lệ kháng cự của hệ thống
+Hình thức tấn công Kịch bản giả lập đối kháng Phản hồi của hệ
+thống
+Kết quả
+Leoquyềndọc
+(VerticalPrivilege
+Escalation)
+TàikhoảnvaitròMarketergửiyêu
+cầutớicácendpointquảntrị: POST
+/contents/{id}/approve, POST
+/contents/{id}/reject, DELETE
+/campaigns/{id}.
+HTTP403
+Forbidden.
+RoleChecker
+chặnđứngngay
+tạitầngrouting
+dependency.
+Khángcự
+100%
+Leoquyềnngang
+(HorizontalIDOR
+Attack)
+MarketerAcốtìnhtruycậphoặc
+chỉnhsửachiếndịch/nộidung/chỉsố
+thuộcquyềnsởhữucủaMarketerB
+thôngquaviệcđoánđịnhdanhID.
+HTTP403
+Forbiddenhoặc
+404NotFound.
+Thuậttoán
+RecordScopelọc
+sạchquyềntruy
+cập.
+Khángcự
+100%
+Vượtquytrình
+duyệt(State
+MachineBypass)
+Kẻtấncônggửipayloadcốtìnhgán
+"status": "APPROVED" qua POST
+/contentshoặc PUT
+/contents/{id}.
+HTTP400Bad
+Request. Hệ
+thốngtừchốicập
+nhậttrựctiếpvà
+yêucầuqua
+endpointnghiệp
+vụ.
+Khángcự
+100%
+Gianlậnsauphê
+duyệt
+(Post-Approval
+Tampering)
+Bàiviếtđãởtrạngthái APPROVEDbị
+kẻgiansửađổinộidung bodyhoặc
+lờikêugọi ctathànhnộidungđộc
+hại.
+Hệthốngphát
+hiệnthayđổivà
+tựđộnghạcấp
+trạngtháivề
+AI_DRAFT,hủybỏ
+lịchxuấtbản.
+Khángcự
+100%
+GiảmạoToken
+(JWTTampering&
+NoneAlg)
+GiảmạoJWTheadervớithuậttoán
+"alg": "none" ,sửađổipayload
+"sub": "admin" ,hoặclàmgiảchữ
+kýsốbímật.
+HTTP401
+Unauthorized.
+PyJWTxácthực
+nghiêmngặtthuật
+toánHS256và
+chữkýsố.
+Khángcự
+100%
+TiêmmãSQL(SQL
+Injection-SQLi)
+Tiêmpayloadđộchạivàothanhtìm
+kiếm: ' OR '1'='1 , '; DROP TABLE
+users;‐‐, ' UNION SELECT * FROM
+users‐‐.
+Truyvấnantoàn
+tuyệtđối.
+SQLAlchemy
+thamsốhóa
+100%thamsố
+truyvấn
+(parameterized
+queries).
+Khángcự
+100%
+TấncôngXSS NhúngmãđộcJavaScriptvàotiêu
+đềchiếndịchvànộidungbàiviết:
+<script>alert('pwned')</script>.
+Mãscriptđược
+lưutrữantoàn
+dướidạngchuỗi
+thô;Reacttự
+độngescape
+HTMLkhirender
+lênUI.
+Khángcự
+100%
+Kiểmthửmờdữ
+liệu(InputFuzzing)
+GửipayloadchứakýtựUnicodeđặc
+biệt,biểutượngcảmxúc(emojis),
+chuỗisiêudài( >10,000kýtự),hoặc
+sailệchkiểudữliệu(sốthayvìchữ).
+Pydanticv2xửlý
+sạchsẽ;trảvề
+HTTP422
+Unprocessable
+Entityvớithông
+báolỗichitiết.
+Khángcự
+100%28
+=== PAGE 40 ===
+• Tổng số ca kiểm thử: 205/205Passed.
+• Tỷ lệ thành công: 100.0%.
+• Số lượng thất bại (Failures): 0.
+• Số lượng lỗi phát sinh (Errors): 0.
+• Cảnh báo (Warnings): 0 (Đã chuẩn hóa hoàn toàn cú pháp SQLAlchemy 2.0 và xử
+lýdứtđiểmcáccảnhbáosubquery).
+• Tổng thời gian thực thi: 182.4 giây (bao gồm toàn bộ các kịch bản đối kháng mạng
+vàtiêmlỗicôlập).
+6.6. Kết luận chương
+Chương6đãcungcấpbằngchứngthựcnghiệmrõràngvềchấtlượngmãnguồncủaMarket-
+FlowAI.Với205cakiểmthửtựđộngbaophủtoàndiệntừkiểmthửđơnvị,kiểmthửluồng
+nghiệpvụđếnkiểmthửbảomậtđốikhángđạttỷlệvượtqua100%,hệthốngđãchứngminh
+độbềnbỉ,tínhtoànvẹndữliệuvàkhảnăngkhángcựvượttrộitrướcmọikịchbảntấncông
+khai thác lỗ hổng. Chương tiếp theo sẽ trình bày kết quả đánh giá thực nghiệm định lượng
+đốivớicácdịchvụAI.
+29

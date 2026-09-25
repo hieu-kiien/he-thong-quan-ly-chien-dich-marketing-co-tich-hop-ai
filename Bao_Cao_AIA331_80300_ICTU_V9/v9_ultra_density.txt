@@ -1,0 +1,58 @@
+Page 01: words= 65, lines=13 | TRƯỜNG ĐẠI HỌC CÔNG NGHỆ THÔNG TIN VÀ
+Page 02: words=137, lines=23 | LỜI CẢM ƠN Lờiđầutiên,nhómtácgiảxinbàytỏlòngbiếtơnsâusắcvàchânthànhnhấttớicácThầy,Cô giáo thuộc Khoa Công
+Page 03: words= 41, lines=14 | DANH MỤC TỪ VIẾT TẮT Bảng 1: Các
+Page 04: words=546, lines=34 | MỤC LỤC LỜI CẢM ƠN i DANH MỤC
+Page 05: words=620, lines=38 | 3.6 Kếtluậnchương . . . . . .
+Page 06: words=546, lines=32 | 7.5 Thựcnghiệmkhảnăngchịulỗi(FaultInjection ResilienceTesting) . . . . 33
+Page 07: words=438, lines=34 | DANH MỤC BẢNG BIỂU 1 Cáctừviếttắtsửdụngtrongtàiliệu . .
+Page 08: words= 47, lines= 4 | C.5 QuytrìnhđónggóiMulti-stageBuildvàphânphốitĩnhFrontendquaNginx Alpine . . . . .
+Page 09: words=129, lines=11 | DANH MỤC HÌNH VẼ 1.1 SơđồranhgiớihệthốngMarketFlowAI . .
+Page 10: words=325, lines=37 | LỜI MỞ ĐẦU Lý do chọn đề tài
+Page 11: words=107, lines=16 | ngữcảnh. 5. Chương 5: Hiện thực hóa hệ
+Page 12: words=212, lines=33 | CHƯƠNG 1. TỔNG QUAN ĐỀ TÀI VÀ BỐI
+Page 13: words=268, lines=98 | Bảng 1.1: Người sử dụng và tiêu chí
+Page 14: words=154, lines=73 | connectorantoàn)vàcácnềntảngmạngxãhội(đượctrừutượnghóathôngquakênh pháthànhvàlịchđăng,chuẩnbịsẵnsàngchokếtnốiWebhookchínhthức). 1.4. Mục tiêu và tiêu chí
+Page 15: words=309, lines=36 | 2. Phân quyền mức bản ghi (Record-level Authorization)
+Page 16: words=265, lines=36 | CHƯƠNG 2. CƠ SỞ KỸ THUẬT VÀ CÔNG
+Page 17: words=225, lines=64 | Bảng 2.1: Ngăn xếp công nghệ hiện thực
+Page 18: words=342, lines=40 | mượt mà khi tương tác với các bảng
+Page 19: words=137, lines=18 | Declarative Base giúp toàn bộ định nghĩa bảng,
+Page 20: words=140, lines=53 | CHƯƠNG 3. PHÂN TÍCH YÊU CẦU HỆ THỐNG
+Page 21: words=172, lines=67 | HỆ THỐNG QUẢN LÝ CHIẾN DỊCH MARKETING Quản
+Page 22: words=136, lines=83 | Bảng 3.2 (tiếp theo): Danh mục yêu cầu
+Page 23: words=275, lines=38 | • NFR01 (Kiểm soát truy cập đa tầng):
+Page 24: words=224, lines=35 | Nhân viên Giao diện Web API Backend Điều
+Page 25: words=201, lines=53 | tra quyền của Marketer trêncampaign_id mục tiêu trước
+Page 26: words=184, lines=22 | IN_REVIEW(bấtkỳtácgiảnàocóquyềntrênnộidungđềugọiđược). • POST /contents/{id}/approve : ChỉchophépvaitròManagergọitrêncácbài viếtđangở IN_REVIEW.Tựđộngghinhậnthôngtinngườiduyệtvàmốcthờigian
+Page 27: words=251, lines=51 | CHƯƠNG 4. THIẾT KẾ KIẾN TRÚC VÀ MÔ
+Page 28: words=163, lines=47 | Bảng 4.1: Phân định trách nhiệm của các
+Page 29: words=143, lines=81 | Bảng 4.2: Từ điển dữ liệu và các
+Page 30: words=335, lines=108 | product_categories (Nhóm SP) PK id : INTEGER name
+Page 31: words=197, lines=50 | 4.4.1. Đặc tả hợp đồng dữ liệu chuẩn
+Page 32: words=102, lines= 9 | • Hệ thống đánh dấu cờis_fallback = True
+Page 33: words=151, lines=54 | CHƯƠNG 5. HIỆN THỰC HÓA HỆ THỐNG 5.1.
+Page 34: words=258, lines=55 | 5.2.1. Phân hệ Bảo mật, Xác thực và
+Page 35: words=387, lines=102 | Bảng 5.3: Quy tắc chuyển dịch trạng thái
+Page 36: words=217, lines=53 | vàlưuthànhbảnnhápđểđưavàoquytrìnhduyệt. 5.4. Hiện thực hóa AI Fallback De-hallucination
+Page 37: words=240, lines=34 | CHƯƠNG 6. KIỂM THỬ THỰC NGHIỆM VÀ ĐỐI
+Page 38: words=139, lines=58 | Bảng 6.1: Danh mục các tệp kiểm thử
+Page 39: words=183, lines=125 | Bảng 6.2: Ma trận kiểm thử đối kháng
+Page 40: words= 92, lines=16 | • Tổng số ca kiểm thử: 205/205Passed. •
+Page 41: words=217, lines=36 | CHƯƠNG 7. ĐÁNH GIÁ THỰC NGHIỆM AI ĐỊNH
+Page 42: words=244, lines=51 | • Ước tính chi phí vận hành (Operational
+Page 43: words=213, lines=38 | (như tự phỏng đoán thời gian đăng bài
+Page 44: words=186, lines=45 | Bảng 7.2: Dự phóng tiêu thụ token và
+Page 45: words=290, lines=35 | CHƯƠNG 8. KẾT LUẬN VÀ GIỚI HẠN ĐÃ
+Page 46: words=169, lines=66 | 8.2. Đánh giá khách quan các giới hạn
+Page 47: words=209, lines=35 | TÀI LIỆU THAM KHẢO [1] K. Peffers, T.
+Page 48: words=105, lines=13 | PHỤ LỤC A. MA TRẬN TRUY XUẤT NGUỒN
+Page 49: words=212, lines=146 | Bảng A.1: Ma trận truy xuất nguồn gốc
+Page 50: words=175, lines=35 | PHỤ LỤC B. PROMPT VÀ NHẬT KÝ SỬ
+Page 51: words=209, lines=30 | Tạitừngmốcđánhgiáđịnhkỳ(KT1,KT2,KT3vàCuốikỳ),AIđượcsửdụngnhưmộttrợ lýgiatốcpháttriển;tuynhiên,mọikếtquảsinhrađềuphảitrảiquaquytrìnhkiểmthửđộc lập,ràsoátpháthiệncáckhiếmkhuyết(nhưảogiáchallucination,lỗichiacho0,thiếukiểm soát phân quyền hoặc nguy
+Page 52: words=215, lines=146 | Bảng B.3: Nhật ký minh chứng tương tác
+Page 53: words=136, lines=100 | Bảng B.4: Kết quả AI Code Review và
+Page 54: words=197, lines=82 | Bảng B.5: Đặc tả kỹ thuật bảo vệ
+Page 55: words=150, lines=55 | PHỤ LỤC C. THIẾT KẾ DỮ LIỆU VÀ
+Page 56: words=234, lines=68 | Bảng C.2: Quy trình các bước khởi tạo
+Page 57: words=209, lines=48 | C.5.1. Dockerfile cho Backend FastAPI (Chuẩn bảo mật
+Page 58: words=128, lines=39 | Bảng C.5: Quy trình đóng gói Multi-stage Build

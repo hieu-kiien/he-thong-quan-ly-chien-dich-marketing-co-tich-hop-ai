@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Sparkles, Loader2 } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
 import { Dashboard } from './pages/Dashboard';
@@ -8,72 +8,54 @@ import { ReviewQueue } from './pages/ReviewQueue';
 import { WorkflowCanvas } from './components/WorkflowCanvas';
 import { AIDrawer } from './components/AIDrawer';
 import { AIStudio } from './pages/AIStudio';
+import { Settings } from './pages/Settings';
+import { LoginPage } from './pages/LoginPage';
+import { RegisterPage } from './pages/RegisterPage';
+import { BrandKitModal } from './components/BrandKitModal';
 import { ToastProvider, useToast } from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { Campaign, MarketingContent, User } from './types';
-import { authApi, campaignApi, contentApi, getApiErrorMessage } from './services/api';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { WorkspaceProvider, useWorkspace } from './context/WorkspaceContext';
+import { Campaign, MarketingContent } from './types';
+import { campaignApi, contentApi, getApiErrorMessage } from './services/api';
 
 function AppContent() {
   const toast = useToast();
+  const { user, userRole, isAuthenticated, isLoading: isAuthLoading, logout } = useAuth();
+  const { currentWorkspace } = useWorkspace();
+
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [contents, setContents] = useState<MarketingContent[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
-  const [isAuthReady, setIsAuthReady] = useState<boolean>(false);
+  const [isBrandKitModalOpen, setIsBrandKitModalOpen] = useState<boolean>(false);
 
-  // Khởi tạo đăng nhập tự động tài khoản Manager để demo mượt mà
-  useEffect(() => {
-    initAuthAndData();
-  }, []);
-
-  const initAuthAndData = async () => {
-    try {
-      // Đăng nhập mặc định Manager
-      const authRes = await authApi.login('manager@ictu.edu.vn', 'Manager@123');
-      setCurrentUser(authRes.user);
-      await loadCampaignsAndContents();
-    } catch (e) {
-      console.error('Lỗi khởi tạo đăng nhập:', e);
-      toast.warning('Chưa kết nối được tới Backend API (127.0.0.1:8000). Vui lòng kiểm tra dịch vụ backend.');
-    } finally {
-      setIsAuthReady(true);
-    }
-  };
-
-  const loadCampaignsAndContents = async () => {
+  const loadCampaignsAndContents = useCallback(async (wsId?: number) => {
     try {
       const [cList, ctList] = await Promise.all([
-        campaignApi.getAll(),
-        contentApi.getAll()
+        campaignApi.getAll(undefined, undefined, wsId),
+        contentApi.getAll(undefined, undefined, wsId)
       ]);
       setCampaigns(cList);
       setContents(ctList);
       if (cList.length > 0) {
         setSelectedCampaign(cList[0]);
+      } else {
+        setSelectedCampaign(null);
       }
     } catch (e) {
-      console.error(e);
+      console.error('Lỗi nạp chiến dịch & nội dung:', e);
     }
-  };
+  }, []);
 
-  const handleSwitchRole = async (role: 'MANAGER' | 'MARKETER') => {
-    try {
-      if (role === 'MANAGER') {
-        const res = await authApi.login('manager@ictu.edu.vn', 'Manager@123');
-        setCurrentUser(res.user);
-        toast.success('Đã chuyển sang vai trò Quản lý (Manager)');
-      } else {
-        const res = await authApi.login('marketer@ictu.edu.vn', 'Marketer@123');
-        setCurrentUser(res.user);
-        toast.success('Đã chuyển sang vai trò Nhân viên (Marketer)');
-      }
-    } catch (e: any) {
-      toast.error(getApiErrorMessage(e), 'Lỗi chuyển vai trò');
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadCampaignsAndContents(currentWorkspace?.id);
     }
-  };
+  }, [isAuthenticated, currentWorkspace, loadCampaignsAndContents]);
 
   const handleOpenWorkflow = (campaign: Campaign) => {
     setSelectedCampaign(campaign);
@@ -89,34 +71,47 @@ function AppContent() {
     try {
       await contentApi.approve(id);
       toast.success('Đã phê duyệt bài viết thành công (APPROVED)!');
-      loadCampaignsAndContents();
+      loadCampaignsAndContents(currentWorkspace?.id);
     } catch (e: any) {
       toast.error(getApiErrorMessage(e), 'Lỗi khi duyệt bài');
     }
   };
 
-  if (!isAuthReady) {
+  // Trạng thái đang tải session đăng nhập
+  if (isAuthLoading) {
     return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white gap-3 font-['Plus_Jakarta_Sans',sans-serif]">
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-950 text-white gap-3 font-sans">
         <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 animate-pulse">
           <Sparkles className="w-6 h-6 text-white" />
         </div>
         <div className="text-center">
           <h2 className="font-bold text-sm text-slate-100">MarketFlow AI</h2>
-          <p className="text-xs text-slate-400 mt-0.5">Đang thiết lập phiên làm việc và bảo mật API...</p>
+          <p className="text-xs text-slate-400 mt-1 flex items-center justify-center gap-1.5">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <span>Đang xác thực thông tin tài khoản...</span>
+          </p>
         </div>
       </div>
     );
   }
 
+  // Nếu chưa đăng nhập: Điều hướng tới LoginPage hoặc RegisterPage
+  if (!isAuthenticated) {
+    if (authMode === 'register') {
+      return <RegisterPage onNavigateToLogin={() => setAuthMode('login')} />;
+    }
+    return <LoginPage onNavigateToRegister={() => setAuthMode('register')} />;
+  }
+
+  // Đã đăng nhập: Giao diện chính của ứng dụng
   return (
-    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans">
       {/* Sidebar Navigation (with Mobile Drawer support) */}
       <Sidebar
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
-        currentUser={currentUser}
-        onLogout={() => handleSwitchRole('MARKETER')}
+        currentUser={user}
+        onLogout={logout}
         isOpen={isMobileSidebarOpen}
         onClose={() => setIsMobileSidebarOpen(false)}
       />
@@ -124,8 +119,7 @@ function AppContent() {
       {/* Main Content Viewport */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Navbar
-          currentUser={currentUser}
-          onSwitchRole={handleSwitchRole}
+          onOpenBrandKit={() => setIsBrandKitModalOpen(true)}
           onOpenAIDrawer={() => {
             if (!selectedCampaign && campaigns.length > 0) {
               setSelectedCampaign(campaigns[0]);
@@ -145,7 +139,7 @@ function AppContent() {
               onOpenWorkflow={handleOpenWorkflow}
               onOpenAI={handleOpenAI}
               onNavigateTab={(t) => setCurrentTab(t)}
-              userRole={currentUser?.role}
+              userRole={userRole || undefined}
             />
           )}
 
@@ -157,7 +151,7 @@ function AppContent() {
               }}
               onOpenWorkflow={handleOpenWorkflow}
               onOpenAI={handleOpenAI}
-              userRole={currentUser?.role}
+              userRole={userRole || undefined}
             />
           )}
 
@@ -165,8 +159,8 @@ function AppContent() {
             <div className="p-8 max-w-7xl mx-auto space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-2xl font-black text-slate-900 tracking-tight">Sơ đồ Luồng Chiến dịch</h2>
-                  <p className="text-xs text-slate-500 mt-1">Trực quan hóa luồng công việc dạng Node theo chuẩn Klaviyo / Braze Canvas.</p>
+                  <h2 className="text-2xl font-black text-slate-900 tracking-tight">Trung tâm Điều phối Chiến dịch & Pipeline</h2>
+                  <p className="text-xs text-slate-500 mt-1">Không gian điều phối chiến dịch toàn diện: Quản lý Pipeline nội dung, AI Copilot đa kênh, Bác sĩ AI chẩn đoán và Sơ đồ vòng đời.</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <select
@@ -187,16 +181,19 @@ function AppContent() {
               <WorkflowCanvas
                 campaign={selectedCampaign}
                 contents={contents}
+                campaigns={campaigns}
+                onSelectCampaign={setSelectedCampaign}
                 onOpenAI={handleOpenAI}
                 onApproveContent={handleApproveContent}
-                onSubmitForReview={() => loadCampaignsAndContents()}
-                userRole={currentUser?.role}
+                onSubmitForReview={() => loadCampaignsAndContents(currentWorkspace?.id)}
+                onRefreshData={() => loadCampaignsAndContents(currentWorkspace?.id)}
+                userRole={userRole || undefined}
               />
             </div>
           )}
 
           {currentTab === 'reviews' && (
-            <ReviewQueue userRole={currentUser?.role} />
+            <ReviewQueue userRole={userRole || undefined} />
           )}
 
           {currentTab === 'ai_studio' && (
@@ -204,9 +201,18 @@ function AppContent() {
               campaigns={campaigns}
               selectedCampaign={selectedCampaign}
               onSelectCampaign={setSelectedCampaign}
-              onContentCreated={loadCampaignsAndContents}
+              onContentCreated={() => loadCampaignsAndContents(currentWorkspace?.id)}
               onNavigateToReviews={() => setCurrentTab('reviews')}
             />
+          )}
+
+          {currentTab === 'settings' && (
+            <div className="p-8 max-w-7xl mx-auto">
+              <Settings 
+                currentUser={user} 
+                currentWorkspace={currentWorkspace} 
+              />
+            </div>
           )}
         </main>
       </div>
@@ -218,7 +224,13 @@ function AppContent() {
         campaign={selectedCampaign}
         campaigns={campaigns}
         onSelectCampaign={setSelectedCampaign}
-        onContentCreated={loadCampaignsAndContents}
+        onContentCreated={() => loadCampaignsAndContents(currentWorkspace?.id)}
+      />
+
+      {/* Brand Kit Configuration Modal */}
+      <BrandKitModal
+        isOpen={isBrandKitModalOpen}
+        onClose={() => setIsBrandKitModalOpen(false)}
       />
     </div>
   );
@@ -228,7 +240,11 @@ export function App() {
   return (
     <ErrorBoundary>
       <ToastProvider>
-        <AppContent />
+        <AuthProvider>
+          <WorkspaceProvider>
+            <AppContent />
+          </WorkspaceProvider>
+        </AuthProvider>
       </ToastProvider>
     </ErrorBoundary>
   );

@@ -1,0 +1,43 @@
+4.4.1. Đặc tả hợp đồng dữ liệu chuẩn hóa (Data Contract Specification)
+Prompt Engine thiết lập các hợp đồng dữ liệu đầu ra bắt buộc thông qua mô hình Pydantic
+v2 nhằm bảo đảm tính xác thực cấu trúc (Structural Validity) trước khi chuyển giao dữ liệu
+sangtầngứngdụng. Bảng 4.3đặctảchitiếtcấutrúcdữliệuchobatácvụAIcốtlõi(100%
+cáctrườngđềulàbắtbuộc).
+Bảng 4.3: Đặc tả hợp đồng dữ liệu Pydantic Schema cho các tác vụ AI (Bắt buộc 100%)
+Tác vụ Trường dữ liệu Kiểu dữ liệu Ý nghĩa nghiệp vụ & Ràng buộc
+IDEA
+task Literal["IDEA"] Địnhdanhloạitácvụgợiýýtưởng.
+campaign_name str Tênchiếndịchngữcảnhmụctiêu.
+ideas List[IdeaItem] Danhsáchcácgóctiếpcậnýtưởng
+đềxuất.
+ideas[i] Dict[str, str] Gồm3khóa: angle, concept,và
+target_hook.
+DRAFT
+task Literal["DRAFT"] Địnhdanhloạitácvụviếtbảnnháp.
+channel ChannelEnum Kênhtruyềnthông(Facebook,Email,
+Ads).
+title, body str Tiêuđềvàthânbàiviếtđịnhdạng
+chuẩntheokênh.
+cta str Lờikêugọihànhđộngcụthể( CTA).
+SUMMARY
+task Literal["SUMMARY"] Địnhdanhloạitácvụtómtắtchỉsố.
+kpi_overview Dict[str, float] Tổnghợpsốhọc: views,clicks,cost,
+revenue,ROI.
+insights, recs List[str] Nhậnđịnhbámsátsốliệuthựcvàđề
+xuấttốiưuhóa.
+4.4.2. Cơ chế khử ảo giác (De-hallucination Smart Fallback)
+TrongtrườnghợpnhàcungcấpGeminigặpsựcốkếtnối,quáthờigianchờ(10s)hoặcphản
+hồi không thể phân tích cú pháp JSON, hệ thống chuyển hướng tự động sang bộ sinh dự
+phòng _generate_fallback:
+• Ý tưởng và bản nháp: Tổnghợpnộidungdựatrênbộkhungmẫu(templates)chuẩn
+côngnghiệpgắnliềnvớithôngsốsảnphẩmvàkênhthựctế.
+• Tóm tắt chỉ số: Tínhtoánchínhxáccácchỉsốtàichínhtừdữliệumảngmetricstruyền
+vào; loại bỏ hoàn toàn các nhận định ảo giác (nhưtựsuydiễnkhunggiờvàng19h–
+21h hay khuyến nghị đăng bài cuối tuần khi dữ liệu đầu vào chỉ có các con số thống
+kêtổngthể).
+• Minh bạch thông tin: Hệthốngđánhdấucờ is_fallback = True ,ghinhậnrõràng
+vào ai_logsvàthôngbáominhbạchchongườidùngtrêngiaodiện.
+4.5. Kết luận chương
+Chương 4 đã trình bày thiết kế kiến trúc toàn diện của MarketFlow AI từ sơ đồ khối logic,
+mô hình dữ liệu quan hệ chặt chẽ đến cơ chế tương tác an toàn với mô hình ngôn ngữ lớn
+20

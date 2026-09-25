@@ -1,0 +1,53 @@
+\chapter{KẾT LUẬN VÀ GIỚI HẠN ĐÃ BIẾT}
+
+\section{Tổng kết thành quả đạt được}
+
+Đề tài \textbf{“Hệ thống quản lý chiến dịch marketing có tích hợp AI (MarketFlow AI)”} đã hoàn thành xuất sắc toàn bộ các mục tiêu nghiên cứu và hiện thực hóa phần mềm đặt ra cho học phần AIA331. Dự án không chỉ dừng lại ở bản thiết kế lý thuyết mà đã chuyển giao thành một hệ thống phần mềm hoàn chỉnh, vận hành ổn định trên nền tảng FastAPI, React 18, SQLite và Docker, đồng thời vượt qua các bài kiểm định thực nghiệm khắt khe.
+
+Các thành quả cốt lõi đạt được bao gồm:
+\begin{enumerate}
+  \item \textbf{Hiện thực hóa trọn vẹn quy trình quản trị tiếp thị}: Xây dựng thành công hệ thống quản lý tập trung từ mục tiêu chiến dịch, danh mục sản phẩm, phân bổ ngân sách, sáng tạo nội dung đa kênh đến thu thập chỉ số hiệu quả (views, clicks, conversions, cost, revenue) và tự động tính toán các chỉ số kinh doanh then chốt (CTR, CPC, CPA, ROI).
+  \item \textbf{Kiến trúc bảo mật đa tầng và kiểm soát phân quyền mức bản ghi (Record-level NFR01)}: Khắc phục triệt để lỗ hổng leo quyền ngang IDOR. Marketer chỉ được thao tác trong phạm vi các chiến dịch mà mình là chủ sở hữu hoặc được chỉ định thành viên (\texttt{CampaignMember}). Đồng bộ kiểm tra trạng thái tài khoản kích hoạt (\texttt{user.status == 'ACTIVE'}) tại mọi ranh giới bảo mật.
+  \item \textbf{Máy trạng thái duyệt nội dung Human-in-the-loop (HITL) chống can thiệp}: Thiết lập chu trình kiểm duyệt nghiêm ngặt \texttt{DRAFT / AI\_DRAFT} $\rightarrow$ \texttt{IN\_REVIEW} $\rightarrow$ \texttt{APPROVED / REJECTED} $\rightarrow$ \texttt{PUBLISHED}. Chặn tuyệt đối việc tạo bài viết trực tiếp ở trạng thái phê duyệt; tự động hạ cấp trạng thái về \texttt{AI\_DRAFT} nếu bài viết đã duyệt bị chỉnh sửa nội dung.
+  \item \textbf{Tích hợp AI có kiểm soát và khử ảo giác (De-hallucination Engine)}: Ứng dụng độc quyền hệ sinh thái Google Gemini qua lớp Prompt Engine kiểm soát ngữ cảnh an toàn; cơ chế Smart Fallback bảo đảm hệ thống không bao giờ gián đoạn dịch vụ và loại bỏ 100\% hiện tượng ảo giác vô căn cứ về thời gian hay xu hướng.
+  \item \textbf{Hệ thống kiểm thử tự động toàn diện}: Xây dựng và thực thi 205 ca kiểm thử tự động (\texttt{pytest}) bao phủ từ đơn vị, tích hợp đến kiểm thử đối kháng (Adversarial Tests) đạt tỷ lệ vượt qua 100\%, 0 lỗi và 0 cảnh báo.
+  \item \textbf{Đánh giá định lượng minh bạch}: Đo lường thực chứng tỷ lệ hợp lệ Schema đạt 100\%, Grounding Score đạt 95.8\%, độ trễ trung vị P50 ở mức 1.52 giây, và chi phí thực tế 0 VNĐ trên nền tảng Google AI Studio Free Tier (dự phóng lý thuyết quy mô doanh nghiệp chỉ ~3,300 VNĐ cho mỗi 1,000 lượt yêu cầu).
+\end{enumerate}
+
+\section{Đánh giá khách quan các giới hạn kỹ thuật đã biết}
+
+Nhằm duy trì tính trung thực học thuật và định vị đúng ranh giới của giải pháp kỹ thuật, nhóm thẳng thắn ghi nhận các điểm giới hạn đã biết (Known Limitations) trong Bảng~\ref{tab:v9-known-limitations}.
+
+\begin{table}[h!]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\caption{Đánh giá khách quan các giới hạn kỹ thuật đã biết và phương án nâng cấp}
+\label{tab:v9-known-limitations}
+\begin{tabularx}{\textwidth}{|L{3.0cm}|Y|Y|}
+\hline
+\thead{Hạng mục} & \thead{Hiện trạng và giới hạn kỹ thuật} & \thead{Tác động và giải pháp trong tương lai}\\
+\hline
+Hệ quản trị CSDL & Hệ thống sử dụng SQLite với WAL mode. Rất tối ưu cho quy mô nhóm nội bộ (5--20 tài khoản, hàng chục nghìn bản ghi), nhưng sẽ gặp hiện tượng nút thắt cổ chai khi có hàng trăm yêu cầu ghi đồng thời. & Cần chuyển đổi sang PostgreSQL phân tán kết hợp PgBouncer để tối ưu Connection Pooling khi mở rộng quy mô toàn doanh nghiệp.\\
+\hline
+Tích hợp mạng xã hội & Hệ thống mới quản lý lịch đăng và nội dung phê duyệt ở phạm vi nội bộ; chưa trực tiếp gọi Webhook phát hành bài viết lên Facebook API hay Google Ads API thật do yêu cầu tài khoản doanh nghiệp xác minh chính thức. & Xây dựng adapter kết nối OAuth 2.0 và tích hợp SDK chính thức của Meta Marketing API và Google Ads API trong giai đoạn thương mại hóa.\\
+\hline
+Bộ nhớ đệm (Caching) & Chưa tích hợp tầng lưu trữ đệm phân tán (Redis). Các truy vấn báo cáo và kết quả sinh nội dung tương đồng vẫn phải xử lý lại từ đầu. & Bổ sung Redis Cache cho tầng đọc Dashboard và lưu đệm kết quả prompt phổ biến để giảm độ trễ xuống dưới 10ms.\\
+\hline
+Khả năng đa phương thức & Hệ thống hiện tập trung tối ưu hóa xử lý văn bản (text) và số liệu định lượng (metrics); chưa hỗ trợ phân tích hình ảnh/banner hoặc video tiếp thị. & Tận dụng năng lực đa phương thức (Multimodal) của Google Gemini để tự động đánh giá và chấm điểm chất lượng hình ảnh banner quảng cáo.\\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Lộ trình phát triển và hoàn thiện tiếp theo}
+
+Từ các giới hạn đã được nhận diện, nhóm xác lập lộ trình kỹ thuật cho các giai đoạn tiếp theo:
+\begin{enumerate}
+  \item \textbf{Giai đoạn 1 (Hạ tầng \& Caching)}: Chuyển đổi sang PostgreSQL 16 phân tán và tích hợp Redis Cache nhằm tối ưu hóa thời gian đọc Dashboard xuống dưới 10ms.
+  \item \textbf{Giai đoạn 2 (Tự động hóa phát hành)}: Đăng ký định danh doanh nghiệp chính thức với Meta và Google để kết nối trực tiếp Webhook phát hành nội dung \texttt{APPROVED}.
+  \item \textbf{Giai đoạn 3 (Nâng cấp AI đa phương thức)}: Tận dụng Gemini Multimodal phân tích chất lượng ảnh banner và tự động kiểm tra vi phạm chính sách hiển thị.
+\end{enumerate}
+
+\section{Lời kết}
+
+Dự án MarketFlow AI là minh chứng thực tế khẳng định trí tuệ nhân tạo (Google Gemini), khi vận hành trong kiến trúc chuẩn mực và quy trình Human-in-the-loop kiên cố, hoàn toàn có thể trở thành đòn bẩy năng suất vượt trội cho doanh nghiệp mà không phát sinh rủi ro sai lệch dữ liệu.

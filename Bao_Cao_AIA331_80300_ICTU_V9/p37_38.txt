@@ -1,0 +1,94 @@
+=== PAGE 37 ===
+CHƯƠNG 6.
+KIỂM THỬ THỰC NGHIỆM VÀ ĐỐI KHÁNG
+6.1. Chiến lược kiểm thử đa tầng (Testing Pyramid)
+Nhằm bảo đảm hệ thống MarketFlow AI vận hành an toàn tuyệt đối trong môi trường sản
+xuấtthựctế,dựánthiếtlậpmộtchiếnlượckiểmthửđatầngtheomôhìnhKimtựthápkiểm
+thử (Testing Pyramid). Chiến lược này bao phủ từ tầng kiểm thử đơn vị (Unit Tests), kiểm
+thử tích hợp giao diện API (Integration Tests), kiểm thử quy trình máy trạng thái nghiệp vụ
+(StateMachineWorkflowTests)đếntầngkiểmthửbảomậtđốikhángnângcao(Adversarial
+SecurityTests).
+Mọi ca kiểm thử đều được tự động hóa hoàn toàn thông qua frameworkpytest và
+thưviện httpx,chạytrêncơsởdữliệukiểmthửcôlậptrongbộnhớ( sqlite:///:memory:)
+đểbảođảmtínhđộclập,cóthểtáilập100%vàkhônggâyảnhhưởngđếndữliệuthựctế.
+6.2. Danh mục các bộ kiểm thử tự động
+Hệ thống sở hữu bộ kiểm thử tự động đồ sộ gồm 170 ca kiểm thử chuyên sâu được tổ chức
+trongthưmục backend/tests/,đượcphânloạichitiếttrongBảng 6.1.
+6.3. Kiểm thử đối kháng bảo mật (Adversarial Security Testing)
+Nhằmngănchặntìnhtrạngtựchứngnhậnkếtquảlỏnglẻo,nhómđãtriểnkhaibộkiểmthử
+đối kháng (Adversarial Attack Suite) nhằm giả lập các hành vi tấn công mạng và gian lận
+quytrìnhtinhvinhất.
+Bảng6.2tổnghợpcáckịchbảntấncôngđốikhángvàkếtquảphòngthủcủahệthống.
+6.4. Kiểm thử quy trình duyệt nội dung Human-in-the-loop
+Quytrìnhphêduyệtnộidungđượckiểmthửnghiêmngặtquatoànbộvòngđờithựctế:
+1. Khởi tạo: NhânviênMarketertạobàiviếtnhápquaAPIhoặcAIDrawer. Trạngthái
+ghinhậnchínhxáclà DRAFThoặc AI_DRAFT.
+2. Gửi duyệt: Tác giả gọiPOST /contents/{id}/submit . Hệ thống kiểm tra tính hợp
+lệvàchuyểntrạngtháisang IN_REVIEW.
+3. Thẩm định: ManagerxemxétbàiviếttrongReviewQueue.
+• Nếu chấp thuận: Manager gọi POST /contents/{id}/approve . Trạng thái
+chuyển sang APPROVED, tự động ghi nhậnreviewer_id và mốc thời gian vào
+content_reviews.
+• Nếutừchối: Managergọi POST /contents/{id}/reject kèmlýdo. Trạngthái
+chuyểnsang REJECTED.Tácgiảcóthểchỉnhsửavàgửiduyệtlại.
+4. Lập lịch xuất bản : Chỉ khi bài viết đạtAPPROVED, endpointPOST /schedules mới
+26
+=== PAGE 38 ===
+Bảng 6.1: Danh mục các tệp kiểm thử tự động trong MarketFlow AI
+Tệp kiểm thử Số ca test Trọng tâm kiểm định kỹ thuật Tỷ lệ Pass
+test_backend_remediation.py 8 Kiểmthửcáclỗicốtlõiđãđượckhắc
+phục: xácthực401,CORSheader,
+kiểmtrađịnhdạngngày,chống
+trùnglặpmetric(409Conflict),chặn
+directAPPROVEDquaPUT.
+100%(8/8)
+test_extended_coverage.py 48 Kiểmthửcáctrườnghợpbiên
+(Boundaryvalues),tàikhoản
+INACTIVE(403),kiểmtratoànvẹn
+khóangoạiCSDLSQLite( PRAGMA
+foreign_keys),vàkhảnăngchịulỗi
+củaAISmartFallback.
+100%
+(48/48)
+test_ieee829_cases.py 12 Bộkiểmthửchuẩnhóatheotiêu
+chuẩnquốctếIEEE829baogồm
+cácnhómcakiểmthửkhẳngđịnh
+(POS),phủđịnh(NEG)vàbiêngiới
+hạn(BND).
+100%
+(12/12)
+test_marketflow_deep_scenarios.py102 Bộkiểmthửđốikhángvàkịchbản
+sâu: Matrậnphânquyềnđavaitrò
+(RBAC),kiểmsoátphạmvibảnghi
+(Record-levelScope),máytrạngthái
+duyệtbàichốnggianlận,toánhọc
+tàichính(tránhchia0),chốngSQLi,
+XSS,fuzzingdữliệuđầuvàovàlàm
+giảJWT.
+100%
+(102/102)
+test_v3_security_and_state_machine.py19 Kiểmđịnhchuyênsâuphânquyền
+phạmvibảnghi(Record-level
+NFR01),côlậptàinguyênchiến
+dịchvàmáytrạngtháiHITLchống
+tạo/sửatrựctiếpsangAPPROVED.
+100%
+(19/19)
+test_adversarial_v3.py 16 Kịchbảntấncôngđốikhángnâng
+cao: leoquyềnngangIDOR,sửađổi
+dữliệuhậuphêduyệt,tiêmngữcảnh
+độchạivàkiểmtratàikhoảnvôhiệu
+hóa.
+100%
+(16/16)
+Tổng cộng 205 Toàn bộ các phân hệ backend, an
+ninh mức bản ghi, quy trình duyệt
+và đối kháng
+100% Pass
+cho phép tạo lịch phát hành. Mọi nỗ lực lập lịch cho bài viết đangDRAFT, IN_REVIEW
+hoặc REJECTEDđềubịchặnvớiHTTP400.
+6.5. Kết quả thực nghiệm toàn diện
+Toànbộ205cakiểmthửtựđộngđượcthựcthiđồngbộvàcôlậptrênmôitrườngcơsởdữ
+liệuin-memorythôngquacôngcụkiểmthửtiêuchuẩncôngnghiệp pytest.
+Kếtquảnghiệmthukỹthuậtthuđượcđạtsựhoànhảotuyệtđối:
+27

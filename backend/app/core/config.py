@@ -17,7 +17,13 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:8080",
-        "http://127.0.0.1:8080"
+        "http://127.0.0.1:8080",
+        "http://localhost",
+        "http://localhost:80",
+        "https://marketflow.ictu.edu.vn",
+        "http://marketflow.ictu.edu.vn",
+        "https://*.ictu.edu.vn",
+        "http://*.ictu.edu.vn"
     ]
 
     # Base directory

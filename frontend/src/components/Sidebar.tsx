@@ -8,7 +8,8 @@ import {
   LogOut,
   Layers,
   ShieldCheck,
-  X
+  X,
+  Settings
 } from 'lucide-react';
 import { User } from '../types';
 
@@ -30,16 +31,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClose
 }) => {
   const menuItems = [
-    { id: 'dashboard', label: 'Bàn làm việc', icon: LayoutDashboard },
-    { id: 'campaigns', label: 'Chiến dịch', icon: Megaphone },
-    { id: 'workflow', label: 'Luồng chiến dịch (Nodes)', icon: GitBranch },
+    { id: 'dashboard', label: 'Tổng quan Hiệu quả', icon: LayoutDashboard },
+    { id: 'campaigns', label: 'Quản lý Chiến dịch', icon: Megaphone },
+    { id: 'workflow', label: 'Trung tâm Điều phối & Pipeline', icon: GitBranch, highlight: true },
     { 
       id: 'reviews', 
-      label: 'Hàng đợi duyệt', 
+      label: 'Kiểm duyệt Nội dung (HITL)', 
       icon: CheckSquare,
       badge: currentUser?.role === 'MANAGER' ? 'Sếp' : undefined 
     },
-    { id: 'ai_studio', label: 'Xưởng AI Assistant', icon: Sparkles, highlight: true }
+    { id: 'ai_studio', label: 'AI Marketing Copilot', icon: Sparkles },
+    { id: 'settings', label: 'Cài đặt & Khóa AI', icon: Settings }
   ];
 
   return (
@@ -48,13 +50,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {isOpen && (
         <div
           onClick={onClose}
-          className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-40 md:hidden transition-opacity"
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-40 md:hidden transition-opacity no-print"
         />
       )}
 
       {/* Sidebar Aside */}
       <aside
-        className={`w-64 bg-slate-900 text-slate-300 flex flex-col h-screen border-r border-slate-800 shrink-0 z-50 fixed md:static inset-y-0 left-0 transition-transform duration-300 ease-in-out ${
+        className={`w-64 bg-slate-900 text-slate-300 flex flex-col h-screen border-r border-slate-800 shrink-0 z-50 fixed md:static inset-y-0 left-0 transition-transform duration-300 ease-in-out no-print ${
           isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
         }`}
       >
@@ -84,17 +86,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Role Badge */}
         <div className="px-5 py-3 border-b border-slate-800/50 bg-slate-950/40">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">Vai trò hiện tại:</span>
+            <span className="text-xs text-slate-400">Vai trò:</span>
             <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${
-              currentUser?.role === 'MANAGER' 
+              currentUser?.role === 'MANAGER' || currentUser?.role === 'AGENCY_MANAGER'
                 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
-                : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                : currentUser?.role === 'CLIENT_APPROVER'
+                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
             }`}>
               <ShieldCheck className="w-3 h-3" />
-              {currentUser?.role === 'MANAGER' ? 'Quản lý (Manager)' : 'Nhân viên (Marketer)'}
+              {currentUser?.role === 'AGENCY_MANAGER'
+                ? 'Agency Manager'
+                : currentUser?.role === 'MANAGER'
+                ? 'Quản lý (Manager)'
+                : currentUser?.role === 'CLIENT_APPROVER'
+                ? 'Client Approver'
+                : 'Marketer'}
             </span>
           </div>
         </div>
+
 
         {/* Navigation */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
@@ -127,6 +138,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             );
           })}
         </nav>
+
+        {/* Subdomain status */}
+        <div className="px-4 py-2 border-t border-slate-800/60 bg-slate-950/30 flex items-center justify-between text-[11px]">
+          <div className="flex items-center gap-1.5 text-slate-400">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="font-mono text-[10px] text-slate-300">marketflow.ictu.edu.vn</span>
+          </div>
+          <span className="text-[9px] uppercase tracking-wider font-bold bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded">
+            PROD
+          </span>
+        </div>
 
         {/* User Info & Logout */}
         <div className="p-4 border-t border-slate-800 bg-slate-950/60">

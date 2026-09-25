@@ -1,0 +1,60 @@
+=== PAGE 18 ===
+mượt mà khi tương tác với các bảng dữ liệu lớn hoặc đồ thị phân tích phức tạp. Các
+thành phần giao diện như AI Drawer, Review Queue, Campaign Table được module
+hóađộclập.
+2. Kiểm soát kiểu chặt chẽ với TypeScript : Toàn bộ các mô hình dữ liệu (User, Cam-
+paign, MarketingContent, Metric, AIResponse) được đồng bộ kiểu dữ liệu chính xác
+với backend schemas, loại bỏ hoàn toàn các lỗi truy cập thuộc tính không xác định
+(undefined property ).
+3. Trạng thái tương tác toàn diện (UI Resilience) : Hệ thống cài đặt các thành phần
+chuyên biệt: Skeleton cho trạng thái chờ phản hồi mạng,Toast cho thông báo tức
+thời (thành công/cảnh báo/thất bại), vàErrorBoundary ngăn ngừa hiện tượng màn
+hìnhtrắng(whitescreen)khixảyrangoạilệgiaodiện.
+2.2.3. Hệ sinh thái AI: Google Gemini và cơ chế Smart Fallback
+Tuânthủnghiêmngặtchỉthịkiếntrúc,dựánsửdụngđộcquyềnhệsinhtháimôhìnhGoogle
+Gemini (Gemini Pro / Gemini Flash) và tuyệt đối không phụ thuộc vào các dịch vụ bị cấm
+(nhưClaudehayGPT):
+1. Kiểm soát ngữ cảnh (Context Whitelisting): Trướckhigửiyêucầutớimôhìnhngôn
+ngữ,hệthốngchỉlọclấycácthôngtintốicầnthiếtchotácvụ(tênsảnphẩm,mụctiêu
+chiếndịch,tệpkháchhàngmụctiêu,cácdòngsốliệumetricsđãđượcphêduyệt). Mọi
+thôngtinnhạycảm(mậtkhẩu,khóaAPI,dữliệuđịnhdanhngườidùng)đềubịloạibỏ
+tuyệtđốikhỏiprompt.
+2. Cơ chế Structured Outputs: PromptEngineépbuộcGeminitrảvềkếtquảtuânthủ
+nghiêm ngặt định dạng JSON Schema quy định trước, ngăn ngừa việc mô hình sinh
+vănbảntựdokhóphântíchcúpháp.
+3. Cơ chế Smart Fallback (De-hallucination Engine) : Khi gặp sự cố mạng, vượt hạn
+ngạch (rate limit) hoặc lỗi phản hồi từ LLM, hệ thống tự động kích hoạt bộ sinh nội
+suycụcbộtheoquytắcdựatrênsốliệuthựcchứng. Bộsinhdựphòngnàyđượcthiết
+kế loại bỏ hoàn toàn các suy đoán ảo giác (ví dụ: không suy diễn về khung giờ đăng
+hayhànhvicuốituầnkhidữliệuđầuvàochỉcómetrictổng).
+2.2.4. Cơ sở dữ liệu: SQLite với W AL Mode và SQLAlchemy 2.0
+Hệ thống sử dụng SQLite làm hệ quản trị cơ sở dữ liệu hạt nhân trong giai đoạn vận hành
+hiệntạivớicáccấuhìnhtốiưuhóachuyênsâu:
+1. Ràng buộc khóa ngoại bắt buộc : Mặc định SQLite không bật kiểm tra khóa ngoại;
+hệthốngkíchhoạttườngminhchỉthị PRAGMA foreign_keys = ON ngaykhikhởitạo
+mỗi session kết nối trongbackend/app/db/session.py, bảo đảm tính toàn vẹn tham
+chiếu100%.
+2. Chế độ Write-Ahead Logging (W AL): BậtPRAGMA journal_mode = WAL cho phép
+cáctiếntrìnhđọc(readers)vàtiếntrìnhghi(writer)hoạtđộngđồngthờimàkhônggây
+khóabảng(tablelock),giatăngthônglượngxửlýcủahệthống.
+3. Chuyển đổi linh hoạt qua SQLAlchemy 2.0 : ViệcsửdụngchuẩnSQLAlchemy2.0
+7
+=== PAGE 19 ===
+Declarative Base giúp toàn bộ định nghĩa bảng, chỉ mục (indices) và ràng buộc duy
+nhất (UniqueConstraints) hoàn toàn độc lập với phần mềm máy chủ CSDL, sẵn sàng
+chuyểnđổiliềnmạchsangPostgreSQLtrongmôitrườngsảnxuấtquymôlớn.
+2.2.5. Đóng gói Container và Tự động hóa CI/CD
+1. Kiến trúc Containerization: Ứngdụngđượcđónggóithànhhaidịchvụđộclậptrong
+docker‐compose.yml: dịchvụBackendchạytrênnềnPython3.11-slimtốigiảndung
+lượng,vàdịchvụFrontendsửdụngkỹthuậtmulti-stagebuild(biêndịchbằngNode.js
+vàphânphốitĩnhbằngmáychủwebsiêunhẹNginx).
+2. Tích hợp liên tục (CI Pipeline): PipelineGitHubActions( .github/workflows/ci.yml)
+tự động kích hoạt mỗi khi có mã nguồn mới, thực hiện toàn diện ba giai đoạn: kiểm
+tra chất lượng mã (Linting/Typecheck), chạy bộ test tự động backend với pytest, và
+kiểmtratínhtoànvẹnkhibuildcontainer.
+2.3. Kết luận chương
+ViệclựachọnvàkếthợphàihòagiữaFastAPI,React18,hệsinhtháiGoogleGemini,SQLite
+tối ưu và Docker đã tạo nên một nền tảng kỹ thuật vững chắc cho MarketFlow AI. Sự nhất
+quán về công nghệ và việc tuân thủ các tiêu chuẩn kỹ thuật quốc tế là tiền đề để triển khai
+chitiếtcácyêucầunghiệpvụphứctạpởcácchươngtiếptheo.
+8
