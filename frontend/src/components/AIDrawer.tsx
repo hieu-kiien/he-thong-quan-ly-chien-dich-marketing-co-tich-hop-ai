@@ -358,7 +358,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
                 AI Marketing Copilot
                 <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">
-                  OpenRouter
+                  Google Gemini 2.5
                 </span>
               </h3>
               {campaigns && campaigns.length > 0 ? (

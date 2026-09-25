@@ -10,6 +10,7 @@ import {
 import { 
   MOCK_USER_MANAGER, 
   MOCK_USER_MARKETER, 
+  MOCK_USER_CLIENT_APPROVER,
   MOCK_PRODUCTS, 
   MOCK_CAMPAIGNS, 
   MOCK_CONTENTS, 
@@ -91,8 +92,9 @@ export const authApi = {
       // Chỉ khi backend hoàn toàn offline (Network Error), hỗ trợ demo login có kiểm tra email
       console.warn('Backend API offline, hỗ trợ phiên đăng nhập giả lập offline');
       const isManager = email.toLowerCase().includes('manager');
-      const user = isManager ? MOCK_USER_MANAGER : MOCK_USER_MARKETER;
-      const demoToken = 'marketflow-demo-token-' + (isManager ? 'manager' : 'marketer');
+      const isApprover = email.toLowerCase().includes('approver');
+      const user = isManager ? MOCK_USER_MANAGER : isApprover ? MOCK_USER_CLIENT_APPROVER : MOCK_USER_MARKETER;
+      const demoToken = 'marketflow-demo-token-' + (isManager ? 'manager' : isApprover ? 'approver' : 'marketer');
       localStorage.setItem('access_token', demoToken);
       localStorage.setItem('current_user', JSON.stringify(user));
       return { access_token: demoToken, user };

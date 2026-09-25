@@ -622,7 +622,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-900">{currentUser?.full_name || 'Người dùng MarketFlow'}</h2>
-              <p className="text-slate-500 text-sm">{currentUser?.email || 'manager@ictu.edu.vn'}</p>
+              <p className="text-slate-500 text-sm">{currentUser?.email || 'manager@agency.com'}</p>
               <div className="flex items-center gap-2 mt-2">
                 <span className="px-2.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-full uppercase">
                   {currentUser?.role || 'MANAGER'}

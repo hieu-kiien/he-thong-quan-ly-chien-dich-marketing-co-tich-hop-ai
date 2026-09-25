@@ -186,7 +186,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 AI Viết Bài 1-Click
               </h4>
               <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                OpenRouter AI tạo 5 góc ý tưởng + bài viết hoàn chỉnh (Tiêu đề, Body, CTA) chuẩn đa kênh.
+                Google Gemini 2.5 Flash tạo 5 góc ý tưởng + bài viết hoàn chỉnh (Tiêu đề, Body, CTA) chuẩn đa kênh.
               </p>
             </div>
 
@@ -243,7 +243,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Danh sách Chiến dịch</h3>
-              <span className="text-xs text-indigo-600 font-semibold cursor-pointer hover:underline">Xem tất cả</span>
+              <button 
+                onClick={() => onNavigateTab?.('campaigns')}
+                className="text-xs text-indigo-600 font-semibold cursor-pointer hover:underline"
+              >
+                Xem tất cả
+              </button>
             </div>
 
             {loading ? (
@@ -281,7 +286,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-amber-500" /> Hàng đợi duyệt ({pendingContents.length})
               </span>
-              <span className="text-[11px] text-slate-400">Sếp duyệt</span>
+              <button 
+                onClick={() => onNavigateTab?.('reviews')}
+                className="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer"
+              >
+                Vào duyệt &rarr;
+              </button>
             </div>
 
             {pendingContents.length === 0 ? (

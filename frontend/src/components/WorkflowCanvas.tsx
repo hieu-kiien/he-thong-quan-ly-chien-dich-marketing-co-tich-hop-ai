@@ -1252,7 +1252,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                   /* Realistic Email Marketing Mockup */
                   <div className="max-w-lg mx-auto bg-white rounded-xl border border-slate-200 shadow-md overflow-hidden text-xs">
                     <div className="bg-slate-100 p-3 border-b border-slate-200 space-y-1 text-slate-600">
-                      <div><strong className="text-slate-800">Từ:</strong> MarketFlow Campaign &lt;marketing@ictu.edu.vn&gt;</div>
+                      <div><strong className="text-slate-800">Từ:</strong> MarketFlow Campaign &lt;marketing@enterprise.io&gt;</div>
                       <div><strong className="text-slate-800">Đến:</strong> Tệp khách hàng: {campaign.audience}</div>
                       <div><strong className="text-slate-800">Tiêu đề:</strong> {generatedDraft.title}</div>
                     </div>
@@ -1553,7 +1553,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
               <span>Luồng nghiệp vụ tự động hóa Marketing tuân thủ 100% nguyên tắc kiểm duyệt con người (Human-in-the-loop).</span>
             </div>
             <div className="text-[11px] text-slate-500 font-mono">
-              Model: Gemini 2.5 Flash Free Tier • Subdomain: marketflow.ictu.edu.vn
+              Model: Gemini 2.5 Flash • Production: marketflow-7vt.pages.dev
             </div>
           </div>
         </div>
