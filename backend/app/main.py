@@ -56,11 +56,11 @@ app.include_router(brand_kit_router, prefix=settings.API_V1_PREFIX)
 app.include_router(settings_router, prefix=settings.API_V1_PREFIX)
 
 
-from app.core.database import engine, ensure_sqlite_schema_compatibility
+from app.core.database import engine, init_db
 
 @app.on_event("startup")
 def on_startup():
-    ensure_sqlite_schema_compatibility(engine)
+    init_db(engine)
 
 
 @app.get("/")
