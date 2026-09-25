@@ -1,0 +1,19 @@
+{
+  "name": "marketflow-cloudflare",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "npm --prefix ../frontend run build",
+    "deploy": "npm run build && wrangler deploy --secrets-file .env.production",
+    "check": "wrangler types && tsc --noEmit"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "^0.3.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.140.0"
+  }
+}

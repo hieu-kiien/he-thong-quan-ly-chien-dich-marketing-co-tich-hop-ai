@@ -23,7 +23,8 @@ import {
   MOCK_CUSTOM_API_KEYS
 } from './mockData';
 
-const API_BASE_URL = ((import.meta as any).env?.VITE_API_URL || 'http://127.0.0.1:8000/api/v1');
+const API_BASE_URL = ((import.meta as any).env?.VITE_API_URL ||
+  ((import.meta as any).env?.PROD ? '/api/v1' : 'http://127.0.0.1:8000/api/v1'));
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,

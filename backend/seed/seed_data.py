@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -40,21 +41,21 @@ def seed_data(session=None):
         manager = User(
             email="manager@ictu.edu.vn",
             full_name="Nguyễn Văn Quản Lý",
-            password_hash=hash_password("Manager@123"),
+            password_hash=hash_password(os.getenv("MARKETFLOW_MANAGER_PASSWORD", "Manager@123")),
             role="MANAGER",
             status="ACTIVE"
         )
         marketer = User(
             email="marketer@ictu.edu.vn",
             full_name="Trần Thị Marketing",
-            password_hash=hash_password("Marketer@123"),
+            password_hash=hash_password(os.getenv("MARKETFLOW_MARKETER_PASSWORD", "Marketer@123")),
             role="MARKETER",
             status="ACTIVE"
         )
         approver = User(
             email="approver@ictu.edu.vn",
             full_name="Đại Diện Khách Hàng (Approver)",
-            password_hash=hash_password("Approver@123"),
+            password_hash=hash_password(os.getenv("MARKETFLOW_APPROVER_PASSWORD", "Approver@123")),
             role="CLIENT_APPROVER",
             status="ACTIVE"
         )

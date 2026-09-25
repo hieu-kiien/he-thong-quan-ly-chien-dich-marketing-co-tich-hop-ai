@@ -1,0 +1,54 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "marketflow-kienhieu",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "secrets": {
+    "required": [
+      "SECRET_KEY",
+      "MARKETFLOW_MANAGER_PASSWORD",
+      "MARKETFLOW_MARKETER_PASSWORD",
+      "MARKETFLOW_APPROVER_PASSWORD"
+    ]
+  },
+  "assets": {
+    "directory": "../frontend/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/health"]
+  },
+  "containers": [
+    {
+      "class_name": "FastApiContainer",
+      "image": "../backend/cloudflare.Dockerfile",
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "API",
+        "class_name": "FastApiContainer"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["FastApiContainer"]
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "DATABASE_BACKUPS",
+      "bucket_name": "marketflow-production-data"
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "kienhieu.id.vn",
+      "custom_domain": true
+    }
+  ]
+}

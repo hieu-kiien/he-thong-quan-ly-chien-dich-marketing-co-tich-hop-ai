@@ -49,4 +49,6 @@ test-recordings/
 *.png
 .agents/
 .wrangler/
+cloudflare/worker-configuration.d.ts
+cloudflare/.local-credentials.txt
 
