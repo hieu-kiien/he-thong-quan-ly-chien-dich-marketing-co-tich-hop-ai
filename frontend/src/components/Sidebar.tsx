@@ -9,7 +9,8 @@ import {
   Layers,
   ShieldCheck,
   X,
-  Settings
+  Settings,
+  Calendar
 } from 'lucide-react';
 import { User } from '../types';
 
@@ -31,17 +32,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClose
 }) => {
   const menuItems = [
-    { id: 'dashboard', label: 'Tổng quan Hiệu quả', icon: LayoutDashboard },
-    { id: 'campaigns', label: 'Quản lý Chiến dịch', icon: Megaphone },
-    { id: 'workflow', label: 'Trung tâm Điều phối & Pipeline', icon: GitBranch, highlight: true },
+    { id: 'dashboard', label: 'Bảng Điều Khiển', icon: LayoutDashboard },
+    { id: 'campaigns', label: 'Quản Lý Chiến Dịch', icon: Megaphone, highlight: true },
     { 
       id: 'reviews', 
-      label: 'Kiểm duyệt Nội dung (HITL)', 
+      label: 'Hàng Đợi Phê Duyệt', 
       icon: CheckSquare,
-      badge: currentUser?.role === 'MANAGER' ? 'Sếp' : undefined 
+      badge: currentUser?.role === 'MANAGER' || currentUser?.role === 'AGENCY_MANAGER' ? 'Duyệt bài' : undefined 
     },
-    { id: 'ai_studio', label: 'AI Marketing Copilot', icon: Sparkles },
-    { id: 'settings', label: 'Cài đặt & Khóa AI', icon: Settings }
+    { id: 'calendar', label: 'Lịch Xuất Bản', icon: Calendar },
+    { id: 'ai_studio', label: 'Xưởng Sáng Tạo AI', icon: Sparkles },
+    { id: 'settings', label: 'Cài Đặt & Brand Kit', icon: Settings }
   ];
 
   return (
@@ -68,7 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <div>
               <h1 className="font-bold text-white text-base tracking-tight">MarketFlow AI</h1>
-              <p className="text-[11px] text-slate-400 font-medium">AIA331 • Đề tài 80300</p>
+              <p className="text-[11px] text-indigo-400 font-semibold tracking-wide">Enterprise Omnichannel</p>
             </div>
           </div>
 

@@ -9,6 +9,7 @@ import { WorkflowCanvas } from './components/WorkflowCanvas';
 import { AIDrawer } from './components/AIDrawer';
 import { AIStudio } from './pages/AIStudio';
 import { Settings } from './pages/Settings';
+import { MarketingCalendar } from './components/MarketingCalendar';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { BrandKitModal } from './components/BrandKitModal';
@@ -151,8 +152,21 @@ function AppContent() {
               }}
               onOpenWorkflow={handleOpenWorkflow}
               onOpenAI={handleOpenAI}
+              onNavigateTab={(t) => setCurrentTab(t)}
+              onRefreshData={() => loadCampaignsAndContents(currentWorkspace?.id)}
               userRole={userRole || undefined}
             />
+          )}
+
+          {currentTab === 'calendar' && (
+            <div className="p-8 max-w-7xl mx-auto space-y-6">
+              <MarketingCalendar
+                campaigns={campaigns}
+                contents={contents}
+                selectedCampaign={selectedCampaign}
+                onSelectCampaign={setSelectedCampaign}
+              />
+            </div>
           )}
 
           {currentTab === 'workflow' && (

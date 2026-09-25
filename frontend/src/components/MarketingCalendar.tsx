@@ -44,7 +44,7 @@ export const MarketingCalendar: React.FC<MarketingCalendarProps> = ({
   const [selectedChannel, setSelectedChannel] = useState<string>('ALL');
 
   // Month navigation: default to current month
-  const [currentDate, setCurrentDate] = useState<Date>(new Date(2026, 8, 1)); // Sept 2026
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
   useEffect(() => {
     loadSchedules();

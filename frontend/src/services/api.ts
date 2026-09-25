@@ -275,6 +275,19 @@ export const campaignApi = {
       return newCamp;
     }
   },
+  update: async (id: number, data: Partial<Campaign>): Promise<Campaign> => {
+    try {
+      const res = await apiClient.put(`/campaigns/${id}`, data);
+      return res.data;
+    } catch (e) {
+      const list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
+      const updated = list.map(c => c.id === id ? { ...c, ...data, updated_at: new Date().toISOString() } : c);
+      setStoredList('mf_campaigns', updated);
+      const found = updated.find(c => c.id === id);
+      if (found) return found;
+      throw e;
+    }
+  },
   getKpi: async (id: number): Promise<KPISummary> => {
     try {
       const res = await apiClient.get(`/campaigns/${id}/kpi`);
