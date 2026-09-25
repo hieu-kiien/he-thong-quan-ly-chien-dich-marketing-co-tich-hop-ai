@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { Building2, ChevronDown, Check, Plus, Palette, Sparkles, Loader2 } from 'lucide-react';
 import { Workspace } from '../types';
+import { useToast } from './Toast';
+import { getApiErrorMessage } from '../services/api';
 
 interface WorkspaceSwitcherProps {
   onOpenBrandKit: () => void;
@@ -9,6 +11,7 @@ interface WorkspaceSwitcherProps {
 
 export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({ onOpenBrandKit }) => {
   const { workspaces, currentWorkspace, setCurrentWorkspace, createWorkspace, isLoadingWorkspaces } = useWorkspace();
+  const toast = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
@@ -38,11 +41,12 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({ onOpenBran
     setIsSubmitting(true);
     try {
       await createWorkspace(newWorkspaceName.trim());
+      toast.success(`Đã tạo không gian làm việc "${newWorkspaceName.trim()}" thành công!`);
       setNewWorkspaceName('');
       setIsCreating(false);
       setIsOpen(false);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      toast.error(getApiErrorMessage(err), 'Không thể tạo Workspace mới');
     } finally {
       setIsSubmitting(false);
     }

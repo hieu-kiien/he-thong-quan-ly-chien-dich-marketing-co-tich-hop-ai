@@ -194,12 +194,16 @@ def update_campaign(
 @router.delete("/{campaign_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_campaign(
     campaign_id: int,
-    user_payload=Depends(RoleChecker(allowed_roles=["MANAGER"])), # Chỉ MANAGER mới được xóa!
+    current_user: User = Depends(get_current_user),
+    user_payload=Depends(RoleChecker(allowed_roles=["MANAGER", "AGENCY_MANAGER", "ADMIN"])), # Chỉ quản lý/admin mới được xóa!
     db: Session = Depends(get_db)
 ):
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
+    
+    # Xác thực quyền truy cập đối tượng và cô lập Tenant Isolation
+    check_campaign_access(campaign, current_user, db)
     
     db.delete(campaign)
     db.commit()

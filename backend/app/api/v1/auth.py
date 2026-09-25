@@ -26,8 +26,16 @@ def register(req: UserRegister, db: Session = Depends(get_db)):
             detail="Email này đã được sử dụng trong hệ thống"
         )
 
-    # 2. Tạo User mới
-    role = req.role or "MARKETER"
+    # 2. Tạo User mới (Chặn leo thang đặc quyền Privilege Escalation)
+    requested_role = (req.role or "MARKETER").strip().upper()
+    if requested_role in ("ADMIN", "MANAGER"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Không được phép tự đăng ký tài khoản với vai trò Quản trị viên (ADMIN) hoặc Quản lý cấp cao (MANAGER)."
+        )
+    if requested_role not in ("MARKETER", "AGENCY_MANAGER", "CLIENT_APPROVER"):
+        requested_role = "MARKETER"
+    role = requested_role
     user = User(
         email=req.email,
         full_name=req.full_name,

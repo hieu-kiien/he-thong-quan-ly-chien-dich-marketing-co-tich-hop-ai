@@ -98,12 +98,14 @@ def store_custom_ai_key(
     target_ws_id = req.workspace_id
     if target_ws_id is not None:
         # Kiểm tra quyền với workspace nếu chỉ định workspace_id
-        if current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER"):
-            is_member = db.query(WorkspaceMember).filter(
+        if current_user.role != "ADMIN" and target_ws_id > 1:
+            ws = db.query(Workspace).filter(Workspace.id == target_ws_id).first()
+            is_ws_owner = ws is not None and ws.owner_id == current_user.id
+            is_ws_member = db.query(WorkspaceMember).filter(
                 WorkspaceMember.workspace_id == target_ws_id,
                 WorkspaceMember.user_id == current_user.id
             ).first()
-            if not is_member:
+            if not (is_ws_owner or (is_ws_member and is_ws_member.role in ("MANAGER", "AGENCY_MANAGER"))):
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền quản lý khóa cho Workspace này.")
 
         existing = db.query(CustomApiKey).filter(
@@ -220,6 +222,19 @@ def get_custom_ai_keys(
     key_record = None
 
     if workspace_id is not None:
+        if current_user.role != "ADMIN" and workspace_id > 1:
+            ws = db.query(Workspace).filter(Workspace.id == workspace_id).first()
+            is_ws_owner = ws is not None and ws.owner_id == current_user.id
+            is_ws_member = db.query(WorkspaceMember).filter(
+                WorkspaceMember.workspace_id == workspace_id,
+                WorkspaceMember.user_id == current_user.id
+            ).first() is not None
+            if not (is_ws_owner or is_ws_member):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Không có quyền truy cập cấu hình AI của Workspace này."
+                )
+
         key_record = db.query(CustomApiKey).filter(
             CustomApiKey.workspace_id == workspace_id,
             CustomApiKey.provider == "gemini"
@@ -283,6 +298,18 @@ def list_custom_ai_keys(
     """Danh sách tất cả các khóa của người dùng hoặc workspace (đã che mặt nạ)."""
     query = db.query(CustomApiKey)
     if workspace_id is not None:
+        if current_user.role != "ADMIN" and workspace_id > 1:
+            ws = db.query(Workspace).filter(Workspace.id == workspace_id).first()
+            is_ws_owner = ws is not None and ws.owner_id == current_user.id
+            is_ws_member = db.query(WorkspaceMember).filter(
+                WorkspaceMember.workspace_id == workspace_id,
+                WorkspaceMember.user_id == current_user.id
+            ).first() is not None
+            if not (is_ws_owner or is_ws_member):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Không có quyền truy cập cấu hình AI của Workspace này."
+                )
         query = query.filter(CustomApiKey.workspace_id == workspace_id)
     else:
         query = query.filter(
@@ -325,6 +352,18 @@ def deactivate_or_delete_current_byok_key(
 ):
     """Vô hiệu hóa hoặc xóa custom key để hoàn nguyên về System Default Key (theo test_t1_r6_05)."""
     if workspace_id is not None:
+        if current_user.role != "ADMIN" and workspace_id > 1:
+            ws = db.query(Workspace).filter(Workspace.id == workspace_id).first()
+            is_ws_owner = ws is not None and ws.owner_id == current_user.id
+            is_ws_member = db.query(WorkspaceMember).filter(
+                WorkspaceMember.workspace_id == workspace_id,
+                WorkspaceMember.user_id == current_user.id
+            ).first() is not None
+            if not (is_ws_owner or is_ws_member):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Không có quyền thao tác trên Workspace này."
+                )
         key_record = db.query(CustomApiKey).filter(
             CustomApiKey.workspace_id == workspace_id,
             CustomApiKey.provider == "gemini"
@@ -342,11 +381,46 @@ def deactivate_or_delete_current_byok_key(
             ).first()
 
     if key_record:
+        check_ai_key_access(key_record, current_user, db)
         key_record.is_active = False
         db.delete(key_record)
         db.commit()
 
     return {"status": "DEACTIVATED", "message": "Custom AI key deactivated/removed successfully."}
+
+
+def check_ai_key_access(key_record: CustomApiKey, current_user: User, db: Session):
+    """Kiểm tra quyền thao tác trên CustomApiKey (Xóa hoặc Bật/Tắt).
+    - ADMIN có toàn quyền.
+    - Người tạo khóa (user_id == current_user.id) có quyền thao tác trên khóa của mình.
+    - Nếu là khóa của Workspace (workspace_id is not None):
+      Người dùng là MANAGER / AGENCY_MANAGER phải thuộc workspace đó (là owner của workspace hoặc thành viên).
+    - Bất kỳ trường hợp nào khác: 403 FORBIDDEN.
+    """
+    if current_user.role == "ADMIN":
+        return
+
+    # Người tạo khóa được thao tác trên khóa của chính mình
+    if key_record.user_id == current_user.id:
+        return
+
+    # Nếu khóa thuộc một Workspace cụ thể
+    if key_record.workspace_id is not None:
+        if current_user.role in ("MANAGER", "AGENCY_MANAGER"):
+            ws = db.query(Workspace).filter(Workspace.id == key_record.workspace_id).first()
+            if ws and ws.owner_id == current_user.id:
+                return
+            is_member = db.query(WorkspaceMember).filter(
+                WorkspaceMember.workspace_id == key_record.workspace_id,
+                WorkspaceMember.user_id == current_user.id
+            ).first()
+            if is_member and is_member.role in ("MANAGER", "AGENCY_MANAGER"):
+                return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Không có quyền thao tác trên cấu hình khóa AI này."
+    )
 
 
 @router.delete("/ai-keys/{key_id}", status_code=status.HTTP_200_OK)
@@ -360,8 +434,7 @@ def delete_custom_ai_key_by_id(
     if not key_record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy cấu hình khóa.")
 
-    if key_record.user_id != current_user.id and current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền xóa khóa này.")
+    check_ai_key_access(key_record, current_user, db)
 
     db.delete(key_record)
     db.commit()
@@ -378,6 +451,8 @@ def toggle_custom_ai_key_active(
     key_record = db.query(CustomApiKey).filter(CustomApiKey.id == key_id).first()
     if not key_record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy cấu hình khóa.")
+
+    check_ai_key_access(key_record, current_user, db)
 
     key_record.is_active = not key_record.is_active
     db.commit()

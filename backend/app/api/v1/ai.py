@@ -291,10 +291,28 @@ def generate_omnichannel(
             brand_kit = db.query(BrandKit).filter(BrandKit.workspace_id == campaign.workspace_id).first()
 
     if not brand_kit and req.brand_kit_id:
-        brand_kit = db.query(BrandKit).filter(BrandKit.id == req.brand_kit_id).first()
+        bk = db.query(BrandKit).filter(BrandKit.id == req.brand_kit_id).first()
+        if bk:
+            # Xác minh quyền truy cập Brand Kit theo Tenant Isolation
+            if current_user.role != "ADMIN" and bk.workspace_id and bk.workspace_id > 1:
+                ws = db.query(Workspace).filter(Workspace.id == bk.workspace_id).first()
+                is_ws_owner = ws is not None and ws.owner_id == current_user.id
+                is_ws_member = db.query(WorkspaceMember).filter(
+                    WorkspaceMember.workspace_id == bk.workspace_id,
+                    WorkspaceMember.user_id == current_user.id
+                ).first() is not None
+                if not (is_ws_owner or is_ws_member):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Not authorized to access this Brand Kit"
+                    )
+            brand_kit = bk
 
     if not brand_kit:
-        brand_kit = db.query(BrandKit).first()
+        # Fallback an toàn vào workspace của người dùng hiện tại (nếu có), tuyệt đối không lấy BrandKit của tenant khác
+        membership = db.query(WorkspaceMember).filter(WorkspaceMember.user_id == user_id).first()
+        if membership:
+            brand_kit = db.query(BrandKit).filter(BrandKit.workspace_id == membership.workspace_id).first()
 
     # Kế thừa thông số Brand Kit
     brand_name = brand_kit.brand_name if brand_kit else (product.name if product else "MarketFlow AI")

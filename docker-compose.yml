@@ -8,16 +8,16 @@ services:
     container_name: aia331_backend
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       - APP_NAME=Marketing Campaign Management System with AI
       - APP_ENV=${APP_ENV:-production}
       - API_V1_PREFIX=/api/v1
       - DATABASE_URL=sqlite:////app/marketing_campaigns.db
       - SECRET_KEY=${SECRET_KEY:-aia331-super-secret-production-key-change-it}
-      - AI_PROVIDER=${AI_PROVIDER:-opencode}
-      - AI_BASE_URL=${AI_BASE_URL:-https://api.opencode.ai/v1}
-      - AI_MODEL=${AI_MODEL:-muse-spark-1.3}
+      - AI_PROVIDER=${AI_PROVIDER:-gemini}
+      - AI_BASE_URL=${AI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai}
+      - AI_MODEL=${AI_MODEL:-gemini-2.5-flash}
       - AI_TIMEOUT_SECONDS=10
       - AI_ENABLE_FALLBACK=true
     volumes:

@@ -4,7 +4,8 @@ import {
   Trash2, ExternalLink, RefreshCw, Loader2, Sparkles, Building2, User, 
   Check, Power, ShieldAlert, Cpu, ArrowRight
 } from 'lucide-react';
-import { settingsApi } from '../services/api';
+import { settingsApi, getApiErrorMessage } from '../services/api';
+import { useToast } from '../components/Toast';
 import { CustomApiKey, AIKeyTestResponse, User as UserType, Workspace } from '../types';
 
 interface SettingsProps {
@@ -13,6 +14,7 @@ interface SettingsProps {
 }
 
 export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspace }) => {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<'byok' | 'profile' | 'workspace'>('byok');
 
   // BYOK Form States
@@ -131,19 +133,21 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
       } else {
         await settingsApi.deleteKey(currentWorkspace?.id);
       }
+      toast.success('Đã xóa cấu hình khóa AI thành công!');
       await loadKeys();
-    } catch (err) {
-      console.error('Lỗi khi xóa khóa:', err);
+    } catch (err: any) {
+      toast.error(getApiErrorMessage(err), 'Lỗi khi xóa khóa AI');
     }
   };
 
   const handleToggleActive = async (keyId?: number) => {
     if (!keyId) return;
     try {
-      await settingsApi.toggleKey(keyId);
+      const updated = await settingsApi.toggleKey(keyId);
+      toast.success(`Đã ${updated.is_active ? 'bật kích hoạt' : 'tạm dừng'} khóa AI thành công!`);
       await loadKeys();
-    } catch (err) {
-      console.error('Lỗi khi đổi trạng thái khóa:', err);
+    } catch (err: any) {
+      toast.error(getApiErrorMessage(err), 'Lỗi khi đổi trạng thái khóa AI');
     }
   };
 

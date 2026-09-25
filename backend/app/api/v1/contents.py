@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.core.database import get_db
 from app.core.security import RoleChecker, get_current_user
-from app.models.entities import MarketingContent, Campaign, MarketingChannel, ContentReview, User, CampaignMember
+from app.models.entities import MarketingContent, Campaign, MarketingChannel, ContentReview, User, CampaignMember, Workspace, WorkspaceMember
 from app.schemas.schemas import (
     ContentCreate, ContentUpdate, ContentResponse, ReviewCreate,
     ComplianceCheckRequest, ComplianceCheckResponse
@@ -15,23 +15,41 @@ from app.services.compliance.compliance_service import ComplianceScanner
 router = APIRouter(prefix="/contents", tags=["Quản lý Nội dung Marketing"])
 
 def check_content_access(content: MarketingContent, user: User, db: Session):
-    """Xác thực phân quyền mức bản ghi (Record-level authorization):
-    User ADMIN / MANAGER / AGENCY_MANAGER có toàn quyền.
-    User MARKETER chỉ được thao tác trên bài viết do mình tạo HOẶC thuộc chiến dịch mình sở hữu / là thành viên.
-    """
-    if user.role in ("ADMIN", "MANAGER", "AGENCY_MANAGER"):
+    """Xác thực phân quyền mức bản ghi (Record-level authorization) & cách ly Workspace."""
+    if user.role == "ADMIN":
         return
+
+    # Tenant Isolation: Nếu content thuộc Workspace cụ thể (> 1), kiểm tra user có thuộc workspace đó không
+    if content.workspace_id is not None and content.workspace_id > 1:
+        ws = db.query(Workspace).filter(Workspace.id == content.workspace_id).first()
+        is_ws_owner = ws is not None and ws.owner_id == user.id
+        is_ws_member = db.query(WorkspaceMember).filter(
+            WorkspaceMember.workspace_id == content.workspace_id,
+            WorkspaceMember.user_id == user.id
+        ).first() is not None
+        if not (is_ws_owner or is_ws_member):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access resources in this workspace"
+            )
+
+    if user.role in ("MANAGER", "AGENCY_MANAGER"):
+        return
+
     if content.created_by == user.id:
         return
+
     campaign = db.query(Campaign).filter(Campaign.id == content.campaign_id).first()
     if campaign and campaign.owner_id == user.id:
         return
+
     is_member = db.query(CampaignMember).filter(
         CampaignMember.campaign_id == content.campaign_id,
         CampaignMember.user_id == user.id
     ).first()
     if is_member:
         return
+
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Not authorized to access this resource"

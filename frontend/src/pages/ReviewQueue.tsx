@@ -53,8 +53,8 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
 
   const handleImageChange = async (contentId: number, newImageUrl: string) => {
     try {
-      await contentApi.update(contentId, { image_url: newImageUrl });
-      setContents(prev => prev.map(c => c.id === contentId ? { ...c, image_url: newImageUrl } : c));
+      const updated = await contentApi.update(contentId, { image_url: newImageUrl });
+      setContents(prev => prev.map(c => c.id === contentId ? { ...c, image_url: updated.image_url || newImageUrl, status: updated.status || c.status } : c));
       toast.success('Đã cập nhật ảnh sản phẩm / banner thành công!');
     } catch (e: any) {
       toast.error(getApiErrorMessage(e), 'Lỗi khi cập nhật ảnh');

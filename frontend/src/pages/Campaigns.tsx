@@ -385,13 +385,13 @@ export const Campaigns: React.FC<CampaignsProps> = ({
     }
   };
 
-  // Submit Final Wizard (Creates Campaign + Creatives in 1 Atomic Flow)
+  // Submit Final Wizard (Creates Campaign + Creatives in 1 Atomic Flow with Rollback)
   const handleFinishWizard = async () => {
+    setIsSubmitting(true);
+    let newCamp: Campaign | null = null;
     try {
-      setIsSubmitting(true);
-
       // 1. Create Campaign
-      const newCamp = await campaignApi.create({
+      newCamp = await campaignApi.create({
         name: wizardData.name.trim(),
         product_id: Number(wizardData.product_id),
         objective: wizardData.objectiveTitle,
@@ -407,18 +407,20 @@ export const Campaigns: React.FC<CampaignsProps> = ({
         newCamp.status = 'DRAFT';
       }
 
-      // 2. Persist Generated Creatives if available
+      // 2. Persist Generated Creatives if available (Starting at AI_DRAFT per state machine)
       if (generatedCreatives) {
+        const creativePromises: Promise<any>[] = [];
+
         // Facebook Creative
         if (generatedCreatives.facebook && wizardData.channels.includes('facebook')) {
-          await contentApi.create({
+          creativePromises.push(contentApi.create({
             campaign_id: newCamp.id,
             channel_id: 1, // Facebook
             title: generatedCreatives.facebook.headline || generatedCreatives.facebook.title || 'Quảng cáo Facebook Feed',
             body: generatedCreatives.facebook.primary_text || generatedCreatives.facebook.body,
             cta: generatedCreatives.facebook.cta,
-            status: 'APPROVED'
-          });
+            status: 'AI_DRAFT'
+          }));
         }
 
         // TikTok Script Creative
@@ -427,27 +429,29 @@ export const Campaigns: React.FC<CampaignsProps> = ({
             ? generatedCreatives.tiktok.scenes.map(s => `[Cảnh ${s.scene_number || s.scene} - ${s.duration_seconds || '0-5s'}]\n• Hình ảnh: ${s.visual_action || s.visual}\n• Lời thoại: ${s.voiceover_script || s.voiceover}\n• Âm thanh: ${s.audio_hint || s.audio || 'Trending sound'}`).join('\n\n')
             : `Hook: ${generatedCreatives.tiktok.hook_3s}`;
 
-          await contentApi.create({
+          creativePromises.push(contentApi.create({
             campaign_id: newCamp.id,
             channel_id: 2, // TikTok
             title: `Kịch bản Video TikTok: ${generatedCreatives.tiktok.hook_3s?.slice(0, 50) || 'Hook 3s viral'}`,
             body: `Hook 3s: ${generatedCreatives.tiktok.hook_3s}\n\n${tiktokScriptBody}`,
             cta: 'Xem ngay trên TikTok Shop / Bio link',
-            status: 'APPROVED'
-          });
+            status: 'AI_DRAFT'
+          }));
         }
 
         // Email Newsletter Creative
         if (generatedCreatives.email && wizardData.channels.includes('email')) {
-          await contentApi.create({
+          creativePromises.push(contentApi.create({
             campaign_id: newCamp.id,
             channel_id: 3, // Email
             title: `[Email Newsletter] ${generatedCreatives.email.subject || 'Ưu đãi đặc biệt'}`,
             body: `Tiêu đề: ${generatedCreatives.email.subject || ''}\nLời chào: ${generatedCreatives.email.preheader || generatedCreatives.email.greeting || ''}\n\n${generatedCreatives.email.body}`,
             cta: generatedCreatives.email.cta,
-            status: 'APPROVED'
-          });
+            status: 'AI_DRAFT'
+          }));
         }
+
+        await Promise.all(creativePromises);
       }
 
       toast.success(`Chiến dịch "${newCamp.name}" và trọn bộ Mẫu Quảng Cáo đã được tạo thành công!`);
@@ -457,6 +461,14 @@ export const Campaigns: React.FC<CampaignsProps> = ({
       await loadData();
       if (onRefreshData) onRefreshData();
     } catch (e) {
+      // Rollback campaign if creation was interrupted or failed to ensure atomic consistency
+      if (newCamp && newCamp.id) {
+        try {
+          await campaignApi.delete(newCamp.id);
+        } catch (rollbackErr) {
+          console.error('Không thể rollback campaign sau khi lỗi creative:', rollbackErr);
+        }
+      }
       toast.error(getApiErrorMessage(e), 'Lỗi khi khởi tạo chiến dịch');
     } finally {
       setIsSubmitting(false);

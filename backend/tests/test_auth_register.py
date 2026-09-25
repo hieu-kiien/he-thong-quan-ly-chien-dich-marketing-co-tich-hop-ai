@@ -148,3 +148,26 @@ def test_register_client_approver_role(client):
     resp = client.post("/api/v1/auth/register", json=payload)
     assert resp.status_code == 201
     assert resp.json()["role"] == "CLIENT_APPROVER"
+
+def test_register_admin_role_rejected(client):
+    """Đăng ký tài khoản với vai trò ADMIN bị từ chối để chống leo thang đặc quyền."""
+    payload = {
+        "email": "hacker_admin@example.com",
+        "password": "Password@123",
+        "full_name": "Hacker Wanna Be Admin",
+        "role": "ADMIN"
+    }
+    resp = client.post("/api/v1/auth/register", json=payload)
+    # Bị chặn bởi Pydantic validation (422) hoặc Endpoint Security (403)
+    assert resp.status_code in (403, 422)
+
+def test_register_manager_role_rejected(client):
+    """Đăng ký tài khoản với vai trò MANAGER bị từ chối để chống leo thang đặc quyền."""
+    payload = {
+        "email": "hacker_mgr@example.com",
+        "password": "Password@123",
+        "full_name": "Hacker Wanna Be Manager",
+        "role": "MANAGER"
+    }
+    resp = client.post("/api/v1/auth/register", json=payload)
+    assert resp.status_code in (403, 422)

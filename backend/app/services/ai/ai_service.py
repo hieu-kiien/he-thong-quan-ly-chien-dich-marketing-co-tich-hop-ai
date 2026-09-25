@@ -241,7 +241,13 @@ class AIService:
             "temperature": 0.7,
         }
 
-        url = f"{self.base_url}/chat/completions"
+        # Tự động định tuyến endpoint nếu sử dụng Google Gemini hoặc BYOK Gemini
+        if (model_to_use and "gemini" in model_to_use.lower()) or (key_to_use and key_to_use.startswith("AIzaSy")):
+            base_url = "https://generativelanguage.googleapis.com/v1beta/openai" if "opencode.ai" in self.base_url else self.base_url
+        else:
+            base_url = self.base_url
+
+        url = f"{base_url}/chat/completions"
 
         last_error = None
         for attempt in range(self.max_retries + 1):

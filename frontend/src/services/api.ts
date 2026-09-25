@@ -125,7 +125,8 @@ export const workspaceApi = {
     try {
       const res = await apiClient.get('/workspaces');
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       return getStoredList<Workspace>('mf_workspaces', MOCK_WORKSPACES);
     }
   },
@@ -133,7 +134,8 @@ export const workspaceApi = {
     try {
       const res = await apiClient.post('/workspaces', data);
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       const list = getStoredList<Workspace>('mf_workspaces', MOCK_WORKSPACES);
       const newWs: Workspace = {
         id: Date.now(),
@@ -151,7 +153,8 @@ export const workspaceApi = {
     try {
       const res = await apiClient.get(`/workspaces/${id}`);
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       const list = getStoredList<Workspace>('mf_workspaces', MOCK_WORKSPACES);
       const found = list.find(w => w.id === id);
       if (found) return found;
@@ -162,7 +165,8 @@ export const workspaceApi = {
     try {
       const res = await apiClient.put(`/workspaces/${id}`, data);
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       const list = getStoredList<Workspace>('mf_workspaces', MOCK_WORKSPACES);
       const idx = list.findIndex(w => w.id === id);
       if (idx !== -1) {
@@ -184,7 +188,8 @@ export const brandKitApi = {
     try {
       const res = await apiClient.get('/brand-kit', { params: { workspace_id: workspaceId } });
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       const stored = MOCK_BRAND_KITS[workspaceId] || {
         id: workspaceId,
         workspace_id: workspaceId,
@@ -200,7 +205,8 @@ export const brandKitApi = {
     try {
       const res = await apiClient.put('/brand-kit', data, { params: { workspace_id: workspaceId } });
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       const current = MOCK_BRAND_KITS[workspaceId] || {
         id: workspaceId,
         workspace_id: workspaceId,
@@ -225,7 +231,8 @@ export const campaignApi = {
       if (workspaceId) params.workspace_id = workspaceId;
       const res = await apiClient.get('/campaigns', { params });
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       let list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
       if (workspaceId) {
         list = list.filter(c => !c.workspace_id || c.workspace_id === workspaceId);
@@ -244,7 +251,8 @@ export const campaignApi = {
     try {
       const res = await apiClient.get(`/campaigns/${id}`);
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       const list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
       const found = list.find(c => c.id === id);
       if (found) return found;
@@ -263,7 +271,8 @@ export const campaignApi = {
     try {
       const res = await apiClient.post('/campaigns', data);
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       const list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
       const newCamp: Campaign = {
         id: Date.now(),
@@ -281,7 +290,8 @@ export const campaignApi = {
     try {
       const res = await apiClient.put(`/campaigns/${id}`, data);
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       const list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
       const updated = list.map(c => c.id === id ? { ...c, ...data, updated_at: new Date().toISOString() } : c);
       setStoredList('mf_campaigns', updated);
@@ -298,7 +308,8 @@ export const campaignApi = {
         data.roas = data.total_cost > 0 ? Number((data.total_revenue / data.total_cost).toFixed(2)) : 0.0;
       }
       return data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       return MOCK_DASHBOARD_KPI;
     }
   },
@@ -306,7 +317,8 @@ export const campaignApi = {
     try {
       const res = await apiClient.post(`/campaigns/${campaignId}/ai-doctor`);
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       return {
         ...MOCK_AI_DOCTOR_REPORT,
         campaign_id: campaignId
@@ -317,7 +329,8 @@ export const campaignApi = {
     try {
       const res = await apiClient.get(`/campaigns/${campaignId}/attribution`);
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       return MOCK_CHANNEL_ATTRIBUTIONS;
     }
   },
@@ -325,7 +338,8 @@ export const campaignApi = {
     try {
       const res = await apiClient.get(`/campaigns/${campaignId}/contents`);
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       return list.filter(c => c.campaign_id === campaignId);
     }
@@ -333,7 +347,8 @@ export const campaignApi = {
   delete: async (id: number): Promise<void> => {
     try {
       await apiClient.delete(`/campaigns/${id}`);
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       const list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
       setStoredList('mf_campaigns', list.filter(c => c.id !== id));
     }
@@ -345,7 +360,8 @@ export const productApi = {
     try {
       const res = await apiClient.get('/products');
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       return MOCK_PRODUCTS;
     }
   }
@@ -360,7 +376,8 @@ export const contentApi = {
       if (workspaceId) params.workspace_id = workspaceId;
       const res = await apiClient.get('/contents', { params });
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       let list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       if (workspaceId) list = list.filter(c => !c.workspace_id || c.workspace_id === workspaceId);
       if (campaignId) list = list.filter(c => c.campaign_id === campaignId);
@@ -373,7 +390,8 @@ export const contentApi = {
     try {
       const res = await apiClient.post('/contents', data);
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       const newContent: MarketingContent = {
         id: Date.now(),
@@ -399,7 +417,8 @@ export const contentApi = {
     try {
       const res = await apiClient.put(`/contents/${id}`, data);
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       const updated = list.map(c => c.id === id ? { ...c, ...data, updated_at: new Date().toISOString() } : c);
       setStoredList('mf_contents', updated);
@@ -412,6 +431,7 @@ export const contentApi = {
       const res = await apiClient.post('/contents/compliance-check', data);
       return res.data;
     } catch (e: any) {
+      if (e?.response) throw e;
       const local = evaluateMarketingCompliance(data.title || '', data.body || '', data.cta);
       const violations: ComplianceViolation[] = local.flagged_items.map(f => ({
         category: f.risk_level === 'HIGH' ? 'AD_POLICY' : 'BRAND_BANNED',
@@ -436,9 +456,7 @@ export const contentApi = {
       const res = await apiClient.post(`/contents/${id}/submit`);
       return res.data;
     } catch (e: any) {
-      if (e.response?.status === 400 || e.response?.status === 403 || e.response?.status === 404 || e.response?.status === 422) {
-        throw e;
-      }
+      if (e?.response) throw e;
       const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       const updated = list.map(c => c.id === id ? { ...c, status: 'IN_REVIEW' as const } : c);
       setStoredList('mf_contents', updated);
@@ -449,7 +467,8 @@ export const contentApi = {
     try {
       const res = await apiClient.post(`/contents/${id}/approve`);
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       const updated = list.map(c => c.id === id ? { ...c, status: 'APPROVED' as const } : c);
       setStoredList('mf_contents', updated);
@@ -460,7 +479,8 @@ export const contentApi = {
     try {
       const res = await apiClient.post(`/contents/${id}/reject`, { decision: 'REJECTED', reason });
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       const updated = list.map(c => c.id === id ? { ...c, status: 'REJECTED' as const, rejection_reason: reason } : c);
       setStoredList('mf_contents', updated);
@@ -704,7 +724,8 @@ export const scheduleApi = {
     try {
       const res = await apiClient.get('/schedules');
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       return getStoredList<MarketingSchedule>('mf_schedules', MOCK_SCHEDULES);
     }
   },
@@ -716,7 +737,8 @@ export const scheduleApi = {
         timezone
       });
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
       const list = getStoredList<MarketingSchedule>('mf_schedules', MOCK_SCHEDULES);
       const newSched: MarketingSchedule = {
         id: Date.now(),
@@ -916,6 +938,7 @@ export const settingsApi = {
       const res = await apiClient.delete('/settings/ai-keys', { params });
       return res.data;
     } catch (e: any) {
+      if (e?.response) throw e;
       const list = getStoredList<CustomApiKey>('custom_api_keys', MOCK_CUSTOM_API_KEYS);
       const filtered = workspaceId ? list.filter(k => k.workspace_id !== workspaceId) : [];
       setStoredList('custom_api_keys', filtered);
@@ -928,6 +951,7 @@ export const settingsApi = {
       const res = await apiClient.delete(`/settings/ai-keys/${keyId}`);
       return res.data;
     } catch (e: any) {
+      if (e?.response) throw e;
       const list = getStoredList<CustomApiKey>('custom_api_keys', MOCK_CUSTOM_API_KEYS);
       const filtered = list.filter(k => k.id !== keyId);
       setStoredList('custom_api_keys', filtered);
@@ -940,6 +964,7 @@ export const settingsApi = {
       const res = await apiClient.patch(`/settings/ai-keys/${keyId}/toggle`);
       return res.data;
     } catch (e: any) {
+      if (e?.response) throw e;
       const list = getStoredList<CustomApiKey>('custom_api_keys', MOCK_CUSTOM_API_KEYS);
       const item = list.find(k => k.id === keyId);
       if (item) {
