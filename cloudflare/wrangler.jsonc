@@ -9,6 +9,7 @@
       "SECRET_KEY",
       "JWT_SECRET_KEY",
       "BYOK_ENCRYPTION_KEY",
+      "AI_API_KEY",
       "MARKETFLOW_MANAGER_PASSWORD",
       "MARKETFLOW_MARKETER_PASSWORD",
       "MARKETFLOW_APPROVER_PASSWORD"
@@ -49,8 +50,8 @@
   ],
   "routes": [
     {
-      "pattern": "marketing.kienhieu.id.vn",
-      "custom_domain": true
+      "pattern": "marketing.kienhieu.id.vn/*",
+      "zone_name": "kienhieu.id.vn"
     }
   ]
 }
