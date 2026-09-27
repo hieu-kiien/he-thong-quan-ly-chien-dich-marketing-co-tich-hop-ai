@@ -15,6 +15,24 @@ import logging
 
 logger = logging.getLogger("marketflow.ai_service")
 
+
+def _sanitize_ai_error(err_msg: Optional[str], active_key: Optional[str] = None) -> str:
+    """Làm sạch các token nhạy cảm, API keys, query parameter ?key=... khỏi log và thông báo lỗi."""
+    if not err_msg:
+        return ""
+    sanitized = str(err_msg)
+    if active_key and len(active_key.strip()) >= 4:
+        sanitized = sanitized.replace(active_key.strip(), "[REDACTED_API_KEY]")
+    # Xóa query param ?key= hoặc &key=
+    sanitized = re.sub(r'([?&]key=)[^&\s"\'\\}]+', r'\1[REDACTED]', sanitized, flags=re.IGNORECASE)
+    # Xóa Gemini key patterns
+    sanitized = re.sub(r'AIza[0-9A-Za-z_-]{35}', '[REDACTED_GEMINI_KEY]', sanitized)
+    sanitized = re.sub(r'AIzaSy[0-9A-Za-z_-]+', '[REDACTED_GEMINI_KEY]', sanitized)
+    # Xóa Bearer tokens
+    sanitized = re.sub(r'(Bearer\s+)[A-Za-z0-9._-]+', r'\1[REDACTED]', sanitized, flags=re.IGNORECASE)
+    return sanitized
+
+
 class AIService:
     def __init__(self):
         self._base_url = None
@@ -261,11 +279,12 @@ class AIService:
                         time.sleep(1.0 * (attempt + 1))
                         continue
                     else:
-                        raise RuntimeError(f"AI Provider trả về lỗi HTTP {resp.status_code}: {resp.text}")
+                        clean_err = _sanitize_ai_error(resp.text, active_key=key_to_use)
+                        raise RuntimeError(f"AI Provider trả về lỗi HTTP {resp.status_code}: {clean_err}")
             except httpx.TimeoutException:
                 last_error = "TIMEOUT"
             except Exception as e:
-                last_error = str(e)
+                last_error = _sanitize_ai_error(str(e), active_key=key_to_use)
 
         raise RuntimeError(last_error or "Không thể kết nối AI Provider")
 
@@ -568,8 +587,9 @@ class AIService:
                         raise schema_err
             except Exception as e:
                 if result_status != "SCHEMA_ERROR":
-                    err_str = str(e)
-                    if "TIMEOUT" in err_str:
+                    raw_err = str(e)
+                    err_str = _sanitize_ai_error(raw_err, active_key=active_key)
+                    if "TIMEOUT" in raw_err:
                         result_status = "TIMEOUT"
                         error_code = "ERR_AI_TIMEOUT"
                     else:
@@ -587,7 +607,7 @@ class AIService:
                     else:
                         latency_ms = int((time.time() - start_time) * 1000)
                         self._log_call(db, user_id, campaign_id, task_code, active_model, prompt_version, input_hash, None, result_status, error_code, latency_ms)
-                        raise e
+                        raise RuntimeError(err_str) from None
 
         # Ghi log vào bảng ai_logs
         self._log_call(

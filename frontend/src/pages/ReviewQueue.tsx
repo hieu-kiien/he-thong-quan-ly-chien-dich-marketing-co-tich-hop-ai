@@ -24,6 +24,7 @@ import { useToast } from '../components/Toast';
 import { ReviewQueueSkeleton } from '../components/Skeleton';
 import { SocialPreviewContainer } from '../components/previews';
 import { ExportActions } from '../components/ExportActions';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface ReviewQueueProps {
   userRole?: string;
@@ -45,8 +46,17 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
   const [rejectId, setRejectId] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState<string>('');
   const [isRejecting, setIsRejecting] = useState<boolean>(false);
+  const [approvingId, setApprovingId] = useState<number | null>(null);
   const [submittingId, setSubmittingId] = useState<number | null>(null);
   const [showSocialPreview, setShowSocialPreview] = useState<boolean>(true);
+
+  const rejectModalRef = useFocusTrap<HTMLDivElement>({
+    isActive: !!rejectId,
+    onEscape: () => {
+      setRejectId(null);
+      setRejectReason('');
+    }
+  });
 
   const approverRoles = ['MANAGER', 'AGENCY_MANAGER', 'CLIENT_APPROVER'];
   const isApprover = approverRoles.includes(userRole || '');
@@ -83,12 +93,16 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
       toast.warning('Chỉ Quản lý (Manager, Agency Manager, Client Approver) mới có quyền duyệt nội dung!');
       return;
     }
+    if (approvingId !== null) return;
+    setApprovingId(id);
     try {
       await contentApi.approve(id);
       toast.success('Đã phê duyệt bài viết thành công (APPROVED)!');
-      loadContents();
+      await loadContents();
     } catch (e: any) {
       toast.error(getApiErrorMessage(e), 'Lỗi khi duyệt bài');
+    } finally {
+      setApprovingId(null);
     }
   };
 
@@ -97,6 +111,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
       toast.warning('Chỉ Quản lý mới có quyền từ chối bài viết!');
       return;
     }
+    if (isRejecting) return;
     if (rejectReason.trim().length < 5) {
       toast.warning('Vui lòng nhập lý do từ chối cụ thể (tối thiểu 5 ký tự) để nhân viên có hướng điều chỉnh!');
       return;
@@ -107,7 +122,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
       setRejectId(null);
       setRejectReason('');
       toast.success('Đã gửi phản hồi từ chối bài viết (REJECTED)');
-      loadContents();
+      await loadContents();
     } catch (e: any) {
       toast.error(getApiErrorMessage(e), 'Lỗi khi từ chối bài');
     } finally {
@@ -116,11 +131,12 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
   };
 
   const handleSubmitDraft = async (id: number) => {
+    if (submittingId !== null) return;
     try {
       setSubmittingId(id);
       await contentApi.submitForReview(id);
       toast.success('Đã chuyển bài viết sang Hàng đợi phê duyệt (IN_REVIEW)!');
-      loadContents();
+      await loadContents();
     } catch (e: any) {
       toast.error(getApiErrorMessage(e), 'Lỗi khi gửi duyệt bản nháp');
     } finally {
@@ -129,7 +145,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
   };
 
   const pendingList = contents.filter(c => c.status === 'IN_REVIEW');
-  const draftList = contents.filter(c => c.status === 'AI_DRAFT' || c.status === 'DRAFT');
+  const draftList = contents.filter(c => c.status === 'AI_DRAFT' || c.status === 'DRAFT' || c.status === 'REJECTED');
   const historyList = contents.filter(c => c.status === 'APPROVED' || c.status === 'REJECTED');
   const rejectModalItem = contents.find(c => c.id === rejectId) || null;
 
@@ -203,14 +219,14 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
           onClick={() => setActiveTab('pending')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
             activeTab === 'pending'
-              ? 'bg-amber-500 text-white shadow-sm'
+              ? 'bg-amber-700 text-white shadow-sm'
               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
           }`}
         >
           <Clock className="w-3.5 h-3.5" />
           <span>Chờ phê duyệt</span>
           <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
-            activeTab === 'pending' ? 'bg-amber-600 text-white' : 'bg-slate-200 text-slate-700'
+            activeTab === 'pending' ? 'bg-amber-800 text-white' : 'bg-slate-200 text-slate-700'
           }`}>
             {pendingList.length}
           </span>
@@ -288,16 +304,20 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                         <div className="flex items-center gap-2 no-print review-actions">
                           <button
                             onClick={() => handleApprove(item.id)}
-                            disabled={!isApprover}
+                            disabled={!isApprover || approvingId === item.id}
                             title={!isApprover ? 'Chỉ Quản lý (Manager, Agency Manager, Client Approver) mới có quyền duyệt' : 'Phê duyệt xuất bản'}
-                            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
+                            className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
                           >
-                            <CheckCircle2 className="w-4 h-4" />
-                            <span>Phê duyệt (Approve)</span>
+                            {approvingId === item.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <CheckCircle2 className="w-4 h-4" />
+                            )}
+                            <span>{approvingId === item.id ? 'Đang duyệt...' : 'Phê duyệt (Approve)'}</span>
                           </button>
                           <button
                             onClick={() => { setRejectId(item.id); setRejectReason(''); }}
-                            disabled={!isApprover}
+                            disabled={!isApprover || isRejecting}
                             title={!isApprover ? 'Chỉ Quản lý (Manager, Agency Manager, Client Approver) mới có quyền từ chối' : 'Từ chối & yêu cầu chỉnh sửa'}
                             className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed text-rose-700 rounded-lg text-xs font-bold flex items-center gap-1.5 border border-rose-200 transition-all active:scale-95"
                           >
@@ -320,7 +340,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                           </p>
                           {item.cta && (
                             <div className="mt-2 text-xs">
-                              <span className="text-slate-400 font-semibold">Lời kêu gọi (CTA): </span>
+                              <span className="text-slate-600 font-semibold">Lời kêu gọi (CTA): </span>
                               <span className="font-bold text-indigo-600">{item.cta}</span>
                             </div>
                           )}
@@ -360,8 +380,12 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                     <div key={item.id} className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs hover:border-blue-300 transition-all space-y-4 review-item-card print-card">
                       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded border border-blue-200">
-                            BẢN NHÁP ({item.status})
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                            item.status === 'REJECTED'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              : 'bg-blue-50 text-blue-700 border-blue-200'
+                          }`}>
+                            {item.status === 'REJECTED' ? 'CẦN CHỈNH SỬA (REJECTED)' : `BẢN NHÁP (${item.status})`}
                           </span>
                           <span className="text-xs text-slate-500 font-medium">Kênh: {item.channel?.name || 'Mạng xã hội'}</span>
                         </div>
@@ -371,17 +395,28 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                           <button
                             onClick={() => handleSubmitDraft(item.id)}
                             disabled={submittingId === item.id}
-                            className="px-3.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:bg-slate-300 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-600/20 transition-all active:scale-95"
+                            className={`px-3.5 py-1.5 disabled:bg-slate-300 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md transition-all active:scale-95 ${
+                              item.status === 'REJECTED'
+                                ? 'bg-gradient-to-r from-amber-600 to-indigo-600 hover:from-amber-700 hover:to-indigo-700 shadow-amber-600/20'
+                                : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-600/20'
+                            }`}
                           >
                             {submittingId === item.id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
                               <Send className="w-4 h-4" />
                             )}
-                            <span>Gửi Sếp phê duyệt (Submit)</span>
+                            <span>{item.status === 'REJECTED' ? 'Sửa & Gửi lại (Resubmit)' : 'Gửi Sếp phê duyệt (Submit)'}</span>
                           </button>
                         </div>
                       </div>
+
+                      {item.status === 'REJECTED' && (item.rejection_reason || (item as any).rejection_feedback) && (
+                        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
+                          <span className="font-bold">Lý do từ chối: </span>
+                          <span>{item.rejection_reason || (item as any).rejection_feedback}</span>
+                        </div>
+                      )}
 
                       {showSocialPreview ? (
                         <SocialPreviewContainer
@@ -396,7 +431,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                           </p>
                           {item.cta && (
                             <div className="mt-2 text-xs">
-                              <span className="text-slate-400 font-semibold">Lời kêu gọi (CTA): </span>
+                              <span className="text-slate-600 font-semibold">Lời kêu gọi (CTA): </span>
                               <span className="font-bold text-indigo-600">{item.cta}</span>
                             </div>
                           )}
@@ -437,7 +472,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                         <tr key={h.id} className="hover:bg-slate-50/60 transition-colors">
                           <td className="py-3 px-4 font-medium text-slate-900">
                             <div>{h.title}</div>
-                            <span className="text-[10px] text-slate-400 font-normal">Kênh: {h.channel?.name || 'Mạng xã hội'}</span>
+                            <span className="text-[10px] text-slate-600 font-normal">Kênh: {h.channel?.name || 'Mạng xã hội'}</span>
                           </td>
                           <td className="py-3 px-4 whitespace-nowrap">
                             <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold ${
@@ -459,7 +494,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                               </span>
                             )}
                           </td>
-                          <td className="py-3 px-4 text-slate-400 whitespace-nowrap">{h.updated_at ? new Date(h.updated_at).toLocaleDateString('vi-VN') : 'Gần đây'}</td>
+                          <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{h.updated_at ? new Date(h.updated_at).toLocaleDateString('vi-VN') : 'Gần đây'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -474,14 +509,21 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
       {/* Dedicated Reject Modal with Quick Feedback Templates */}
       {rejectModalItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 no-print">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div
+            ref={rejectModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reject-modal-title"
+            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+          >
             <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-rose-50/60">
               <div className="flex items-center gap-2 text-rose-700">
                 <XCircle className="w-5 h-5 text-rose-600" />
-                <h3 className="font-bold text-sm text-slate-900">Từ chối Phê duyệt & Yêu cầu chỉnh sửa</h3>
+                <h3 id="reject-modal-title" className="font-bold text-sm text-slate-900">Từ chối Phê duyệt & Yêu cầu chỉnh sửa</h3>
               </div>
               <button
                 onClick={() => { setRejectId(null); setRejectReason(''); }}
+                aria-label="Đóng modal từ chối"
                 className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
               >
                 <X className="w-4 h-4" />
@@ -490,15 +532,15 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
 
             <div className="p-5 space-y-4">
               <div>
-                <span className="text-[11px] font-bold text-slate-400 uppercase">Bài viết:</span>
+                <span className="text-[11px] font-bold text-slate-600 uppercase">Bài viết:</span>
                 <p className="text-xs font-semibold text-slate-800 line-clamp-2 mt-0.5">{rejectModalItem.title}</p>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-2 flex items-center gap-1.5">
+                <span className="block text-xs font-bold text-slate-700 mb-2 flex items-center gap-1.5">
                   <Tag className="w-3.5 h-3.5 text-indigo-600" />
                   Mẫu phản hồi nhanh (Quick Feedback Templates):
-                </label>
+                </span>
                 <div className="flex flex-wrap gap-1.5">
                   {REJECT_FEEDBACK_TEMPLATES.map((tmpl, idx) => (
                     <button
@@ -514,13 +556,14 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                <label htmlFor="reject-reason-input" className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
                   <span>Chi tiết lý do từ chối & hướng dẫn sửa (tối thiểu 5 ký tự):</span>
-                  <span className={`text-[10px] font-semibold ${rejectReason.trim().length >= 5 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                  <span className={`text-[10px] font-semibold ${rejectReason.trim().length >= 5 ? 'text-emerald-700' : 'text-slate-600'}`}>
                     {rejectReason.trim().length}/5
                   </span>
                 </label>
                 <textarea
+                  id="reject-reason-input"
                   rows={3}
                   value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}

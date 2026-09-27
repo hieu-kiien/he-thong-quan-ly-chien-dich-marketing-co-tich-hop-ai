@@ -74,9 +74,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
+  const isManager = userRole === 'MANAGER' || userRole === 'AGENCY_MANAGER' || userRole === 'ADMIN';
+
   const handleDeleteCampaign = async (id: number) => {
-    if (userRole !== 'MANAGER') {
-      toast.warning('Chỉ Quản lý (Manager) mới có quyền xóa chiến dịch');
+    if (!isManager) {
+      toast.warning('Chỉ Quản lý (Manager / Agency Manager) mới có quyền xóa chiến dịch');
       return;
     }
 
@@ -301,11 +303,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 {pendingContents.slice(0, 3).map((item) => (
                   <div key={item.id} className="p-3 bg-slate-50 border border-slate-100 rounded-lg hover:border-slate-300 transition-colors">
                     <p className="text-xs font-bold text-slate-900 truncate">{item.title}</p>
-                    <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{item.body}</p>
-                    {userRole === 'MANAGER' && (
+                    <p className="text-[11px] text-slate-500 truncate mt-0.5">{item.body}</p>
+                    {isManager && (
                       <button
                         onClick={() => handleApproveQuick(item.id)}
-                        className="mt-2 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                        className="mt-2 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
                       >
                         <CheckCircle2 className="w-3 h-3" /> Phê duyệt ngay
                       </button>

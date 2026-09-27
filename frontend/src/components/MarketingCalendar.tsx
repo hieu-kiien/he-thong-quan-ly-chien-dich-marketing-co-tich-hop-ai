@@ -17,11 +17,13 @@ import {
   Info,
   CalendarCheck,
   ShieldCheck,
-  Lock
+  Lock,
+  X
 } from 'lucide-react';
 import { Campaign, MarketingContent, MarketingSchedule } from '../types';
 import { scheduleApi, getApiErrorMessage } from '../services/api';
 import { useToast } from './Toast';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface MarketingCalendarProps {
   campaigns: Campaign[];
@@ -42,6 +44,16 @@ export const MarketingCalendar: React.FC<MarketingCalendarProps> = ({
   const [schedules, setSchedules] = useState<MarketingSchedule[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedChannel, setSelectedChannel] = useState<string>('ALL');
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState<boolean>(false);
+  const [selectedContentId, setSelectedContentId] = useState<number | null>(null);
+  const [scheduledDate, setScheduledDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [scheduledTime, setScheduledTime] = useState<string>('19:30');
+  const [isSubmittingSchedule, setIsSubmittingSchedule] = useState<boolean>(false);
+
+  const scheduleModalRef = useFocusTrap<HTMLDivElement>({
+    isActive: isScheduleModalOpen,
+    onEscape: () => setIsScheduleModalOpen(false)
+  });
 
   // Month navigation: default to current month
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -184,6 +196,7 @@ export const MarketingCalendar: React.FC<MarketingCalendarProps> = ({
               const found = campaigns.find(c => c.id === cid) || null;
               onSelectCampaign(found);
             }}
+            aria-label="Lọc theo chiến dịch"
             className="text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800"
           >
             <option value="">Tất cả Chiến dịch ({campaigns.length})</option>
@@ -196,6 +209,7 @@ export const MarketingCalendar: React.FC<MarketingCalendarProps> = ({
           <select
             value={selectedChannel}
             onChange={(e) => setSelectedChannel(e.target.value)}
+            aria-label="Lọc theo kênh tiếp thị"
             className="text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800"
           >
             <option value="ALL">Tất cả Kênh tiếp thị</option>
@@ -206,23 +220,40 @@ export const MarketingCalendar: React.FC<MarketingCalendarProps> = ({
           </select>
         </div>
 
-        {/* Month Navigation */}
+        {/* Month Navigation & Schedule Trigger */}
         <div className="flex items-center gap-3">
           <button
-            onClick={prevMonth}
-            className="p-1.5 hover:bg-slate-100 text-slate-600 rounded-lg transition-colors border border-slate-200"
+            type="button"
+            onClick={() => {
+              const approvedFirst = contents.find(c => c.status === 'APPROVED');
+              if (approvedFirst) setSelectedContentId(approvedFirst.id);
+              setIsScheduleModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <CalendarCheck className="w-4 h-4" />
+            <span>Lên lịch xuất bản</span>
           </button>
-          <span className="text-xs font-bold text-slate-900 min-w-[120px] text-center">
-            {monthNames[month]} Năm {year}
-          </span>
-          <button
-            onClick={nextMonth}
-            className="p-1.5 hover:bg-slate-100 text-slate-600 rounded-lg transition-colors border border-slate-200"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={prevMonth}
+              aria-label="Tháng trước"
+              className="p-1.5 hover:bg-slate-100 text-slate-600 rounded-lg transition-colors border border-slate-200"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-xs font-bold text-slate-900 min-w-[120px] text-center">
+              {monthNames[month]} Năm {year}
+            </span>
+            <button
+              onClick={nextMonth}
+              aria-label="Tháng sau"
+              className="p-1.5 hover:bg-slate-100 text-slate-600 rounded-lg transition-colors border border-slate-200"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -267,14 +298,19 @@ export const MarketingCalendar: React.FC<MarketingCalendarProps> = ({
                     {dayNum}
                   </span>
                   {itemsForDay.length > 0 && (
-                    <span className="text-[10px] font-bold text-slate-400">
+                    <span className="text-[10px] font-bold text-slate-600">
                       {itemsForDay.length} bài
                     </span>
                   )}
                 </div>
 
                 {/* Event Chips */}
-                <div className="space-y-1.5 flex-1 overflow-y-auto max-h-[80px]">
+                <div
+                  tabIndex={0}
+                  role="region"
+                  aria-label={`Sự kiện ngày ${dayNum}`}
+                  className="space-y-1.5 flex-1 overflow-y-auto max-h-[80px] focus:outline-hidden"
+                >
                   {itemsForDay.map((ev) => {
                     const chInfo = getChannelInfo(ev.channel_id);
                     const Icon = chInfo.icon;
@@ -289,7 +325,7 @@ export const MarketingCalendar: React.FC<MarketingCalendarProps> = ({
                             <span className={`w-1.5 h-1.5 rounded-full ${chInfo.dot}`}></span>
                             {ev.time}
                           </span>
-                          <span className="uppercase text-[9px]">{ev.status}</span>
+                          <span className="uppercase text-[9px] font-bold text-slate-700">{ev.status}</span>
                         </div>
                         <p className="font-semibold truncate text-[10px]">{ev.title}</p>
                       </div>
@@ -301,6 +337,104 @@ export const MarketingCalendar: React.FC<MarketingCalendarProps> = ({
           })}
         </div>
       </div>
+
+      {/* Schedule Modal */}
+      {isScheduleModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div
+            ref={scheduleModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="schedule-modal-title"
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <CalendarCheck className="w-5 h-5 text-indigo-600" />
+                <h3 id="schedule-modal-title" className="font-black text-sm text-slate-900">Lập Lịch Xuất Bản Đa Kênh</h3>
+              </div>
+              <button 
+                onClick={() => setIsScheduleModalOpen(false)}
+                aria-label="Đóng modal lên lịch"
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="calendar-content-select" className="text-xs font-bold text-slate-700 block mb-1">Chọn bài viết đã duyệt:</label>
+                <select
+                  id="calendar-content-select"
+                  value={selectedContentId || ''}
+                  onChange={(e) => setSelectedContentId(Number(e.target.value))}
+                  className="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-800"
+                >
+                  {contents.filter(c => c.status === 'APPROVED' || c.status === 'PUBLISHED').map(c => (
+                    <option key={c.id} value={c.id}>#{c.id} - {c.title}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="calendar-schedule-date" className="text-xs font-bold text-slate-700 block mb-1">Ngày xuất bản:</label>
+                  <input
+                    id="calendar-schedule-date"
+                    type="date"
+                    value={scheduledDate}
+                    onChange={(e) => setScheduledDate(e.target.value)}
+                    className="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="calendar-schedule-time" className="text-xs font-bold text-slate-700 block mb-1">Giờ phát hành:</label>
+                  <input
+                    id="calendar-schedule-time"
+                    type="time"
+                    value={scheduledTime}
+                    onChange={(e) => setScheduledTime(e.target.value)}
+                    className="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-800"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsScheduleModalOpen(false)}
+                className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-xs font-semibold"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={isSubmittingSchedule || !selectedContentId}
+                onClick={async () => {
+                  if (!selectedContentId) return;
+                  try {
+                    setIsSubmittingSchedule(true);
+                    await scheduleApi.create(selectedContentId, `${scheduledDate} ${scheduledTime}`);
+                    toast.success(`Đã lập lịch xuất bản bài viết thành công vào lúc ${scheduledTime} ngày ${scheduledDate}!`);
+                    setIsScheduleModalOpen(false);
+                    await loadSchedules();
+                  } catch (e: any) {
+                    toast.error(getApiErrorMessage(e), 'Lỗi khi lập lịch xuất bản');
+                  } finally {
+                    setIsSubmittingSchedule(false);
+                  }
+                }}
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/20"
+              >
+                <CalendarCheck className="w-4 h-4" />
+                <span>Xác nhận Lên lịch</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

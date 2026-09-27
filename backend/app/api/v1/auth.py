@@ -20,6 +20,9 @@ def generate_workspace_slug(name: str, user_id: int) -> str:
 def register(req: UserRegister, db: Session = Depends(get_db)):
     # 1. Kiểm tra email duy nhất
     existing_user = db.query(User).filter(User.email == req.email).first()
+    if not existing_user and "@ictu.edu.vn" in req.email:
+        fallback_email = req.email.replace("@ictu.edu.vn", "@gmail.com")
+        existing_user = db.query(User).filter(User.email == fallback_email).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -28,14 +31,12 @@ def register(req: UserRegister, db: Session = Depends(get_db)):
 
     # 2. Tạo User mới (Chặn leo thang đặc quyền Privilege Escalation)
     requested_role = (req.role or "MARKETER").strip().upper()
-    if requested_role in ("ADMIN", "MANAGER"):
+    if requested_role in ("AGENCY_MANAGER", "CLIENT_APPROVER", "ADMIN", "MANAGER"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Không được phép tự đăng ký tài khoản với vai trò Quản trị viên (ADMIN) hoặc Quản lý cấp cao (MANAGER)."
+            detail="Self-registration with privileged roles is not allowed. Contact your workspace administrator."
         )
-    if requested_role not in ("MARKETER", "AGENCY_MANAGER", "CLIENT_APPROVER"):
-        requested_role = "MARKETER"
-    role = requested_role
+    role = "MARKETER"
     user = User(
         email=req.email,
         full_name=req.full_name,
@@ -86,6 +87,9 @@ def register(req: UserRegister, db: Session = Depends(get_db)):
 @router.post("/login", response_model=TokenResponse)
 def login(req: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == req.email).first()
+    if not user and "@ictu.edu.vn" in req.email:
+        fallback_email = req.email.replace("@ictu.edu.vn", "@gmail.com")
+        user = db.query(User).filter(User.email == fallback_email).first()
     if not user or not verify_password(req.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

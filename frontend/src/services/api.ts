@@ -28,11 +28,14 @@ const API_BASE_URL = ((import.meta as any).env?.VITE_API_URL ||
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 5000,
+  timeout: 60000, // 60s phù hợp với chu kỳ khởi động lại (cold start ~50s) của Render Free Tier
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Helper kiểm tra chế độ Demo Offline (chỉ kích hoạt khi có cờ VITE_ENABLE_OFFLINE_DEMO=true tường minh)
+export const isOfflineDemoEnabled = (): boolean => import.meta.env.VITE_ENABLE_OFFLINE_DEMO === 'true';
 
 // Helper quản lý bộ nhớ đệm LocalStorage cho chế độ Offline/Cloudflare Demo
 function getStoredList<T>(key: string, defaultData: T[]): T[] {
@@ -65,8 +68,31 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Helper trích xuất thông báo lỗi chuẩn từ FastAPI backend
+let backendReachable = true;
+
+apiClient.interceptors.response.use(
+  (response) => {
+    backendReachable = true;
+    return response;
+  },
+  (error) => {
+    if (!error?.response) {
+      backendReachable = false;
+    }
+    return Promise.reject(error);
+  }
+);
+
+export const isBackendConnected = (): boolean => backendReachable;
+
+// Helper trích xuất thông báo lỗi chuẩn từ FastAPI backend hoặc lỗi mạng
 export const getApiErrorMessage = (error: any): string => {
+  if (!error?.response) {
+    if (error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')) {
+      return 'Máy chủ backend (Render) đang khởi động lại (cold start) hoặc phản hồi quá thời gian chờ (60s). Vui lòng thử lại sau giây lát.';
+    }
+    return 'Không thể kết nối đến máy chủ backend. Máy chủ (Render) có thể đang ngủ đông hoặc khởi động lại. Vui lòng thử lại sau 30-50 giây.';
+  }
   if (error?.response?.data?.detail) {
     const detail = error.response.data.detail;
     if (typeof detail === 'string') return detail;
@@ -90,8 +116,12 @@ export const authApi = {
       if (e?.response) {
         throw e;
       }
-      // Chỉ khi backend hoàn toàn offline (Network Error), hỗ trợ demo login có kiểm tra email
-      console.warn('Backend API offline, hỗ trợ phiên đăng nhập giả lập offline');
+      // Không tự ý tạo token demo nếu không bật chế độ Offline Demo
+      if (!isOfflineDemoEnabled()) {
+        throw e;
+      }
+      // Chỉ khi backend hoàn toàn offline và bật chế độ Demo tường minh
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: Backend API offline, hỗ trợ phiên đăng nhập giả lập offline');
       const isManager = email.toLowerCase().includes('manager');
       const isApprover = email.toLowerCase().includes('approver');
       const user = isManager ? MOCK_USER_MANAGER : isApprover ? MOCK_USER_CLIENT_APPROVER : MOCK_USER_MARKETER;
@@ -128,6 +158,8 @@ export const workspaceApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: workspaceApi.getAll');
       return getStoredList<Workspace>('mf_workspaces', MOCK_WORKSPACES);
     }
   },
@@ -137,6 +169,8 @@ export const workspaceApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: workspaceApi.create');
       const list = getStoredList<Workspace>('mf_workspaces', MOCK_WORKSPACES);
       const newWs: Workspace = {
         id: Date.now(),
@@ -156,6 +190,8 @@ export const workspaceApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: workspaceApi.getById');
       const list = getStoredList<Workspace>('mf_workspaces', MOCK_WORKSPACES);
       const found = list.find(w => w.id === id);
       if (found) return found;
@@ -168,6 +204,8 @@ export const workspaceApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: workspaceApi.update');
       const list = getStoredList<Workspace>('mf_workspaces', MOCK_WORKSPACES);
       const idx = list.findIndex(w => w.id === id);
       if (idx !== -1) {
@@ -191,6 +229,8 @@ export const brandKitApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: brandKitApi.getByWorkspace');
       const stored = MOCK_BRAND_KITS[workspaceId] || {
         id: workspaceId,
         workspace_id: workspaceId,
@@ -208,6 +248,8 @@ export const brandKitApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: brandKitApi.update');
       const current = MOCK_BRAND_KITS[workspaceId] || {
         id: workspaceId,
         workspace_id: workspaceId,
@@ -234,6 +276,8 @@ export const campaignApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.getAll');
       let list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
       if (workspaceId) {
         list = list.filter(c => !c.workspace_id || c.workspace_id === workspaceId);
@@ -254,6 +298,8 @@ export const campaignApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.getById');
       const list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
       const found = list.find(c => c.id === id);
       if (found) return found;
@@ -274,6 +320,8 @@ export const campaignApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.create');
       const list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
       const newCamp: Campaign = {
         id: Date.now(),
@@ -293,6 +341,8 @@ export const campaignApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.update');
       const list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
       const updated = list.map(c => c.id === id ? { ...c, ...data, updated_at: new Date().toISOString() } : c);
       setStoredList('mf_campaigns', updated);
@@ -311,6 +361,8 @@ export const campaignApi = {
       return data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.getKpi');
       return MOCK_DASHBOARD_KPI;
     }
   },
@@ -320,6 +372,8 @@ export const campaignApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.getAIDoctor');
       return {
         ...MOCK_AI_DOCTOR_REPORT,
         campaign_id: campaignId
@@ -332,6 +386,8 @@ export const campaignApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.getAttribution');
       return MOCK_CHANNEL_ATTRIBUTIONS;
     }
   },
@@ -341,6 +397,8 @@ export const campaignApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.getContents');
       const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       return list.filter(c => c.campaign_id === campaignId);
     }
@@ -350,6 +408,8 @@ export const campaignApi = {
       await apiClient.delete(`/campaigns/${id}`);
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.delete');
       const list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
       setStoredList('mf_campaigns', list.filter(c => c.id !== id));
     }
@@ -363,6 +423,8 @@ export const productApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: productApi.getAll');
       return MOCK_PRODUCTS;
     }
   }
@@ -379,6 +441,8 @@ export const contentApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: contentApi.getAll');
       let list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       if (workspaceId) list = list.filter(c => !c.workspace_id || c.workspace_id === workspaceId);
       if (campaignId) list = list.filter(c => c.campaign_id === campaignId);
@@ -393,6 +457,8 @@ export const contentApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: contentApi.create');
       const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       const newContent: MarketingContent = {
         id: Date.now(),
@@ -420,6 +486,8 @@ export const contentApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: contentApi.update');
       const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       const updated = list.map(c => c.id === id ? { ...c, ...data, updated_at: new Date().toISOString() } : c);
       setStoredList('mf_contents', updated);
@@ -433,6 +501,8 @@ export const contentApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: contentApi.checkCompliance');
       const local = evaluateMarketingCompliance(data.title || '', data.body || '', data.cta);
       const violations: ComplianceViolation[] = local.flagged_items.map(f => ({
         category: f.risk_level === 'HIGH' ? 'AD_POLICY' : 'BRAND_BANNED',
@@ -458,6 +528,8 @@ export const contentApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: contentApi.submitForReview');
       const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       const updated = list.map(c => c.id === id ? { ...c, status: 'IN_REVIEW' as const } : c);
       setStoredList('mf_contents', updated);
@@ -470,6 +542,8 @@ export const contentApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: contentApi.approve');
       const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       const updated = list.map(c => c.id === id ? { ...c, status: 'APPROVED' as const } : c);
       setStoredList('mf_contents', updated);
@@ -482,8 +556,24 @@ export const contentApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: contentApi.reject');
       const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       const updated = list.map(c => c.id === id ? { ...c, status: 'REJECTED' as const, rejection_reason: reason } : c);
+      setStoredList('mf_contents', updated);
+      return updated.find(c => c.id === id)!;
+    }
+  },
+  publish: async (id: number): Promise<MarketingContent> => {
+    try {
+      const res = await apiClient.post(`/contents/${id}/publish`);
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: contentApi.publish');
+      const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
+      const updated = list.map(c => c.id === id ? { ...c, status: 'PUBLISHED' as const } : c);
       setStoredList('mf_contents', updated);
       return updated.find(c => c.id === id)!;
     }
@@ -509,7 +599,10 @@ export const aiApi = {
       if (customData?.tone) payload.tone = customData.tone;
       const res = await apiClient.post('/ai/ideas', payload);
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: aiApi.generateIdeas');
       return {
         task_type: 'IDEA',
         ideas: [
@@ -560,7 +653,10 @@ export const aiApi = {
       if (customData?.usp) payload.custom_usp = customData.usp;
       const res = await apiClient.post('/ai/draft', payload);
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: aiApi.generateDraft');
       return {
         task_type: 'DRAFT',
         title: 'Bí quyết Bứt phá Doanh số Đa kênh 2026 Nhờ Tự Động Hóa AI',
@@ -580,7 +676,10 @@ export const aiApi = {
         prompt_version: promptVersion
       });
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: aiApi.generateSummary');
       return {
         task_type: 'SUMMARY',
         executive_summary: 'Chiến dịch duy trì chỉ số hoàn vốn ROI ấn tượng ở mức +220.47% trên tổng doanh thu 68.900.000 VNĐ.',
@@ -605,7 +704,10 @@ export const aiApi = {
     try {
       const res = await apiClient.post('/ai/omnichannel', req);
       return res.data;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: aiApi.generateOmnichannel');
       const briefName = req.brief || 'Chiến dịch Tiếp thị Toàn diện';
       return {
         task_type: 'OMNICHANNEL',
@@ -711,7 +813,10 @@ export const analyticsApi = {
         ...data,
         channel_attributions: data.channel_attributions || MOCK_CHANNEL_ATTRIBUTIONS
       };
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: analyticsApi.getDashboard');
       return { 
         kpi: MOCK_DASHBOARD_KPI,
         channel_attributions: MOCK_CHANNEL_ATTRIBUTIONS
@@ -727,6 +832,8 @@ export const scheduleApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: scheduleApi.getAll');
       return getStoredList<MarketingSchedule>('mf_schedules', MOCK_SCHEDULES);
     }
   },
@@ -740,6 +847,8 @@ export const scheduleApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: scheduleApi.create');
       const list = getStoredList<MarketingSchedule>('mf_schedules', MOCK_SCHEDULES);
       const newSched: MarketingSchedule = {
         id: Date.now(),
@@ -857,6 +966,10 @@ export const settingsApi = {
       if (e?.response?.data) {
         return e.response.data;
       }
+      if (!isOfflineDemoEnabled()) {
+        throw e;
+      }
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: settingsApi.testConnection');
       return {
         success: true,
         latency_ms: 120,
@@ -873,6 +986,9 @@ export const settingsApi = {
       const res = await apiClient.get('/settings/ai-keys', { params });
       return res.data;
     } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: settingsApi.getKeys');
       const list = getStoredList<CustomApiKey>('custom_api_keys', MOCK_CUSTOM_API_KEYS);
       const found = workspaceId 
         ? list.find(k => k.workspace_id === workspaceId)
@@ -894,6 +1010,9 @@ export const settingsApi = {
       const res = await apiClient.get('/settings/ai-keys/list', { params });
       return res.data;
     } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: settingsApi.getKeysList');
       const list = getStoredList<CustomApiKey>('custom_api_keys', MOCK_CUSTOM_API_KEYS);
       if (workspaceId) {
         return list.filter(k => k.workspace_id === workspaceId);
@@ -908,6 +1027,8 @@ export const settingsApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: settingsApi.saveKey');
       const cleanKey = data.api_key.trim();
       const masked = cleanKey.length >= 10 
         ? `${cleanKey.slice(0, 6)}...${cleanKey.slice(-4)}`
@@ -940,6 +1061,8 @@ export const settingsApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: settingsApi.deleteKey');
       const list = getStoredList<CustomApiKey>('custom_api_keys', MOCK_CUSTOM_API_KEYS);
       const filtered = workspaceId ? list.filter(k => k.workspace_id !== workspaceId) : [];
       setStoredList('custom_api_keys', filtered);
@@ -953,6 +1076,8 @@ export const settingsApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: settingsApi.deleteKeyById');
       const list = getStoredList<CustomApiKey>('custom_api_keys', MOCK_CUSTOM_API_KEYS);
       const filtered = list.filter(k => k.id !== keyId);
       setStoredList('custom_api_keys', filtered);
@@ -966,6 +1091,8 @@ export const settingsApi = {
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: settingsApi.toggleKey');
       const list = getStoredList<CustomApiKey>('custom_api_keys', MOCK_CUSTOM_API_KEYS);
       const item = list.find(k => k.id === keyId);
       if (item) {

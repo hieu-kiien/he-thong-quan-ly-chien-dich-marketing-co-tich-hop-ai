@@ -27,7 +27,10 @@ _current_project_inventory.json
 **/*.pyd
 **/.pytest_cache/
 **/*.db
+**/*.db-shm
+**/*.db-wal
 **/*.sqlite3
+**/test-results.json
 
 # Environment & Secrets
 .env
@@ -47,6 +50,8 @@ frontend/dist/
 # Testing & Temporary Artifacts
 test-recordings/
 *.png
+playwright-report/
+test-results/
 .agents/
 .wrangler/
 cloudflare/worker-configuration.d.ts

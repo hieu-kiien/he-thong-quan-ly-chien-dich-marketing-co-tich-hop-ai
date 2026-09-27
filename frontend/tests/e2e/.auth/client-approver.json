@@ -1,0 +1,22 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://127.0.0.1:4173",
+      "localStorage": [
+        {
+          "name": "access_token",
+          "value": "token-client_approver-3"
+        },
+        {
+          "name": "current_user",
+          "value": "{\"id\":3,\"email\":\"approver@gmail.com\",\"full_name\":\"Đại Diện Khách Hàng (Approver)\",\"role\":\"CLIENT_APPROVER\",\"status\":\"ACTIVE\",\"created_at\":\"2026-01-01T00:00:00Z\"}"
+        },
+        {
+          "name": "active_workspace_id",
+          "value": "1"
+        }
+      ]
+    }
+  ]
+}

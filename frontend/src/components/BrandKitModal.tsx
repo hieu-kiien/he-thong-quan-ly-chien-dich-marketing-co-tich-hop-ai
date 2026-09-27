@@ -3,6 +3,7 @@ import { useWorkspace } from '../context/WorkspaceContext';
 import { useAuth } from '../context/AuthContext';
 import { X, Palette, Sparkles, Plus, AlertCircle, CheckCircle2, Loader2, ShieldAlert } from 'lucide-react';
 import { BrandKit } from '../types';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface BrandKitModalProps {
   isOpen: boolean;
@@ -22,6 +23,11 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({ isOpen, onClose })
   const { userRole } = useAuth();
 
   const isEditable = userRole === 'MANAGER' || userRole === 'AGENCY_MANAGER';
+
+  const modalRef = useFocusTrap<HTMLDivElement>({
+    isActive: isOpen,
+    onEscape: onClose,
+  });
 
   const [brandName, setBrandName] = useState('');
   const [usp, setUsp] = useState('');
@@ -91,7 +97,13 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({ isOpen, onClose })
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl shadow-black/80 flex flex-col max-h-[90vh] overflow-hidden text-slate-100">
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="brand-kit-modal-title"
+        className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl shadow-black/80 flex flex-col max-h-[90vh] overflow-hidden text-slate-100"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/80">
           <div className="flex items-center gap-3">
@@ -100,7 +112,7 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({ isOpen, onClose })
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-white">Brand Kit Thương Hiệu</h3>
+                <h3 id="brand-kit-modal-title" className="text-base font-bold text-white">Brand Kit Thương Hiệu</h3>
                 <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-medium">
                   {currentWorkspace?.name}
                 </span>
@@ -113,6 +125,7 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({ isOpen, onClose })
           <button
             type="button"
             onClick={onClose}
+            aria-label="Đóng modal Brand Kit"
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -145,15 +158,17 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({ isOpen, onClose })
         <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 space-y-5">
           {/* Brand Name */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+            <label htmlFor="brand-kit-name" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
               Tên thương hiệu (Brand Name)
             </label>
             <input
+              id="brand-kit-name"
               type="text"
+              data-autofocus="true"
               value={brandName}
               onChange={(e) => setBrandName(e.target.value)}
-              disabled={!isEditable}
-              placeholder="VD: VinFast, ICTU Education..."
+              readOnly={!isEditable}
+              placeholder="VD: VinFast, Shopee, Techcombank..."
               className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-violet-500 disabled:opacity-60 transition-all"
               required
             />
@@ -161,13 +176,14 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({ isOpen, onClose })
 
           {/* USP */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+            <label htmlFor="brand-kit-usp" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
               Lợi thế bán hàng độc nhất (USP / Positioning Statement)
             </label>
             <textarea
+              id="brand-kit-usp"
               value={usp}
               onChange={(e) => setUsp(e.target.value)}
-              disabled={!isEditable}
+              readOnly={!isEditable}
               rows={3}
               placeholder="Mô tả giá trị cốt lõi, thế mạnh vượt trội mà thương hiệu cam kết mang lại..."
               className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-violet-500 disabled:opacity-60 transition-all resize-none"
@@ -176,14 +192,15 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({ isOpen, onClose })
 
           {/* Tone of Voice */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+            <label htmlFor="brand-kit-tone" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
               Giọng văn chuẩn (Tone of Voice)
             </label>
             <input
+              id="brand-kit-tone"
               type="text"
               value={toneOfVoice}
               onChange={(e) => setToneOfVoice(e.target.value)}
-              disabled={!isEditable}
+              readOnly={!isEditable}
               placeholder="VD: Chuyên nghiệp, hiện đại, tin cậy..."
               className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-violet-500 disabled:opacity-60 transition-all mb-2"
               required
@@ -207,7 +224,7 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({ isOpen, onClose })
           {/* Blacklist / Banned Keywords */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+              <label htmlFor="brandkit-new-keyword" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
                 Danh sách từ khóa cấm kỵ (Banned Keywords Blacklist)
               </label>
               <span className="text-[11px] text-slate-400">
@@ -222,6 +239,7 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({ isOpen, onClose })
             {isEditable && (
               <div className="flex gap-2 mb-3">
                 <input
+                  id="brandkit-new-keyword"
                   type="text"
                   value={newKeyword}
                   onChange={(e) => setNewKeyword(e.target.value)}
@@ -263,6 +281,7 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({ isOpen, onClose })
                       <button
                         type="button"
                         onClick={() => handleRemoveKeyword(index)}
+                        aria-label={`Xóa từ khóa ${kw}`}
                         className="hover:text-rose-100 hover:bg-rose-500/30 rounded p-0.5 transition-colors"
                       >
                         <X className="w-3 h-3" />

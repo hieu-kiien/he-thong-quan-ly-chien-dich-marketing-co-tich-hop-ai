@@ -98,7 +98,7 @@ export const KPIGrid9: React.FC<KPIGrid9Props> = ({ kpi, loading = false, classN
           </div>
           <div className="mt-3 flex items-center justify-between text-xs pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
             <span className="text-slate-500 dark:text-slate-400">Toàn bộ 3 kênh quảng cáo</span>
-            <span className="font-bold text-emerald-600 flex items-center gap-0.5">
+            <span className="font-bold text-emerald-700 flex items-center gap-0.5">
               <ArrowDownRight className="w-3.5 h-3.5" />
               <span>-4.2%</span>
             </span>
@@ -114,16 +114,16 @@ export const KPIGrid9: React.FC<KPIGrid9Props> = ({ kpi, loading = false, classN
                 <Info className="w-3.5 h-3.5 text-slate-400" />
               </span>
             </span>
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 flex items-center justify-center shrink-0">
               <TrendingUp className="w-4.5 h-4.5" />
             </div>
           </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight text-emerald-600 dark:text-emerald-400">
+          <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight text-emerald-700 dark:text-emerald-400">
             {revenue.toLocaleString('vi-VN')} <span className="text-sm font-semibold text-slate-500">đ</span>
           </div>
           <div className="mt-3 flex items-center justify-between text-xs pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
             <span className="text-slate-500 dark:text-slate-400">Giá trị đơn hàng quy kết</span>
-            <span className="font-bold text-emerald-600 flex items-center gap-0.5">
+            <span className="font-bold text-emerald-700 flex items-center gap-0.5">
               <ArrowUpRight className="w-3.5 h-3.5" />
               <span>+18.5%</span>
             </span>
@@ -176,7 +176,7 @@ export const KPIGrid9: React.FC<KPIGrid9Props> = ({ kpi, loading = false, classN
           </div>
           <div className="mt-3 flex items-center justify-between text-xs pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
             <span className="text-slate-500 dark:text-slate-400">Lợi nhuận ròng trên vốn tiếp thị</span>
-            <span className="font-bold text-emerald-600 flex items-center gap-0.5">
+            <span className="font-bold text-emerald-700 flex items-center gap-0.5">
               <ArrowUpRight className="w-3.5 h-3.5" />
               <span>+35.1%</span>
             </span>
@@ -201,7 +201,7 @@ export const KPIGrid9: React.FC<KPIGrid9Props> = ({ kpi, loading = false, classN
           </div>
           <div className="mt-3 flex items-center justify-between text-xs pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
             <span className="text-slate-500 dark:text-slate-400">Độ phủ Facebook, TikTok, Email</span>
-            <span className="font-bold text-emerald-600 flex items-center gap-0.5">
+            <span className="font-bold text-emerald-700 flex items-center gap-0.5">
               <ArrowUpRight className="w-3.5 h-3.5" />
               <span>+14.8%</span>
             </span>
@@ -226,7 +226,7 @@ export const KPIGrid9: React.FC<KPIGrid9Props> = ({ kpi, loading = false, classN
           </div>
           <div className="mt-3 flex items-center justify-between text-xs pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
             <span className="text-slate-500 dark:text-slate-400">Lưu lượng truy cập thực tế</span>
-            <span className="font-bold text-emerald-600 flex items-center gap-0.5">
+            <span className="font-bold text-emerald-700 flex items-center gap-0.5">
               <ArrowUpRight className="w-3.5 h-3.5" />
               <span>+12.3%</span>
             </span>
@@ -251,7 +251,7 @@ export const KPIGrid9: React.FC<KPIGrid9Props> = ({ kpi, loading = false, classN
           </div>
           <div className="mt-3 flex items-center justify-between text-xs pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
             <span className="text-slate-500 dark:text-slate-400">Chuẩn ngành TMĐT: 2.5%</span>
-            <span className="font-bold text-emerald-600 flex items-center gap-0.5">
+            <span className="font-bold text-emerald-700 flex items-center gap-0.5">
               <ArrowUpRight className="w-3.5 h-3.5" />
               <span>+22.4%</span>
             </span>
@@ -276,7 +276,7 @@ export const KPIGrid9: React.FC<KPIGrid9Props> = ({ kpi, loading = false, classN
           </div>
           <div className="mt-3 flex items-center justify-between text-xs pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
             <span className="text-slate-500 dark:text-slate-400">Tỷ lệ CVR: {cvr.toFixed(2)}%</span>
-            <span className="font-bold text-emerald-600 flex items-center gap-0.5">
+            <span className="font-bold text-emerald-700 flex items-center gap-0.5">
               <ArrowUpRight className="w-3.5 h-3.5" />
               <span>+9.4%</span>
             </span>
@@ -301,7 +301,7 @@ export const KPIGrid9: React.FC<KPIGrid9Props> = ({ kpi, loading = false, classN
           </div>
           <div className="mt-3 flex items-center justify-between text-xs pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
             <span className="text-slate-500 dark:text-slate-400">CVR trung bình: {cvr.toFixed(2)}%</span>
-            <span className="font-bold text-emerald-600 flex items-center gap-0.5">
+            <span className="font-bold text-emerald-700 flex items-center gap-0.5">
               <ArrowDownRight className="w-3.5 h-3.5" />
               <span>-8.1% (Tối ưu)</span>
             </span>

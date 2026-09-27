@@ -438,10 +438,10 @@ export const SocialPreviewContainer: React.FC<SocialPreviewContainerProps> = ({
           <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
             <button
               onClick={() => setViewMode('RAW')}
-              className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition flex items-center gap-1 ${
+              className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition flex items-center gap-1 ${
                 viewMode === 'RAW'
                   ? 'bg-white text-slate-900 shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-800'
+                  : 'text-slate-700 hover:text-slate-900'
               }`}
             >
               <FileText className="w-3 h-3" />
@@ -449,10 +449,10 @@ export const SocialPreviewContainer: React.FC<SocialPreviewContainerProps> = ({
             </button>
             <button
               onClick={() => setViewMode('PREVIEW')}
-              className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition flex items-center gap-1 ${
+              className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition flex items-center gap-1 ${
                 viewMode === 'PREVIEW'
                   ? 'bg-indigo-600 text-white shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-800'
+                  : 'text-slate-700 hover:text-slate-900'
               }`}
             >
               <Eye className="w-3 h-3" />

@@ -58,6 +58,9 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({ onOpenBran
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
+        aria-label="Chuyển đổi không gian làm việc"
+        aria-expanded={isOpen}
+        aria-haspopup="true"
         className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-slate-200 transition-all text-sm font-medium shadow-sm group"
         title="Chuyển đổi không gian làm việc"
       >
@@ -68,7 +71,7 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({ onOpenBran
           <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold leading-none">
             Workspace
           </span>
-          <span className="text-xs font-semibold text-slate-100 max-w-[130px] truncate mt-0.5">
+          <span className="text-xs font-semibold text-slate-100 max-w-[80px] sm:max-w-[130px] truncate mt-0.5">
             {currentWorkspace ? currentWorkspace.name : 'Chọn Workspace...'}
           </span>
         </div>

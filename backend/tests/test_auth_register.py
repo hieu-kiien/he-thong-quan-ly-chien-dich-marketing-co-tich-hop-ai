@@ -117,8 +117,8 @@ def test_register_short_password_fails(client):
     resp = client.post("/api/v1/auth/register", json=payload)
     assert resp.status_code == 422
 
-def test_register_agency_manager_role(client, db_session):
-    """Đăng ký tài khoản với vai trò AGENCY_MANAGER thành công."""
+def test_register_agency_manager_role(client):
+    """Đăng ký tài khoản với vai trò đặc quyền AGENCY_MANAGER bị chặn với HTTP 403 Forbidden."""
     payload = {
         "email": "agency_mgr@example.com",
         "password": "Password@123",
@@ -126,19 +126,11 @@ def test_register_agency_manager_role(client, db_session):
         "role": "AGENCY_MANAGER"
     }
     resp = client.post("/api/v1/auth/register", json=payload)
-    assert resp.status_code == 201
-    assert resp.json()["role"] == "AGENCY_MANAGER"
-
-    user_id = resp.json()["id"]
-    ws = db_session.query(Workspace).filter(Workspace.owner_id == user_id).first()
-    membership = db_session.query(WorkspaceMember).filter(
-        WorkspaceMember.workspace_id == ws.id,
-        WorkspaceMember.user_id == user_id
-    ).first()
-    assert membership.role == "AGENCY_MANAGER"
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Self-registration with privileged roles is not allowed. Contact your workspace administrator."
 
 def test_register_client_approver_role(client):
-    """Đăng ký tài khoản với vai trò CLIENT_APPROVER thành công."""
+    """Đăng ký tài khoản với vai trò đặc quyền CLIENT_APPROVER bị chặn với HTTP 403 Forbidden."""
     payload = {
         "email": "client_appr@example.com",
         "password": "Password@123",
@@ -146,8 +138,8 @@ def test_register_client_approver_role(client):
         "role": "CLIENT_APPROVER"
     }
     resp = client.post("/api/v1/auth/register", json=payload)
-    assert resp.status_code == 201
-    assert resp.json()["role"] == "CLIENT_APPROVER"
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Self-registration with privileged roles is not allowed. Contact your workspace administrator."
 
 def test_register_admin_role_rejected(client):
     """Đăng ký tài khoản với vai trò ADMIN bị từ chối để chống leo thang đặc quyền."""

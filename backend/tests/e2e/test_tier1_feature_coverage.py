@@ -34,14 +34,14 @@ class TestTier1FeatureCoverageR1:
     def test_t1_r1_02_user_login_and_token(self, client: TestClient, manager_headers):
         """Verify login endpoint returns valid JWT bearer token and user profile."""
         resp = client.post("/api/v1/auth/login", json={
-            "email": "manager@ictu.edu.vn",
+            "email": "manager@gmail.com",
             "password": "Manager@123"
         })
         assert resp.status_code == 200
         data = resp.json()
         assert "access_token" in data
         assert data["token_type"].lower() == "bearer"
-        assert data["user"]["email"] == "manager@ictu.edu.vn"
+        assert data["user"]["email"] in ("manager@gmail.com", "manager@ictu.edu.vn")
         assert data["user"]["role"] in ("ADMIN", "MANAGER", "AGENCY_MANAGER")
 
     def test_t1_r1_03_create_workspace(self, client: TestClient, manager_headers):

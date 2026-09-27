@@ -75,6 +75,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   onRefreshData
 }) => {
   const toast = useToast();
+  const isApprover = userRole === 'MANAGER' || userRole === 'AGENCY_MANAGER' || userRole === 'CLIENT_APPROVER' || userRole === 'ADMIN';
 
   // Top Tabs: 'pipeline' | 'calendar' | 'attribution' | 'copilot' | 'doctor' | 'lifecycle'
   const [activeTab, setActiveTab] = useState<'pipeline' | 'calendar' | 'attribution' | 'copilot' | 'doctor' | 'lifecycle'>('pipeline');
@@ -728,7 +729,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                     <p className="text-[11px] text-slate-500 line-clamp-2">{item.body}</p>
                     
                     <div className="pt-2 border-t border-slate-100">
-                      {userRole === 'MANAGER' ? (
+                      {isApprover ? (
                         <div className="grid grid-cols-2 gap-1.5">
                           <button
                             onClick={() => handleApproveContentItem(item.id)}
@@ -1199,7 +1200,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                     {/* CTA Bar */}
                     <div className="bg-slate-50 px-3.5 py-2.5 border-t border-b border-slate-100 flex items-center justify-between">
                       <div className="text-[11px] text-slate-500 truncate max-w-[200px]">
-                        marketflow.ictu.edu.vn
+                        kienhieu.id.vn
                       </div>
                       <span className="px-3 py-1 bg-indigo-600 text-white font-bold text-xs rounded-md shadow-xs">
                         {generatedDraft.cta || 'ĐĂNG KÝ NGAY'}

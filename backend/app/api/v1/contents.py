@@ -14,17 +14,48 @@ from app.services.compliance.compliance_service import ComplianceScanner
 
 router = APIRouter(prefix="/contents", tags=["Quản lý Nội dung Marketing"])
 
+def check_workspace_boundary(content: MarketingContent, user: User, db: Session):
+    """Xác thực người dùng có quyền truy cập Workspace của nội dung (là owner hoặc member)."""
+    if user.role == "ADMIN":
+        return
+
+    ws_id = content.workspace_id
+    if ws_id is None and content.campaign_id:
+        campaign = db.query(Campaign).filter(Campaign.id == content.campaign_id).first()
+        if campaign:
+            ws_id = campaign.workspace_id
+
+    if ws_id is not None:
+        ws = db.query(Workspace).filter(Workspace.id == ws_id).first()
+        is_owner = ws is not None and ws.owner_id == user.id
+        is_member = db.query(WorkspaceMember).filter(
+            WorkspaceMember.workspace_id == ws_id,
+            WorkspaceMember.user_id == user.id
+        ).first() is not None
+
+        if not (is_owner or is_member):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User does not have access to this workspace content"
+            )
+
 def check_content_access(content: MarketingContent, user: User, db: Session):
     """Xác thực phân quyền mức bản ghi (Record-level authorization) & cách ly Workspace."""
     if user.role == "ADMIN":
         return
 
-    # Tenant Isolation: Nếu content thuộc Workspace cụ thể (> 1), kiểm tra user có thuộc workspace đó không
-    if content.workspace_id is not None and content.workspace_id > 1:
-        ws = db.query(Workspace).filter(Workspace.id == content.workspace_id).first()
+    ws_id = content.workspace_id
+    if ws_id is None and content.campaign_id:
+        campaign = db.query(Campaign).filter(Campaign.id == content.campaign_id).first()
+        if campaign:
+            ws_id = campaign.workspace_id
+
+    # Tenant Isolation: Nếu content thuộc Workspace cụ thể, kiểm tra user có thuộc workspace đó không
+    if ws_id is not None:
+        ws = db.query(Workspace).filter(Workspace.id == ws_id).first()
         is_ws_owner = ws is not None and ws.owner_id == user.id
         is_ws_member = db.query(WorkspaceMember).filter(
-            WorkspaceMember.workspace_id == content.workspace_id,
+            WorkspaceMember.workspace_id == ws_id,
             WorkspaceMember.user_id == user.id
         ).first() is not None
         if not (is_ws_owner or is_ws_member):
@@ -59,6 +90,18 @@ def check_campaign_access_for_content(campaign_id: int, user: User, db: Session)
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
+    if user.role != "ADMIN" and campaign.workspace_id is not None:
+        ws = db.query(Workspace).filter(Workspace.id == campaign.workspace_id).first()
+        is_ws_owner = ws is not None and ws.owner_id == user.id
+        is_ws_member = db.query(WorkspaceMember).filter(
+            WorkspaceMember.workspace_id == campaign.workspace_id,
+            WorkspaceMember.user_id == user.id
+        ).first() is not None
+        if not (is_ws_owner or is_ws_member):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access campaigns in this workspace"
+            )
     if user.role in ("ADMIN", "MANAGER", "AGENCY_MANAGER"):
         return campaign
     if campaign.owner_id == user.id:
@@ -105,6 +148,18 @@ def get_contents(
             query = query.filter(MarketingContent.campaign_id == campaign_id)
 
     if workspace_id is not None:
+        if current_user.role != "ADMIN":
+            ws = db.query(Workspace).filter(Workspace.id == workspace_id).first()
+            is_ws_owner = ws is not None and ws.owner_id == current_user.id
+            is_ws_member = db.query(WorkspaceMember).filter(
+                WorkspaceMember.workspace_id == workspace_id,
+                WorkspaceMember.user_id == current_user.id
+            ).first() is not None
+            if not (is_ws_owner or is_ws_member):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Not authorized to access resources in this workspace"
+                )
         query = query.filter(MarketingContent.workspace_id == workspace_id)
     if status_filter:
         query = query.filter(MarketingContent.status == status_filter)
@@ -254,6 +309,9 @@ def submit_for_review(
     if not content:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nội dung không tồn tại")
 
+    # Enforce workspace boundary
+    check_workspace_boundary(content, current_user, db)
+
     # Record-level authorization
     check_content_access(content, current_user, db)
 
@@ -297,13 +355,20 @@ def approve_content(
     if not content:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nội dung không tồn tại")
 
+    reviewer_id = int(user_payload.get("sub"))
+    current_user = db.query(User).filter(User.id == reviewer_id).first()
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Người dùng không tồn tại")
+
+    # Enforce workspace boundary
+    check_workspace_boundary(content, current_user, db)
+
     if content.status != "IN_REVIEW":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Chỉ có thể phê duyệt nội dung đang ở trạng thái chờ duyệt (IN_REVIEW)"
         )
 
-    reviewer_id = int(user_payload.get("sub"))
     content.status = "APPROVED"
 
     review_log = ContentReview(
@@ -328,6 +393,14 @@ def reject_content(
     if not content:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nội dung không tồn tại")
 
+    reviewer_id = int(user_payload.get("sub"))
+    current_user = db.query(User).filter(User.id == reviewer_id).first()
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Người dùng không tồn tại")
+
+    # Enforce workspace boundary
+    check_workspace_boundary(content, current_user, db)
+
     if content.status != "IN_REVIEW":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -345,7 +418,6 @@ def reject_content(
             detail="Lý do từ chối quá ngắn (tối thiểu 3 ký tự)"
         )
 
-    reviewer_id = int(user_payload.get("sub"))
     content.status = "REJECTED"
 
     review_log = ContentReview(
@@ -368,6 +440,14 @@ def publish_content(
     content = db.query(MarketingContent).filter(MarketingContent.id == content_id).first()
     if not content:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nội dung không tồn tại")
+
+    publisher_id = int(user_payload.get("sub"))
+    current_user = db.query(User).filter(User.id == publisher_id).first()
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Người dùng không tồn tại")
+
+    # Enforce workspace boundary
+    check_workspace_boundary(content, current_user, db)
 
     if content.status != "APPROVED":
         raise HTTPException(

@@ -14,7 +14,9 @@ services:
       - APP_ENV=${APP_ENV:-production}
       - API_V1_PREFIX=/api/v1
       - DATABASE_URL=sqlite:////app/marketing_campaigns.db
-      - SECRET_KEY=${SECRET_KEY:-aia331-super-secret-production-key-change-it}
+      - "SECRET_KEY=${SECRET_KEY:?Error: SECRET_KEY required}"
+      - "JWT_SECRET_KEY=${JWT_SECRET_KEY:?Error: JWT_SECRET_KEY required}"
+      - "BYOK_ENCRYPTION_KEY=${BYOK_ENCRYPTION_KEY:?Error: BYOK_ENCRYPTION_KEY required}"
       - AI_PROVIDER=${AI_PROVIDER:-gemini}
       - AI_BASE_URL=${AI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai}
       - AI_MODEL=${AI_MODEL:-gemini-2.5-flash}

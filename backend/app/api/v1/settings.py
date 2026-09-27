@@ -18,6 +18,31 @@ from app.core.crypto import encrypt_api_key, decrypt_api_key, mask_api_key
 router = APIRouter(prefix="/settings", tags=["Cài đặt Doanh nghiệp & Custom AI Key (BYOK)"])
 
 
+import re
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def sanitize_error_text(text: Optional[str], secret_key: Optional[str] = None) -> str:
+    """Loại bỏ triệt để các token nhạy cảm, query param ?key=... và API key khỏi chuỗi lỗi/log."""
+    if not text:
+        return ""
+    sanitized = str(text)
+    # 1. Nếu có key cụ thể được truyền vào, thay thế trực tiếp
+    if secret_key and len(secret_key.strip()) >= 4:
+        clean = secret_key.strip()
+        sanitized = sanitized.replace(clean, "[REDACTED_API_KEY]")
+    # 2. Xóa query parameter ?key=... hoặc &key=...
+    sanitized = re.sub(r'([?&]key=)[^&\s"\'\\}]+', r'\1[REDACTED]', sanitized, flags=re.IGNORECASE)
+    # 3. Xóa các token định dạng Google Gemini API key: AIzaSy... hoặc AIza... (39 ký tự)
+    sanitized = re.sub(r'AIza[0-9A-Za-z_-]{35}', '[REDACTED_GEMINI_KEY]', sanitized)
+    sanitized = re.sub(r'AIzaSy[0-9A-Za-z_-]+', '[REDACTED_GEMINI_KEY]', sanitized)
+    # 4. Xóa Bearer tokens
+    sanitized = re.sub(r'(Bearer\s+)[A-Za-z0-9._-]+', r'\1[REDACTED]', sanitized, flags=re.IGNORECASE)
+    return sanitized
+
+
 @router.post("/test-ai-connection", response_model=AIKeyTestResponse)
 def test_ai_connection(
     req: AIKeyTestRequest,
@@ -65,23 +90,27 @@ def test_ai_connection(
                     model=req.model
                 )
             else:
+                sanitized_err = sanitize_error_text(resp.text, secret_key=clean_key)
+                logger.warning("[BYOK Connection Test] Gemini rejected request (HTTP %d): %s", resp.status_code, sanitized_err)
                 return AIKeyTestResponse(
                     success=False,
                     latency_ms=latency,
                     message=f"Google Gemini từ chối yêu cầu (HTTP {resp.status_code}).",
                     provider=req.provider,
                     model=req.model,
-                    error=resp.text
+                    error=sanitized_err
                 )
     except Exception as e:
         latency = int((time.time() - start_time) * 1000) or 40
+        sanitized_exc = sanitize_error_text(str(e), secret_key=clean_key)
+        logger.error("[BYOK Connection Test] Error testing Gemini connection: %s", sanitized_exc)
         return AIKeyTestResponse(
             success=False,
             latency_ms=latency,
-            message=f"Không thể kết nối đến máy chủ Google Gemini: {str(e)}",
+            message=f"Không thể kết nối đến máy chủ Google Gemini: {sanitized_exc}",
             provider=req.provider,
             model=req.model,
-            error=str(e)
+            error=sanitized_exc
         )
 
 
@@ -98,7 +127,7 @@ def store_custom_ai_key(
     target_ws_id = req.workspace_id
     if target_ws_id is not None:
         # Kiểm tra quyền với workspace nếu chỉ định workspace_id
-        if current_user.role != "ADMIN" and target_ws_id > 1:
+        if current_user.role != "ADMIN":
             ws = db.query(Workspace).filter(Workspace.id == target_ws_id).first()
             is_ws_owner = ws is not None and ws.owner_id == current_user.id
             is_ws_member = db.query(WorkspaceMember).filter(
@@ -222,7 +251,7 @@ def get_custom_ai_keys(
     key_record = None
 
     if workspace_id is not None:
-        if current_user.role != "ADMIN" and workspace_id > 1:
+        if current_user.role != "ADMIN":
             ws = db.query(Workspace).filter(Workspace.id == workspace_id).first()
             is_ws_owner = ws is not None and ws.owner_id == current_user.id
             is_ws_member = db.query(WorkspaceMember).filter(
@@ -298,7 +327,7 @@ def list_custom_ai_keys(
     """Danh sách tất cả các khóa của người dùng hoặc workspace (đã che mặt nạ)."""
     query = db.query(CustomApiKey)
     if workspace_id is not None:
-        if current_user.role != "ADMIN" and workspace_id > 1:
+        if current_user.role != "ADMIN":
             ws = db.query(Workspace).filter(Workspace.id == workspace_id).first()
             is_ws_owner = ws is not None and ws.owner_id == current_user.id
             is_ws_member = db.query(WorkspaceMember).filter(
@@ -352,7 +381,7 @@ def deactivate_or_delete_current_byok_key(
 ):
     """Vô hiệu hóa hoặc xóa custom key để hoàn nguyên về System Default Key (theo test_t1_r6_05)."""
     if workspace_id is not None:
-        if current_user.role != "ADMIN" and workspace_id > 1:
+        if current_user.role != "ADMIN":
             ws = db.query(Workspace).filter(Workspace.id == workspace_id).first()
             is_ws_owner = ws is not None and ws.owner_id == current_user.id
             is_ws_member = db.query(WorkspaceMember).filter(

@@ -89,6 +89,7 @@ export const CampaignTable: React.FC<CampaignTableProps> = ({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              aria-label="Lọc chiến dịch theo tên"
               placeholder="Lọc chiến dịch theo tên..."
               className="text-xs pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:border-indigo-500 w-56"
             />
@@ -98,6 +99,7 @@ export const CampaignTable: React.FC<CampaignTableProps> = ({
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
+              aria-label="Lọc chiến dịch theo trạng thái"
               className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-hidden"
             >
               <option value="ALL">Tất cả trạng thái</option>
@@ -140,7 +142,7 @@ export const CampaignTable: React.FC<CampaignTableProps> = ({
                       {c.name}
                       <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
-                    <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{c.objective}</p>
+                    <p className="text-xs text-slate-500 truncate mt-0.5">{c.objective}</p>
                   </td>
                   <td className="py-3.5 px-4 whitespace-nowrap">
                     <div className="flex items-center gap-1.5 text-xs text-slate-600">
@@ -177,10 +179,11 @@ export const CampaignTable: React.FC<CampaignTableProps> = ({
                         <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
                         <span>AI Viết</span>
                       </button>
-                      {userRole === 'MANAGER' && onDeleteCampaign && (
+                      {(userRole === 'MANAGER' || userRole === 'AGENCY_MANAGER' || userRole === 'ADMIN') && onDeleteCampaign && (
                         <button
                           onClick={() => onDeleteCampaign(c.id)}
-                          title="Xóa chiến dịch (Chỉ Sếp)"
+                          aria-label="Xóa chiến dịch"
+                          title="Xóa chiến dịch"
                           className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
                         >
                           <Trash2 className="w-3.5 h-3.5" />

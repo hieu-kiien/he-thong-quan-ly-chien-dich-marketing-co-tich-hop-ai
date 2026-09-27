@@ -61,6 +61,7 @@ import {
 } from '../services/api';
 import { useToast } from '../components/Toast';
 import { CampaignCardSkeleton, CampaignTableSkeleton } from '../components/Skeleton';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface CampaignsProps {
   onSelectCampaign: (campaign: Campaign) => void;
@@ -120,6 +121,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
   userRole
 }) => {
   const toast = useToast();
+  const isManager = userRole === 'MANAGER' || userRole === 'AGENCY_MANAGER' || userRole === 'ADMIN';
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [brandKit, setBrandKit] = useState<BrandKit | null>(null);
@@ -145,7 +147,28 @@ export const Campaigns: React.FC<CampaignsProps> = ({
   const [wizardStep, setWizardStep] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState<boolean>(false);
+  const [isSavingDrawer, setIsSavingDrawer] = useState<boolean>(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+
+  const wizardModalRef = useFocusTrap<HTMLDivElement>({
+    isActive: isWizardOpen,
+    onEscape: () => {
+      if (!isSubmitting && !isGeneratingAI) setIsWizardOpen(false);
+    }
+  });
+
+  const drawerRef = useFocusTrap<HTMLDivElement>({
+    isActive: !!selectedDrawerCampaign,
+    onEscape: () => setSelectedDrawerCampaign(null)
+  });
+
+  const deleteModalRef = useFocusTrap<HTMLDivElement>({
+    isActive: !!deletingId,
+    onEscape: () => {
+      if (!isDeleting) setDeletingId(null);
+    }
+  });
 
   // Wizard Form State
   const [wizardData, setWizardData] = useState({
@@ -255,6 +278,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
   // 1-Click Status Toggle (Active <-> Paused) - Meta Ads Manager behavior
   const handleToggleStatus = async (campaign: Campaign, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isUpdatingStatusId !== null) return;
     const nextStatus: Campaign['status'] = campaign.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
     
     // Optimistic update
@@ -285,6 +309,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
   // 1-Click Duplicate Campaign (Meta Ads clone for A/B testing)
   const handleDuplicateCampaign = async (campaign: Campaign, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (loading) return;
     try {
       setLoading(true);
       const duplicatedName = `${campaign.name} (Bản sao A/B Test)`;
@@ -342,8 +367,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
   // Save Settings from Drawer
   const handleSaveDrawerSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedDrawerCampaign) return;
+    if (!selectedDrawerCampaign || isSavingDrawer) return;
 
+    setIsSavingDrawer(true);
     try {
       const updated = await campaignApi.update(selectedDrawerCampaign.id, {
         name: editFormData.name,
@@ -360,11 +386,14 @@ export const Campaigns: React.FC<CampaignsProps> = ({
       if (onRefreshData) onRefreshData();
     } catch (err) {
       toast.error(getApiErrorMessage(err), 'Lỗi khi cập nhật chiến dịch');
+    } finally {
+      setIsSavingDrawer(false);
     }
   };
 
   // AI Omnichannel Generation inside Wizard Step 3
   const handleGenerateOmnichannelCreatives = async () => {
+    if (isGeneratingAI) return;
     try {
       setIsGeneratingAI(true);
       const selectedProd = products.find(p => p.id === Number(wizardData.product_id));
@@ -387,6 +416,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
 
   // Submit Final Wizard (Creates Campaign + Creatives in 1 Atomic Flow with Rollback)
   const handleFinishWizard = async () => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
     let newCamp: Campaign | null = null;
     try {
@@ -477,7 +507,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
 
   // Delete Campaign
   const handleDeleteCampaign = async (id: number) => {
+    if (isDeleting) return;
     try {
+      setIsDeleting(true);
       await campaignApi.delete(id);
       setCampaigns(prev => prev.filter(c => c.id !== id));
       if (selectedDrawerCampaign?.id === id) {
@@ -488,6 +520,8 @@ export const Campaigns: React.FC<CampaignsProps> = ({
       if (onRefreshData) onRefreshData();
     } catch (e) {
       toast.error(getApiErrorMessage(e), 'Lỗi khi xóa chiến dịch');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -545,7 +579,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
   };
 
   return (
-    <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-6">
+    <div className="p-3 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 overflow-hidden">
       {/* 1. Header with Meta Ads Command Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
@@ -570,6 +604,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => loadData()}
+            aria-label="Làm mới dữ liệu từ server"
             title="Làm mới dữ liệu từ server"
             className="p-2.5 text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-colors shadow-2xs"
           >
@@ -625,7 +660,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
               style={{ width: `${Math.min(Number(aggregateMetrics.pacingPercent), 100)}%` }}
             ></div>
           </div>
-          <div className="text-[10px] text-slate-400 mt-1 flex justify-between">
+          <div className="text-[10px] text-slate-600 font-medium mt-1 flex justify-between">
             <span>Tiến độ ngân sách: {aggregateMetrics.pacingPercent}%</span>
             <span>Chu kỳ 30 ngày</span>
           </div>
@@ -642,7 +677,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
           <div className="text-xl font-black text-slate-900 font-mono tracking-tight">
             {aggregateMetrics.totalClicks.toLocaleString('vi-VN')} <span className="text-xs font-medium text-slate-500">Clicks</span>
           </div>
-          <div className="text-[11px] text-emerald-600 mt-1 flex items-center gap-1 font-semibold">
+          <div className="text-[11px] text-emerald-700 mt-1 flex items-center gap-1 font-semibold">
             <TrendingUp className="w-3.5 h-3.5" />
             <span>CTR trung bình 4.2% (Vượt benchmark +15%)</span>
           </div>
@@ -656,7 +691,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
               <BarChart3 className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-xl font-black text-emerald-600 font-mono tracking-tight">
+          <div className="text-xl font-black text-emerald-700 font-mono tracking-tight">
             {aggregateMetrics.avgRoas}x <span className="text-xs font-medium text-slate-500">Doanh thu/Chi phí</span>
           </div>
           <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
@@ -674,6 +709,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
+              aria-label="Tìm theo tên chiến dịch, sản phẩm, đối tượng"
               placeholder="Tìm theo tên chiến dịch, sản phẩm, đối tượng..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -685,6 +721,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
           <select
             value={objectiveFilter}
             onChange={(e) => setObjectiveFilter(e.target.value)}
+            aria-label="Lọc theo mục tiêu chiến dịch"
             className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-medium text-slate-700 outline-hidden hover:bg-white"
           >
             <option value="ALL">Mọi Mục Tiêu</option>
@@ -695,7 +732,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
         </div>
 
         {/* Status Filters & View Toggle */}
-        <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-between md:justify-end">
           <div className="flex items-center p-1 bg-slate-100 rounded-xl gap-1 text-[11px] font-semibold">
             {[
               { id: 'ALL', label: 'Tất cả' },
@@ -720,6 +757,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
           <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200">
             <button
               onClick={() => setViewMode('table')}
+              aria-label="Chế độ bảng dữ liệu"
               title="Chế độ Bảng Dữ Liệu Chuyên Sâu (Meta Ads Data Table)"
               className={`p-1.5 rounded-lg transition-all ${
                 viewMode === 'table' ? 'bg-white text-indigo-700 shadow-2xs' : 'text-slate-500 hover:text-slate-900'
@@ -729,6 +767,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
             </button>
             <button
               onClick={() => setViewMode('grid')}
+              aria-label="Chế độ thẻ trực quan"
               title="Chế độ Thẻ Trực Quan (Grid Cards)"
               className={`p-1.5 rounded-lg transition-all ${
                 viewMode === 'grid' ? 'bg-white text-indigo-700 shadow-2xs' : 'text-slate-500 hover:text-slate-900'
@@ -768,187 +807,311 @@ export const Campaigns: React.FC<CampaignsProps> = ({
           </button>
         </div>
       ) : viewMode === 'table' ? (
-        /* Meta Ads Manager Data Table */
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
-                  <th className="py-3 px-4 w-28">Phân phối</th>
-                  <th className="py-3 px-4 min-w-[240px]">Chiến dịch & Sản phẩm</th>
-                  <th className="py-3 px-4 min-w-[130px]">Kênh</th>
-                  <th className="py-3 px-4 min-w-[170px]">Ngân sách & Chi tiêu</th>
-                  <th className="py-3 px-4 min-w-[140px]">Chỉ số Hiệu suất</th>
-                  <th className="py-3 px-4 min-w-[140px]">Mẫu QC & Duyệt</th>
-                  <th className="py-3 px-4 w-28 text-center">Bác sĩ AI</th>
-                  <th className="py-3 px-4 w-32 text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
-                {filteredCampaigns.map((c) => {
-                  const isActive = c.status === 'ACTIVE';
-                  const isPaused = c.status === 'PAUSED';
-                  const isUpdating = isUpdatingStatusId === c.id;
+        <>
+          {/* Mobile Reflow: Card Layout (<768px) to eliminate horizontal scroll at 320px */}
+          <div className="md:hidden space-y-4">
+            {filteredCampaigns.map((c) => {
+              const isActive = c.status === 'ACTIVE';
+              const isPaused = c.status === 'PAUSED';
+              const isUpdating = isUpdatingStatusId === c.id;
 
-                  // Pacing estimate
-                  const spendAmt = Math.round(c.budget * 0.684);
-                  const spendPercent = Math.min(68.4, 100);
+              return (
+                <div
+                  key={`mobile-${c.id}`}
+                  onClick={() => setSelectedDrawerCampaign(c)}
+                  className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs hover:shadow-xs transition-shadow cursor-pointer space-y-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 truncate max-w-[140px]">
+                      {c.product?.name || `Sản phẩm #${c.product_id}`}
+                    </span>
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        disabled={isUpdating}
+                        onClick={(e) => handleToggleStatus(c, e)}
+                        aria-label={isActive ? `Tạm dừng chiến dịch ${c.name}` : `Kích hoạt phân phối chiến dịch ${c.name}`}
+                        title={isActive ? 'Nhấp để Tạm dừng chiến dịch' : 'Nhấp để Kích hoạt phân phối'}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                          isActive ? 'bg-emerald-500' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                            isActive ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                      <span className={`text-[10px] font-bold ${
+                        isActive ? 'text-emerald-700' : isPaused ? 'text-slate-600' : 'text-slate-600'
+                      }`}>
+                        {isActive ? 'BẬT' : isPaused ? 'TẮT' : c.status}
+                      </span>
+                    </div>
+                  </div>
 
-                  return (
-                    <tr 
-                      key={c.id} 
-                      onClick={() => setSelectedDrawerCampaign(c)}
-                      className="hover:bg-indigo-50/30 transition-colors group cursor-pointer"
-                    >
-                      {/* Column 1: Delivery Toggle Switch */}
-                      <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            disabled={isUpdating}
-                            onClick={(e) => handleToggleStatus(c, e)}
-                            title={isActive ? 'Nhấp để Tạm dừng chiến dịch' : 'Nhấp để Kích hoạt phân phối'}
-                            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                              isActive ? 'bg-emerald-500' : 'bg-slate-300'
-                            }`}
-                          >
-                            <span
-                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                                isActive ? 'translate-x-4' : 'translate-x-0'
-                              }`}
-                            />
-                          </button>
-                          
-                          <span className={`text-[10px] font-bold ${
-                            isActive ? 'text-emerald-700' : isPaused ? 'text-slate-500' : 'text-slate-400'
-                          }`}>
-                            {isActive ? 'BẬT' : isPaused ? 'TẮT' : c.status}
-                          </span>
-                        </div>
-                      </td>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 line-clamp-1">
+                      {c.name}
+                    </h3>
+                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                      {c.objective}
+                    </p>
+                  </div>
 
-                      {/* Column 2: Campaign & Product Hierarchy */}
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors text-xs flex items-center gap-1.5">
-                          <span>{c.name}</span>
-                          <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 text-indigo-600 transition-opacity" />
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                            <Package className="w-3 h-3 text-slate-500" />
-                            <span>{c.product?.name || `Sản phẩm #${c.product_id}`}</span>
-                          </span>
-                          <span className="text-[10px] font-medium text-slate-500 truncate max-w-[180px]">
-                            {c.objective}
-                          </span>
-                        </div>
-                      </td>
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
+                    <div>
+                      <div className="text-[10px] text-slate-600 font-bold uppercase">Ngân sách</div>
+                      <div className="font-mono font-bold text-slate-900 mt-0.5">
+                        {c.budget.toLocaleString('vi-VN')} đ
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-slate-600 font-bold uppercase">Hiệu suất</div>
+                      <div className="text-emerald-700 font-mono font-bold mt-0.5">
+                        3.82x ROAS
+                      </div>
+                    </div>
+                  </div>
 
-                      {/* Column 3: Channels */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-6 h-6 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-[10px]" title="Facebook Ads">
-                            FB
-                          </span>
-                          <span className="w-6 h-6 rounded-md bg-slate-900 text-white flex items-center justify-center font-bold text-[10px]" title="TikTok Video">
-                            TT
-                          </span>
-                          <span className="w-6 h-6 rounded-md bg-violet-50 text-violet-600 flex items-center justify-center font-bold text-[10px]" title="Email Newsletter">
-                            <Mail className="w-3 h-3" />
-                          </span>
-                        </div>
-                      </td>
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-[9px]">FB</span>
+                      <span className="w-5 h-5 rounded-md bg-slate-900 text-white flex items-center justify-center font-bold text-[9px]">TT</span>
+                      <span className="w-5 h-5 rounded-md bg-violet-50 text-violet-600 flex items-center justify-center font-bold text-[9px]">
+                        <Mail className="w-2.5 h-2.5" />
+                      </span>
+                    </div>
 
-                      {/* Column 4: Budget & Spend Pacing */}
-                      <td className="py-3.5 px-4">
-                        <div className="font-mono font-bold text-slate-900 text-xs">
-                          {c.budget.toLocaleString('vi-VN')} <span className="text-[10px] font-normal text-slate-500">đ</span>
-                        </div>
-                        <div className="mt-1 flex items-center gap-2">
-                          <div className="flex-1 bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                            <div 
-                              className="bg-indigo-600 h-1.5 rounded-full" 
-                              style={{ width: `${spendPercent}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-[10px] font-mono text-slate-500">{spendPercent}%</span>
-                        </div>
-                      </td>
-
-                      {/* Column 5: Performance Metrics */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-1.5">
-                          <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-mono font-bold text-[11px] border border-emerald-200">
-                            3.82x ROAS
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-slate-500 mt-1">
-                          2,450 Clicks • 4.1% CVR
-                        </div>
-                      </td>
-
-                      {/* Column 6: Creatives & Approval Ratio */}
-                      <td className="py-3.5 px-4">
-                        <div className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-lg">
-                          <Layers className="w-3.5 h-3.5 text-indigo-600" />
-                          <span>3 Mẫu QC</span>
-                          <span className="text-emerald-600 font-semibold text-[10px]">(Đã duyệt)</span>
-                        </div>
-                      </td>
-
-                      {/* Column 7: AI Doctor Health */}
-                      <td className="py-3.5 px-4 text-center">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          <span>94/100 Tốt</span>
-                        </span>
-                      </td>
-
-                      {/* Column 8: Quick Actions */}
-                      <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => setSelectedDrawerCampaign(c)}
-                            title="Xem chi tiết & Mẫu quảng cáo"
-                            className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-
-                          <button
-                            onClick={(e) => handleDuplicateCampaign(c, e)}
-                            title="Nhân bản chiến dịch để chạy thử nghiệm A/B"
-                            className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </button>
-
-                          <button
-                            onClick={() => onOpenAI(c)}
-                            title="Mở Trợ lý Sáng tạo AI Copilot"
-                            className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                          >
-                            <Sparkles className="w-4 h-4" />
-                          </button>
-
-                          {userRole === 'MANAGER' && (
-                            <button
-                              onClick={() => setDeletingId(c.id)}
-                              title="Xóa chiến dịch"
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => setSelectedDrawerCampaign(c)}
+                        aria-label={`Xem chi tiết chiến dịch ${c.name}`}
+                        title="Xem chi tiết & Mẫu quảng cáo"
+                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => handleDuplicateCampaign(c, e)}
+                        aria-label={`Nhân bản chiến dịch ${c.name}`}
+                        title="Nhân bản chiến dịch"
+                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => onOpenAI(c)}
+                        aria-label={`Mở AI sáng tạo nội dung cho chiến dịch ${c.name}`}
+                        title="Mở Trợ lý Sáng tạo AI Copilot"
+                        className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                      </button>
+                      {isManager && (
+                        <button
+                          onClick={() => setDeletingId(c.id)}
+                          aria-label={`Xóa chiến dịch ${c.name}`}
+                          title="Xóa chiến dịch"
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
+
+          {/* Desktop Data Table (>=768px) */}
+          <div className="hidden md:block bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-3 px-4 w-28">Phân phối</th>
+                    <th className="py-3 px-4 min-w-[240px]">Chiến dịch & Sản phẩm</th>
+                    <th className="py-3 px-4 min-w-[130px]">Kênh</th>
+                    <th className="py-3 px-4 min-w-[170px]">Ngân sách & Chi tiêu</th>
+                    <th className="py-3 px-4 min-w-[140px]">Chỉ số Hiệu suất</th>
+                    <th className="py-3 px-4 min-w-[140px]">Mẫu QC & Duyệt</th>
+                    <th className="py-3 px-4 w-28 text-center">Bác sĩ AI</th>
+                    <th className="py-3 px-4 w-32 text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {filteredCampaigns.map((c) => {
+                    const isActive = c.status === 'ACTIVE';
+                    const isPaused = c.status === 'PAUSED';
+                    const isUpdating = isUpdatingStatusId === c.id;
+
+                    // Pacing estimate
+                    const spendAmt = Math.round(c.budget * 0.684);
+                    const spendPercent = Math.min(68.4, 100);
+
+                    return (
+                      <tr 
+                        key={c.id} 
+                        onClick={() => setSelectedDrawerCampaign(c)}
+                        className="hover:bg-indigo-50/30 transition-colors group cursor-pointer"
+                      >
+                        {/* Column 1: Delivery Toggle Switch */}
+                        <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              disabled={isUpdating}
+                              onClick={(e) => handleToggleStatus(c, e)}
+                              aria-label={isActive ? `Tạm dừng chiến dịch ${c.name}` : `Kích hoạt phân phối chiến dịch ${c.name}`}
+                              title={isActive ? 'Nhấp để Tạm dừng chiến dịch' : 'Nhấp để Kích hoạt phân phối'}
+                              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                                isActive ? 'bg-emerald-500' : 'bg-slate-300'
+                              }`}
+                            >
+                              <span
+                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                  isActive ? 'translate-x-4' : 'translate-x-0'
+                                }`}
+                              />
+                            </button>
+                            
+                            <span className={`text-[10px] font-bold ${
+                              isActive ? 'text-emerald-700' : isPaused ? 'text-slate-600' : 'text-slate-600'
+                            }`}>
+                              {isActive ? 'BẬT' : isPaused ? 'TẮT' : c.status}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Column 2: Campaign & Product Hierarchy */}
+                        <td className="py-3.5 px-4">
+                          <div className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors text-xs flex items-center gap-1.5">
+                            <span>{c.name}</span>
+                            <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 text-indigo-600 transition-opacity" />
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                              <Package className="w-3 h-3 text-slate-500" />
+                              <span>{c.product?.name || `Sản phẩm #${c.product_id}`}</span>
+                            </span>
+                            <span className="text-[10px] font-medium text-slate-500 truncate max-w-[180px]">
+                              {c.objective}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Column 3: Channels */}
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-6 h-6 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-[10px]" title="Facebook Ads">
+                              FB
+                            </span>
+                            <span className="w-6 h-6 rounded-md bg-slate-900 text-white flex items-center justify-center font-bold text-[10px]" title="TikTok Video">
+                              TT
+                            </span>
+                            <span className="w-6 h-6 rounded-md bg-violet-50 text-violet-600 flex items-center justify-center font-bold text-[10px]" title="Email Newsletter">
+                              <Mail className="w-3 h-3" />
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Column 4: Budget & Spend Pacing */}
+                        <td className="py-3.5 px-4">
+                          <div className="font-mono font-bold text-slate-900 text-xs">
+                            {c.budget.toLocaleString('vi-VN')} <span className="text-[10px] font-normal text-slate-500">đ</span>
+                          </div>
+                          <div className="mt-1 flex items-center gap-2">
+                            <div className="flex-1 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                              <div 
+                                className="bg-indigo-600 h-1.5 rounded-full" 
+                                style={{ width: `${spendPercent}%` }}
+                              ></div>
+                            </div>
+                            <span className="text-[10px] font-mono text-slate-500">{spendPercent}%</span>
+                          </div>
+                        </td>
+
+                        {/* Column 5: Performance Metrics */}
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-mono font-bold text-[11px] border border-emerald-200">
+                              3.82x ROAS
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-slate-500 mt-1">
+                            2,450 Clicks • 4.1% CVR
+                          </div>
+                        </td>
+
+                        {/* Column 6: Creatives & Approval Ratio */}
+                        <td className="py-3.5 px-4">
+                          <div className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-lg">
+                            <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>3 Mẫu QC</span>
+                            <span className="text-emerald-700 font-semibold text-[10px]">(Đã duyệt)</span>
+                          </div>
+                        </td>
+
+                        {/* Column 7: AI Doctor Health */}
+                        <td className="py-3.5 px-4 text-center">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span>94/100 Tốt</span>
+                          </span>
+                        </td>
+
+                        {/* Column 8: Quick Actions */}
+                        <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => setSelectedDrawerCampaign(c)}
+                              aria-label={`Xem chi tiết chiến dịch ${c.name}`}
+                              title="Xem chi tiết & Mẫu quảng cáo"
+                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              onClick={(e) => handleDuplicateCampaign(c, e)}
+                              aria-label={`Nhân bản chiến dịch ${c.name}`}
+                              title="Nhân bản chiến dịch để chạy thử nghiệm A/B"
+                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              onClick={() => onOpenAI(c)}
+                              aria-label={`Mở AI sáng tạo nội dung cho chiến dịch ${c.name}`}
+                              title="Mở Trợ lý Sáng tạo AI Copilot"
+                              className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            >
+                              <Sparkles className="w-4 h-4" />
+                            </button>
+
+                            {isManager && (
+                              <button
+                                onClick={() => setDeletingId(c.id)}
+                                aria-label={`Xóa chiến dịch ${c.name}`}
+                                title="Xóa chiến dịch"
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       ) : (
         /* Card Grid View */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -970,8 +1133,10 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                     <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
+                        disabled={isUpdatingStatusId === c.id}
                         onClick={(e) => handleToggleStatus(c, e)}
-                        className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                        aria-label={isActive ? `Tạm dừng chiến dịch ${c.name}` : `Kích hoạt phân phối chiến dịch ${c.name}`}
+                        className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden disabled:opacity-50 disabled:cursor-not-allowed ${
                           isActive ? 'bg-emerald-500' : 'bg-slate-300'
                         }`}
                       >
@@ -997,13 +1162,13 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                   {/* Budget & Date */}
                   <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <div className="text-[10px] text-slate-400 font-semibold uppercase">Ngân sách</div>
+                      <div className="text-[10px] text-slate-600 font-bold uppercase">Ngân sách</div>
                       <div className="font-mono font-bold text-slate-900 mt-0.5">
                         {c.budget.toLocaleString('vi-VN')} đ
                       </div>
                     </div>
                     <div>
-                      <div className="text-[10px] text-slate-400 font-semibold uppercase">Thời hạn</div>
+                      <div className="text-[10px] text-slate-600 font-bold uppercase">Thời hạn</div>
                       <div className="font-medium text-slate-700 mt-0.5 text-[11px]">
                         {c.end_date ? c.end_date : 'Vô thời hạn'}
                       </div>
@@ -1024,6 +1189,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                   <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={(e) => handleDuplicateCampaign(c, e)}
+                      aria-label={`Nhân bản chiến dịch ${c.name}`}
                       title="Nhân bản để thử nghiệm A/B"
                       className="p-1.5 text-slate-500 hover:text-indigo-600 rounded-lg hover:bg-slate-100"
                     >
@@ -1031,6 +1197,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                     </button>
                     <button
                       onClick={() => onOpenAI(c)}
+                      aria-label={`Mở AI sáng tạo nội dung cho chiến dịch ${c.name}`}
                       title="Sáng tạo nội dung với AI"
                       className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg"
                     >
@@ -1046,7 +1213,12 @@ export const Campaigns: React.FC<CampaignsProps> = ({
 
       {/* 5. SLIDE-OVER CAMPAIGN DETAIL DRAWER (Meta Ads Inspector) */}
       {selectedDrawerCampaign && (
-        <div className="fixed inset-0 z-50 overflow-hidden">
+        <div 
+          className="fixed inset-0 z-50 overflow-hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="campaign-drawer-title"
+        >
           {/* Backdrop */}
           <div 
             className="absolute inset-0 bg-slate-950/40 backdrop-blur-xs transition-opacity"
@@ -1054,7 +1226,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
           />
 
           <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-            <div className="w-screen max-w-2xl bg-white shadow-2xl flex flex-col">
+            <div ref={drawerRef} className="w-screen max-w-2xl bg-white shadow-2xl flex flex-col">
               {/* Drawer Top Navigation */}
               <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
                 <div className="flex items-center gap-3">
@@ -1062,7 +1234,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                     <Megaphone className="w-4 h-4" />
                   </div>
                   <div>
-                    <h2 className="text-base font-bold text-slate-900 line-clamp-1">
+                    <h2 id="campaign-drawer-title" className="text-base font-bold text-slate-900 line-clamp-1">
                       {selectedDrawerCampaign.name}
                     </h2>
                     <div className="flex items-center gap-2 mt-0.5">
@@ -1097,6 +1269,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
 
                   <button
                     onClick={() => setSelectedDrawerCampaign(null)}
+                    aria-label="Đóng bảng chi tiết chiến dịch"
                     className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"
                   >
                     <X className="w-5 h-5" />
@@ -1243,7 +1416,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                               <span>Sao chép</span>
                             </button>
 
-                            {userRole === 'MANAGER' && item.status !== 'APPROVED' && (
+                            {(isManager || userRole === 'CLIENT_APPROVER') && item.status !== 'APPROVED' && (
                               <button
                                 onClick={() => handleApproveDrawerContent(item.id)}
                                 className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] flex items-center gap-1"
@@ -1301,14 +1474,14 @@ export const Campaigns: React.FC<CampaignsProps> = ({
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-white p-3.5 rounded-2xl border border-slate-200 text-xs">
-                        <span className="text-slate-400 font-semibold uppercase text-[10px]">CPA Ước tính</span>
+                        <span className="text-slate-600 font-bold uppercase text-[10px]">CPA Ước tính</span>
                         <div className="text-base font-black text-slate-900 font-mono mt-1">45.000 đ / Lead</div>
-                        <span className="text-[10px] text-emerald-600 font-semibold">Tối ưu hơn 22%</span>
+                        <span className="text-[10px] text-emerald-700 font-semibold">Tối ưu hơn 22%</span>
                       </div>
                       <div className="bg-white p-3.5 rounded-2xl border border-slate-200 text-xs">
-                        <span className="text-slate-400 font-semibold uppercase text-[10px]">Tỷ lệ chuyển đổi (CVR)</span>
+                        <span className="text-slate-600 font-bold uppercase text-[10px]">Tỷ lệ chuyển đổi (CVR)</span>
                         <div className="text-base font-black text-slate-900 font-mono mt-1">4.2%</div>
-                        <span className="text-[10px] text-emerald-600 font-semibold">Chuẩn ngành TMĐT</span>
+                        <span className="text-[10px] text-emerald-700 font-semibold">Chuẩn ngành TMĐT</span>
                       </div>
                     </div>
                   </div>
@@ -1376,8 +1549,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                 {drawerTab === 'settings' && (
                   <form onSubmit={handleSaveDrawerSettings} className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 text-xs">
                     <div>
-                      <label className="block font-bold text-slate-700 mb-1">Tên Chiến dịch</label>
+                      <label htmlFor="drawer-campaign-name" className="block font-bold text-slate-700 mb-1">Tên Chiến dịch</label>
                       <input
+                        id="drawer-campaign-name"
                         type="text"
                         value={editFormData.name}
                         onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
@@ -1388,8 +1562,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block font-bold text-slate-700 mb-1">Ngân sách (VNĐ)</label>
+                        <label htmlFor="drawer-campaign-budget" className="block font-bold text-slate-700 mb-1">Ngân sách (VNĐ)</label>
                         <input
+                          id="drawer-campaign-budget"
                           type="number"
                           value={editFormData.budget}
                           onChange={(e) => setEditFormData(prev => ({ ...prev, budget: Number(e.target.value) }))}
@@ -1401,8 +1576,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                       </div>
 
                       <div>
-                        <label className="block font-bold text-slate-700 mb-1">Trạng thái phân phối</label>
+                        <label htmlFor="drawer-campaign-status" className="block font-bold text-slate-700 mb-1">Trạng thái phân phối</label>
                         <select
+                          id="drawer-campaign-status"
                           value={editFormData.status}
                           onChange={(e) => setEditFormData(prev => ({ ...prev, status: e.target.value as any }))}
                           className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold outline-hidden focus:bg-white focus:border-indigo-500"
@@ -1418,8 +1594,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block font-bold text-slate-700 mb-1">Ngày bắt đầu</label>
+                        <label htmlFor="drawer-start-date" className="block font-bold text-slate-700 mb-1">Ngày bắt đầu</label>
                         <input
+                          id="drawer-start-date"
                           type="date"
                           value={editFormData.start_date}
                           onChange={(e) => setEditFormData(prev => ({ ...prev, start_date: e.target.value }))}
@@ -1427,8 +1604,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         />
                       </div>
                       <div>
-                        <label className="block font-bold text-slate-700 mb-1">Ngày kết thúc</label>
+                        <label htmlFor="drawer-end-date" className="block font-bold text-slate-700 mb-1">Ngày kết thúc</label>
                         <input
+                          id="drawer-end-date"
                           type="date"
                           value={editFormData.end_date}
                           onChange={(e) => setEditFormData(prev => ({ ...prev, end_date: e.target.value }))}
@@ -1438,8 +1616,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                     </div>
 
                     <div>
-                      <label className="block font-bold text-slate-700 mb-1">Tệp Đối tượng Mục tiêu</label>
+                      <label htmlFor="drawer-audience" className="block font-bold text-slate-700 mb-1">Tệp Đối tượng Mục tiêu</label>
                       <textarea
+                        id="drawer-audience"
                         value={editFormData.audience}
                         onChange={(e) => setEditFormData(prev => ({ ...prev, audience: e.target.value }))}
                         rows={2}
@@ -1463,7 +1642,12 @@ export const Campaigns: React.FC<CampaignsProps> = ({
 
       {/* 6. GUIDED 4-STEP CAMPAIGN CREATION WIZARD MODAL (Meta & Google Ads Standard) */}
       {isWizardOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div 
+          className="fixed inset-0 z-50 overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="campaign-wizard-title"
+        >
           <div className="flex items-center justify-center min-h-screen px-4 py-8">
             <div 
               className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
@@ -1472,11 +1656,11 @@ export const Campaigns: React.FC<CampaignsProps> = ({
               }}
             />
 
-            <div className="relative bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 z-10 space-y-6">
+            <div ref={wizardModalRef} className="relative bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 z-10 space-y-6">
               {/* Wizard Header */}
               <div className="flex items-center justify-between pb-4 border-b border-slate-100">
                 <div>
-                  <h3 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                  <h3 id="campaign-wizard-title" className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
                     <span>Quy trình Thiết lập Chiến dịch Quảng cáo</span>
                     <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full">
                       Bước {wizardStep}/4
@@ -1489,6 +1673,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsWizardOpen(false)}
+                  aria-label="Đóng cửa sổ thiết lập chiến dịch"
                   className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
                 >
                   <X className="w-5 h-5" />
@@ -1508,7 +1693,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                       wizardStep >= s.step ? 'bg-indigo-600' : 'bg-slate-200'
                     }`} />
                     <span className={`text-[10px] font-bold ${
-                      wizardStep === s.step ? 'text-indigo-600' : wizardStep > s.step ? 'text-slate-700' : 'text-slate-400'
+                      wizardStep === s.step ? 'text-indigo-600' : wizardStep > s.step ? 'text-slate-700' : 'text-slate-600'
                     }`}>
                       {s.label}
                     </span>
@@ -1572,8 +1757,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                   {/* Product & Campaign Name */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">Sản phẩm Tiếp thị</label>
+                      <label htmlFor="wizard-product-select" className="block text-xs font-bold text-slate-700 mb-1">Sản phẩm Tiếp thị</label>
                       <select
+                        id="wizard-product-select"
                         value={wizardData.product_id}
                         onChange={(e) => {
                           const pid = Number(e.target.value);
@@ -1593,8 +1779,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">Tên Chiến dịch</label>
+                      <label htmlFor="wizard-campaign-name" className="block text-xs font-bold text-slate-700 mb-1">Tên Chiến dịch</label>
                       <input
+                        id="wizard-campaign-name"
                         type="text"
                         value={wizardData.name}
                         onChange={(e) => setWizardData(prev => ({ ...prev, name: e.target.value }))}
@@ -1608,12 +1795,13 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                   {/* Budget & Presets */}
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-bold text-slate-700">Ngân sách Tổng (VNĐ)</label>
+                      <label htmlFor="wizard-campaign-budget" className="block text-xs font-bold text-slate-700">Ngân sách Tổng (VNĐ)</label>
                       <span className="text-xs font-mono font-black text-indigo-600">
                         {Number(wizardData.budget).toLocaleString('vi-VN')} VNĐ
                       </span>
                     </div>
                     <input
+                      id="wizard-campaign-budget"
                       type="number"
                       value={wizardData.budget}
                       onChange={(e) => setWizardData(prev => ({ ...prev, budget: Number(e.target.value) }))}
@@ -1624,7 +1812,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
 
                     {/* Quick Budget Presets */}
                     <div className="flex items-center gap-1.5 mt-2">
-                      <span className="text-[10px] text-slate-400 font-semibold uppercase">Gợi ý nhanh:</span>
+                      <span className="text-[10px] text-slate-600 font-semibold uppercase">Gợi ý nhanh:</span>
                       {[5000000, 10000000, 20000000, 50000000].map(amt => (
                         <button
                           key={amt}
@@ -1641,8 +1829,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                   {/* Schedule & Presets */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">Ngày Bắt đầu</label>
+                      <label htmlFor="wizard-start-date" className="block text-xs font-bold text-slate-700 mb-1">Ngày Bắt đầu</label>
                       <input
+                        id="wizard-start-date"
                         type="date"
                         value={wizardData.start_date}
                         onChange={(e) => setWizardData(prev => ({ ...prev, start_date: e.target.value }))}
@@ -1650,8 +1839,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">Ngày Kết thúc</label>
+                      <label htmlFor="wizard-end-date" className="block text-xs font-bold text-slate-700 mb-1">Ngày Kết thúc</label>
                       <input
+                        id="wizard-end-date"
                         type="date"
                         value={wizardData.end_date}
                         onChange={(e) => setWizardData(prev => ({ ...prev, end_date: e.target.value }))}
@@ -1660,7 +1850,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-slate-400 font-semibold uppercase">Thời lượng:</span>
+                    <span className="text-[10px] text-slate-600 font-semibold uppercase">Thời lượng:</span>
                     {[7, 14, 30, 60].map(days => (
                       <button
                         key={days}
@@ -1704,10 +1894,11 @@ export const Campaigns: React.FC<CampaignsProps> = ({
 
                   {/* Target Persona */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                    <label htmlFor="wizard-audience-persona" className="block text-xs font-bold text-slate-700 mb-1">
                       Tệp Khách hàng Mục tiêu (Audience Persona)
                     </label>
                     <textarea
+                      id="wizard-audience-persona"
                       value={wizardData.audience}
                       onChange={(e) => setWizardData(prev => ({ ...prev, audience: e.target.value }))}
                       rows={2}
@@ -2008,15 +2199,20 @@ export const Campaigns: React.FC<CampaignsProps> = ({
 
       {/* Delete Confirmation Modal */}
       {deletingId && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div 
+          className="fixed inset-0 z-50 overflow-y-auto"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="delete-dialog-title"
+        >
           <div className="flex items-center justify-center min-h-screen px-4">
             <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity" onClick={() => setDeletingId(null)} />
-            <div className="relative bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 z-10 space-y-4 text-center">
+            <div ref={deleteModalRef} className="relative bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 z-10 space-y-4 text-center">
               <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
                 <Trash2 className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="text-base font-bold text-slate-900">Xác nhận xóa chiến dịch?</h4>
+                <h4 id="delete-dialog-title" className="text-base font-bold text-slate-900">Xác nhận xóa chiến dịch?</h4>
                 <p className="text-xs text-slate-500 mt-1">
                   Hành động này sẽ xóa chiến dịch cùng toàn bộ các mẫu quảng cáo đi kèm. Không thể hoàn tác.
                 </p>
@@ -2024,17 +2220,26 @@ export const Campaigns: React.FC<CampaignsProps> = ({
               <div className="flex items-center gap-3 pt-2">
                 <button
                   type="button"
+                  disabled={isDeleting}
                   onClick={() => setDeletingId(null)}
-                  className="flex-1 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl"
+                  className="flex-1 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Hủy
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleDeleteCampaign(deletingId)}
-                  className="flex-1 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-xs"
+                  disabled={isDeleting}
+                  onClick={() => deletingId && handleDeleteCampaign(deletingId)}
+                  className="flex-1 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Xóa vĩnh viễn
+                  {isDeleting ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Đang xóa...</span>
+                    </>
+                  ) : (
+                    <span>Xóa vĩnh viễn</span>
+                  )}
                 </button>
               </div>
             </div>

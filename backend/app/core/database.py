@@ -1,23 +1,44 @@
+import logging
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 from app.core.config import settings
 
-connect_args = {}
-if settings.DATABASE_URL.startswith("sqlite"):
-    connect_args = {"check_same_thread": False}
+logger = logging.getLogger("marketflow.database")
 
-engine = create_engine(
-    settings.DATABASE_URL,
-    connect_args=connect_args,
-    echo=False
-)
+class DatabaseMigrationError(RuntimeError):
+    """Ngoại lệ tùy chỉnh khi quá trình migration hoặc kiểm tra tương thích schema CSDL thất bại."""
+    pass
 
-# Kích hoạt bắt buộc kiểm tra ràng buộc khóa ngoại trên SQLite
-if settings.DATABASE_URL.startswith("sqlite"):
+from pathlib import Path
+
+db_url = settings.DATABASE_URL
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+elif db_url.startswith("sqlite:///") and not db_url.startswith("sqlite:////") and db_url != "sqlite:///:memory:":
+    raw_path = db_url[len("sqlite:///"):]
+    p = Path(raw_path)
+    if not p.is_absolute():
+        base_target = (settings.BASE_DIR / raw_path.lstrip("./")).resolve()
+        if base_target.exists():
+            db_url = f"sqlite:///{base_target.as_posix()}"
+
+engine_kwargs = {"echo": False}
+if db_url.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    engine_kwargs["pool_pre_ping"] = True
+    engine_kwargs["pool_recycle"] = 300
+
+engine = create_engine(db_url, **engine_kwargs)
+
+# Kích hoạt bắt buộc kiểm tra ràng buộc khóa ngoại và tối ưu hóa đồng thời WAL trên SQLite
+if db_url.startswith("sqlite"):
     @event.listens_for(engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
         cursor.close()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -36,8 +57,8 @@ def ensure_sqlite_schema_compatibility(db_engine=engine):
     """Tự động kiểm tra và bổ sung các cột mới vào CSDL SQLite hiện hữu nếu thiếu (Idempotent Zero Migration Failure)."""
     if not str(db_engine.url).startswith("sqlite"):
         return
-    with db_engine.connect() as conn:
-        try:
+    try:
+        with db_engine.connect() as conn:
             res = conn.exec_driver_sql("PRAGMA table_info(marketing_contents)")
             existing_cols = [row[1] for row in res.fetchall()]
             if existing_cols:
@@ -63,8 +84,9 @@ def ensure_sqlite_schema_compatibility(db_engine=engine):
                 if "is_active" not in key_cols:
                     conn.exec_driver_sql("ALTER TABLE custom_api_keys ADD COLUMN is_active BOOLEAN DEFAULT 1")
             conn.commit()
-        except Exception:
-            pass
+    except Exception as e:
+        logger.error("Database schema migration failed: %s", e, exc_info=True)
+        raise DatabaseMigrationError(f"Database schema migration failed: {e}") from e
 
 
 def init_db(db_engine=engine):

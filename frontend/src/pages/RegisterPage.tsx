@@ -78,12 +78,13 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateToLogin })
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              <label htmlFor="register-fullname" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                 Họ và tên
               </label>
               <div className="relative">
                 <UserIcon className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
+                  id="register-fullname"
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
@@ -95,12 +96,13 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateToLogin })
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              <label htmlFor="register-email" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                 Email doanh nghiệp
               </label>
               <div className="relative">
                 <Mail className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
+                  id="register-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -112,12 +114,13 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateToLogin })
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              <label htmlFor="register-password" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                 Mật khẩu (Tối thiểu 6 ký tự)
               </label>
               <div className="relative">
                 <Lock className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
+                  id="register-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -129,12 +132,13 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateToLogin })
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              <span className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                 Vai trò chính của bạn
-              </label>
-              <div className="space-y-2">
-                <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${role === 'AGENCY_MANAGER' ? 'bg-indigo-600/10 border-indigo-500/80 text-white' : 'bg-slate-950/40 border-slate-800 hover:border-slate-700 text-slate-300'}`}>
+              </span>
+              <div className="space-y-2" role="radiogroup" aria-label="Vai trò chính của bạn">
+                <label htmlFor="role-agency-manager" className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${role === 'AGENCY_MANAGER' ? 'bg-indigo-600/10 border-indigo-500/80 text-white' : 'bg-slate-950/40 border-slate-800 hover:border-slate-700 text-slate-300'}`}>
                   <input
+                    id="role-agency-manager"
                     type="radio"
                     name="role"
                     value="AGENCY_MANAGER"
@@ -148,8 +152,9 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateToLogin })
                   </div>
                 </label>
 
-                <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${role === 'MARKETER' ? 'bg-indigo-600/10 border-indigo-500/80 text-white' : 'bg-slate-950/40 border-slate-800 hover:border-slate-700 text-slate-300'}`}>
+                <label htmlFor="role-marketer" className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${role === 'MARKETER' ? 'bg-indigo-600/10 border-indigo-500/80 text-white' : 'bg-slate-950/40 border-slate-800 hover:border-slate-700 text-slate-300'}`}>
                   <input
+                    id="role-marketer"
                     type="radio"
                     name="role"
                     value="MARKETER"
@@ -163,8 +168,9 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateToLogin })
                   </div>
                 </label>
 
-                <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${role === 'CLIENT_APPROVER' ? 'bg-indigo-600/10 border-indigo-500/80 text-white' : 'bg-slate-950/40 border-slate-800 hover:border-slate-700 text-slate-300'}`}>
+                <label htmlFor="role-client-approver" className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${role === 'CLIENT_APPROVER' ? 'bg-indigo-600/10 border-indigo-500/80 text-white' : 'bg-slate-950/40 border-slate-800 hover:border-slate-700 text-slate-300'}`}>
                   <input
+                    id="role-client-approver"
                     type="radio"
                     name="role"
                     value="CLIENT_APPROVER"

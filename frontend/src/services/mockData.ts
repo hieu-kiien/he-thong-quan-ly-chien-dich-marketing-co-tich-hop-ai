@@ -2,7 +2,7 @@ import { Campaign, MarketingContent, KPISummary, Product, MarketingSchedule, Use
 
 export const MOCK_USER_MANAGER: User = {
   id: 1,
-  email: 'manager@ictu.edu.vn',
+  email: 'manager@gmail.com',
   full_name: 'Quản Lý Chiến Dịch',
   role: 'MANAGER',
   status: 'ACTIVE',
@@ -11,7 +11,7 @@ export const MOCK_USER_MANAGER: User = {
 
 export const MOCK_USER_MARKETER: User = {
   id: 2,
-  email: 'marketer@ictu.edu.vn',
+  email: 'marketer@gmail.com',
   full_name: 'Chuyên Viên Tiếp Thị',
   role: 'MARKETER',
   status: 'ACTIVE',
@@ -20,7 +20,7 @@ export const MOCK_USER_MARKETER: User = {
 
 export const MOCK_USER_CLIENT_APPROVER: User = {
   id: 3,
-  email: 'approver@ictu.edu.vn',
+  email: 'approver@gmail.com',
   full_name: 'Đại Diện Khách Hàng (Approver)',
   role: 'CLIENT_APPROVER',
   status: 'ACTIVE',
@@ -107,7 +107,7 @@ export const MOCK_CAMPAIGNS: Campaign[] = [
     id: 2,
     product_id: 1,
     owner_id: 1,
-    name: 'Tuyển sinh Đại học & Đào tạo AI Thực chiến ICTU',
+    name: 'Khóa Đào tạo AI Thực chiến & Tiếp thị Số',
     objective: 'Thu hút 2.000 hồ sơ đăng ký tham gia hội thảo định hướng nghề nghiệp Kỹ sư AI & Marketing số',
     audience: 'Học sinh THPT, sinh viên năm cuối, người đi làm chuyển ngành công nghệ',
     budget: 35000000,
@@ -231,7 +231,7 @@ export const MOCK_CONTENTS: MarketingContent[] = [
     channel_id: 1,
     created_by: 2,
     title: 'Học bổng Ươm mầm Tài năng AI & Data Science 2026',
-    body: 'Khoa Công nghệ Thông tin ICTU công bố 50 suất học bổng toàn phần dành cho tân sinh viên xuất sắc đam mê lĩnh vực Trí tuệ Nhân tạo và Tiếp thị số.',
+    body: 'Học viện AI MarketFlow công bố 50 suất học bổng toàn phần dành cho tân sinh viên xuất sắc đam mê lĩnh vực Trí tuệ Nhân tạo và Tiếp thị số.',
     cta: 'Nộp hồ sơ xét học bổng',
     status: 'APPROVED',
     version_no: 1,

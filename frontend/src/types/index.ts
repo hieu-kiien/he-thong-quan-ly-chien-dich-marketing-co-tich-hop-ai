@@ -427,3 +427,15 @@ export interface AIKeySaveResponse {
   updated_at?: string;
 }
 
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'review' | 'campaign' | 'ai' | 'warning' | 'info';
+  timestamp: string;
+  read: boolean;
+  targetTab?: string;
+  actionLabel?: string;
+}
+
+

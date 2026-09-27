@@ -126,6 +126,7 @@ export const EmailInboxPreview: React.FC<EmailInboxPreviewProps> = ({
               <input
                 type="checkbox"
                 readOnly
+                aria-label="Chọn email"
                 className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-0 cursor-pointer"
               />
               <button
@@ -133,6 +134,7 @@ export const EmailInboxPreview: React.FC<EmailInboxPreviewProps> = ({
                   e.stopPropagation();
                   setIsStarred(!isStarred);
                 }}
+                aria-label={isStarred ? 'Bỏ đánh dấu sao' : 'Đánh dấu sao'}
                 className="hover:text-amber-500 transition"
               >
                 <Star className={`w-4 h-4 ${isStarred ? 'fill-amber-400 text-amber-400' : ''}`} />
@@ -160,13 +162,13 @@ export const EmailInboxPreview: React.FC<EmailInboxPreviewProps> = ({
                 {receivedTime}
               </span>
               <div className="hidden group-hover:flex items-center gap-1.5 text-slate-500">
-                <button title="Lưu trữ" className="p-1 hover:text-slate-800 rounded">
+                <button title="Lưu trữ" aria-label="Lưu trữ email" className="p-1 hover:text-slate-800 rounded">
                   <Archive className="w-3.5 h-3.5" />
                 </button>
-                <button title="Xóa" className="p-1 hover:text-rose-600 rounded">
+                <button title="Xóa" aria-label="Xóa email" className="p-1 hover:text-rose-600 rounded">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
-                <button title="Mở thư" className="p-1 text-indigo-600 font-bold">
+                <button title="Mở thư" aria-label="Mở thư email" className="p-1 text-indigo-600 font-bold">
                   <Eye className="w-3.5 h-3.5" />
                 </button>
               </div>

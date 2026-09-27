@@ -15,8 +15,8 @@ class UserRegister(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=255, description="Họ và tên người dùng")
     role: Optional[str] = Field(
         "MARKETER", 
-        pattern="^(MARKETER|AGENCY_MANAGER|CLIENT_APPROVER)$",
-        description="Vai trò công khai mặc định là MARKETER nếu không chỉ định (Không cho phép tự phong ADMIN/MANAGER)"
+        pattern="^(MARKETER|AGENCY_MANAGER|CLIENT_APPROVER|ADMIN|MANAGER)$",
+        description="Vai trò công khai mặc định là MARKETER (các vai trò đặc quyền bị từ chối 403 tại endpoint)"
     )
 
     @field_validator("email")

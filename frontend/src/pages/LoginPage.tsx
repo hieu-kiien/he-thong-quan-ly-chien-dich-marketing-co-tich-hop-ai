@@ -73,12 +73,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToRegister }) =>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              <label htmlFor="login-email" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                 Email doanh nghiệp
               </label>
               <div className="relative">
                 <Mail className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
+                  id="login-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -90,12 +91,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToRegister }) =>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              <label htmlFor="login-password" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                 Mật khẩu
               </label>
               <div className="relative">
                 <Lock className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
+                  id="login-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -134,21 +136,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToRegister }) =>
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
-                onClick={() => handleQuickLogin('manager@ictu.edu.vn', 'Manager@123')}
+                onClick={() => handleQuickLogin('manager@gmail.com', 'Manager@123')}
                 className="py-1.5 px-2 bg-slate-800/70 hover:bg-slate-800 hover:border-indigo-500/50 border border-slate-700/60 rounded-lg text-xs font-medium text-slate-200 transition-all text-center"
               >
                 Manager
               </button>
               <button
                 type="button"
-                onClick={() => handleQuickLogin('marketer@ictu.edu.vn', 'Marketer@123')}
+                onClick={() => handleQuickLogin('marketer@gmail.com', 'Marketer@123')}
                 className="py-1.5 px-2 bg-slate-800/70 hover:bg-slate-800 hover:border-indigo-500/50 border border-slate-700/60 rounded-lg text-xs font-medium text-slate-200 transition-all text-center"
               >
                 Marketer
               </button>
               <button
                 type="button"
-                onClick={() => handleQuickLogin('approver@ictu.edu.vn', 'Approver@123')}
+                onClick={() => handleQuickLogin('approver@gmail.com', 'Approver@123')}
                 className="py-1.5 px-2 bg-slate-800/70 hover:bg-slate-800 hover:border-indigo-500/50 border border-slate-700/60 rounded-lg text-xs font-medium text-slate-200 transition-all text-center"
               >
                 Approver

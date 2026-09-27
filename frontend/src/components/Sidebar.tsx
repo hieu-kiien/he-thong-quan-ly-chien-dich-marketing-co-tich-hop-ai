@@ -77,6 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {onClose && (
             <button
               onClick={onClose}
+              aria-label="Đóng thanh điều hướng"
               className="p-1.5 text-slate-400 hover:text-white rounded-lg md:hidden hover:bg-slate-800 transition-colors"
             >
               <X className="w-5 h-5" />
@@ -88,12 +89,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="px-5 py-3 border-b border-slate-800/50 bg-slate-950/40">
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400">Vai trò:</span>
-            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
               currentUser?.role === 'MANAGER' || currentUser?.role === 'AGENCY_MANAGER'
-                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                ? 'bg-emerald-950/80 text-emerald-200 border border-emerald-500/40' 
                 : currentUser?.role === 'CLIENT_APPROVER'
-                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                ? 'bg-amber-950/80 text-amber-200 border border-amber-500/40'
+                : 'bg-indigo-950/80 text-indigo-200 border border-indigo-500/40'
             }`}>
               <ShieldCheck className="w-3 h-3" />
               {currentUser?.role === 'AGENCY_MANAGER'
@@ -131,7 +132,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span>{item.label}</span>
                 </div>
                 {item.badge && (
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30 font-bold">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                    isActive
+                      ? 'bg-white text-indigo-900 shadow-xs'
+                      : 'bg-emerald-950/80 text-emerald-200 border border-emerald-500/40'
+                  }`}>
                     {item.badge}
                   </span>
                 )}
@@ -144,7 +149,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="px-4 py-2 border-t border-slate-800/60 bg-slate-950/30 flex items-center justify-between text-[11px]">
           <div className="flex items-center gap-1.5 text-slate-400">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span className="font-mono text-[10px] text-slate-300">marketflow.ictu.edu.vn</span>
+            <span className="font-mono text-[10px] text-slate-300">kienhieu.id.vn</span>
           </div>
           <span className="text-[9px] uppercase tracking-wider font-bold bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded">
             PROD
@@ -165,6 +170,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <button
               onClick={onLogout}
+              aria-label="Đăng xuất"
               title="Đăng xuất"
               className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
             >

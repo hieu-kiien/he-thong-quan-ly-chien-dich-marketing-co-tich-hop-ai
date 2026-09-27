@@ -12,17 +12,16 @@ def check_campaign_access(campaign: Campaign, user: User, db: Session):
     """Xác thực phân quyền mức bản ghi và cách ly đa người thuê (Tenant Isolation):
     - User ADMIN có quyền truy cập tất cả tài nguyên.
     - User MANAGER / AGENCY_MANAGER:
-      + Nếu campaign.workspace_id is None hoặc campaign.workspace_id == 1: cho qua (giữ tương thích 205 legacy tests).
-      + Nếu campaign.workspace_id > 1: bắt buộc user phải là owner hoặc member của workspace đó. Nếu không, raise HTTP 403 Forbidden!
+      + Phải là owner hoặc member của workspace chứa campaign.
     - User MARKETER / các role khác:
-      + Nếu campaign.workspace_id > 1: bắt buộc user phải là owner hoặc member của workspace đó.
+      + Phải là owner hoặc member của workspace chứa campaign.
       + Đồng thời user chỉ được thao tác trên tài nguyên mà họ sở hữu (owner_id) HOẶC là thành viên chiến dịch (CampaignMember).
     """
     if user.role == "ADMIN":
         return
 
-    # Kiểm tra Tenant Isolation đối với các workspace cụ thể (> 1)
-    if campaign.workspace_id is not None and campaign.workspace_id > 1:
+    # Kiểm tra Tenant Isolation đối với các workspace cụ thể
+    if campaign.workspace_id is not None:
         ws = db.query(Workspace).filter(Workspace.id == campaign.workspace_id).first()
         is_ws_owner = ws is not None and ws.owner_id == user.id
         is_ws_member = db.query(WorkspaceMember).filter(
@@ -75,7 +74,7 @@ def get_campaigns(
         )
 
     if workspace_id is not None:
-        if current_user.role != "ADMIN" and workspace_id > 1:
+        if current_user.role != "ADMIN":
             ws = db.query(Workspace).filter(Workspace.id == workspace_id).first()
             is_ws_owner = ws is not None and ws.owner_id == current_user.id
             is_ws_member = db.query(WorkspaceMember).filter(
@@ -127,7 +126,20 @@ def create_campaign(
 
     # Phân giải workspace_id an toàn
     ws_id = req.workspace_id
-    if not ws_id:
+    if ws_id:
+        if current_user.role != "ADMIN":
+            ws = db.query(Workspace).filter(Workspace.id == ws_id).first()
+            is_ws_owner = ws is not None and ws.owner_id == user_id
+            is_ws_member = db.query(WorkspaceMember).filter(
+                WorkspaceMember.workspace_id == ws_id,
+                WorkspaceMember.user_id == user_id
+            ).first() is not None
+            if not (is_ws_owner or is_ws_member):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Not authorized to access campaigns in this workspace"
+                )
+    else:
         membership = db.query(WorkspaceMember).filter(WorkspaceMember.user_id == user_id).first()
         ws_id = membership.workspace_id if membership else 1
 
@@ -195,7 +207,7 @@ def update_campaign(
 def delete_campaign(
     campaign_id: int,
     current_user: User = Depends(get_current_user),
-    user_payload=Depends(RoleChecker(allowed_roles=["MANAGER", "AGENCY_MANAGER", "ADMIN"])), # Chỉ quản lý/admin mới được xóa!
+    user_payload=Depends(RoleChecker(allowed_roles=["MANAGER", "AGENCY_MANAGER"])), # Chỉ quản lý/agency manager mới được xóa!
     db: Session = Depends(get_db)
 ):
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()

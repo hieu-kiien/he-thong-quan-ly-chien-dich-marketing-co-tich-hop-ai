@@ -18,7 +18,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WorkspaceProvider, useWorkspace } from './context/WorkspaceContext';
 import { Campaign, MarketingContent } from './types';
-import { campaignApi, contentApi, getApiErrorMessage } from './services/api';
+import { campaignApi, contentApi, getApiErrorMessage, isOfflineDemoEnabled, isBackendConnected } from './services/api';
 
 function AppContent() {
   const toast = useToast();
@@ -33,6 +33,26 @@ function AppContent() {
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
   const [isBrandKitModalOpen, setIsBrandKitModalOpen] = useState<boolean>(false);
+  const [isOffline, setIsOffline] = useState<boolean>(typeof navigator !== 'undefined' ? !navigator.onLine : false);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOffline(false);
+      toast.success('Kết nối mạng đã được khôi phục!');
+    };
+    const handleOffline = () => {
+      setIsOffline(true);
+      toast.error('Mất kết nối mạng! Vui lòng kiểm tra đường truyền Internet.', 'Ngoại tuyến');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [toast]);
 
   const loadCampaignsAndContents = useCallback(async (wsId?: number) => {
     try {
@@ -47,10 +67,11 @@ function AppContent() {
       } else {
         setSelectedCampaign(null);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Lỗi nạp chiến dịch & nội dung:', e);
+      toast.error(getApiErrorMessage(e), 'Lỗi tải dữ liệu');
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -98,10 +119,20 @@ function AppContent() {
 
   // Nếu chưa đăng nhập: Điều hướng tới LoginPage hoặc RegisterPage
   if (!isAuthenticated) {
-    if (authMode === 'register') {
-      return <RegisterPage onNavigateToLogin={() => setAuthMode('login')} />;
-    }
-    return <LoginPage onNavigateToRegister={() => setAuthMode('register')} />;
+    return (
+      <div className="relative min-h-screen">
+        {isOfflineDemoEnabled() && !isBackendConnected() && (
+          <div className="bg-amber-500/20 border-b border-amber-500/40 text-amber-200 px-4 py-2 text-xs text-center font-semibold sticky top-0 z-50">
+            <strong>[CHẾ ĐỘ DEMO OFFLINE]</strong> Hệ thống đang chạy giả lập offline với LocalStorage. Bạn có thể sử dụng email demo để trải nghiệm.
+          </div>
+        )}
+        {authMode === 'register' ? (
+          <RegisterPage onNavigateToLogin={() => setAuthMode('login')} />
+        ) : (
+          <LoginPage onNavigateToRegister={() => setAuthMode('register')} />
+        )}
+      </div>
+    );
   }
 
   // Đã đăng nhập: Giao diện chính của ứng dụng
@@ -119,6 +150,28 @@ function AppContent() {
 
       {/* Main Content Viewport */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Offline Demo Warning Banner */}
+        {isOfflineDemoEnabled() && !isBackendConnected() && (
+          <div className="bg-amber-500/15 border-b border-amber-500/30 text-amber-900 dark:text-amber-200 px-4 py-2 text-xs flex items-center justify-between font-medium z-10 no-print shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-ping shrink-0" />
+              <span>
+                <strong>[CHẾ ĐỘ DEMO CỤC BỘ]</strong> Máy chủ backend hiện chưa kết nối. Hệ thống đang chạy dự phòng với LocalStorage.
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Offline Network Warning Banner */}
+        {isOffline && (
+          <div className="bg-rose-600 text-white px-4 py-2 text-xs flex items-center justify-between font-semibold z-50 shrink-0 shadow-md">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
+              <span>Đang ngoại tuyến: Mất kết nối mạng Internet. Các thao tác có thể không được lưu về máy chủ.</span>
+            </div>
+          </div>
+        )}
+
         <Navbar
           onOpenBrandKit={() => setIsBrandKitModalOpen(true)}
           onOpenAIDrawer={() => {
@@ -128,6 +181,9 @@ function AppContent() {
             setIsAIDrawerOpen(true);
           }}
           onToggleSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
+          onNavigateTab={(tab) => setCurrentTab(tab)}
+          pendingReviewsCount={contents.filter(c => c.status === 'IN_REVIEW').length}
+          activeCampaignsCount={campaigns.filter(c => c.status === 'ACTIVE').length}
         />
 
         <main className="flex-1 overflow-y-auto">
@@ -183,6 +239,7 @@ function AppContent() {
                       const found = campaigns.find(c => c.id === Number(e.target.value));
                       if (found) setSelectedCampaign(found);
                     }}
+                    aria-label="Chọn chiến dịch điều phối"
                     className="text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 font-semibold text-slate-700 shadow-xs outline-hidden"
                   >
                     {campaigns.map((c) => (

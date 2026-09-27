@@ -251,6 +251,7 @@ export const TikTokPhoneMockup: React.FC<TikTokPhoneMockupProps> = ({
               </div>
               <button
                 onClick={() => setIsFollowed(!isFollowed)}
+                aria-label={isFollowed ? 'Bỏ theo dõi tài khoản' : 'Theo dõi tài khoản'}
                 className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full flex items-center justify-center shadow transition ${
                   isFollowed ? 'bg-white text-rose-600' : 'bg-[#FE2C55] text-white'
                 }`}
@@ -262,6 +263,7 @@ export const TikTokPhoneMockup: React.FC<TikTokPhoneMockupProps> = ({
             {/* Like Heart */}
             <button
               onClick={() => setIsLiked(!isLiked)}
+              aria-label={isLiked ? 'Bỏ thích video' : 'Thích video'}
               className="flex flex-col items-center group transition"
             >
               <div className={`p-1.5 rounded-full transition transform active:scale-125 ${isLiked ? 'text-[#FE2C55]' : 'text-white'}`}>
@@ -283,6 +285,7 @@ export const TikTokPhoneMockup: React.FC<TikTokPhoneMockupProps> = ({
             {/* Bookmark */}
             <button
               onClick={() => setIsBookmarked(!isBookmarked)}
+              aria-label={isBookmarked ? 'Bỏ lưu video' : 'Lưu video'}
               className="flex flex-col items-center"
             >
               <div className={`p-1.5 transition ${isBookmarked ? 'text-amber-400' : 'text-white'}`}>

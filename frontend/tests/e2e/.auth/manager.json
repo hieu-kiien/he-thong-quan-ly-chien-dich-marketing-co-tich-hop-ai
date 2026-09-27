@@ -1,0 +1,22 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://127.0.0.1:4173",
+      "localStorage": [
+        {
+          "name": "access_token",
+          "value": "token-manager-1"
+        },
+        {
+          "name": "current_user",
+          "value": "{\"id\":1,\"email\":\"manager@gmail.com\",\"full_name\":\"Quản Lý Chiến Dịch\",\"role\":\"MANAGER\",\"status\":\"ACTIVE\",\"created_at\":\"2026-01-01T00:00:00Z\"}"
+        },
+        {
+          "name": "active_workspace_id",
+          "value": "1"
+        }
+      ]
+    }
+  ]
+}

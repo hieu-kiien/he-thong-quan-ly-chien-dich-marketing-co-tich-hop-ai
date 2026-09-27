@@ -25,6 +25,7 @@ import { Campaign, AIIdeaResponse, AIDraftResponse, AISummaryResponse, Marketing
 import { aiApi, contentApi, getApiErrorMessage } from '../services/api';
 import { useToast } from './Toast';
 import { ComplianceAlertBadge } from './ComplianceAlertBadge';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface AIDrawerProps {
   isOpen: boolean;
@@ -59,6 +60,8 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
   const [omniBrief, setOmniBrief] = useState<string>('');
   const [omniData, setOmniData] = useState<OmnichannelResponse | null>(null);
   const [omniSubTab, setOmniSubTab] = useState<'facebook' | 'tiktok' | 'email'>('facebook');
+  const [omniCreatedStatus, setOmniCreatedStatus] = useState<Record<string, { status: string; id: number }>>({});
+  const [isSavingOmni, setIsSavingOmni] = useState<boolean>(false);
 
   // AI Output States
   const [ideaData, setIdeaData] = useState<AIIdeaResponse | null>(null);
@@ -66,15 +69,11 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
   const [draftData, setDraftData] = useState<AIDraftResponse | null>(null);
   const [summaryData, setSummaryData] = useState<AISummaryResponse | null>(null);
 
-  // Đóng Drawer khi nhấn phím Escape
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  // Focus trap for WCAG 2.2 AA accessibility and Escape key handling
+  const drawerRef = useFocusTrap<HTMLDivElement>({
+    isActive: isOpen,
+    onEscape: onClose,
+  });
 
   // Active campaign: use passed campaign or first available from list
   const activeCampaign = campaign || (campaigns.length > 0 ? campaigns[0] : null);
@@ -253,9 +252,6 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
     }
   };
 
-  const [omniCreatedStatus, setOmniCreatedStatus] = useState<Record<string, { status: string; id: number }>>({});
-  const [isSavingOmni, setIsSavingOmni] = useState<boolean>(false);
-
   const handleSaveOmniChannel = async (channel: 'facebook' | 'tiktok' | 'email', submitReview: boolean = false) => {
     if (!omniData) return;
     const targetCampaignId = activeCampaign?.id || (campaigns.length > 0 ? campaigns[0].id : 1);
@@ -344,6 +340,10 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
       className="fixed inset-0 z-50 overflow-hidden flex justify-end bg-slate-900/40 backdrop-blur-xs transition-opacity"
     >
       <div 
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ai-drawer-title"
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-xl bg-white h-full shadow-2xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-300"
       >
@@ -355,7 +355,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
               <Sparkles className="w-4 h-4 animate-pulse" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+              <h3 id="ai-drawer-title" className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
                 AI Marketing Copilot
                 <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">
                   Google Gemini 2.5
@@ -363,13 +363,14 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
               </h3>
               {campaigns && campaigns.length > 0 ? (
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-[11px] text-slate-400 font-medium">Chiến dịch:</span>
+                  <span className="text-[11px] text-slate-600 font-medium">Chiến dịch:</span>
                   <select
                     value={activeCampaign?.id || ''}
                     onChange={(e) => {
                       const found = campaigns.find(c => c.id === Number(e.target.value));
                       if (onSelectCampaign) onSelectCampaign(found || null);
                     }}
+                    aria-label="Chọn chiến dịch AI"
                     className="text-xs text-indigo-700 font-bold bg-slate-100/90 border border-slate-200 rounded px-2 py-0.5 max-w-[220px] truncate outline-hidden cursor-pointer"
                   >
                     {campaigns.map(c => (
@@ -384,6 +385,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
           </div>
           <button 
             onClick={onClose}
+            aria-label="Đóng AI Assistant"
             className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -397,6 +399,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
             <select
               value={promptVersion}
               onChange={(e) => setPromptVersion(e.target.value)}
+              aria-label="Chọn phiên bản Prompt"
               className="bg-slate-100 border border-slate-200 rounded px-2 py-1 font-semibold text-indigo-700 outline-hidden"
             >
               <option value="v3">V3: Ràng buộc & Cấm ảo giác (98% Acc)</option>
@@ -410,6 +413,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
             <select
               value={channelCode}
               onChange={(e) => setChannelCode(e.target.value)}
+              aria-label="Chọn kênh truyền thông"
               className="bg-slate-100 border border-slate-200 rounded px-2 py-1 font-semibold text-slate-700 outline-hidden"
             >
               <option value="facebook">Facebook Ads</option>
@@ -496,13 +500,15 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label htmlFor="omni-brief-input" className="block text-xs font-bold text-slate-700 mb-1">
                   Bản tóm tắt chiến dịch (Marketing Brief):
                 </label>
                 <textarea
+                  id="omni-brief-input"
+                  aria-label="Bản tóm tắt chiến dịch (Marketing Brief)"
                   value={omniBrief}
                   onChange={(e) => setOmniBrief(e.target.value)}
-                  placeholder="Ví dụ: Chiến dịch tuyển sinh Khóa kỹ sư Trí tuệ nhân tạo thực chiến ICTU 2026. Đối tượng: Sinh viên CNTT, người chuyển ngành. USP: Học thực hành GPU xịn, cam kết đầu ra..."
+                  placeholder="Ví dụ: Chiến dịch tuyển sinh Khóa kỹ sư Trí tuệ nhân tạo thực chiến MarketFlow 2026. Đối tượng: Sinh viên CNTT, người chuyển ngành. USP: Học thực hành GPU xịn, cam kết đầu ra..."
                   className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:border-indigo-500 focus:bg-white h-24"
                 />
               </div>
@@ -797,8 +803,10 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
           {activeTab === 'draft' && (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Ý tưởng hoặc góc nhìn đã chọn:</label>
+                <label htmlFor="selected-idea-input" className="block text-xs font-semibold text-slate-700 mb-1">Ý tưởng hoặc góc nhìn đã chọn:</label>
                 <textarea
+                  id="selected-idea-input"
+                  aria-label="Ý tưởng hoặc góc nhìn đã chọn"
                   value={selectedIdeaText}
                   onChange={(e) => setSelectedIdeaText(e.target.value)}
                   placeholder="Nhập hoặc chọn ý tưởng từ Tab 1 để AI viết thành bài hoàn chỉnh..."

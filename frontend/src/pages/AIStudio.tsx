@@ -110,10 +110,10 @@ export const AIStudio: React.FC<AIStudioProps> = ({
   // Realistic Marketing Presets
   const presets = [
     {
-      label: '🎓 Tuyển sinh AI ICTU',
+      label: '🎓 Khóa học Kỹ sư AI',
       topic: 'Chiến dịch Tuyển sinh Kỹ sư AI 2026',
-      product: 'Khóa Đào tạo Trí tuệ Nhân tạo Thực Chiến ICTU',
-      usp: 'Đào tạo chuẩn quốc tế, cấp chứng chỉ đại học, cam kết kết nối thực tập tại các tập đoàn công nghệ'
+      product: 'Khóa Đào tạo Trí tuệ Nhân tạo Thực Chiến',
+      usp: 'Đào tạo chuẩn quốc tế, cấp chứng chỉ chuyên môn, cam kết kết nối thực tập tại các tập đoàn công nghệ'
     },
     {
       label: '💼 MarketFlow SaaS',
@@ -138,6 +138,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
   };
 
   const handleGenerateIdeas = async () => {
+    if (loading) return;
     setLoading(true);
     setSubmittedSuccess(false);
     try {
@@ -164,6 +165,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
   };
 
   const handleGenerateDraft = async (ideaOverride?: string) => {
+    if (loading) return;
     setLoading(true);
     setSubmittedSuccess(false);
     try {
@@ -202,7 +204,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
   // Submit to Campaign Review Queue
   const handleSubmitForReview = async () => {
-    if (!draftData) return;
+    if (!draftData || isSubmitting) return;
     setIsSubmitting(true);
     try {
       let targetCampaignId = selectedCampaign?.id || campaigns[0]?.id;
@@ -354,6 +356,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
   // Omnichannel Generation & HITL Handlers (R2)
   const handleGenerateOmnichannel = async () => {
+    if (omniLoading) return;
     const activeCampaign = selectedCampaign || (campaigns.length > 0 ? campaigns[0] : null);
     const briefToUse = omniBrief.trim() || (activeCampaign ? `Chiến dịch: ${activeCampaign.name}. Mục tiêu: ${activeCampaign.objective || ''}. Khán giả: ${activeCampaign.audience || ''}` : '');
     if (!briefToUse) {
@@ -377,7 +380,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
   };
 
   const handleSaveOmniChannel = async (channel: 'facebook' | 'tiktok' | 'email', submitReview: boolean = false) => {
-    if (!omniData) return;
+    if (!omniData || omniSaving[channel]) return;
     const targetCampaignId = selectedCampaign?.id || (campaigns.length > 0 ? campaigns[0].id : 1);
     setOmniSaving(prev => ({ ...prev, [channel]: true }));
     try {
@@ -615,13 +618,14 @@ export const AIStudio: React.FC<AIStudioProps> = ({
               <div className="flex flex-wrap items-center gap-2">
                 {campaigns.length > 0 && (
                   <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs">
-                    <span className="text-slate-400 font-medium">Chiến dịch:</span>
+                    <span className="text-slate-600 font-medium">Chiến dịch:</span>
                     <select
                       value={selectedCampaign?.id || campaigns[0]?.id || ''}
                       onChange={(e) => {
                         const found = campaigns.find(c => c.id === Number(e.target.value)) || null;
                         onSelectCampaign(found);
                       }}
+                      aria-label="Chọn chiến dịch sáng tạo"
                       className="bg-transparent font-bold text-indigo-700 outline-hidden cursor-pointer"
                     >
                       {campaigns.map(c => (
@@ -662,7 +666,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                 <label className="font-bold text-slate-800">
                   Nội dung Brief Chiến dịch (Sản phẩm, USP, Khán giả, Thông điệp cốt lõi):
                 </label>
-                <span className="text-slate-400 font-mono text-[11px]">{omniBrief.length} ký tự</span>
+                <span className="text-slate-600 font-mono text-[11px] font-semibold">{omniBrief.length} ký tự</span>
               </div>
               <textarea
                 rows={3}
@@ -851,14 +855,14 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                     ) : (
                       <div className="p-5 space-y-4 flex-1 text-xs">
                         <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tiêu đề (Headline):</span>
+                          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Tiêu đề (Headline):</span>
                           <h4 className="font-bold text-slate-900 text-sm mt-1 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                             {omniData.facebook.headline || omniData.facebook.title}
                           </h4>
                         </div>
 
                         <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nội dung bài viết (Primary Text):</span>
+                          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Nội dung bài viết (Primary Text):</span>
                           <div className="mt-1 bg-slate-50 p-3 rounded-lg border border-slate-200 text-slate-700 whitespace-pre-line leading-relaxed max-h-64 overflow-y-auto font-sans">
                             {omniData.facebook.primary_text || omniData.facebook.body}
                           </div>
@@ -866,7 +870,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
                         {omniData.facebook.hashtags && omniData.facebook.hashtags.length > 0 && (
                           <div>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hashtags:</span>
+                            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Hashtags:</span>
                             <div className="flex flex-wrap gap-1.5 mt-1">
                               {omniData.facebook.hashtags.map((tag, idx) => (
                                 <span key={idx} className="bg-blue-50 text-blue-700 font-mono text-[11px] px-2 py-0.5 rounded-md border border-blue-200">
@@ -878,7 +882,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                         )}
 
                         <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Kêu gọi hành động (CTA):</span>
+                          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Kêu gọi hành động (CTA):</span>
                           <div className="mt-1 bg-blue-50/70 text-blue-700 font-bold p-2.5 rounded-lg border border-blue-200 text-center">
                             {omniData.facebook.cta}
                           </div>
@@ -1005,7 +1009,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                         </div>
 
                         <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">4 Phân cảnh chi tiết:</span>
+                          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">4 Phân cảnh chi tiết:</span>
                           <div className="space-y-2.5 mt-1.5 max-h-72 overflow-y-auto pr-1">
                             {omniData.tiktok.scenes?.map((sc, idx) => (
                               <div key={idx} className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
@@ -1149,7 +1153,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                       <div className="p-5 space-y-4 flex-1 text-xs">
                         {/* A/B Subjects */}
                         <div className="space-y-2">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">A/B Testing Tiêu đề:</span>
+                          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">A/B Testing Tiêu đề:</span>
                           <div className="p-2.5 bg-purple-50/70 border border-purple-200 rounded-lg">
                             <div className="text-[10px] font-bold text-purple-700">TIÊU ĐỀ A:</div>
                             <div className="font-bold text-purple-950 mt-0.5">{omniData.email.subject_line_a || omniData.email.subject}</div>
@@ -1162,7 +1166,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
                         {omniData.email.preheader && (
                           <div>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Preheader:</span>
+                            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Preheader:</span>
                             <p className="text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-200 mt-1 italic">
                               {omniData.email.preheader}
                             </p>
@@ -1170,14 +1174,14 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                         )}
 
                         <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nội dung thư:</span>
+                          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Nội dung thư:</span>
                           <div className="mt-1 bg-slate-50 p-3 rounded-lg border border-slate-200 text-slate-700 whitespace-pre-line leading-relaxed max-h-56 overflow-y-auto">
                             {omniData.email.body_content || omniData.email.body}
                           </div>
                         </div>
 
                         <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nút kêu gọi (CTA Button):</span>
+                          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Nút kêu gọi (CTA Button):</span>
                           <div className="mt-1 bg-purple-600 text-white font-bold p-2.5 rounded-lg text-center shadow-xs">
                             {omniData.email.cta_button || omniData.email.cta}
                           </div>
@@ -1315,14 +1319,16 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                 {/* Campaign Selector if mode is campaign */}
                 {mode === 'campaign' ? (
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700">Chọn chiến dịch thực hiện:</label>
+                    <label htmlFor="ai-studio-campaign-select" className="text-xs font-bold text-slate-700">Chọn chiến dịch thực hiện:</label>
                     {campaigns.length > 0 ? (
                       <select
+                        id="ai-studio-campaign-select"
                         value={selectedCampaign?.id || campaigns[0]?.id || ''}
                         onChange={(e) => {
                           const c = campaigns.find(item => item.id === Number(e.target.value)) || null;
                           onSelectCampaign(c);
                         }}
+                        aria-label="Chọn chiến dịch thực hiện"
                         className="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20"
                       >
                         {campaigns.map(c => (
@@ -1616,21 +1622,21 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                       {/* Title & Body */}
                       <div className="space-y-3">
                         <div>
-                          <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Tiêu đề bài viết:</label>
+                          <label className="text-[11px] font-bold text-slate-600 uppercase block mb-1">Tiêu đề bài viết:</label>
                           <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-900">
                             {draftData.title}
                           </div>
                         </div>
 
                         <div>
-                          <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Nội dung tiếp thị chi tiết:</label>
+                          <label className="text-[11px] font-bold text-slate-600 uppercase block mb-1">Nội dung tiếp thị chi tiết:</label>
                           <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 whitespace-pre-line leading-relaxed">
                             {draftData.body}
                           </div>
                         </div>
 
                         <div>
-                          <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Lời kêu gọi hành động (Call To Action):</label>
+                          <label className="text-[11px] font-bold text-slate-600 uppercase block mb-1">Lời kêu gọi hành động (Call To Action):</label>
                           <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl font-bold text-xs text-indigo-800">
                             {draftData.cta}
                           </div>
@@ -1751,25 +1757,25 @@ export const AIStudio: React.FC<AIStudioProps> = ({
             {/* Campaign Metrics Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
               <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
-                <span className="text-slate-400 font-semibold block">Lượt hiển thị (Views)</span>
+                <span className="text-slate-600 font-semibold block">Lượt hiển thị (Views)</span>
                 <span className="text-lg font-black text-slate-900 mt-1 block">
                   {campaignKpi?.total_views ? campaignKpi.total_views.toLocaleString('vi-VN') : '0'}
                 </span>
               </div>
               <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
-                <span className="text-slate-400 font-semibold block">Tương tác Click & CTR</span>
-                <span className="text-lg font-black text-emerald-600 mt-1 block">
+                <span className="text-slate-600 font-semibold block">Tương tác Click & CTR</span>
+                <span className="text-lg font-black text-emerald-700 mt-1 block">
                   {campaignKpi?.total_clicks ? campaignKpi.total_clicks.toLocaleString('vi-VN') : '0'} ({campaignKpi?.ctr_percent ? campaignKpi.ctr_percent.toFixed(1) : '0.0'}%)
                 </span>
               </div>
               <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
-                <span className="text-slate-400 font-semibold block">Ngân sách tiêu (Cost)</span>
+                <span className="text-slate-600 font-semibold block">Ngân sách tiêu (Cost)</span>
                 <span className="text-lg font-black text-slate-900 mt-1 block">
                   {campaignKpi?.total_cost ? Number(campaignKpi.total_cost).toLocaleString('vi-VN') : '0'} đ
                 </span>
               </div>
               <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
-                <span className="text-slate-400 font-semibold block">Tỷ suất sinh lời ROI</span>
+                <span className="text-slate-600 font-semibold block">Tỷ suất sinh lời ROI</span>
                 <span className="text-lg font-black text-indigo-600 mt-1 block">
                   {campaignKpi?.roi_percent ? (campaignKpi.roi_percent > 0 ? '+' : '') + campaignKpi.roi_percent.toFixed(1) + '%' : '0.0%'}
                 </span>
@@ -1785,7 +1791,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                   <span>Kết quả Chẩn đoán Sức khỏe Chiến dịch</span>
                 </div>
-                <span className="text-[11px] font-mono text-slate-400">
+                <span className="text-[11px] font-mono text-slate-600">
                   Model: {doctorData.model_used}
                 </span>
               </div>

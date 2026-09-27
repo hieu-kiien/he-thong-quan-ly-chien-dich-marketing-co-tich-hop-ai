@@ -114,7 +114,10 @@ export const FacebookPreviewCard: React.FC<FacebookPreviewCardProps> = ({
           </div>
         </div>
 
-        <button className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition">
+        <button
+          aria-label="Tùy chọn bài viết"
+          className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition"
+        >
           <MoreHorizontal className="w-4 h-4" />
         </button>
       </div>

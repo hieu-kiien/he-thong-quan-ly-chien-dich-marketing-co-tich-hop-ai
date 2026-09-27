@@ -1,7 +1,13 @@
+import sys
+import time
+import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+
+logger = logging.getLogger("marketflow.main")
 
 from app.core.config import settings
 from app.api.v1.auth import router as auth_router
@@ -23,6 +29,17 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# Timing Middleware ghi nhận độ trễ xử lý API và chèn header X-Process-Time
+class TimingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        start_time = time.perf_counter()
+        response = await call_next(request)
+        process_time = time.perf_counter() - start_time
+        response.headers["X-Process-Time"] = f"{process_time:.6f}"
+        return response
+
+app.add_middleware(TimingMiddleware)
+
 # CORS Middleware hỗ trợ kết nối từ Frontend React
 app.add_middleware(
     CORSMiddleware,
@@ -30,6 +47,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Process-Time"],
 )
 
 from fastapi.exception_handlers import request_validation_exception_handler
@@ -56,11 +74,15 @@ app.include_router(brand_kit_router, prefix=settings.API_V1_PREFIX)
 app.include_router(settings_router, prefix=settings.API_V1_PREFIX)
 
 
-from app.core.database import engine, init_db
+from app.core.database import engine, init_db, DatabaseMigrationError
 
 @app.on_event("startup")
 def on_startup():
-    init_db(engine)
+    try:
+        init_db(engine)
+    except DatabaseMigrationError as e:
+        logger.critical(f"Critical database migration error during startup: {e}", exc_info=True)
+        sys.exit(1)
 
 
 @app.get("/")
