@@ -165,7 +165,9 @@ class TestP0PrivilegeEscalation:
     ):
         """RoleChecker pulls user from DB dynamically: forged token claims are rejected."""
         # Genuine DB user has MARKETER role
-        marketer_user = db_session.query(User).filter(User.email == "marketer@ictu.edu.vn").first()
+        marketer_user = db_session.query(User).filter(
+            (User.email == "marketer@gmail.com") | (User.email == "marketer@ictu.edu.vn")
+        ).first()
         assert marketer_user is not None
         assert marketer_user.role == "MARKETER"
 
