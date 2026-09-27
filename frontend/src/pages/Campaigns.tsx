@@ -832,7 +832,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         onClick={(e) => handleToggleStatus(c, e)}
                         aria-label={isActive ? `Tạm dừng chiến dịch ${c.name}` : `Kích hoạt phân phối chiến dịch ${c.name}`}
                         title={isActive ? 'Nhấp để Tạm dừng chiến dịch' : 'Nhấp để Kích hoạt phân phối'}
-                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 ${
                           isActive ? 'bg-emerald-500' : 'bg-slate-300'
                         }`}
                       >
@@ -888,7 +888,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         onClick={() => setSelectedDrawerCampaign(c)}
                         aria-label={`Xem chi tiết chiến dịch ${c.name}`}
                         title="Xem chi tiết & Mẫu quảng cáo"
-                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 rounded-lg transition-colors"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
@@ -896,7 +896,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         onClick={(e) => handleDuplicateCampaign(c, e)}
                         aria-label={`Nhân bản chiến dịch ${c.name}`}
                         title="Nhân bản chiến dịch"
-                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 rounded-lg transition-colors"
                       >
                         <Copy className="w-4 h-4" />
                       </button>
@@ -904,7 +904,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         onClick={() => onOpenAI(c)}
                         aria-label={`Mở AI sáng tạo nội dung cho chiến dịch ${c.name}`}
                         title="Mở Trợ lý Sáng tạo AI Copilot"
-                        className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                        className="p-1.5 text-indigo-600 hover:bg-indigo-50 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 rounded-lg transition-colors"
                       >
                         <Sparkles className="w-4 h-4" />
                       </button>
@@ -913,7 +913,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                           onClick={() => setDeletingId(c.id)}
                           aria-label={`Xóa chiến dịch ${c.name}`}
                           title="Xóa chiến dịch"
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 focus:outline-hidden focus:ring-2 focus:ring-rose-500 rounded-lg transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -966,7 +966,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                               onClick={(e) => handleToggleStatus(c, e)}
                               aria-label={isActive ? `Tạm dừng chiến dịch ${c.name}` : `Kích hoạt phân phối chiến dịch ${c.name}`}
                               title={isActive ? 'Nhấp để Tạm dừng chiến dịch' : 'Nhấp để Kích hoạt phân phối'}
-                              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 ${
                                 isActive ? 'bg-emerald-500' : 'bg-slate-300'
                               }`}
                             >
@@ -1069,7 +1069,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                               onClick={() => setSelectedDrawerCampaign(c)}
                               aria-label={`Xem chi tiết chiến dịch ${c.name}`}
                               title="Xem chi tiết & Mẫu quảng cáo"
-                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 rounded-lg transition-colors"
                             >
                               <Eye className="w-4 h-4" />
                             </button>
@@ -1078,7 +1078,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                               onClick={(e) => handleDuplicateCampaign(c, e)}
                               aria-label={`Nhân bản chiến dịch ${c.name}`}
                               title="Nhân bản chiến dịch để chạy thử nghiệm A/B"
-                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 rounded-lg transition-colors"
                             >
                               <Copy className="w-4 h-4" />
                             </button>
@@ -1087,7 +1087,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                               onClick={() => onOpenAI(c)}
                               aria-label={`Mở AI sáng tạo nội dung cho chiến dịch ${c.name}`}
                               title="Mở Trợ lý Sáng tạo AI Copilot"
-                              className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                              className="p-1.5 text-indigo-600 hover:bg-indigo-50 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 rounded-lg transition-colors"
                             >
                               <Sparkles className="w-4 h-4" />
                             </button>
@@ -1097,7 +1097,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                                 onClick={() => setDeletingId(c.id)}
                                 aria-label={`Xóa chiến dịch ${c.name}`}
                                 title="Xóa chiến dịch"
-                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 focus:outline-hidden focus:ring-2 focus:ring-rose-500 rounded-lg transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -1212,21 +1212,22 @@ export const Campaigns: React.FC<CampaignsProps> = ({
       )}
 
       {/* 5. SLIDE-OVER CAMPAIGN DETAIL DRAWER (Meta Ads Inspector) */}
-      {selectedDrawerCampaign && (
+      {Boolean(selectedDrawerCampaign) && (
         <div 
-          className="fixed inset-0 z-50 overflow-hidden"
+          className="fixed inset-0 z-50 overflow-hidden pointer-events-auto"
           role="dialog"
           aria-modal="true"
           aria-labelledby="campaign-drawer-title"
         >
           {/* Backdrop */}
           <div 
-            className="absolute inset-0 bg-slate-950/40 backdrop-blur-xs transition-opacity"
+            className="absolute inset-0 bg-slate-950/40 backdrop-blur-xs transition-opacity cursor-pointer pointer-events-auto"
+            aria-hidden="true"
             onClick={() => setSelectedDrawerCampaign(null)}
           />
 
-          <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-            <div ref={drawerRef} className="w-screen max-w-2xl bg-white shadow-2xl flex flex-col">
+          <div className="fixed inset-y-0 right-0 max-w-full flex pl-10 pointer-events-none">
+            <div ref={drawerRef} className="w-screen max-w-2xl bg-white shadow-2xl flex flex-col pointer-events-auto">
               {/* Drawer Top Navigation */}
               <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
                 <div className="flex items-center gap-3">
@@ -1270,7 +1271,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                   <button
                     onClick={() => setSelectedDrawerCampaign(null)}
                     aria-label="Đóng bảng chi tiết chiến dịch"
-                    className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"
+                    className="p-1.5 text-slate-500 hover:text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 rounded-lg hover:bg-slate-100"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -1500,7 +1501,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                           {drawerDoctorReport?.health_score || 94}/100 Tối ưu
                         </span>
                       </div>
-                      <p className="text-xs text-slate-300 mt-2">
+                      <p className="text-xs text-slate-200 mt-2">
                         {drawerDoctorReport?.diagnosis_summary || 'Chiến dịch đang phân bổ ngân sách cân đối và chỉ số ROAS đạt kỳ vọng cao.'}
                       </p>
                     </div>
@@ -1641,22 +1642,23 @@ export const Campaigns: React.FC<CampaignsProps> = ({
       )}
 
       {/* 6. GUIDED 4-STEP CAMPAIGN CREATION WIZARD MODAL (Meta & Google Ads Standard) */}
-      {isWizardOpen && (
+      {Boolean(isWizardOpen) && (
         <div 
-          className="fixed inset-0 z-50 overflow-y-auto"
+          className="fixed inset-0 z-50 overflow-y-auto pointer-events-auto"
           role="dialog"
           aria-modal="true"
           aria-labelledby="campaign-wizard-title"
         >
-          <div className="flex items-center justify-center min-h-screen px-4 py-8">
+          <div className="flex items-center justify-center min-h-screen px-4 py-8 pointer-events-none">
             <div 
-              className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
+              className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity cursor-pointer pointer-events-auto"
+              aria-hidden="true"
               onClick={() => {
                 if (!isSubmitting && !isGeneratingAI) setIsWizardOpen(false);
               }}
             />
 
-            <div ref={wizardModalRef} className="relative bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 z-10 space-y-6">
+            <div ref={wizardModalRef} className="relative bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 z-10 space-y-6 pointer-events-auto">
               {/* Wizard Header */}
               <div className="flex items-center justify-between pb-4 border-b border-slate-100">
                 <div>
@@ -1674,7 +1676,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                   type="button"
                   onClick={() => setIsWizardOpen(false)}
                   aria-label="Đóng cửa sổ thiết lập chiến dịch"
-                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                  className="p-1.5 text-slate-500 hover:text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 rounded-lg hover:bg-slate-100"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -2029,7 +2031,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                               <div key={idx} className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
                                 <div className="font-bold text-slate-900 flex justify-between">
                                   <span>Cảnh {s.scene_number || s.scene}</span>
-                                  <span className="font-mono text-slate-400">{s.duration_seconds || '0-4s'}</span>
+                                  <span className="font-mono text-slate-600 font-semibold">{s.duration_seconds || '0-4s'}</span>
                                 </div>
                                 <div className="text-slate-600">📹 Hình ảnh: {s.visual_action || s.visual}</div>
                                 <div className="text-slate-900 font-medium">🗣️ Lời thoại: {s.voiceover_script || s.voiceover}</div>
@@ -2198,16 +2200,20 @@ export const Campaigns: React.FC<CampaignsProps> = ({
       )}
 
       {/* Delete Confirmation Modal */}
-      {deletingId && (
+      {Boolean(deletingId) && (
         <div 
-          className="fixed inset-0 z-50 overflow-y-auto"
+          className="fixed inset-0 z-50 overflow-y-auto pointer-events-auto"
           role="alertdialog"
           aria-modal="true"
           aria-labelledby="delete-dialog-title"
         >
-          <div className="flex items-center justify-center min-h-screen px-4">
-            <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity" onClick={() => setDeletingId(null)} />
-            <div ref={deleteModalRef} className="relative bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 z-10 space-y-4 text-center">
+          <div className="flex items-center justify-center min-h-screen px-4 pointer-events-none">
+            <div 
+              className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity cursor-pointer pointer-events-auto" 
+              aria-hidden="true"
+              onClick={() => setDeletingId(null)} 
+            />
+            <div ref={deleteModalRef} className="relative bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 z-10 space-y-4 text-center pointer-events-auto">
               <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
                 <Trash2 className="w-6 h-6" />
               </div>

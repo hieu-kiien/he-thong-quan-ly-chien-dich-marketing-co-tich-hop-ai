@@ -9,39 +9,18 @@ import {
   Info, 
   X, 
   ExternalLink,
-  Trash2
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import { AppNotification } from '../types';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { notificationApi } from '../services/api';
 
 interface NotificationCenterProps {
   pendingReviewsCount?: number;
   activeCampaignsCount?: number;
   onNavigateTab?: (tab: string) => void;
 }
-
-const DEFAULT_NOTIFICATIONS: AppNotification[] = [
-  {
-    id: 'notif-system-1',
-    title: 'Hệ thống MarketFlow AI sẵn sàng',
-    message: 'Chào mừng bạn đến với MarketFlow AI. Toàn bộ tính năng AI Copilot, Quản lý Chiến dịch và Hàng đợi Phê duyệt đã sẵn sàng.',
-    type: 'info',
-    timestamp: 'Vừa xong',
-    read: false,
-    targetTab: 'dashboard',
-    actionLabel: 'Xem Tổng quan'
-  },
-  {
-    id: 'notif-ai-1',
-    title: 'Trợ lý AI Đa Kênh đã tối ưu',
-    message: 'Bộ mô hình Google Gemini & OpenRouter đã được cấu hình với độ trễ tối ưu cho việc sinh ý tưởng và bài viết.',
-    type: 'ai',
-    timestamp: '15 phút trước',
-    read: false,
-    targetTab: 'ai_studio',
-    actionLabel: 'Mở AI Studio'
-  }
-];
 
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   pendingReviewsCount = 0,
@@ -50,59 +29,33 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread'>('all');
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
-    try {
-      const saved = localStorage.getItem('mf_notifications');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return DEFAULT_NOTIFICATIONS;
-  });
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const buttonRef = useRef<HTMLButtonElement | null>(null);
 
-  // Sync real-time pending reviews into notifications if count > 0
-  useEffect(() => {
-    if (pendingReviewsCount > 0) {
-      setNotifications(prev => {
-        const reviewNotifExists = prev.some(n => n.id === 'notif-pending-reviews');
-        if (reviewNotifExists) {
-          return prev.map(n => 
-            n.id === 'notif-pending-reviews' 
-              ? { 
-                  ...n, 
-                  message: `Hiện có ${pendingReviewsCount} bài viết đang chờ quản lý phê duyệt trong Hàng đợi.`,
-                  read: false,
-                  timestamp: 'Vừa cập nhật'
-                } 
-              : n
-          );
-        } else {
-          const newNotif: AppNotification = {
-            id: 'notif-pending-reviews',
-            title: 'Bài viết đang chờ duyệt',
-            message: `Hiện có ${pendingReviewsCount} bài viết đang chờ quản lý phê duyệt trong Hàng đợi.`,
-            type: 'review',
-            timestamp: 'Vừa cập nhật',
-            read: false,
-            targetTab: 'reviews',
-            actionLabel: 'Mở Hàng đợi'
-          };
-          return [newNotif, ...prev];
-        }
-      });
-    }
-  }, [pendingReviewsCount]);
-
-  // Persist notifications
-  useEffect(() => {
+  // Fetch real notifications from backend API
+  const fetchNotifications = useCallback(async () => {
     try {
-      localStorage.setItem('mf_notifications', JSON.stringify(notifications));
+      setLoading(true);
+      const data = await notificationApi.getAll();
+      setNotifications(data);
     } catch (e) {
-      console.error(e);
+      console.error('Error fetching notifications:', e);
+    } finally {
+      setLoading(false);
     }
-  }, [notifications]);
+  }, []);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications, pendingReviewsCount]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchNotifications();
+    }
+  }, [isOpen, fetchNotifications]);
 
   const modalRef = useFocusTrap<HTMLDivElement>({
     isActive: isOpen,
@@ -129,21 +82,41 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const markAllAsRead = useCallback(() => {
+  const markAllAsRead = useCallback(async () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    try {
+      await notificationApi.markAllAsRead();
+    } catch (e) {
+      console.error('Error marking all notifications as read:', e);
+    }
   }, []);
 
-  const markAsRead = useCallback((id: string) => {
+  const markAsRead = useCallback(async (id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    try {
+      await notificationApi.markAsRead(id);
+    } catch (e) {
+      console.error('Error marking notification as read:', e);
+    }
   }, []);
 
-  const removeNotification = useCallback((id: string, e: React.MouseEvent) => {
+  const removeNotification = useCallback(async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setNotifications(prev => prev.filter(n => n.id !== id));
+    try {
+      await notificationApi.markAsRead(id);
+    } catch (e) {
+      console.error('Error dismissing notification:', e);
+    }
   }, []);
 
-  const clearAll = useCallback(() => {
+  const clearAll = useCallback(async () => {
     setNotifications([]);
+    try {
+      await notificationApi.markAllAsRead();
+    } catch (e) {
+      console.error('Error clearing notifications:', e);
+    }
   }, []);
 
   const handleActionClick = (notif: AppNotification) => {
@@ -271,7 +244,12 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
           {/* List of Notifications */}
           <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-800/60 p-1">
-            {filteredNotifications.length === 0 ? (
+            {loading && notifications.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 space-y-2">
+                <Loader2 className="w-6 h-6 animate-spin text-indigo-400 mx-auto" />
+                <p className="text-xs font-medium text-slate-300">Đang tải thông báo...</p>
+              </div>
+            ) : filteredNotifications.length === 0 ? (
               <div className="p-8 text-center text-slate-400 space-y-2">
                 <CheckCircle2 className="w-8 h-8 text-emerald-400/80 mx-auto" />
                 <p className="text-xs font-medium text-slate-300">

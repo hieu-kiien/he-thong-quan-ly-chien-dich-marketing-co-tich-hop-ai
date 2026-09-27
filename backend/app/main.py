@@ -1,6 +1,7 @@
 import sys
 import time
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -20,13 +21,27 @@ from app.api.v1.schedules import router as schedules_router
 from app.api.v1.workspaces import router as workspaces_router
 from app.api.v1.brand_kit import router as brand_kit_router
 from app.api.v1.settings import router as settings_router
+from app.api.v1.notifications import router as notifications_router
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    # Lifespan chạy trong event loop thật của ASGI server, nên start_scheduler_task()
+    # luôn tìm được running loop (khác với on_event startup của FastAPI bản cũ).
+    on_startup()
+    try:
+        yield
+    finally:
+        on_shutdown()
+
 
 app = FastAPI(
     title=settings.APP_NAME,
     description="Hệ thống quản lý chiến dịch marketing có tích hợp AI (AIA331 - Đề tài 80300)",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # Timing Middleware ghi nhận độ trễ xử lý API và chèn header X-Process-Time
@@ -72,17 +87,44 @@ app.include_router(schedules_router, prefix=settings.API_V1_PREFIX)
 app.include_router(workspaces_router, prefix=settings.API_V1_PREFIX)
 app.include_router(brand_kit_router, prefix=settings.API_V1_PREFIX)
 app.include_router(settings_router, prefix=settings.API_V1_PREFIX)
+app.include_router(notifications_router, prefix=settings.API_V1_PREFIX)
 
 
-from app.core.database import engine, init_db, DatabaseMigrationError
+from app.core.database import init_db, DatabaseMigrationError
+from seed.seed_data import seed_data
+from app.services.scheduler.worker import start_scheduler_task, stop_scheduler_task
 
-@app.on_event("startup")
+
 def on_startup():
     try:
-        init_db(engine)
+        from app.core.database import engine as current_engine
+        init_db(current_engine)
+        is_production = str(settings.APP_ENV).strip().lower() == "production"
+        if is_production:
+            logger.info("APP_ENV=production: skipping demo seed data.")
+        else:
+            logger.info("Initializing automatic zero-cold-start seed data...")
+            seed_data()
+            logger.info("Database initialized and auto-seeded successfully.")
     except DatabaseMigrationError as e:
         logger.critical(f"Critical database migration error during startup: {e}", exc_info=True)
         sys.exit(1)
+    except Exception as e:
+        logger.error(f"Error during database startup seed: {e}", exc_info=True)
+
+    try:
+        start_scheduler_task(app)
+        logger.info("Background scheduler task initiated on startup.")
+    except Exception as e:
+        logger.error(f"Error starting scheduler task: {e}", exc_info=True)
+
+
+def on_shutdown():
+    try:
+        stop_scheduler_task(app)
+        logger.info("Background scheduler task stopped cleanly on shutdown.")
+    except Exception as e:
+        logger.error(f"Error stopping scheduler task: {e}", exc_info=True)
 
 
 @app.get("/")

@@ -11,10 +11,10 @@ def get_auth_headers(client, email: str, password: str) -> dict:
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 def get_marketer_headers(client) -> dict:
-    return get_auth_headers(client, "marketer@ictu.edu.vn", "Marketer@123")
+    return get_auth_headers(client, "marketer@gmail.com", "Marketer@123")
 
 def get_manager_headers(client) -> dict:
-    return get_auth_headers(client, "manager@ictu.edu.vn", "Manager@123")
+    return get_auth_headers(client, "manager@gmail.com", "Manager@123")
 
 
 # ==============================================================================
@@ -228,7 +228,7 @@ class TestRoleCheckerActiveStatus:
 
     def test_inactive_user_rejected_by_role_checker(self, client, db_session):
         """Tài khoản bị vô hiệu hóa hoặc bị khóa (status != ACTIVE) bị RoleChecker chặn 403."""
-        user = db_session.query(User).filter(User.email == "manager@ictu.edu.vn").first()
+        user = db_session.query(User).filter(User.email == "manager@gmail.com").first()
         user.status = "DISABLED"
         db_session.commit()
 

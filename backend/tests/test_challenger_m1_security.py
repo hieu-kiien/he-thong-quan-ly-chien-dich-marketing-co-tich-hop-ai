@@ -20,7 +20,7 @@ def get_auth_headers(client, email: str, password: str) -> dict:
 class TestRBACBrandKit:
     def test_marketer_updating_brand_kit_blocked_403(self, client):
         """Marketer thử cập nhật Brand Kit của workspace -> Phải bị chặn HTTP 403."""
-        mkt_headers = get_auth_headers(client, "marketer@ictu.edu.vn", "Marketer@123")
+        mkt_headers = get_auth_headers(client, "marketer@gmail.com", "Marketer@123")
         payload = {
             "brand_name": "Hacked Brand Name by Marketer",
             "usp": "Hacked USP",
@@ -39,7 +39,7 @@ class TestRBACCampaignCreation:
            and Compliance scores, approve or reject content. CANNOT create campaigns or edit Brand Kit.'
         Sau khi khắc phục: Hệ thống chặn role CLIENT_APPROVER với HTTP 403 Forbidden.
         """
-        approver_headers = get_auth_headers(client, "approver@ictu.edu.vn", "Approver@123")
+        approver_headers = get_auth_headers(client, "approver@gmail.com", "Approver@123")
         payload = {
             "product_id": 1,
             "name": "Campaign By Client Approver",
@@ -56,14 +56,14 @@ class TestRBACCampaignCreation:
 class TestRBACContentApprove:
     def test_marketer_approve_content_blocked_403(self, client):
         """Tài khoản MARKETER không có quyền duyệt thử gọi POST /api/v1/contents/{id}/approve -> Bị chặn 403."""
-        mkt_headers = get_auth_headers(client, "marketer@ictu.edu.vn", "Marketer@123")
+        mkt_headers = get_auth_headers(client, "marketer@gmail.com", "Marketer@123")
         # Content 1 đang ở trạng thái IN_REVIEW
         resp = client.post("/api/v1/contents/1/approve", headers=mkt_headers)
         assert resp.status_code == 403, f"Expected 403 but got {resp.status_code}: {resp.text}"
 
     def test_manager_and_approver_can_approve_content(self, client, db_session):
         """Manager và Client Approver có quyền phê duyệt nội dung."""
-        approver_headers = get_auth_headers(client, "approver@ictu.edu.vn", "Approver@123")
+        approver_headers = get_auth_headers(client, "approver@gmail.com", "Approver@123")
         # Đảm bảo Content 1 ở trạng thái IN_REVIEW
         content = db_session.query(MarketingContent).filter(MarketingContent.id == 1).first()
         content.status = "IN_REVIEW"
@@ -97,7 +97,7 @@ class TestTokenAuthentication:
         """Gửi token hết hạn -> HTTP 401."""
         expired_payload = {
             "sub": "1",
-            "email": "manager@ictu.edu.vn",
+            "email": "manager@gmail.com",
             "role": "MANAGER",
             "exp": datetime.now(timezone.utc) - timedelta(minutes=10) # 10 phút trước
         }
@@ -139,7 +139,7 @@ class TestPasswordSecurityAndStorage:
 class TestBrandKitSQLiAndJSONSafety:
     def test_banned_keywords_sqli_injection_immune(self, client, db_session):
         """Thử nghiệm các vector SQL Injection và XSS qua banned_keywords."""
-        mgr_headers = get_auth_headers(client, "manager@ictu.edu.vn", "Manager@123")
+        mgr_headers = get_auth_headers(client, "manager@gmail.com", "Manager@123")
         sqli_payloads = [
             "'; DROP TABLE brand_kits; --",
             "' OR '1'='1",
@@ -169,7 +169,7 @@ class TestBrandKitSQLiAndJSONSafety:
 
     def test_banned_keywords_invalid_type_rejected(self, client):
         """Gửi chuỗi hoặc kiểu dữ liệu sai cho banned_keywords -> HTTP 422."""
-        mgr_headers = get_auth_headers(client, "manager@ictu.edu.vn", "Manager@123")
+        mgr_headers = get_auth_headers(client, "manager@gmail.com", "Manager@123")
         bad_payload = {
             "banned_keywords": "this should be a list, not a string"
         }

@@ -1,13 +1,25 @@
 import re
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.security import verify_password, hash_password, create_access_token, get_current_user
+from app.core.security import (
+    verify_password,
+    hash_password,
+    create_access_token,
+    get_current_user,
+    check_login_rate_limit,
+    record_login_failure,
+    reset_login_rate_limit,
+)
 from app.models.entities import User, Workspace, WorkspaceMember, BrandKit
 from app.schemas.schemas import LoginRequest, TokenResponse, UserResponse, UserRegister
 
 router = APIRouter(prefix="/auth", tags=["Xác thực & Phân quyền"])
+
+logger = logging.getLogger(__name__)
 
 def generate_workspace_slug(name: str, user_id: int) -> str:
     cleaned = re.sub(r'[^a-zA-Z0-9]+', '-', name.lower()).strip('-')
@@ -20,9 +32,6 @@ def generate_workspace_slug(name: str, user_id: int) -> str:
 def register(req: UserRegister, db: Session = Depends(get_db)):
     # 1. Kiểm tra email duy nhất
     existing_user = db.query(User).filter(User.email == req.email).first()
-    if not existing_user and "@ictu.edu.vn" in req.email:
-        fallback_email = req.email.replace("@ictu.edu.vn", "@gmail.com")
-        existing_user = db.query(User).filter(User.email == fallback_email).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -85,18 +94,44 @@ def register(req: UserRegister, db: Session = Depends(get_db)):
     return UserResponse.model_validate(user)
 
 @router.post("/login", response_model=TokenResponse)
-def login(req: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == req.email).first()
-    if not user and "@ictu.edu.vn" in req.email:
-        fallback_email = req.email.replace("@ictu.edu.vn", "@gmail.com")
-        user = db.query(User).filter(User.email == fallback_email).first()
-    if not user or not verify_password(req.password, user.password_hash):
+def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    # Brute-force protection (H1): khoá theo (email, client IP) để vừa chặn tấn
+    # công dò tài khoản vừa tránh kẻ xấu khoá chính một email từ IP khác.
+    client_ip = request.client.host if request.client else "unknown"
+    identifier = f"{req.email}|{client_ip}"
+
+    # PHẢI kiểm tra TRƯỚC khi chạm vào CSDL: nếu không, kẻ dò mật khẩu vẫn tiêu tốn
+    # truy vấn cho mỗi lần đoán và không bao giờ bị chặn.
+    check_login_rate_limit(identifier)
+
+    # Nhánh DB được bọc riêng: nếu lỗi CSDL xảy ra, ta KHÔNG được bỏ sót việc
+    # ghi nhận lần thử sai, nếu không kẻ tấn công có thể gây lỗi DB liên tục để
+    # đẩy bộ đếm rate limit về 0.
+    try:
+        user = db.query(User).filter(User.email == req.email).first()
+        password_ok = bool(user) and verify_password(req.password, user.password_hash)
+    except HTTPException:
+        raise
+    except Exception:
+        record_login_failure(identifier)
+        logger.exception("Loi khi truy van nguoi dung dang dang nhap: %s", req.email)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Dịch vụ đăng nhập tạm thời không khả dụng. Vui lòng thử lại sau.",
+            headers={"Retry-After": "30"},
+        )
+
+    if not user or not password_ok:
+        record_login_failure(identifier)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email hoặc mật khẩu không chính xác",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
+    # Đăng nhập thành công: xoá bộ đếm để người dùng thật không bị khoá oan.
+    reset_login_rate_limit(identifier)
+
     if user.status != "ACTIVE":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

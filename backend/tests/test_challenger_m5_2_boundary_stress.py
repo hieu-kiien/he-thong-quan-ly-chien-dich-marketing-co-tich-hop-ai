@@ -26,21 +26,21 @@ from app.core.security import hash_password
 
 @pytest.fixture
 def manager_headers(client: TestClient) -> Dict[str, str]:
-    resp = client.post("/api/v1/auth/login", json={"email": "manager@ictu.edu.vn", "password": "Manager@123"})
+    resp = client.post("/api/v1/auth/login", json={"email": "manager@gmail.com", "password": "Manager@123"})
     assert resp.status_code == 200
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 
 @pytest.fixture
 def marketer_headers(client: TestClient) -> Dict[str, str]:
-    resp = client.post("/api/v1/auth/login", json={"email": "marketer@ictu.edu.vn", "password": "Marketer@123"})
+    resp = client.post("/api/v1/auth/login", json={"email": "marketer@gmail.com", "password": "Marketer@123"})
     assert resp.status_code == 200
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 
 @pytest.fixture
 def approver_headers(client: TestClient) -> Dict[str, str]:
-    resp = client.post("/api/v1/auth/login", json={"email": "approver@ictu.edu.vn", "password": "Approver@123"})
+    resp = client.post("/api/v1/auth/login", json={"email": "approver@gmail.com", "password": "Approver@123"})
     assert resp.status_code == 200
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
@@ -628,7 +628,7 @@ class TestSecurityAndRBACAuthorization:
         """Thử thách 4.6: Phân quyền đa không gian làm việc (Multi-Tenant Isolation):
         Tạo Workspace 2 ("Client ABC Workspace") và một tài khoản Marketer của Workspace 2.
         Tạo Campaign thuộc Workspace 2.
-        Tài khoản Marketer thuộc Workspace 1 (marketer@ictu.edu.vn) cố ý gọi:
+        Tài khoản Marketer thuộc Workspace 1 (marketer@gmail.com) cố ý gọi:
           - GET /api/v1/campaigns/{ws2_camp}/kpi
           - GET /api/v1/campaigns/{ws2_camp}/attribution
           - POST /api/v1/campaigns/{ws2_camp}/ai-doctor
@@ -672,7 +672,7 @@ class TestSecurityAndRBACAuthorization:
         db_session.commit()
 
         # Marketer Workspace 1 đăng nhập
-        resp_login = client.post("/api/v1/auth/login", json={"email": "marketer@ictu.edu.vn", "password": "Marketer@123"})
+        resp_login = client.post("/api/v1/auth/login", json={"email": "marketer@gmail.com", "password": "Marketer@123"})
         assert resp_login.status_code == 200
         token_ws1 = resp_login.json()["access_token"]
         headers_ws1 = {"Authorization": f"Bearer {token_ws1}"}

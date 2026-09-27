@@ -5,12 +5,10 @@ import {
   MarketingSchedule, ContentComplianceCheck, Workspace, BrandKit, 
   ComplianceCheckRequest, ComplianceCheckResponse, ComplianceViolation, 
   ContentReview, ChannelAttribution, AIDoctorReport,
-  CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse
+  CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse,
+  AppNotification
 } from '../types';
 import { 
-  MOCK_USER_MANAGER, 
-  MOCK_USER_MARKETER, 
-  MOCK_USER_CLIENT_APPROVER,
   MOCK_PRODUCTS, 
   MOCK_CAMPAIGNS, 
   MOCK_CONTENTS, 
@@ -35,6 +33,13 @@ const apiClient = axios.create({
 });
 
 // Helper kiểm tra chế độ Demo Offline (chỉ kích hoạt khi có cờ VITE_ENABLE_OFFLINE_DEMO=true tường minh)
+//
+// QUYẾT ĐỊNH CẦN NGƯỜI DÙNG CHỐT - KHÔNG tự ý thêm điều kiện `import.meta.env.PROD !== true`:
+//   Demo Cloudflare Pages được phục vụ bằng chính một bản build production, nên `import.meta.env.PROD`
+//   luôn là `true` ở đúng nơi demo được dùng. Thêm điều kiện đó sẽ biến cờ thành vô hiệu vĩnh viễn
+//   và phá vỡ nhu cầu demo đã được ghi rõ trong .env.example ("môi trường trình diễn giao diện,
+//   như Cloudflare Pages không kèm backend"). Hàng rào hiện tại là biến môi trường tường minh
+//   (mặc định false trong .env, Dockerfile và .env.example đều khoá false).
 export const isOfflineDemoEnabled = (): boolean => import.meta.env.VITE_ENABLE_OFFLINE_DEMO === 'true';
 
 // Helper quản lý bộ nhớ đệm LocalStorage cho chế độ Offline/Cloudflare Demo
@@ -59,23 +64,117 @@ function setStoredList<T>(key: string, data: T[]): void {
   }
 }
 
-// Gắn Bearer token tự động
+// =========================================================================
+// CƠ CHẾ CHỈ BÁO MÁY CHỦ THỨC DẬY (SERVER AWAKENING INDICATOR FOR RENDER)
+// =========================================================================
+export interface ServerAwakeningStatus {
+  isWakingUp: boolean;
+  elapsedSeconds: number;
+  message?: string;
+}
+
+type AwakeningListener = (status: ServerAwakeningStatus) => void;
+let awakeningListeners: AwakeningListener[] = [];
+let activeRequestsCount = 0;
+let awakeningTimer: any = null;
+let secondsInterval: any = null;
+let elapsedCount = 0;
+let isAwakeningActive = false;
+
+export const subscribeServerAwakening = (listener: AwakeningListener): (() => void) => {
+  awakeningListeners.push(listener);
+  // Cung cấp ngay trạng thái hiện tại cho subscriber mới
+  listener({
+    isWakingUp: isAwakeningActive,
+    elapsedSeconds: elapsedCount,
+    message: isAwakeningActive ? `Đang đánh thức máy chủ backend (${elapsedCount}s)...` : undefined
+  });
+  return () => {
+    awakeningListeners = awakeningListeners.filter(l => l !== listener);
+  };
+};
+
+const broadcastAwakening = (status: ServerAwakeningStatus) => {
+  awakeningListeners.forEach(fn => {
+    try {
+      fn(status);
+    } catch (e) {
+      console.error('Error in awakening listener:', e);
+    }
+  });
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('server-awakening', { detail: status }));
+  }
+};
+
+// Gắn Bearer token tự động & theo dõi cold start Render
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  activeRequestsCount++;
+  if (activeRequestsCount === 1) {
+    if (awakeningTimer) clearTimeout(awakeningTimer);
+    elapsedCount = 0;
+    // Nếu request kéo dài hơn 3.5 giây, máy chủ Render nhiều khả năng đang ngủ đông
+    awakeningTimer = setTimeout(() => {
+      isAwakeningActive = true;
+      elapsedCount = 3;
+      broadcastAwakening({
+        isWakingUp: true,
+        elapsedSeconds: elapsedCount,
+        message: 'Đang đánh thức máy chủ backend (Render Cloud)...'
+      });
+      if (secondsInterval) clearInterval(secondsInterval);
+      secondsInterval = setInterval(() => {
+        elapsedCount++;
+        broadcastAwakening({
+          isWakingUp: true,
+          elapsedSeconds: elapsedCount,
+          message: `Đang đánh thức máy chủ backend (${elapsedCount}s/60s)...`
+        });
+      }, 1000);
+    }, 3500);
+  }
+
   return config;
 });
 
 let backendReachable = true;
 
+const cleanupAwakeningTracking = () => {
+  activeRequestsCount = Math.max(0, activeRequestsCount - 1);
+  if (activeRequestsCount === 0) {
+    if (awakeningTimer) {
+      clearTimeout(awakeningTimer);
+      awakeningTimer = null;
+    }
+    if (secondsInterval) {
+      clearInterval(secondsInterval);
+      secondsInterval = null;
+    }
+    if (isAwakeningActive) {
+      isAwakeningActive = false;
+      broadcastAwakening({
+        isWakingUp: false,
+        elapsedSeconds: 0,
+        message: 'Máy chủ đã sẵn sàng!'
+      });
+    }
+    elapsedCount = 0;
+  }
+};
+
 apiClient.interceptors.response.use(
   (response) => {
+    cleanupAwakeningTracking();
     backendReachable = true;
     return response;
   },
   (error) => {
+    cleanupAwakeningTracking();
     if (!error?.response) {
       backendReachable = false;
     }
@@ -112,23 +211,15 @@ export const authApi = {
       localStorage.setItem('current_user', JSON.stringify(res.data.user));
       return res.data;
     } catch (e: any) {
-      // Ném lỗi thực tế ra giao diện nếu có phản hồi từ server
+      // Tuyệt đối không cấp phiên đăng nhập giả khi backend không phản hồi:
+      // suy đoán quyền từ chuỗi email là đường vòng leo thang đặc quyền.
       if (e?.response) {
         throw e;
       }
-      // Không tự ý tạo token demo nếu không bật chế độ Offline Demo
-      if (!isOfflineDemoEnabled()) {
-        throw e;
+      if (e?.code === 'ECONNABORTED' || e?.message?.includes('timeout')) {
+        throw new Error(getApiErrorMessage(e));
       }
-      // Chỉ khi backend hoàn toàn offline và bật chế độ Demo tường minh
-      console.warn('[OFFLINE DEMO] Operating on local mock storage: Backend API offline, hỗ trợ phiên đăng nhập giả lập offline');
-      const isManager = email.toLowerCase().includes('manager');
-      const isApprover = email.toLowerCase().includes('approver');
-      const user = isManager ? MOCK_USER_MANAGER : isApprover ? MOCK_USER_CLIENT_APPROVER : MOCK_USER_MARKETER;
-      const demoToken = 'marketflow-demo-token-' + (isManager ? 'manager' : isApprover ? 'approver' : 'marketer');
-      localStorage.setItem('access_token', demoToken);
-      localStorage.setItem('current_user', JSON.stringify(user));
-      return { access_token: demoToken, user };
+      throw new Error(getApiErrorMessage(e));
     }
   },
   register: async (data: { email: string; password: string; full_name: string; role?: string }): Promise<User> => {
@@ -141,8 +232,18 @@ export const authApi = {
     return res.data;
   },
   getCurrentUser: (): User | null => {
-    const userStr = localStorage.getItem('current_user');
-    return userStr ? JSON.parse(userStr) : null;
+    // localStorage.getItem và JSON.parse đều có thể ném exception (current_user bị hỏng,
+    // storage bị chặn ở chế độ riêng tư). Không được để lỗi này ném ra khỏi quá trình render,
+    // và cũng không được coi dữ liệu đọc được là bằng chứng phiên còn hiệu lực.
+    try {
+      const userStr = localStorage.getItem('current_user');
+      if (!userStr) return null;
+      const parsed = JSON.parse(userStr);
+      if (!parsed || typeof parsed !== 'object') return null;
+      return parsed as User;
+    } catch {
+      return null;
+    }
   },
   logout: () => {
     localStorage.removeItem('access_token');
@@ -825,6 +926,50 @@ export const analyticsApi = {
   }
 };
 
+export const metricsApi = {
+  getCampaignMetrics: async (campaignId: number): Promise<any[]> => {
+    try {
+      const res = await apiClient.get(`/campaigns/${campaignId}/metrics`);
+      return res.data || [];
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: metricsApi.getCampaignMetrics');
+      return [];
+    }
+  },
+  getCampaignKpi: async (campaignId: number): Promise<KPISummary> => {
+    return campaignApi.getKpi(campaignId);
+  },
+  getCampaignAttribution: async (campaignId: number): Promise<ChannelAttribution[]> => {
+    return campaignApi.getAttribution(campaignId);
+  },
+  getDashboardOverview: async () => {
+    return analyticsApi.getDashboard();
+  },
+  getAllCampaignsMetrics: async (): Promise<any[]> => {
+    try {
+      const campaigns = await campaignApi.getAll();
+      if (!campaigns || campaigns.length === 0) return [];
+      // KHÔNG nuốt lỗi ở tầng per-campaign. `.catch(() => [])` trước đây biến 401/403/500
+      // của từng chiến dịch thành "không có số liệu", đúng cái che lỗi cần loại bỏ.
+      // Lỗi giờ nổi lên Promise.all rồi được xử lý bằng cùng khuôn mẫu chuẩn của file này.
+      const metricPromises = campaigns.map(c =>
+        apiClient.get(`/campaigns/${c.id}/metrics`).then(r => r.data || [])
+      );
+      const results = await Promise.all(metricPromises);
+      return results.flat();
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      // Không có biến mock nào cho campaign metrics trong mockData.ts, nên KHÔNG bịa dữ liệu:
+      // ném lỗi để tầng gọi tự hiển thị trạng thái lỗi thay vì trả về danh sách rỗng giả.
+      console.warn('[OFFLINE DEMO] No campaign metrics mock available; metricsApi.getAllCampaignsMetrics cannot serve local data');
+      throw e;
+    }
+  }
+};
+
 export const scheduleApi = {
   getAll: async (): Promise<MarketingSchedule[]> => {
     try {
@@ -966,17 +1111,9 @@ export const settingsApi = {
       if (e?.response?.data) {
         return e.response.data;
       }
-      if (!isOfflineDemoEnabled()) {
-        throw e;
-      }
-      console.warn('[OFFLINE DEMO] Operating on local mock storage: settingsApi.testConnection');
-      return {
-        success: true,
-        latency_ms: 120,
-        message: 'Kết nối Google Gemini AI Studio thành công (Chế độ mô phỏng offline: 120ms)',
-        provider: data.provider,
-        model: data.model || 'gemini-2.5-flash'
-      };
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Không thể kiểm tra kết nối AI khi backend offline.');
+      throw new Error('Không thể kiểm tra kết nối AI: máy chủ backend không phản hồi. Vui lòng thử lại.');
     }
   },
 
@@ -1105,4 +1242,85 @@ export const settingsApi = {
     }
   }
 };
+
+// =========================================================================
+// NOTIFICATION API (M3: Database Notifications Table & Endpoints)
+// =========================================================================
+function formatNotificationRelativeTime(dateStr?: string): string {
+  if (!dateStr) return 'Vừa xong';
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (diffSec < 60) return 'Vừa xong';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin} phút trước`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours} giờ trước`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays} ngày trước`;
+    return date.toLocaleDateString('vi-VN');
+  } catch {
+    return 'Gần đây';
+  }
+}
+
+export const notificationApi = {
+  getAll: async (params?: { workspace_id?: number; unread_only?: boolean; limit?: number }): Promise<AppNotification[]> => {
+    try {
+      const res = await apiClient.get('/notifications', { params });
+      return (res.data || []).map((item: any) => ({
+        id: String(item.id),
+        title: item.title,
+        message: item.message,
+        type: item.type || 'info',
+        timestamp: formatNotificationRelativeTime(item.created_at),
+        read: Boolean(item.read),
+        targetTab: item.target_tab || undefined,
+        actionLabel: item.target_tab === 'reviews' 
+          ? 'Mở Hàng đợi' 
+          : (item.target_tab === 'campaigns' 
+              ? 'Xem Chiến dịch' 
+              : (item.target_tab === 'ai_studio' ? 'Mở AI Studio' : undefined))
+      }));
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: notificationApi.getAll');
+      return getStoredList<AppNotification>('mf_notifications', []);
+    }
+  },
+
+  markAsRead: async (notificationId: string | number): Promise<any> => {
+    try {
+      const res = await apiClient.patch(`/notifications/${notificationId}/read`);
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: notificationApi.markAsRead');
+      const list = getStoredList<AppNotification>('mf_notifications', []);
+      const updated = list.map(n => n.id === String(notificationId) ? { ...n, read: true } : n);
+      setStoredList('mf_notifications', updated);
+      return { success: true };
+    }
+  },
+
+  markAllAsRead: async (workspaceId?: number): Promise<{ success: boolean; count: number }> => {
+    try {
+      const params = workspaceId ? { workspace_id: workspaceId } : {};
+      const res = await apiClient.post('/notifications/mark-all-read', null, { params });
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: notificationApi.markAllAsRead');
+      const list = getStoredList<AppNotification>('mf_notifications', []);
+      const updated = list.map(n => ({ ...n, read: true }));
+      setStoredList('mf_notifications', updated);
+      return { success: true, count: list.length };
+    }
+  }
+};
+
 

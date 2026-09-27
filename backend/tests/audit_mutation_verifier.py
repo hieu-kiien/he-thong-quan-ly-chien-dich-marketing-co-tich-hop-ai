@@ -97,7 +97,7 @@ def run_mutation_verification():
     # Pre-patch: POST /contents with status='HACKED_STATUS' crashed SQLite with HTTP 500.
     # Post-patch: Pydantic regex intercepts and returns 422.
     # We verify that status is 422 and NOT 500.
-    login_resp = client.post("/api/v1/auth/login", json={"email": "marketer@ictu.edu.vn", "password": "Marketer@123"})
+    login_resp = client.post("/api/v1/auth/login", json={"email": "marketer@gmail.com", "password": "Marketer@123"})
     mkt_headers = {"Authorization": f"Bearer {login_resp.json()['access_token']}"}
 
     r_bad_status = client.post("/api/v1/contents", json={
@@ -150,7 +150,7 @@ def run_mutation_verification():
     # 5. Mutation M5: Simulating pre-patch BUG-BE-07b (Modifying APPROVED content retains APPROVED status)
     # Pre-patch: Modifying title/body of APPROVED content left it in APPROVED status without review.
     # Post-patch: Modifying title/body of APPROVED content automatically resets status to AI_DRAFT.
-    mgr_login = client.post("/api/v1/auth/login", json={"email": "manager@ictu.edu.vn", "password": "Manager@123"})
+    mgr_login = client.post("/api/v1/auth/login", json={"email": "manager@gmail.com", "password": "Manager@123"})
     mgr_headers = {"Authorization": f"Bearer {mgr_login.json()['access_token']}"}
 
     client.post("/api/v1/contents/1/approve", headers=mgr_headers)

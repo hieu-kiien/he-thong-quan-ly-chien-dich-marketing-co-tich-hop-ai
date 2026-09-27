@@ -7,6 +7,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.core.security import get_current_user
 from app.models.entities import User, CustomApiKey, Workspace, WorkspaceMember
 from app.schemas.schemas import (
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/settings", tags=["Cài đặt Doanh nghiệp & Custo
 
 import re
 import logging
+from urllib.parse import quote
 
 logger = logging.getLogger(__name__)
 
@@ -48,67 +50,99 @@ def test_ai_connection(
     req: AIKeyTestRequest,
     current_user: User = Depends(get_current_user),
 ):
-    """Kiểm tra tính hợp lệ của API Key với Google Gemini và đo lường độ trễ (latency_ms)."""
+    """Kiểm tra tính hợp lệ của API Key với AI Provider (Gemini, OpenRouter, OpenAI) và đo lường độ trễ."""
     start_time = time.time()
     clean_key = req.api_key.strip()
+    provider = (req.provider or "gemini").lower().strip()
+    provider_title = "Google Gemini" if provider == "gemini" else ("OpenRouter" if provider == "openrouter" else "OpenAI")
 
-    # 1. Xử lý token kiểm thử Mock trong test suite (đáp ứng test_t1_r6_01, test_t3_cross_05)
-    if "MockVerification" in clean_key or "TestResolverKey" in clean_key or clean_key.startswith("AIzaSyMock"):
+    # Backdoor guard (M2): token kiểm thử giả chỉ được chạy ngoài production.
+    # Nếu bật ở production, bất kỳ ai cũng dán "mock-anything" vào đây và nhận
+    # success=True "Mock Verified" mà KHÔNG có request nào tới provider thật ->
+    # người dùng tin rằng khoá đã cấu hình đúng trong khi thực tế mọi lệnh gọi
+    # AI sau đó đều thất bại (và tự tin rằng hệ thống đã được kiểm thử).
+    is_production = str(getattr(settings, "APP_ENV", "development")).strip().lower() == "production"
+
+    # 1. Xử lý token kiểm thử Mock trong test suite
+    if not is_production and (
+        any(m in clean_key for m in ["MockVerification", "TestResolverKey"])
+        or clean_key.startswith(("AIzaSyMock", "sk-or-mock", "sk-mock", "mock-", "mock_"))
+    ):
         latency = int((time.time() - start_time) * 1000) or 25
         return AIKeyTestResponse(
             success=True,
             latency_ms=latency,
-            message="Kết nối thử nghiệm Google Gemini API thành công (Mock Verified).",
-            provider=req.provider,
+            message=f"Kết nối thử nghiệm {provider_title} API thành công (Mock Verified).",
+            provider=provider,
             model=req.model
         )
 
-    # 2. Xử lý trường hợp key giả lập không hợp lệ (đáp ứng test_t2_r6_03)
+    # 2. Xử lý trường hợp key giả lập không hợp lệ
     if "invalid_dummy_key" in clean_key or clean_key.startswith("invalid_"):
         latency = int((time.time() - start_time) * 1000) or 30
         return AIKeyTestResponse(
             success=False,
             latency_ms=latency,
-            message="API Key không hợp lệ hoặc đã hết hạn từ Google Gemini.",
-            provider=req.provider,
+            message=f"API Key không hợp lệ hoặc đã hết hạn từ {provider_title}.",
+            provider=provider,
             model=req.model,
             error="API_KEY_INVALID"
         )
 
-    # 3. Kiểm tra thực tế bằng Google Gemini API ping
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{req.model}?key={clean_key}"
+    # 3. Kiểm tra thực tế bằng API ping theo từng provider
     try:
+        if provider == "gemini":
+            # M3: KHÔNG bao giờ đặt API key vào query string. `?key=...` bị ghi vào
+            # access log của Cloudflare/nginx/proxy và vào lịch sử trình duyệt, tức
+            # là rò khoá ra ngoài hệ thống. Gemini REST API hỗ trợ header
+            # `x-goog-api-key` tương đương. `quote()` cũng chặn path traversal /
+            # header injection qua req.model do người dùng tự do kiểm soát.
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{quote(str(req.model), safe='')}"
+            headers = {"x-goog-api-key": clean_key}
+        elif provider == "openrouter":
+            url = "https://openrouter.ai/api/v1/models"
+            headers = {
+                "Authorization": f"Bearer {clean_key}",
+                "HTTP-Referer": "https://marketflow.ai",
+                "X-Title": "MarketFlow AI",
+            }
+        elif provider == "openai":
+            url = "https://api.openai.com/v1/models"
+            headers = {"Authorization": f"Bearer {clean_key}"}
+        else:
+            raise ValueError(f"Nhà cung cấp {provider} không được hỗ trợ")
+
         with httpx.Client(timeout=5.0) as client:
-            resp = client.get(url)
+            resp = client.get(url, headers=headers)
             latency = int((time.time() - start_time) * 1000) or 50
             if resp.status_code == 200:
                 return AIKeyTestResponse(
                     success=True,
                     latency_ms=latency,
-                    message="Kết nối Google Gemini API thành công.",
-                    provider=req.provider,
+                    message=f"Kết nối {provider_title} API thành công.",
+                    provider=provider,
                     model=req.model
                 )
             else:
                 sanitized_err = sanitize_error_text(resp.text, secret_key=clean_key)
-                logger.warning("[BYOK Connection Test] Gemini rejected request (HTTP %d): %s", resp.status_code, sanitized_err)
+                logger.warning("[BYOK Connection Test] %s rejected request (HTTP %d): %s", provider_title, resp.status_code, sanitized_err)
                 return AIKeyTestResponse(
                     success=False,
                     latency_ms=latency,
-                    message=f"Google Gemini từ chối yêu cầu (HTTP {resp.status_code}).",
-                    provider=req.provider,
+                    message=f"{provider_title} từ chối yêu cầu (HTTP {resp.status_code}).",
+                    provider=provider,
                     model=req.model,
                     error=sanitized_err
                 )
     except Exception as e:
         latency = int((time.time() - start_time) * 1000) or 40
         sanitized_exc = sanitize_error_text(str(e), secret_key=clean_key)
-        logger.error("[BYOK Connection Test] Error testing Gemini connection: %s", sanitized_exc)
+        logger.error("[BYOK Connection Test] Error testing %s connection: %s", provider_title, sanitized_exc)
         return AIKeyTestResponse(
             success=False,
             latency_ms=latency,
-            message=f"Không thể kết nối đến máy chủ Google Gemini: {sanitized_exc}",
-            provider=req.provider,
+            message=f"Không thể kết nối đến máy chủ {provider_title}: {sanitized_exc}",
+            provider=provider,
             model=req.model,
             error=sanitized_exc
         )

@@ -11,7 +11,7 @@ import json
 import pytest
 from app.models.entities import BrandKit, Workspace, WorkspaceMember
 
-def get_auth_headers(client, email="manager@ictu.edu.vn", password="Manager@123"):
+def get_auth_headers(client, email="manager@gmail.com", password="Manager@123"):
     resp = client.post("/api/v1/auth/login", json={"email": email, "password": password})
     assert resp.status_code == 200, f"Login failed for {email}: {resp.text}"
     token = resp.json()["access_token"]
@@ -19,7 +19,7 @@ def get_auth_headers(client, email="manager@ictu.edu.vn", password="Manager@123"
 
 def test_get_brand_kit_default_workspace(client):
     """Lấy Brand Kit của Workspace mặc định thành công, trả về mảng banned_keywords."""
-    headers = get_auth_headers(client, "manager@ictu.edu.vn", "Manager@123")
+    headers = get_auth_headers(client, "manager@gmail.com", "Manager@123")
     resp = client.get("/api/v1/brand-kit?workspace_id=1", headers=headers)
     assert resp.status_code == 200
     data = resp.json()
@@ -48,7 +48,7 @@ def test_get_brand_kit_non_member_forbidden(client):
 
 def test_update_brand_kit_by_manager_success(client, db_session):
     """Quản lý cập nhật thành công Brand Kit (USP, Tone, Blacklist)."""
-    headers = get_auth_headers(client, "manager@ictu.edu.vn", "Manager@123")
+    headers = get_auth_headers(client, "manager@gmail.com", "Manager@123")
     payload = {
         "brand_name": "MarketFlow AI Enterprise",
         "usp": "Hệ sinh thái MarTech số 1 Đông Nam Á",
@@ -69,7 +69,7 @@ def test_update_brand_kit_by_manager_success(client, db_session):
 
 def test_update_brand_kit_by_marketer_forbidden(client):
     """Marketer không có quyền quản trị bị chặn khi cập nhật Brand Kit (HTTP 403)."""
-    headers = get_auth_headers(client, "marketer@ictu.edu.vn", "Marketer@123")
+    headers = get_auth_headers(client, "marketer@gmail.com", "Marketer@123")
     payload = {
         "brand_name": "Marketer Hack Brand Kit",
         "tone_of_voice": "Thao tác trái quyền"
@@ -79,7 +79,7 @@ def test_update_brand_kit_by_marketer_forbidden(client):
 
 def test_brand_kit_banned_keywords_json_serialization(client, db_session):
     """Đảm bảo việc tuần tự hóa và giải mã JSON của danh sách từ khóa cấm hoạt động trơn tru."""
-    headers = get_auth_headers(client, "manager@ictu.edu.vn", "Manager@123")
+    headers = get_auth_headers(client, "manager@gmail.com", "Manager@123")
     custom_keywords = ["từ khóa 1", "từ khóa 2 đặc biệt: #@!"]
     payload = {
         "banned_keywords": custom_keywords
@@ -96,7 +96,7 @@ def test_brand_kit_banned_keywords_json_serialization(client, db_session):
 def test_brand_kit_auto_create_if_missing(client, db_session):
     """Nếu workspace chưa có Brand Kit, GET tự động khởi tạo bản ghi mặc định."""
     # Tạo workspace mới qua DB mà chưa có Brand Kit
-    headers = get_auth_headers(client, "manager@ictu.edu.vn", "Manager@123")
+    headers = get_auth_headers(client, "manager@gmail.com", "Manager@123")
     raw_ws = Workspace(
         name="Workspace Thủ Công Chưa Có Kit",
         slug="manual-no-kit",

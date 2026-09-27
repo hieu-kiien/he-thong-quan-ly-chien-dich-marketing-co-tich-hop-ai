@@ -29,7 +29,7 @@ def get_auth_headers(client: TestClient, email: str, password: str) -> dict:
 
 @pytest.fixture
 def manager_headers(client: TestClient) -> dict:
-    return get_auth_headers(client, "manager@ictu.edu.vn", "Manager@123")
+    return get_auth_headers(client, "manager@gmail.com", "Manager@123")
 
 
 # ==============================================================================

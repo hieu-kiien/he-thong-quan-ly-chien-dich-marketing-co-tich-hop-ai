@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 /**
  * Playwright E2E configuration for MarketFlow AI frontend
- * Supports Microsoft Edge channel natively on Windows
+ * Standardized on Chromium default with Linux CI/CD compatibility
  */
 export default defineConfig({
   testDir: './tests',
@@ -23,16 +23,23 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'off',
-    channel: 'msedge',
+    headless: true,
+    viewport: { width: 1280, height: 720 },
     locale: 'vi-VN',
     timezoneId: 'Asia/Ho_Chi_Minh',
   },
   projects: [
     {
-      name: 'msedge',
+      name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        channel: 'msedge',
+        viewport: { width: 1280, height: 720 },
+        // Standard Chromium binary on Linux CI; msedge fallback on local Windows if no override
+        ...(process.env.CI
+          ? {}
+          : process.env.PLAYWRIGHT_CHANNEL
+          ? { channel: process.env.PLAYWRIGHT_CHANNEL }
+          : { channel: 'msedge' }),
       },
     },
   ],

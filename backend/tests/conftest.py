@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 import os
+import sqlite3
+import tempfile
 import hashlib
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Generator, Optional
@@ -10,6 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
 import pytest
+import bcrypt
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
@@ -50,6 +53,41 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 core_database.SessionLocal = TestingSessionLocal
+core_database.engine = test_engine
+import seed.seed_data as seed_data_module
+seed_data_module.engine = test_engine
+seed_data_module.SessionLocal = TestingSessionLocal
+
+
+# ==============================================================================
+# 0. FAST BCRYPT FOR TESTS (không ảnh hưởng code production)
+# ==============================================================================
+# hash_password() trong app/core/security.py gọi bcrypt.gensalt() (cost mặc định 12).
+# Mỗi lần ~0.34s. Fixture db_session + startup event gọi hash_password tới 6-9 lần
+# mỗi test => ~2.4s setup/test. Ta chỉ hạ cost của bcrypt.gensalt TRONG PHIÊN TEST,
+# không sửa app/core/security.py nên production vẫn dùng cost 12.
+# Lưu ý: phải giữ tham chiếu tới hàm gốc, nếu gọi bcrypt.gensalt bên trong wrapper
+# thì wrapper sẽ tự gọi chính nó -> RecursionError.
+_BCRYPT_ORIGINAL_GENSALT = bcrypt.gensalt
+TEST_BCRYPT_ROUNDS = 4
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _fast_bcrypt_for_tests():
+    """Giảm bcrypt cost trong test để chạy nhanh; KHÔNG ảnh hưởng code production.
+
+    verify_password() vẫn hoạt động bình thường vì bcrypt.checkpw đọc cost từ chính
+    chuỗi hash được lưu, và hash sinh ra vẫn có tiền tố "$2b$" (giữ nguyên giả định
+    của test_challenger_m1_security.py).
+    """
+    def fast_gensalt(rounds: int = TEST_BCRYPT_ROUNDS, prefix: bytes = b"2b"):
+        return _BCRYPT_ORIGINAL_GENSALT(rounds=TEST_BCRYPT_ROUNDS, prefix=prefix)
+
+    bcrypt.gensalt = fast_gensalt
+    try:
+        yield
+    finally:
+        bcrypt.gensalt = _BCRYPT_ORIGINAL_GENSALT
 
 
 @pytest.fixture(autouse=True)
@@ -120,72 +158,181 @@ def freeze_vietnam_time():
 # ==============================================================================
 # 3. BASE DATABASE & TEST CLIENT FIXTURES
 # ==============================================================================
-@pytest.fixture(scope="function")
-def db_session():
-    # Khởi tạo db và nạp seed cho mỗi test
-    Base.metadata.drop_all(bind=test_engine)
-    Base.metadata.create_all(bind=test_engine)
-    db = TestingSessionLocal()
-    try:
-        seed_data(session=db)
+# Nguyên nhân suite chậm (~2.45s setup/test): mỗi test chạy lại
+# drop_all + create_all + seed_data() (3 lần bcrypt cost 12 ~0.34s) + 3 user bổ sung
+# (3 lần bcrypt nữa), RỒI startup event của TestClient lại chạy init_db + seed_data
+# lần nữa. Tổng 6-9 lần bcrypt => ~2.4s chỉ để setup.
+#
+# Chiến lược mới (giữ nguyên bất biến "mỗi test bắt đầu từ DB sạch đã seed"):
+#   1. _seeded_template (scope=session): seed_data() + user bổ sung CHẠY ĐÚNG 1 LẦN
+#      vào một file SQLite tạm, tạo snapshot "khuôn mẫu".
+#   2. db_session (scope=function): dùng SQLite backup API (sqlite3.Connection.backup)
+#      để chép nguyên nội dung template vào in-memory engine. Đây là phép copy ở mức
+#      trang (page-level), đo được ~0.6ms, thay cho ~2.4s seed lại từ đầu.
+#   3. client: bỏ "with TestClient(app)" để không kích hoạt startup event (init_db +
+#      seed_data + scheduler) - dữ liệu đã được _seeded_template cung cấp sẵn.
+#
+# Vì sao chọn phương án template + backup thay vì INSERT ... SELECT:
+#   - SQLite KHÔNG cho phép INSERT INTO ... SELECT ... FROM <db khác> nếu không
+#     ATTACH, nên phương án (b) nguyên bản phải ATTACH rồi copy từng bảng qua SQL
+#     thủ công: chậm hơn nhiều và phải hard-code danh sách bảng/thứ tự khóa ngoại.
+#   - backup() là 1 lệnh nguyên bản của SQLite, copy cả schema lẫn dữ liệu, không
+#     cần biết trước danh sách bảng, và BẢO TOÀN ĐÚNG dữ liệu mà seed_data tạo ra
+#     (campaigns, channels, metrics, brand kit, members...) nên không test nào mất data.
+#   - create_all/drop_all thực ra chỉ ~0.04ms (đo thật), nên DDL không phải nút thắt;
+#     nút thắt là bcrypt. Phương án (a) "bỏ seed_data, tự tạo nhóm dữ liệu tối thiểu"
+#     sẽ phải liệt kê thủ công hàng chục bản ghi mà ~hàng trăm test đang dựa vào -> rủi ro
+#     regression cao hơn nhiều so với lợi ích (phần DDL vốn đã rẻ).
 
-        # Seed additional agency manager user for Workspace Alpha if missing
-        alpha_agency_mgr = db.query(User).filter(User.email.in_(["agency_mgr@gmail.com", "agency_mgr@ictu.edu.vn"])).first()
-        if not alpha_agency_mgr:
-            alpha_agency_mgr = User(
-                email="agency_mgr@gmail.com",
-                full_name="Nguyễn Văn Quản Lý Agency",
-                password_hash=hash_password("AgencyMgr@123"),
-                role="AGENCY_MANAGER",
-                status="ACTIVE"
-            )
-            db.add(alpha_agency_mgr)
-            db.commit()
-            db.refresh(alpha_agency_mgr)
 
-        ws1 = db.query(Workspace).filter(Workspace.id == 1).first()
-        if ws1:
-            mgr = db.query(User).filter(User.email.in_(["manager@gmail.com", "manager@ictu.edu.vn"])).first()
-            mkt = db.query(User).filter(User.email.in_(["marketer@gmail.com", "marketer@ictu.edu.vn"])).first()
-            appr = db.query(User).filter(User.email.in_(["approver@gmail.com", "approver@ictu.edu.vn"])).first()
-            for u_obj, role_name in [
-                (mgr, "AGENCY_MANAGER"),
-                (mkt, "MARKETER"),
-                (appr, "CLIENT_APPROVER"),
-                (alpha_agency_mgr, "AGENCY_MANAGER")
-            ]:
-                if u_obj:
-                    mem = db.query(WorkspaceMember).filter(
-                        WorkspaceMember.workspace_id == ws1.id,
-                        WorkspaceMember.user_id == u_obj.id
-                    ).first()
-                    if not mem:
-                        db.add(WorkspaceMember(
-                            workspace_id=ws1.id,
-                            user_id=u_obj.id,
-                            role=role_name
-                        ))
-            db.commit()
+def _seed_test_only_users(db) -> None:
+    """User & membership chỉ phục vụ test (trước đây chạy lại ở mọi test).
 
-        # Seed pre-existing users for test_adversarial_m1 compatibility
-        for adv_email, adv_name in [
-            ("agency_x_mgr@test.com", "Agency X Manager"),
-            ("agency_y_mgr@test.com", "Agency Y Manager"),
+    Gộp vào template để chạy đúng 1 lần cho cả session thay vì mỗi test.
+    """
+    # Seed additional agency manager user for Workspace Alpha if missing
+    alpha_agency_mgr = db.query(User).filter(User.email.in_(["agency_mgr@gmail.com", "agency_mgr@gmail.com"])).first()
+    if not alpha_agency_mgr:
+        alpha_agency_mgr = User(
+            email="agency_mgr@gmail.com",
+            full_name="Nguyễn Văn Quản Lý Agency",
+            password_hash=hash_password("AgencyMgr@123"),
+            role="AGENCY_MANAGER",
+            status="ACTIVE"
+        )
+        db.add(alpha_agency_mgr)
+        db.commit()
+        db.refresh(alpha_agency_mgr)
+
+    ws1 = db.query(Workspace).filter(Workspace.id == 1).first()
+    if ws1:
+        mgr = db.query(User).filter(User.email.in_(["manager@gmail.com", "manager@gmail.com"])).first()
+        mkt = db.query(User).filter(User.email.in_(["marketer@gmail.com", "marketer@gmail.com"])).first()
+        appr = db.query(User).filter(User.email.in_(["approver@gmail.com", "approver@gmail.com"])).first()
+        for u_obj, role_name in [
+            (mgr, "AGENCY_MANAGER"),
+            (mkt, "MARKETER"),
+            (appr, "CLIENT_APPROVER"),
+            (alpha_agency_mgr, "AGENCY_MANAGER")
         ]:
-            u = db.query(User).filter(User.email == adv_email).first()
-            if not u:
-                db.add(User(
-                    email=adv_email,
-                    full_name=adv_name,
-                    password_hash=hash_password("Password123!"),
-                    role="AGENCY_MANAGER",
-                    status="ACTIVE"
-                ))
+            if u_obj:
+                mem = db.query(WorkspaceMember).filter(
+                    WorkspaceMember.workspace_id == ws1.id,
+                    WorkspaceMember.user_id == u_obj.id
+                ).first()
+                if not mem:
+                    db.add(WorkspaceMember(
+                        workspace_id=ws1.id,
+                        user_id=u_obj.id,
+                        role=role_name
+                    ))
         db.commit()
 
+    # Seed pre-existing users for test_adversarial_m1 compatibility
+    for adv_email, adv_name in [
+        ("agency_x_mgr@test.com", "Agency X Manager"),
+        ("agency_y_mgr@test.com", "Agency Y Manager"),
+    ]:
+        u = db.query(User).filter(User.email == adv_email).first()
+        if not u:
+            db.add(User(
+                email=adv_email,
+                full_name=adv_name,
+                password_hash=hash_password("Password123!"),
+                role="AGENCY_MANAGER",
+                status="ACTIVE"
+            ))
+    db.commit()
+
+
+@pytest.fixture(scope="session")
+def _seeded_template(_fast_bcrypt_for_tests):
+    """Seed dữ liệu mẫu đúng 1 lần cho toàn bộ session, snapshot vào DB tạm.
+
+    Trả về đường dẫn file SQLite chứa "khuôn mẫu" đã seed. File nằm trong thư mục
+    tạm của hệ điều hành (không phải marketing_campaigns.db thật) nên live_db_guard
+    không bị ảnh hưởng, và được xoá khi session kết thúc.
+    """
+    fd, template_path = tempfile.mkstemp(prefix="marketflow_seed_template_", suffix=".sqlite")
+    os.close(fd)
+
+    template_engine = create_engine(
+        f"sqlite:///{template_path}",
+        connect_args={"check_same_thread": False},
+    )
+
+    @event.listens_for(template_engine, "connect")
+    def set_template_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+    TemplateSession = sessionmaker(autocommit=False, autoflush=False, bind=template_engine)
+    try:
+        Base.metadata.create_all(bind=template_engine)
+        s = TemplateSession()
+        try:
+            seed_data(session=s)
+            _seed_test_only_users(s)
+        finally:
+            s.close()
+        yield template_path
+    finally:
+        template_engine.dispose()
+        try:
+            os.unlink(template_path)
+        except OSError:
+            pass
+
+
+def _restore_seeded_template(template_path: str) -> None:
+    """Ghi đè toàn bộ in-memory DB bằng bản snapshot đã seed (SQLite backup API).
+
+    sqlite3.Connection.backup() yêu cầu connection đích KHÔNG nằm trong
+    transaction đang mở, nên phải rollback trước khi copy.
+    """
+    raw = test_engine.raw_connection()
+    try:
+        dest = raw.driver_connection
+        if dest.in_transaction:
+            dest.rollback()
+        src = sqlite3.connect(template_path)
+        try:
+            src.backup(dest)
+        finally:
+            src.close()
+    finally:
+        raw.close()
+
+
+def _seed_test_db_legacy_way() -> None:
+    """Fallback: tạo lại DB từ đầu nếu backup API không khả dụng trên nền tảng này."""
+    Base.metadata.drop_all(bind=test_engine)
+    Base.metadata.create_all(bind=test_engine)
+    s = TestingSessionLocal()
+    try:
+        seed_data(session=s)
+        _seed_test_only_users(s)
+    finally:
+        s.close()
+
+
+@pytest.fixture(scope="function")
+def db_session(_seeded_template):
+    # Khôi phục "khuôn mẫu" đã seed cho mỗi test: nhanh (~0.6ms) và sạch hoàn toàn
+    try:
+        _restore_seeded_template(_seeded_template)
+    except sqlite3.Error:
+        _seed_test_db_legacy_way()
+
+    db = TestingSessionLocal()
+    try:
         yield db
     finally:
         db.close()
+        # Giữ nguyên hành vi cũ: sau mỗi test DB trả về trạng thái rỗng, để các test
+        # tự tạo session riêng không vô tình đọc dữ liệu của test trước.
+        # drop_all chỉ ~0.04ms nên không ảnh hưởng tổng thời gian.
         Base.metadata.drop_all(bind=test_engine)
 
 
@@ -198,9 +345,15 @@ def client(db_session):
             pass
 
     app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as c:
+    # KHÔNG dùng "with TestClient(app)": context manager sẽ chạy startup event của
+    # app/main.py, gọi init_db() + seed_data() lần nữa (và start_scheduler_task).
+    # Dữ liệu đã có sẵn từ _seeded_template nên không cần startup event.
+    c = TestClient(app)
+    try:
         yield c
-    app.dependency_overrides.clear()
+    finally:
+        c.close()
+        app.dependency_overrides.clear()
 
 
 # ==============================================================================
@@ -220,7 +373,7 @@ def workspace_alpha(db_session) -> Workspace:
 def workspace_beta(db_session, workspace_alpha) -> Workspace:
     """Workspace Beta (id=2, slug='beta-workspace') with dedicated Agency Manager and Marketer."""
     # 1. Users
-    agency_mgr_beta = db_session.query(User).filter(User.email.in_(["agency_mgr_beta@gmail.com", "agency_mgr_beta@ictu.edu.vn"])).first()
+    agency_mgr_beta = db_session.query(User).filter(User.email.in_(["agency_mgr_beta@gmail.com", "agency_mgr_beta@gmail.com"])).first()
     if not agency_mgr_beta:
         agency_mgr_beta = User(
             email="agency_mgr_beta@gmail.com",
@@ -233,7 +386,7 @@ def workspace_beta(db_session, workspace_alpha) -> Workspace:
         db_session.commit()
         db_session.refresh(agency_mgr_beta)
 
-    marketer_beta = db_session.query(User).filter(User.email.in_(["marketer_beta@gmail.com", "marketer_beta@ictu.edu.vn"])).first()
+    marketer_beta = db_session.query(User).filter(User.email.in_(["marketer_beta@gmail.com", "marketer_beta@gmail.com"])).first()
     if not marketer_beta:
         marketer_beta = User(
             email="marketer_beta@gmail.com",
@@ -348,21 +501,21 @@ def _token_for_user(user: User) -> Dict[str, str]:
 
 @pytest.fixture
 def manager_headers(db_session, workspace_alpha) -> Dict[str, str]:
-    u = db_session.query(User).filter(User.email.in_(["manager@gmail.com", "manager@ictu.edu.vn"])).first()
+    u = db_session.query(User).filter(User.email.in_(["manager@gmail.com", "manager@gmail.com"])).first()
     assert u is not None, "Manager user must exist"
     return _token_for_user(u)
 
 
 @pytest.fixture
 def marketer_headers(db_session, workspace_alpha) -> Dict[str, str]:
-    u = db_session.query(User).filter(User.email.in_(["marketer@gmail.com", "marketer@ictu.edu.vn"])).first()
+    u = db_session.query(User).filter(User.email.in_(["marketer@gmail.com", "marketer@gmail.com"])).first()
     assert u is not None, "Marketer user must exist"
     return _token_for_user(u)
 
 
 @pytest.fixture
 def client_approver_headers(db_session, workspace_alpha) -> Dict[str, str]:
-    u = db_session.query(User).filter(User.email.in_(["approver@gmail.com", "approver@ictu.edu.vn"])).first()
+    u = db_session.query(User).filter(User.email.in_(["approver@gmail.com", "approver@gmail.com"])).first()
     assert u is not None, "Client approver user must exist"
     return _token_for_user(u)
 
@@ -375,21 +528,21 @@ def approver_headers(client_approver_headers) -> Dict[str, str]:
 
 @pytest.fixture
 def agency_manager_headers(db_session, workspace_alpha) -> Dict[str, str]:
-    u = db_session.query(User).filter(User.email.in_(["agency_mgr@gmail.com", "agency_mgr@ictu.edu.vn"])).first()
+    u = db_session.query(User).filter(User.email.in_(["agency_mgr@gmail.com", "agency_mgr@gmail.com"])).first()
     assert u is not None, "Agency manager user must exist"
     return _token_for_user(u)
 
 
 @pytest.fixture
 def beta_agency_manager_headers(db_session, workspace_beta) -> Dict[str, str]:
-    u = db_session.query(User).filter(User.email.in_(["agency_mgr_beta@gmail.com", "agency_mgr_beta@ictu.edu.vn"])).first()
+    u = db_session.query(User).filter(User.email.in_(["agency_mgr_beta@gmail.com", "agency_mgr_beta@gmail.com"])).first()
     assert u is not None, "Beta agency manager user must exist"
     return _token_for_user(u)
 
 
 @pytest.fixture
 def beta_marketer_headers(db_session, workspace_beta) -> Dict[str, str]:
-    u = db_session.query(User).filter(User.email.in_(["marketer_beta@gmail.com", "marketer_beta@ictu.edu.vn"])).first()
+    u = db_session.query(User).filter(User.email.in_(["marketer_beta@gmail.com", "marketer_beta@gmail.com"])).first()
     assert u is not None, "Beta marketer user must exist"
     return _token_for_user(u)
 

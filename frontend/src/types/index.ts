@@ -166,6 +166,7 @@ export interface KPISummary {
   ctr_percent: number;
   cpc_avg: number;
   cvr_percent: number;
+  cpa_avg?: number;
   roi_percent: number;
   roas?: number;
   channel_metrics?: ChannelAttribution[];

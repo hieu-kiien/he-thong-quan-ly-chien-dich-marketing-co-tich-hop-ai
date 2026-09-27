@@ -25,7 +25,7 @@ from app.models.entities import (
 
 @pytest.fixture
 def manager_headers(client: TestClient):
-    resp = client.post("/api/v1/auth/login", json={"email": "manager@ictu.edu.vn", "password": "Manager@123"})
+    resp = client.post("/api/v1/auth/login", json={"email": "manager@gmail.com", "password": "Manager@123"})
     assert resp.status_code == 200, f"Login failed: {resp.text}"
     token = resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
@@ -33,7 +33,7 @@ def manager_headers(client: TestClient):
 
 @pytest.fixture
 def marketer_headers(client: TestClient):
-    resp = client.post("/api/v1/auth/login", json={"email": "marketer@ictu.edu.vn", "password": "Marketer@123"})
+    resp = client.post("/api/v1/auth/login", json={"email": "marketer@gmail.com", "password": "Marketer@123"})
     assert resp.status_code == 200, f"Login failed: {resp.text}"
     token = resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
@@ -268,7 +268,7 @@ class TestAuthenticationSecurityBoundary:
     def test_21_disabled_user_token_blocked_403(self, client: TestClient, db_session: Session):
         """User có trạng thái DISABLED trong CSDL dù có token hợp lệ cũng phải bị chặn HTTP 403."""
         disabled_user = User(
-            email="disabled_user@ictu.edu.vn",
+            email="disabled_user@gmail.com",
             full_name="Bị Khóa Tài Khoản",
             password_hash=hash_password("Pass@123"),
             role="MARKETER",

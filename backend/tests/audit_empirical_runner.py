@@ -75,7 +75,7 @@ def record(scenario_name, condition, expected, actual, passed, details=""):
         print(f"       Details: {details}")
 
 
-def get_token(email="marketer@ictu.edu.vn", password="Marketer@123"):
+def get_token(email="marketer@gmail.com", password="Marketer@123"):
     resp = client.post("/api/v1/auth/login", json={"email": email, "password": password})
     assert resp.status_code == 200, f"Login failed: {resp.text}"
     return resp.json()["access_token"]
@@ -168,7 +168,7 @@ def run_all_adversarial_tests():
     # SCENARIO 3: SQL Injection & Payload Corruption (Must receive 422, NEVER 500)
     # --------------------------------------------------------------------------
     print("\n--- Running Scenario 3: SQLi & Payload Corruption (422, never 500) ---")
-    mkt_token = get_token("marketer@ictu.edu.vn", "Marketer@123")
+    mkt_token = get_token("marketer@gmail.com", "Marketer@123")
     mkt_headers = {"Authorization": f"Bearer {mkt_token}"}
 
     sqli_status_payloads = [
@@ -255,7 +255,7 @@ def run_all_adversarial_tests():
     # SCENARIO 5: HITL State Machine Bypass (Must receive 400 Bad Request)
     # --------------------------------------------------------------------------
     print("\n--- Running Scenario 5: HITL State Machine Bypass ---")
-    mgr_token = get_token("manager@ictu.edu.vn", "Manager@123")
+    mgr_token = get_token("manager@gmail.com", "Manager@123")
     mgr_headers = {"Authorization": f"Bearer {mgr_token}"}
 
     # Marketer direct PUT status APPROVED -> 400

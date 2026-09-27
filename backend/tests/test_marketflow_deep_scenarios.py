@@ -26,17 +26,17 @@ def get_auth_headers_for(client, email: str, password: str) -> dict:
 
 def get_marketer_headers(client) -> dict:
     """Helper lấy token xác thực quyền MARKETER."""
-    return get_auth_headers_for(client, "marketer@ictu.edu.vn", "Marketer@123")
+    return get_auth_headers_for(client, "marketer@gmail.com", "Marketer@123")
 
 
 def get_manager_headers(client) -> dict:
     """Helper lấy token xác thực quyền MANAGER."""
-    return get_auth_headers_for(client, "manager@ictu.edu.vn", "Manager@123")
+    return get_auth_headers_for(client, "manager@gmail.com", "Manager@123")
 
 
 def get_custom_role_headers(role: str, user_id: str = "1") -> dict:
     """Helper tạo Bearer header với role tùy ý nhằm kiểm thử RBAC ma trận."""
-    token = create_access_token(data={"sub": user_id, "email": f"{role.lower()}@ictu.edu.vn", "role": role})
+    token = create_access_token(data={"sub": user_id, "email": f"{role.lower()}@gmail.com", "role": role})
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -248,8 +248,12 @@ class TestDeepRBACMatrix:
 class TestDeepContentStateMachine:
     """Kiểm thử máy trạng thái nội dung (Content State Machine) & Anti-tampering."""
 
-    def test_transition_draft_to_approved_directly_via_put_rejected(self, client):
-        """16. Không cho phép chuyển trực tiếp DRAFT sang APPROVED qua PUT /contents/{id} (HTTP 400)."""
+    def test_transition_draft_to_approved_directly_via_put_rejected(self, client, db_session):
+        """16. Không cho phép chuyển trực tiếp DRAFT sang APPROVED qua PUT /contents/{id} (HTTP 400).
+
+        ContentUpdate đã bỏ trường `status` nên guard chặn sớm: mọi thay đổi trạng thái
+        phải đi qua /submit, /approve, /reject hoặc /publish.
+        """
         mkt_headers = get_marketer_headers(client)
         resp_c = client.post("/api/v1/contents", json={
             "campaign_id": 1,
@@ -262,7 +266,17 @@ class TestDeepContentStateMachine:
 
         resp_put = client.put(f"/api/v1/contents/{content_id}", json={"status": "APPROVED"}, headers=mkt_headers)
         assert resp_put.status_code == 400
-        assert "không thể chuyển trạng thái trực tiếp sang approved" in resp_put.json()["detail"].lower()
+        detail = resp_put.json()["detail"].lower()
+        assert "trạng thái" in detail, f"Thông báo lỗi phải nêu rõ lỗi trạng thái, nhận được: {detail!r}"
+        assert "put" in detail or "submit" in detail, (
+            f"Thông báo lỗi phải hướng dẫn dùng endpoint chuyên dụng, nhận được: {detail!r}"
+        )
+
+        # Trạng thái trong DB phải được giữ nguyên, không phải APPROVED.
+        db_session.expire_all()
+        assert db_session.query(MarketingContent).filter(
+            MarketingContent.id == content_id
+        ).one().status != "APPROVED"
 
     def test_transition_ai_draft_to_approved_directly_via_put_rejected(self, client):
         """17. Không cho phép chuyển trực tiếp AI_DRAFT sang APPROVED qua PUT (HTTP 400)."""

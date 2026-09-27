@@ -32,8 +32,8 @@ def check_campaign_access_for_ai(campaign_id: int, user: User, db: Session) -> C
     if user.role == "ADMIN":
         return campaign
 
-    # Kiểm tra Tenant Isolation đối với các workspace cụ thể (> 1)
-    if campaign.workspace_id is not None and campaign.workspace_id > 1:
+    # Kiểm tra Tenant Isolation đối với workspace (kể cả workspace_id == 1)
+    if campaign.workspace_id is not None:
         ws = db.query(Workspace).filter(Workspace.id == campaign.workspace_id).first()
         is_ws_owner = ws is not None and ws.owner_id == user.id
         is_ws_member = db.query(WorkspaceMember).filter(
@@ -294,7 +294,7 @@ def generate_omnichannel(
         bk = db.query(BrandKit).filter(BrandKit.id == req.brand_kit_id).first()
         if bk:
             # Xác minh quyền truy cập Brand Kit theo Tenant Isolation
-            if current_user.role != "ADMIN" and bk.workspace_id and bk.workspace_id > 1:
+            if current_user.role != "ADMIN" and bk.workspace_id is not None:
                 ws = db.query(Workspace).filter(Workspace.id == bk.workspace_id).first()
                 is_ws_owner = ws is not None and ws.owner_id == current_user.id
                 is_ws_member = db.query(WorkspaceMember).filter(

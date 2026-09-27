@@ -95,7 +95,7 @@ def test_init_db_preserves_existing_data(isolated_engine):
     assert persisted_user.full_name == "Enterprise VIP Client"
 
     # Kiểm tra các dữ liệu mặc định cũng không bị trùng lặp
-    default_mgr = session.query(User).filter(User.email == "manager@ictu.edu.vn").all()
+    default_mgr = session.query(User).filter(User.email == "manager@gmail.com").all()
     assert len(default_mgr) == 1
 
     default_ws = session.query(Workspace).filter(Workspace.id == 1).all()

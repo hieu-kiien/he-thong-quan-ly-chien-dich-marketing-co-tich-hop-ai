@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Stethoscope, 
   Sparkles, 
@@ -12,14 +12,15 @@ import {
   Wand2, 
   Check, 
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  Info
 } from 'lucide-react';
 import { AIDoctorReport, AIDoctorRecommendation } from '../../types';
 import { campaignApi } from '../../services/api';
 import { useToast } from '../Toast';
 import { MOCK_AI_DOCTOR_REPORT } from '../../services/mockData';
 
-interface AIDoctorWidgetProps {
+export interface AIDoctorWidgetProps {
   campaignId?: number;
   initialReport?: AIDoctorReport | null;
   compact?: boolean;
@@ -38,14 +39,17 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
   const [report, setReport] = useState<AIDoctorReport | null>(initialReport || null);
   const [loading, setLoading] = useState<boolean>(false);
   const [appliedActions, setAppliedActions] = useState<Record<number, boolean>>({});
+  const [isFallback, setIsFallback] = useState<boolean>(!initialReport && !campaignId);
 
   useEffect(() => {
     if (initialReport) {
       setReport(initialReport);
+      setIsFallback(false);
     } else if (campaignId) {
       loadDiagnosis(campaignId);
     } else {
       setReport(MOCK_AI_DOCTOR_REPORT);
+      setIsFallback(true);
     }
   }, [campaignId, initialReport]);
 
@@ -54,8 +58,10 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
       setLoading(true);
       const data = await campaignApi.getAIDoctor(cid);
       setReport(data);
+      setIsFallback(false);
     } catch (e) {
       setReport({ ...MOCK_AI_DOCTOR_REPORT, campaign_id: cid });
+      setIsFallback(true);
     } finally {
       setLoading(false);
     }
@@ -79,31 +85,45 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
   const currentReport = report || MOCK_AI_DOCTOR_REPORT;
   const score = currentReport.health_score;
 
+  // Determine if Demo Mode should be flagged (sparse/insufficient data or heuristic fallback)
+  const isDemoMode = useMemo(() => {
+    if (isFallback) return true;
+    if (!report) return true;
+    if (report.is_sparse_data) return true;
+    const analyzed = report.metrics_analyzed;
+    if (analyzed) {
+      const conv = Number(analyzed.total_conversions) || 0;
+      const cost = Number(analyzed.total_cost) || 0;
+      if (conv === 0 || cost === 0) return true;
+    }
+    return false;
+  }, [report, isFallback]);
+
   // Status mapping
   const getStatusBadge = (status: string, scoreVal: number) => {
     if (status === 'HEALTHY' || scoreVal >= 75) {
       return {
         text: 'Khỏe Mạnh (HEALTHY)',
-        badge: 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300',
-        color: '#10B981',
-        stroke: 'stroke-emerald-500',
+        badge: 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300',
+        color: '#047857',
+        stroke: 'stroke-emerald-600',
         desc: 'Chiến dịch tăng trưởng tích cực, sẵn sàng tăng ngân sách'
       };
     }
     if (status === 'NEEDS_ATTENTION' || scoreVal >= 45) {
       return {
         text: 'Cần Chú Ý (NEEDS_ATTENTION)',
-        badge: 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300',
-        color: '#F59E0B',
-        stroke: 'stroke-amber-500',
+        badge: 'bg-amber-50 text-amber-900 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300',
+        color: '#B45309',
+        stroke: 'stroke-amber-600',
         desc: 'Phát hiện điểm nghẽn hiệu suất cần tối ưu hóa'
       };
     }
     return {
       text: 'Nguy Kịch (CRITICAL)',
-      badge: 'bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/40 dark:text-rose-300',
-      color: '#F43F5E',
-      stroke: 'stroke-rose-500',
+      badge: 'bg-rose-50 text-rose-900 border-rose-300 dark:bg-rose-950/40 dark:text-rose-300',
+      color: '#BE123C',
+      stroke: 'stroke-rose-600',
       desc: 'Báo động đỏ: Nguy cơ lãng phí ngân sách hoặc lỗ vốn'
     };
   };
@@ -127,15 +147,30 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
             <Stethoscope className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
                 Bác Sĩ Chiến Dịch AI (AI Doctor)
               </h3>
+              
+              {/* Zero Hallucination Pill */}
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                 Zero Hallucination
               </span>
+
+              {/* R5: Demo Mode Warning Pill Badge */}
+              {isDemoMode && (
+                <span 
+                  role="status"
+                  aria-label="Chế độ dữ liệu mẫu"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-700 text-[11px] font-bold shadow-2xs"
+                  title="Dữ liệu mẫu: Hệ thống đang chạy chế độ mô phỏng do chiến dịch chưa tích lũy đủ số liệu thực tế"
+                >
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0" aria-hidden="true" />
+                  <span>Dữ liệu Mẫu / Demo Mode</span>
+                </span>
+              )}
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
               Đánh giá sức khỏe chiến dịch và kê đơn hành động 1-click dựa trên số liệu thực tế CSDL
             </p>
           </div>
@@ -143,9 +178,10 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
 
         {campaignId && (
           <button
+            type="button"
             onClick={() => loadDiagnosis(campaignId)}
             disabled={loading}
-            className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shrink-0 self-start sm:self-auto"
+            className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shrink-0 self-start sm:self-auto focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-indigo-600' : ''}`} />
             <span>{loading ? 'Đang khám số liệu...' : 'Khám & Chẩn đoán lại'}</span>
@@ -153,13 +189,35 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
         )}
       </div>
 
+      {/* R5: Demo Mode Informative Banner */}
+      {isDemoMode && (
+        <div 
+          role="status"
+          className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5 shadow-2xs"
+        >
+          <Info className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="leading-relaxed">
+            <span className="font-bold">Chế độ Thử nghiệm (Sample / Demo Mode):</span>{' '}
+            <span>
+              Chiến dịch chưa phát sinh đủ số liệu tương tác thực tế (chi phí hoặc chuyển đổi bằng 0), hoặc hệ thống đang hiển thị phân tích dự phòng. 
+              Các chỉ số chẩn đoán và đơn thuốc bên dưới là kịch bản chuẩn để tham khảo. Khi chiến dịch bắt đầu phân phối và ghi nhận số liệu, Bác sĩ AI sẽ tự động phân tích trên 100% dữ liệu thật.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* 2. Health Score Meter & Diagnostic Summary */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center bg-gradient-to-r from-slate-50 via-indigo-50/30 to-emerald-50/30 dark:from-slate-800/40 dark:to-slate-800/20 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800">
         
         {/* Circular Gauge Meter */}
         <div className="md:col-span-4 flex items-center gap-4 justify-center md:justify-start">
           <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
-            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 96 96">
+            <svg 
+              className="w-full h-full transform -rotate-90" 
+              viewBox="0 0 96 96"
+              role="img"
+              aria-label={`Điểm sức khỏe chiến dịch: ${score} trên 100 điểm`}
+            >
               <circle
                 cx="48"
                 cy="48"
@@ -184,7 +242,7 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
               <span className="text-2xl font-black text-slate-900 dark:text-white leading-none">
                 {score}
               </span>
-              <span className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">/ 100đ</span>
+              <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase mt-0.5">/ 100đ</span>
             </div>
           </div>
 
@@ -192,7 +250,7 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
             <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold border ${statusInfo.badge}`}>
               {statusInfo.text}
             </span>
-            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 leading-tight">
+            <div className="text-[11px] font-medium text-slate-600 dark:text-slate-400 leading-tight">
               {statusInfo.desc}
             </div>
           </div>
@@ -200,8 +258,8 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
 
         {/* Diagnostic Narrative */}
         <div className="md:col-span-8 space-y-1.5 md:border-l md:border-slate-200 dark:md:border-slate-800 md:pl-5">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-700 dark:text-indigo-400" />
             <span>Tóm tắt Chẩn đoán Cấp Quản lý</span>
           </span>
           <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
@@ -214,10 +272,10 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
+            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-500" />
             <span>Điểm Nghẽn Hiệu Suất Phát Hiện ({bottlenecks.length})</span>
           </h4>
-          <span className="text-[11px] text-slate-400">Thẩm định theo thời gian thực</span>
+          <span className="text-[11px] text-slate-600 dark:text-slate-400">Thẩm định theo thời gian thực</span>
         </div>
 
         <div className="space-y-2">
@@ -232,14 +290,14 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
               >
                 <span className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 font-bold text-[10px] ${
                   isHigh 
-                    ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60' 
+                    ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-200' 
                     : isMedium 
-                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60' 
-                    : 'bg-blue-100 text-blue-700 dark:bg-blue-950/60'
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200' 
+                    : 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-200'
                 }`}>
                   {isHigh ? '!' : idx + 1}
                 </span>
-                <div className="flex-1 text-slate-700 dark:text-slate-300 leading-relaxed">
+                <div className="flex-1 text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
                   {item}
                 </div>
               </div>
@@ -252,10 +310,12 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
       <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
         <div className="flex items-center justify-between">
           <h4 className="text-xs font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Zap className="w-4 h-4 text-indigo-600" />
+            <Zap className="w-4 h-4 text-indigo-700 dark:text-indigo-400" />
             <span>Đơn Thuốc Chiến Lược & Hành Động 1-Click ({recommendations.length})</span>
           </h4>
-          <span className="text-[11px] text-emerald-600 font-bold">100% Căn Cứ Số Liệu Thật</span>
+          <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold">
+            {isDemoMode ? 'Định Hướng Mẫu' : '100% Căn Cứ Số Liệu Thật'}
+          </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -288,7 +348,7 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
                       {rec.action}
                     </span>
                     {rec.channel && (
-                      <span className="text-[11px] font-mono font-bold text-slate-500 uppercase">
+                      <span className="text-[11px] font-mono font-bold text-slate-600 dark:text-slate-400 uppercase">
                         {rec.channel}
                       </span>
                     )}
@@ -305,23 +365,24 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
 
                 <div className="space-y-2.5 pt-2">
                   {rec.impact && (
-                    <div className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <div className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
                       <TrendingUp className="w-3.5 h-3.5" />
                       <span>{rec.impact}</span>
                     </div>
                   )}
 
                   <button
+                    type="button"
                     onClick={() => handleApplyAction(idx, rec)}
                     disabled={isApplied}
-                    className={`w-full py-2 px-3 rounded-lg text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95 ${
+                    className={`w-full py-2 px-3 rounded-lg text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95 focus:outline-hidden focus:ring-2 focus:ring-offset-2 ${
                       isApplied
                         ? 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400 cursor-default'
                         : isScale
-                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20 focus:ring-emerald-500'
                         : isOptimize
-                        ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20'
-                        : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/20'
+                        ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20 focus:ring-indigo-500'
+                        : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/20 focus:ring-rose-500'
                     }`}
                   >
                     {isApplied ? (

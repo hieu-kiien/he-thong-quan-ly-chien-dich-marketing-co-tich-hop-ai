@@ -10,14 +10,14 @@ from app.models.entities import Campaign, CampaignMetric, MarketingChannel, User
 
 @pytest.fixture
 def manager_headers(client: TestClient) -> Dict[str, str]:
-    resp = client.post("/api/v1/auth/login", json={"email": "manager@ictu.edu.vn", "password": "Manager@123"})
+    resp = client.post("/api/v1/auth/login", json={"email": "manager@gmail.com", "password": "Manager@123"})
     assert resp.status_code == 200
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 
 @pytest.fixture
 def marketer_headers(client: TestClient) -> Dict[str, str]:
-    resp = client.post("/api/v1/auth/login", json={"email": "marketer@ictu.edu.vn", "password": "Marketer@123"})
+    resp = client.post("/api/v1/auth/login", json={"email": "marketer@gmail.com", "password": "Marketer@123"})
     assert resp.status_code == 200
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 

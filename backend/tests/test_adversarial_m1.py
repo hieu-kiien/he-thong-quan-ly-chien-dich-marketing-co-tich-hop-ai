@@ -71,13 +71,13 @@ class TestAdversarialWorkspaceBoundaries:
     """Stress-test workspace inputs: empty name, whitespace-only, special characters, XSS."""
 
     def test_adv_empty_workspace_name_rejected_422(self, client: TestClient):
-        token = get_token(client, "manager@ictu.edu.vn", "Manager@123")
+        token = get_token(client, "manager@gmail.com", "Manager@123")
         resp = client.post("/api/v1/workspaces", json={"name": ""}, headers=auth_headers(token))
         assert resp.status_code == 422, f"Empty workspace name returned {resp.status_code} instead of 422"
 
     def test_adv_whitespace_only_workspace_name(self, client: TestClient):
         """Adversarial vector: name containing only spaces '   '."""
-        token = get_token(client, "manager@ictu.edu.vn", "Manager@123")
+        token = get_token(client, "manager@gmail.com", "Manager@123")
         resp = client.post("/api/v1/workspaces", json={"name": "   "}, headers=auth_headers(token))
         # If whitespace-only is accepted without trimming, this is a data cleanliness vulnerability
         if resp.status_code in (200, 201):
@@ -86,7 +86,7 @@ class TestAdversarialWorkspaceBoundaries:
             assert resp.status_code == 422
 
     def test_adv_xss_and_special_chars_in_workspace(self, client: TestClient):
-        token = get_token(client, "manager@ictu.edu.vn", "Manager@123")
+        token = get_token(client, "manager@gmail.com", "Manager@123")
         payload = {
             "name": "<script>alert('xss')</script> Brand Việt Nam 🇻🇳",
             "description": "SQL' OR '1'='1 -- test"
@@ -229,7 +229,7 @@ class TestAdversarialBrandKitContract:
 
     def test_adv_put_brand_kit_without_workspace_id_query_param(self, client: TestClient):
         """As specified in PROJECT.md interface contract: PUT /api/v1/brand-kit can be called with JSON body."""
-        token = get_token(client, "manager@ictu.edu.vn", "Manager@123")
+        token = get_token(client, "manager@gmail.com", "Manager@123")
         payload = {
             "brand_name": "Test Brand",
             "usp": "Test USP",

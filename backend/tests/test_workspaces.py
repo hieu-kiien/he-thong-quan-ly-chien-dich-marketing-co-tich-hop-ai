@@ -11,7 +11,7 @@ Covers:
 import pytest
 from app.models.entities import Workspace, WorkspaceMember, BrandKit, User
 
-def get_auth_headers(client, email="manager@ictu.edu.vn", password="Manager@123"):
+def get_auth_headers(client, email="manager@gmail.com", password="Manager@123"):
     resp = client.post("/api/v1/auth/login", json={"email": email, "password": password})
     assert resp.status_code == 200, f"Login failed for {email}: {resp.text}"
     token = resp.json()["access_token"]
@@ -19,7 +19,7 @@ def get_auth_headers(client, email="manager@ictu.edu.vn", password="Manager@123"
 
 def test_list_workspaces_authenticated(client):
     """Người dùng đã đăng nhập lấy được danh sách workspace của mình."""
-    headers = get_auth_headers(client, "manager@ictu.edu.vn", "Manager@123")
+    headers = get_auth_headers(client, "manager@gmail.com", "Manager@123")
     resp = client.get("/api/v1/workspaces", headers=headers)
     assert resp.status_code == 200
     workspaces = resp.json()
@@ -33,7 +33,7 @@ def test_list_workspaces_unauthenticated_fails(client):
 
 def test_create_workspace_success(client, db_session):
     """Tạo workspace mới thành công trả về HTTP 201."""
-    headers = get_auth_headers(client, "manager@ictu.edu.vn", "Manager@123")
+    headers = get_auth_headers(client, "manager@gmail.com", "Manager@123")
     payload = {
         "name": "VinFast Auto Brand",
         "slug": "vinfast-auto",
@@ -55,7 +55,7 @@ def test_create_workspace_success(client, db_session):
 
 def test_create_workspace_auto_generates_slug(client):
     """Tạo workspace không truyền slug sẽ tự động sinh slug hợp lệ."""
-    headers = get_auth_headers(client, "manager@ictu.edu.vn", "Manager@123")
+    headers = get_auth_headers(client, "manager@gmail.com", "Manager@123")
     payload = {
         "name": "Tiki E-Commerce Workspace",
         "description": "Sàn thương mại điện tử"
@@ -68,7 +68,7 @@ def test_create_workspace_auto_generates_slug(client):
 
 def test_create_workspace_auto_initializes_brand_kit(client, db_session):
     """Tạo workspace mới tự động khởi tạo Brand Kit trong CSDL."""
-    headers = get_auth_headers(client, "manager@ictu.edu.vn", "Manager@123")
+    headers = get_auth_headers(client, "manager@gmail.com", "Manager@123")
     payload = {
         "name": "Shopee Mall Campaign",
         "slug": "shopee-mall"
@@ -83,7 +83,7 @@ def test_create_workspace_auto_initializes_brand_kit(client, db_session):
 
 def test_get_workspace_by_id_owner(client):
     """Chủ sở hữu có quyền xem chi tiết workspace."""
-    headers = get_auth_headers(client, "manager@ictu.edu.vn", "Manager@123")
+    headers = get_auth_headers(client, "manager@gmail.com", "Manager@123")
     resp = client.get("/api/v1/workspaces/1", headers=headers)
     assert resp.status_code == 200
     assert resp.json()["id"] == 1
@@ -108,7 +108,7 @@ def test_get_workspace_by_id_non_member_forbidden(client):
 
 def test_update_workspace_by_manager(client):
     """Quản lý có quyền cập nhật thông tin Workspace."""
-    headers = get_auth_headers(client, "manager@ictu.edu.vn", "Manager@123")
+    headers = get_auth_headers(client, "manager@gmail.com", "Manager@123")
     payload = {
         "name": "Không gian Tiếp thị Cập Nhật",
         "description": "Mô tả mới đã cập nhật"
@@ -119,7 +119,7 @@ def test_update_workspace_by_manager(client):
 
 def test_update_workspace_by_marketer_forbidden(client):
     """Marketer không có quyền quản trị bị chặn khi cập nhật Workspace (HTTP 403)."""
-    headers = get_auth_headers(client, "marketer@ictu.edu.vn", "Marketer@123")
+    headers = get_auth_headers(client, "marketer@gmail.com", "Marketer@123")
     payload = {
         "name": "Marketer Cố Tình Đổi Tên",
         "description": "Thao tác trái quyền"
@@ -129,7 +129,7 @@ def test_update_workspace_by_marketer_forbidden(client):
 
 def test_add_workspace_member_success(client, db_session):
     """Quản lý thêm thành viên mới vào workspace thành công, thêm trùng lặp bị từ chối."""
-    headers = get_auth_headers(client, "manager@ictu.edu.vn", "Manager@123")
+    headers = get_auth_headers(client, "manager@gmail.com", "Manager@123")
 
     # Đăng ký tài khoản mới để thêm vào workspace
     reg_payload = {

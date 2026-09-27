@@ -36,7 +36,7 @@ from app.schemas.schemas import AIDoctorResponse, ComplianceCheckResponse
 # Helper Functions & Fixtures
 # ==============================================================================
 
-def get_auth_token(client: TestClient, email: str = "manager@ictu.edu.vn", password: str = "Manager@123") -> dict:
+def get_auth_token(client: TestClient, email: str = "manager@gmail.com", password: str = "Manager@123") -> dict:
     resp = client.post("/api/v1/auth/login", json={"email": email, "password": password})
     assert resp.status_code == 200, f"Login failed for {email}: {resp.text}"
     token = resp.json()["access_token"]
@@ -45,12 +45,12 @@ def get_auth_token(client: TestClient, email: str = "manager@ictu.edu.vn", passw
 
 @pytest.fixture
 def manager_headers(client: TestClient) -> dict:
-    return get_auth_token(client, "manager@ictu.edu.vn", "Manager@123")
+    return get_auth_token(client, "manager@gmail.com", "Manager@123")
 
 
 @pytest.fixture
 def marketer_headers(client: TestClient) -> dict:
-    return get_auth_token(client, "marketer@ictu.edu.vn", "Marketer@123")
+    return get_auth_token(client, "marketer@gmail.com", "Marketer@123")
 
 
 def create_test_campaign(db: Session, name: str = "Test Campaign", budget: float = 10000000.0) -> Campaign:

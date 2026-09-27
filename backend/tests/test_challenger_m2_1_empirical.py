@@ -20,7 +20,7 @@ from app.models.entities import (
 
 @pytest.fixture
 def manager_headers(client: TestClient):
-    resp = client.post("/api/v1/auth/login", json={"email": "manager@ictu.edu.vn", "password": "Manager@123"})
+    resp = client.post("/api/v1/auth/login", json={"email": "manager@gmail.com", "password": "Manager@123"})
     assert resp.status_code == 200, f"Login failed: {resp.text}"
     token = resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
@@ -28,7 +28,7 @@ def manager_headers(client: TestClient):
 
 @pytest.fixture
 def marketer_headers(client: TestClient):
-    resp = client.post("/api/v1/auth/login", json={"email": "marketer@ictu.edu.vn", "password": "Marketer@123"})
+    resp = client.post("/api/v1/auth/login", json={"email": "marketer@gmail.com", "password": "Marketer@123"})
     assert resp.status_code == 200, f"Login failed: {resp.text}"
     token = resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
@@ -149,7 +149,7 @@ class TestChallenger1OmnichannelEmpirical:
     def test_emp_05_brand_kit_inheritance_from_workspace(self, client: TestClient, manager_headers, db_session: Session):
         """Kiểm chứng 3: Kế thừa Brand Kit (USP, Tone, Banned keywords) từ Workspace và lưu log SQLite."""
         # 1. Tạo Workspace và Brand Kit riêng biệt
-        manager = db_session.query(User).filter(User.email == "manager@ictu.edu.vn").first()
+        manager = db_session.query(User).filter(User.email == "manager@gmail.com").first()
         ws = Workspace(name="Empirical Workspace M2", slug="emp-workspace-m2", owner_id=manager.id)
         db_session.add(ws)
         db_session.commit()
@@ -238,7 +238,7 @@ class TestChallenger1OmnichannelEmpirical:
         assert r6.status_code == 404
 
         # G. Marketer không có quyền trên Campaign của người khác (403)
-        manager = db_session.query(User).filter(User.email == "manager@ictu.edu.vn").first()
+        manager = db_session.query(User).filter(User.email == "manager@gmail.com").first()
         private_camp = Campaign(
             owner_id=manager.id,
             product_id=1,

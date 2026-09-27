@@ -1,7 +1,7 @@
 import json
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field, model_validator, field_validator, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, model_validator, field_validator, ConfigDict, ValidationInfo
 
 # --- AUTH & USER ---
 class UserBase(BaseModel):
@@ -279,8 +279,13 @@ class ContentUpdate(BaseModel):
     body: Optional[str] = None
     cta: Optional[str] = None
     image_url: Optional[str] = Field(None, max_length=1024, description="URL hình ảnh sản phẩm/banner mới (hoặc chuỗi rỗng để gỡ ảnh)")
-    status: Optional[str] = Field(None, pattern="^(DRAFT|AI_DRAFT|IN_REVIEW|APPROVED|REJECTED|PUBLISHED)$")
+    # status KHONG duoc cap nhat qua PUT. Moi chuyen trang thai phai qua cac endpoint chuyen trang thai: /submit, /approve, /reject, /publish.
     warnings_json: Optional[str] = None
+
+    # extra="allow": giu lai truong "status" do client gui len de endpoint PUT co the
+    # tu choi ro rang bang HTTP 400 thay vi bo qua im lang. Endpoint chi doc cac
+    # thuoc tinh khai bao o tren, truong extra khong bao gio duoc gan vao model.
+    model_config = ConfigDict(extra="allow")
 
     @field_validator("image_url")
     @classmethod
@@ -324,7 +329,7 @@ class ViolationItem(BaseModel):
     suggestion: str = Field(..., description="Đề xuất diễn đạt thay thế an toàn")
 
 class ComplianceCheckRequest(BaseModel):
-    workspace_id: Optional[int] = Field(1, description="ID Workspace chứa cấu hình Brand Kit")
+    workspace_id: Optional[int] = Field(None, description="ID Workspace chứa cấu hình Brand Kit")
     channel: Optional[str] = Field("facebook", description="Kênh truyền thông")
     title: Optional[str] = Field("", description="Tiêu đề nội dung cần quét")
     body: Optional[str] = Field("", description="Thân bài viết cần quét")
@@ -339,13 +344,18 @@ class ComplianceCheckResponse(BaseModel):
 # --- CONTENT REVIEW ---
 class ReviewCreate(BaseModel):
     decision: str = Field(..., pattern="^(APPROVED|REJECTED|REQUEST_CHANGES)$")
-    reason: Optional[str] = Field(None, description="Lý do phê duyệt hoặc từ chối")
+    reason: Optional[str] = Field(None, min_length=3, description="Lý do phê duyệt hoặc từ chối (tối thiểu 3 ký tự)")
 
     @field_validator("reason")
     @classmethod
     def validate_reason_not_blank(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and not v.strip():
-            raise ValueError("Lý do từ chối không được để trống hoặc chỉ chứa khoảng trắng")
+        if v is not None:
+            clean = v.strip()
+            if not clean:
+                raise ValueError("Lý do từ chối không được để trống hoặc chỉ chứa khoảng trắng")
+            if len(clean) < 3:
+                raise ValueError("Lý do từ chối quá ngắn (tối thiểu 3 ký tự)")
+            return clean
         return v
 
 class ReviewResponse(BaseModel):
@@ -360,9 +370,13 @@ class ReviewResponse(BaseModel):
 
 # --- MARKETING SCHEDULE ---
 class ScheduleCreate(BaseModel):
-    content_id: int
+    content_id: Optional[int] = None
     scheduled_at: str # YYYY-MM-DD HH:MM
     timezone: str = "Asia/Ho_Chi_Minh"
+
+class ScheduleUpdate(BaseModel):
+    scheduled_at: Optional[str] = Field(None, description="Thời gian hẹn đăng mới (YYYY-MM-DD HH:MM hoặc ISO)")
+    timezone: Optional[str] = Field("Asia/Ho_Chi_Minh", description="Múi giờ đăng bài")
 
 class ScheduleResponse(BaseModel):
     id: int
@@ -467,6 +481,7 @@ class KPISummaryResponse(BaseModel):
     ctr_percent: float # (clicks / views) * 100
     cpc_avg: float     # cost / clicks
     cvr_percent: float # (conversions / clicks) * 100
+    cpa_avg: float = Field(0.0, description="Cost Per Acquisition = total_cost / total_conversions")
     roi_percent: float # ((revenue - cost) / cost) * 100
     roas: float = Field(0.0, description="Return on Ad Spend = revenue / cost")
     channel_metrics: Optional[List[ChannelAttributionResponse]] = Field(default_factory=list)
@@ -744,9 +759,9 @@ EmailContentResponse = EmailCreative
 # ==============================================================================
 
 class AIKeyTestRequest(BaseModel):
-    provider: str = Field("gemini", description="Nhà cung cấp AI (chỉ chấp nhận 'gemini')")
+    provider: str = Field("gemini", pattern="^(gemini|openrouter|openai)$", description="Nhà cung cấp AI ('gemini', 'openrouter', 'openai')")
     api_key: str = Field(..., description="API Key cần kiểm tra")
-    model: Optional[str] = Field("gemini-2.5-flash", description="Model Google Gemini cần kiểm tra")
+    model: Optional[str] = Field("gemini-2.5-flash", description="Model AI cần kiểm tra")
 
     @field_validator("api_key")
     @classmethod
@@ -755,31 +770,66 @@ class AIKeyTestRequest(BaseModel):
             raise ValueError("API Key không được để trống hoặc chỉ chứa khoảng trắng.")
         return v.strip()
 
-    @field_validator("provider")
+    @field_validator("provider", mode="before")
     @classmethod
-    def validate_provider(cls, v: str) -> str:
-        lower_p = (v or "").lower().strip()
-        prohibited_providers = ["anthropic", "openai", "claude", "gpt"]
-        for p in prohibited_providers:
-            if p in lower_p:
-                raise ValueError(f"Nhà cung cấp '{v}' bị nghiêm cấm theo chính sách dự án. Chỉ hỗ trợ Google Gemini.")
-        if lower_p not in ["gemini", "google"]:
-            raise ValueError(f"Nhà cung cấp '{v}' không được hỗ trợ. Chỉ hỗ trợ 'gemini'.")
-        return "gemini"
+    def validate_provider(cls, v: Any) -> str:
+        # Chạy TRƯỚC ràng buộc `pattern` của field để trả thông báo lỗi thân thiện,
+        # đồng thời chuẩn hoá alias ("google" -> "gemini", "gpt" -> "openai") về đúng
+        # 3 provider trong whitelist. `pattern` vẫn là lớp phòng thủ thứ hai.
+        if not isinstance(v, str):
+            raise ValueError(f"Nhà cung cấp '{v}' không được hỗ trợ. Chỉ hỗ trợ 'gemini', 'openrouter', 'openai'.")
+        lower_p = v.lower().strip()
+        if lower_p in ["google", "gemini"]:
+            return "gemini"
+        if lower_p == "openrouter":
+            return "openrouter"
+        if lower_p in ["openai", "gpt"]:
+            return "openai"
+        raise ValueError(f"Nhà cung cấp '{v}' không được hỗ trợ. Chỉ hỗ trợ 'gemini', 'openrouter', 'openai'.")
 
     @field_validator("model")
     @classmethod
-    def validate_model(cls, v: Optional[str]) -> str:
+    def validate_model(cls, v: Optional[str], info: ValidationInfo) -> str:
+        provider = info.data.get("provider", "gemini") if info.data else "gemini"
         if not v or not v.strip():
+            if provider == "openai":
+                return "gpt-4o"
+            elif provider == "openrouter":
+                return "meta-llama/llama-3.3-70b-instruct"
             return "gemini-2.5-flash"
-        lower_m = v.lower().strip()
-        prohibited_models = ["claude-3-7-sonnet", "gpt-4o", "claude-3-5-sonnet", "claude", "gpt", "sonnet"]
-        for p in prohibited_models:
-            if p in lower_m:
-                raise ValueError(f"Mô hình '{v}' bị nghiêm cấm theo chính sách dự án. Chỉ chấp nhận mô hình Google Gemini.")
-        if not lower_m.startswith("gemini"):
-            raise ValueError(f"Mô hình '{v}' không thuộc hệ sinh thái Google Gemini.")
-        return lower_m
+        clean_m = v.strip()
+        lower_m = clean_m.lower()
+
+        if provider == "gemini":
+            if not lower_m.startswith("gemini"):
+                raise ValueError(f"Mô hình '{v}' không thuộc hệ sinh thái Google Gemini.")
+            return lower_m
+        elif provider == "openai":
+            valid_prefixes = ("gpt-", "o1", "o3", "text-embedding-", "chatgpt-")
+            if not any(lower_m.startswith(p) for p in valid_prefixes):
+                raise ValueError(f"Mô hình '{v}' không thuộc hệ sinh thái OpenAI.")
+            return lower_m
+        elif provider == "openrouter":
+            if "/" not in clean_m or len(clean_m) < 3:
+                raise ValueError(f"Mô hình '{v}' không hợp lệ cho OpenRouter (cần định dạng tác giả/tên-mô-hình, ví dụ 'meta-llama/llama-3.3-70b-instruct').")
+            return clean_m
+        return clean_m
+
+    @model_validator(mode="after")
+    def validate_provider_and_model_compatibility(self) -> "AIKeyTestRequest":
+        prov = (self.provider or "gemini").lower().strip()
+        m = (self.model or "").lower().strip()
+        if prov == "gemini":
+            if not m.startswith("gemini"):
+                raise ValueError(f"Mô hình '{self.model}' không thuộc hệ sinh thái Google Gemini.")
+        elif prov == "openai":
+            valid_prefixes = ("gpt-", "o1", "o3", "text-embedding-", "chatgpt-")
+            if not any(m.startswith(p) for p in valid_prefixes):
+                raise ValueError(f"Mô hình '{self.model}' không thuộc hệ sinh thái OpenAI.")
+        elif prov == "openrouter":
+            if "/" not in self.model or len(self.model) < 3:
+                raise ValueError(f"Mô hình '{self.model}' không hợp lệ cho OpenRouter.")
+        return self
 
 
 class AIKeyTestResponse(BaseModel):
@@ -792,9 +842,9 @@ class AIKeyTestResponse(BaseModel):
 
 
 class AIKeyCreate(BaseModel):
-    provider: str = Field("gemini", description="Nhà cung cấp AI")
+    provider: str = Field("gemini", pattern="^(gemini|openrouter|openai)$", description="Nhà cung cấp AI ('gemini', 'openrouter', 'openai')")
     api_key: str = Field(..., description="API Key cần lưu trữ an toàn")
-    model: Optional[str] = Field("gemini-2.5-flash", description="Model Gemini lựa chọn")
+    model: Optional[str] = Field("gemini-2.5-flash", description="Model AI lựa chọn")
     workspace_id: Optional[int] = Field(None, description="ID Workspace nếu lưu khóa cho Workspace")
     is_active: Optional[bool] = Field(True, description="Trạng thái kích hoạt khóa")
 
@@ -805,31 +855,53 @@ class AIKeyCreate(BaseModel):
             raise ValueError("API Key không được để trống hoặc chỉ chứa khoảng trắng.")
         return v.strip()
 
-    @field_validator("provider")
+    @field_validator("provider", mode="before")
     @classmethod
-    def validate_provider(cls, v: str) -> str:
-        lower_p = (v or "").lower().strip()
-        prohibited = ["anthropic", "openai", "claude", "gpt"]
-        for p in prohibited:
-            if p in lower_p:
-                raise ValueError(f"Nhà cung cấp '{v}' bị cấm. Chỉ hỗ trợ Google Gemini.")
-        if lower_p not in ["gemini", "google"]:
-            raise ValueError(f"Nhà cung cấp '{v}' không được hỗ trợ. Chỉ hỗ trợ 'gemini'.")
-        return "gemini"
+    def validate_provider(cls, v: Any) -> str:
+        # Chạy TRƯỚC ràng buộc `pattern` của field để trả thông báo lỗi thân thiện,
+        # đồng thời chuẩn hoá alias ("google" -> "gemini", "gpt" -> "openai") về đúng
+        # 3 provider trong whitelist. `pattern` vẫn là lớp phòng thủ thứ hai.
+        if not isinstance(v, str):
+            raise ValueError(f"Nhà cung cấp '{v}' không được hỗ trợ. Chỉ hỗ trợ 'gemini', 'openrouter', 'openai'.")
+        lower_p = v.lower().strip()
+        if lower_p in ["google", "gemini"]:
+            return "gemini"
+        if lower_p == "openrouter":
+            return "openrouter"
+        if lower_p in ["openai", "gpt"]:
+            return "openai"
+        raise ValueError(f"Nhà cung cấp '{v}' không được hỗ trợ. Chỉ hỗ trợ 'gemini', 'openrouter', 'openai'.")
 
     @field_validator("model")
     @classmethod
-    def validate_model(cls, v: Optional[str]) -> str:
+    def validate_model(cls, v: Optional[str], info: ValidationInfo) -> str:
+        provider = info.data.get("provider", "gemini") if info.data else "gemini"
         if not v or not v.strip():
+            if provider == "openai":
+                return "gpt-4o"
+            elif provider == "openrouter":
+                return "meta-llama/llama-3.3-70b-instruct"
             return "gemini-2.5-flash"
-        lower_m = v.lower().strip()
-        prohibited = ["claude-3-7-sonnet", "gpt-4o", "claude-3-5-sonnet", "claude", "gpt", "sonnet"]
-        for p in prohibited:
-            if p in lower_m:
-                raise ValueError(f"Mô hình '{v}' bị nghiêm cấm. Chỉ hỗ trợ Google Gemini.")
-        if not lower_m.startswith("gemini"):
-            raise ValueError(f"Mô hình '{v}' không thuộc hệ sinh thái Google Gemini.")
-        return lower_m
+        clean_m = v.strip()
+        lower_m = clean_m.lower()
+
+        if provider == "gemini":
+            if not lower_m.startswith("gemini"):
+                raise ValueError(f"Mô hình '{v}' không thuộc hệ sinh thái Google Gemini.")
+            return lower_m
+        elif provider == "openai":
+            valid_prefixes = ("gpt-", "o1", "o3", "text-embedding-", "chatgpt-")
+            if not any(lower_m.startswith(p) for p in valid_prefixes):
+                raise ValueError(f"Mô hình '{v}' không thuộc hệ sinh thái OpenAI.")
+            return lower_m
+        elif provider == "openrouter":
+            if "/" not in clean_m or len(clean_m) < 3:
+                raise ValueError(f"Mô hình '{v}' không hợp lệ cho OpenRouter (cần định dạng tác giả/tên-mô-hình, ví dụ 'meta-llama/llama-3.3-70b-instruct').")
+            return clean_m
+        return clean_m
+
+
+AISettingsUpdate = AIKeyCreate
 
 
 class AIKeyResponse(BaseModel):
@@ -850,4 +922,23 @@ class AIKeyResponse(BaseModel):
 
 AIKeySaveRequest = AIKeyCreate
 AIKeySaveResponse = AIKeyResponse
+
+
+# --- NOTIFICATIONS ---
+class NotificationUpdate(BaseModel):
+    read: Optional[bool] = Field(None, description="Trạng thái đã đọc")
+
+class NotificationResponse(BaseModel):
+    id: int
+    user_id: Optional[int] = None
+    workspace_id: int
+    title: str
+    message: str
+    type: str
+    read: bool
+    target_tab: Optional[str] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
 

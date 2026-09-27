@@ -152,7 +152,7 @@ class TestAttackScenario2_TokenClaimsSpoofingAndInactiveUserBypass:
         và cố gắng phê duyệt hoặc xuất bản nội dung.
         Hệ thống phải truy vấn DB để xác thực vai trò thực tế và chặn với 403 Forbidden.
         """
-        marketer = db_session.query(User).filter(User.email == "marketer@ictu.edu.vn").first()
+        marketer = db_session.query(User).filter(User.email == "marketer@gmail.com").first()
         assert marketer is not None
         assert marketer.role == "MARKETER"
 
@@ -184,7 +184,7 @@ class TestAttackScenario2_TokenClaimsSpoofingAndInactiveUserBypass:
         """Tài khoản quản lý bị vô hiệu hóa (status='DISABLED') nhưng kẻ tấn công có token hợp lệ.
         Hệ thống phải kiểm tra user.status == 'ACTIVE' trong DB và chặn với 403 Forbidden.
         """
-        manager = db_session.query(User).filter(User.email == "manager@ictu.edu.vn").first()
+        manager = db_session.query(User).filter(User.email == "manager@gmail.com").first()
         assert manager is not None
         orig_status = manager.status
         try:

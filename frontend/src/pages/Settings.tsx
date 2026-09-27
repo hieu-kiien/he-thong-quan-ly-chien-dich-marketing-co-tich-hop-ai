@@ -8,6 +8,135 @@ import { settingsApi, getApiErrorMessage } from '../services/api';
 import { useToast } from '../components/Toast';
 import { CustomApiKey, AIKeyTestResponse, User as UserType, Workspace } from '../types';
 
+const PROVIDER_CONFIGS = {
+  gemini: {
+    name: 'Google Gemini',
+    initials: 'G',
+    initialsColor: 'text-indigo-600',
+    badge: 'Chính thức',
+    badgeColor: 'bg-emerald-100 text-emerald-800',
+    desc: 'Hệ sinh thái Gemini tối ưu tốc độ và chi phí với cửa sổ ngữ cảnh lớn.',
+    keyLabel: 'Google Gemini API Key',
+    keyLink: 'https://aistudio.google.com/app/apikey',
+    linkText: 'Lấy API Key tại Google AI Studio',
+    placeholder: 'AIzaSy... (Dán khóa API Google Gemini tại đây)',
+    models: [
+      {
+        id: 'gemini-2.5-flash',
+        name: 'Gemini 2.5 Flash',
+        badge: 'Khuyên dùng',
+        badgeColor: 'bg-indigo-100 text-indigo-700',
+        desc: 'Tốc độ cực nhanh (~120ms), tối ưu sáng tạo đa kênh Facebook, TikTok, Email.'
+      },
+      {
+        id: 'gemini-2.5-pro',
+        name: 'Gemini 2.5 Pro',
+        badge: 'Chuyên sâu',
+        badgeColor: 'bg-purple-100 text-purple-700',
+        desc: 'Suy luận chiến lược phức tạp, tối ưu cho phân tích Bác sĩ AI Doctor.'
+      },
+      {
+        id: 'gemini-2.0-flash',
+        name: 'Gemini 2.0 Flash',
+        badge: 'Cân bằng',
+        badgeColor: 'bg-blue-100 text-blue-700',
+        desc: 'Cân đối giữa tốc độ phản hồi và chi phí vận hành hàng ngày.'
+      },
+      {
+        id: 'gemini-1.5-flash',
+        name: 'Gemini 1.5 Flash',
+        badge: 'Tiết kiệm',
+        badgeColor: 'bg-slate-100 text-slate-700',
+        desc: 'Phù hợp các tác vụ tóm tắt ngắn và trích xuất từ khóa đơn giản.'
+      }
+    ]
+  },
+  openrouter: {
+    name: 'OpenRouter',
+    initials: 'OR',
+    initialsColor: 'text-purple-600',
+    badge: 'Đa mô hình',
+    badgeColor: 'bg-purple-100 text-purple-800',
+    desc: 'Cổng Gateway kết nối hàng trăm mô hình mã nguồn mở và thương mại.',
+    keyLabel: 'OpenRouter API Key',
+    keyLink: 'https://openrouter.ai/keys',
+    linkText: 'Lấy API Key tại OpenRouter',
+    placeholder: 'sk-or-v1-... (Dán khóa API OpenRouter tại đây)',
+    models: [
+      {
+        id: 'meta-llama/llama-3.3-70b-instruct',
+        name: 'Llama 3.3 70B',
+        badge: 'Khuyên dùng',
+        badgeColor: 'bg-indigo-100 text-indigo-700',
+        desc: 'Mô hình mã nguồn mở hàng đầu, văn phong tiếp thị tự nhiên và sáng tạo.'
+      },
+      {
+        id: 'google/gemini-2.5-flash',
+        name: 'Gemini 2.5 Flash (OR)',
+        badge: 'Cân bằng',
+        badgeColor: 'bg-blue-100 text-blue-700',
+        desc: 'Truy cập Gemini qua OpenRouter gateway tốc độ cao.'
+      },
+      {
+        id: 'anthropic/claude-3.5-sonnet',
+        name: 'Claude 3.5 Sonnet',
+        badge: 'Cao cấp',
+        badgeColor: 'bg-amber-100 text-amber-800',
+        desc: 'Chất lượng văn phong vượt trội, lý luận sắc bén cho chiến dịch lớn.'
+      },
+      {
+        id: 'openai/gpt-4o-mini',
+        name: 'GPT-4o Mini (OR)',
+        badge: 'Tiết kiệm',
+        badgeColor: 'bg-emerald-100 text-emerald-800',
+        desc: 'Nhanh, chi phí siêu rẻ cho việc sinh tiêu đề và hashtag hàng loạt.'
+      }
+    ]
+  },
+  openai: {
+    name: 'OpenAI',
+    initials: 'OA',
+    initialsColor: 'text-emerald-600',
+    badge: 'Tiêu chuẩn',
+    badgeColor: 'bg-blue-100 text-blue-800',
+    desc: 'Dòng mô hình GPT và o-series hàng đầu thế giới từ OpenAI.',
+    keyLabel: 'OpenAI API Key',
+    keyLink: 'https://platform.openai.com/api-keys',
+    linkText: 'Lấy API Key tại OpenAI Platform',
+    placeholder: 'sk-... (Dán khóa API OpenAI tại đây)',
+    models: [
+      {
+        id: 'gpt-4o',
+        name: 'GPT-4o',
+        badge: 'Khuyên dùng',
+        badgeColor: 'bg-indigo-100 text-indigo-700',
+        desc: 'Mô hình đa nhiệm thông minh nhất, xuất sắc trong sáng tạo kịch bản video và email.'
+      },
+      {
+        id: 'gpt-4o-mini',
+        name: 'GPT-4o Mini',
+        badge: 'Tiết kiệm',
+        badgeColor: 'bg-emerald-100 text-emerald-800',
+        desc: 'Tối ưu độ trễ thấp và chi phí tiết kiệm cho các tác vụ hàng ngày.'
+      },
+      {
+        id: 'gpt-3.5-turbo',
+        name: 'GPT-3.5 Turbo',
+        badge: 'Cơ bản',
+        badgeColor: 'bg-slate-100 text-slate-700',
+        desc: 'Mô hình truyền thống ổn định cho việc trích xuất và phân loại nội dung.'
+      },
+      {
+        id: 'o3-mini',
+        name: 'o3-mini',
+        badge: 'Suy luận',
+        badgeColor: 'bg-purple-100 text-purple-700',
+        desc: 'Chuyên sâu giải toán, lập luận logic và phân tích chỉ số Attribution.'
+      }
+    ]
+  }
+};
+
 interface SettingsProps {
   currentUser?: UserType | null;
   currentWorkspace?: Workspace | null;
@@ -18,6 +147,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
   const [activeTab, setActiveTab] = useState<'byok' | 'profile' | 'workspace'>('byok');
 
   // BYOK Form States
+  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'openrouter' | 'openai'>('gemini');
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
@@ -71,7 +201,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
 
     try {
       const res = await settingsApi.testConnection({
-        provider: 'gemini',
+        provider: selectedProvider,
         api_key: apiKey.trim(),
         model: selectedModel
       });
@@ -102,7 +232,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
 
     try {
       await settingsApi.saveKey({
-        provider: 'gemini',
+        provider: selectedProvider,
         api_key: apiKey.trim(),
         model: selectedModel,
         workspace_id: scope === 'workspace' ? (currentWorkspace?.id || 1) : null,
@@ -246,67 +376,55 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
               </div>
 
               <form onSubmit={handleSaveKey} className="space-y-6">
-                {/* Provider Selection */}
+                {/* Provider Selection (BYOK Multi-Provider) */}
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
                     Nhà cung cấp AI (AI Provider)
                   </label>
-                  <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center font-bold text-indigo-600 text-xs shadow-sm">
-                        G
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                          Google Gemini AI Studio
-                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-semibold rounded-full">
-                            Chính thức & Độc quyền
-                          </span>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {(Object.keys(PROVIDER_CONFIGS) as Array<keyof typeof PROVIDER_CONFIGS>).map((pKey) => {
+                      const p = PROVIDER_CONFIGS[pKey];
+                      const isSelected = selectedProvider === pKey;
+                      return (
+                        <div
+                          key={pKey}
+                          onClick={() => {
+                            setSelectedProvider(pKey);
+                            setSelectedModel(p.models[0].id);
+                          }}
+                          className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                            isSelected
+                              ? 'border-indigo-600 bg-indigo-50/50 shadow-sm'
+                              : 'border-slate-200 hover:border-slate-300 bg-white'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center font-bold text-xs shadow-sm ${p.initialsColor}`}>
+                                  {p.initials}
+                                </div>
+                                <span className="font-bold text-sm text-slate-900">{p.name}</span>
+                              </div>
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${p.badgeColor}`}>
+                                {p.badge}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 leading-snug">{p.desc}</p>
+                          </div>
                         </div>
-                        <p className="text-xs text-slate-500">
-                          Tuân thủ chính sách bảo mật doanh nghiệp MarketFlow AI (Không hỗ trợ Claude hoặc GPT).
-                        </p>
-                      </div>
-                    </div>
+                      );
+                    })}
                   </div>
                 </div>
 
                 {/* Model Selection */}
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Lựa chọn Mô hình AI (Gemini Model)
+                    Lựa chọn Mô hình AI ({PROVIDER_CONFIGS[selectedProvider].name} Model)
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {[
-                      {
-                        id: 'gemini-2.5-flash',
-                        name: 'Gemini 2.5 Flash',
-                        badge: 'Khuyên dùng',
-                        badgeColor: 'bg-indigo-100 text-indigo-700',
-                        desc: 'Tốc độ cực nhanh (~120ms), tối ưu sáng tạo đa kênh Facebook, TikTok, Email.'
-                      },
-                      {
-                        id: 'gemini-2.5-pro',
-                        name: 'Gemini 2.5 Pro',
-                        badge: 'Chuyên sâu',
-                        badgeColor: 'bg-purple-100 text-purple-700',
-                        desc: 'Suy luận chiến lược phức tạp, tối ưu cho phân tích Bác sĩ AI Doctor.'
-                      },
-                      {
-                        id: 'gemini-2.0-flash',
-                        name: 'Gemini 2.0 Flash',
-                        badge: 'Cân bằng',
-                        badgeColor: 'bg-blue-100 text-blue-700',
-                        desc: 'Cân đối giữa tốc độ phản hồi và chi phí vận hành hàng ngày.'
-                      },
-                      {
-                        id: 'gemini-flash-lite',
-                        name: 'Gemini Flash Lite',
-                        badge: 'Tiết kiệm',
-                        badgeColor: 'bg-slate-100 text-slate-700',
-                        desc: 'Phù hợp các tác vụ tóm tắt ngắn và trích xuất từ khóa đơn giản.'
-                      }
-                    ].map((m) => (
+                    {PROVIDER_CONFIGS[selectedProvider].models.map((m) => (
                       <div
                         key={m.id}
                         onClick={() => setSelectedModel(m.id)}
@@ -390,15 +508,15 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="block text-sm font-semibold text-slate-700">
-                      Google Gemini API Key
+                      {PROVIDER_CONFIGS[selectedProvider].keyLabel}
                     </label>
                     <a
-                      href="https://aistudio.google.com/app/apikey"
+                      href={PROVIDER_CONFIGS[selectedProvider].keyLink}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs text-indigo-600 hover:text-indigo-700 flex items-center gap-1 font-medium"
                     >
-                      Lấy API Key tại Google AI Studio
+                      {PROVIDER_CONFIGS[selectedProvider].linkText}
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
@@ -407,7 +525,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
                       type={showKey ? 'text' : 'password'}
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="AIzaSy... (Dán khóa API Google Gemini tại đây)"
+                      placeholder={PROVIDER_CONFIGS[selectedProvider].placeholder}
                       className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm pr-12 transition-all shadow-sm"
                     />
                     <button
@@ -433,7 +551,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
                       {isTesting ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
-                          <span>Đang kiểm tra kết nối với Gemini AI...</span>
+                          <span>Đang kiểm tra kết nối với {PROVIDER_CONFIGS[selectedProvider].name}...</span>
                         </>
                       ) : (
                         <>

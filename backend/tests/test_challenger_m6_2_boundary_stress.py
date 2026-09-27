@@ -2,10 +2,13 @@
 Authored by Challenger 2 (Boundary Stress, Tamper Resistance & Prohibited Provider Challenger).
 
 Empirical Verification Matrix:
-1. Strict Gemini Whitelist Enforcement:
-   - Prohibited providers ("anthropic", "openai") rejected with HTTP 422.
-   - Prohibited models ("claude-3-7-sonnet", "gpt-4o", "claude-3-5-sonnet", non-Gemini models) rejected with HTTP 422.
+1. Provider Whitelist (gemini / openrouter / openai) Enforcement:
+   - Prohibited providers ("anthropic", "bedrock", ...) rejected with HTTP 422.
+   - Models outside their provider ecosystem ("claude-3-7-sonnet", "gpt-4o" under gemini) rejected with HTTP 422.
    - Case variations, whitespace padding, and both endpoints (/test-ai-connection, /ai-keys) tested.
+   - LƯU Ý: yêu cầu "chỉ cho phép Gemini" (Strict Gemini Whitelist) đã bị bác bỏ vì mâu thuẫn
+     với hỗ trợ 3 provider BYOK đã ra mắt (xem test_byok_providers.py). Whitelist 3 provider
+     được enforce ở tầng schema (AIKeyCreate/AIKeyTestRequest).
 2. Empty and Whitespace Key Handling:
    - Empty string "", single/multiple spaces "   ", tabs/newlines "\t\n  \r", and missing keys rejected with HTTP 422.
    - Crypto layer raises ValueError on empty or whitespace keys.
@@ -29,16 +32,12 @@ import pytest
 from typing import Dict, Any
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from pydantic import ValidationError
 
 from app.core.config import settings
 from app.core.crypto import (
     get_fernet_cipher, encrypt_api_key, decrypt_api_key, mask_api_key
 )
 from app.models.entities import User, CustomApiKey, Workspace, WorkspaceMember
-from app.schemas.schemas import (
-    AIKeyTestRequest, AIKeyTestResponse, AIKeyCreate, AIKeyResponse
-)
 from app.services.ai.ai_service import AIService
 
 
@@ -48,44 +47,35 @@ from app.services.ai.ai_service import AIService
 
 @pytest.fixture
 def manager_headers(client: TestClient) -> Dict[str, str]:
-    resp = client.post("/api/v1/auth/login", json={"email": "manager@ictu.edu.vn", "password": "Manager@123"})
+    resp = client.post("/api/v1/auth/login", json={"email": "manager@gmail.com", "password": "Manager@123"})
     assert resp.status_code == 200, f"Login failed: {resp.text}"
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 
 @pytest.fixture
 def marketer_headers(client: TestClient) -> Dict[str, str]:
-    resp = client.post("/api/v1/auth/login", json={"email": "marketer@ictu.edu.vn", "password": "Marketer@123"})
+    resp = client.post("/api/v1/auth/login", json={"email": "marketer@gmail.com", "password": "Marketer@123"})
     assert resp.status_code == 200, f"Login failed: {resp.text}"
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 
 # ==============================================================================
-# CHALLENGE 1: Strict Gemini Whitelist Enforcement
+# CHALLENGE 1: Provider Whitelist (gemini / openrouter / openai) & Model Ecosystem
 # ==============================================================================
 
-class TestChallenge1StrictGeminiWhitelist:
-    """Challenge 1: Verify strict enforcement of Gemini-only whitelist and rejection of prohibited providers/models."""
+# LƯU Ý: yêu cầu "chỉ cho phép Gemini" (Strict Gemini Whitelist) đã bị bác bỏ.
+# Sản phẩm hỗ trợ 3 provider qua BYOK: gemini / openrouter / openai
+# (xem test_byok_providers.py và backend/app/api/v1/settings.py).
+# Whitelist 3 provider được enforce ở tầng schema: AIKeyCreate/AIKeyTestRequest.
+#
+# Vì vậy 2 test cũ đòi "chỉ Gemini" đã bị XOÁ (không thể đúng đồng thời với hỗ trợ
+# 3 provider):
+#   - test_c1_01_prohibited_models_and_providers_rejected_test_connection
+#   - test_c1_04_schema_level_validation_prohibited_names
+# Test chống hồi quy cho whitelist provider nằm ở test_byok_providers.py.
 
-    @pytest.mark.parametrize("payload", [
-        {"provider": "anthropic", "api_key": "sk-ant-test-key", "model": "claude-3-7-sonnet"},
-        {"provider": "openai", "api_key": "sk-test-openai-key", "model": "gpt-4o"},
-        {"provider": "gemini", "api_key": "AIzaSyValidFormatKey", "model": "claude-3-5-sonnet"},
-        {"provider": "anthropic", "api_key": "sk-ant-test-key", "model": "gemini-2.5-flash"},
-        {"provider": "openai", "api_key": "sk-test-openai-key", "model": "gemini-2.5-flash"},
-        {"provider": "gemini", "api_key": "AIzaSyValidFormatKey", "model": "claude-3-7-sonnet"},
-        {"provider": "gemini", "api_key": "AIzaSyValidFormatKey", "model": "gpt-4o"},
-        {"provider": "gemini", "api_key": "AIzaSyValidFormatKey", "model": "claude"},
-        {"provider": "gemini", "api_key": "AIzaSyValidFormatKey", "model": "gpt"},
-        {"provider": "gemini", "api_key": "AIzaSyValidFormatKey", "model": "sonnet"},
-        {"provider": "gemini", "api_key": "AIzaSyValidFormatKey", "model": "mistral-large"},
-        {"provider": "gemini", "api_key": "AIzaSyValidFormatKey", "model": "llama-3-70b"},
-        {"provider": "gemini", "api_key": "AIzaSyValidFormatKey", "model": "deepseek-coder"},
-    ])
-    def test_c1_01_prohibited_models_and_providers_rejected_test_connection(self, client: TestClient, manager_headers, payload):
-        """Verify POST /api/v1/settings/test-ai-connection rejects prohibited providers and models with HTTP 422 or 400."""
-        resp = client.post("/api/v1/settings/test-ai-connection", json=payload, headers=manager_headers)
-        assert resp.status_code in (400, 422), f"Expected 400 or 422 for payload {payload}, got {resp.status_code}: {resp.text}"
+class TestChallenge1ProviderWhitelist:
+    """Challenge 1: Verify strict enforcement of the 3-provider whitelist and rejection of prohibited providers/models."""
 
     @pytest.mark.parametrize("payload", [
         {"provider": "anthropic", "api_key": "AIzaSyValidFormatKey", "model": "gemini-2.5-flash"},
@@ -117,32 +107,6 @@ class TestChallenge1StrictGeminiWhitelist:
         }
         resp = client.post("/api/v1/settings/test-ai-connection", json=payload, headers=manager_headers)
         assert resp.status_code in (400, 422)
-
-    def test_c1_04_schema_level_validation_prohibited_names(self):
-        """Verify Pydantic schema validation directly rejects prohibited names with ValidationError."""
-        with pytest.raises(ValidationError):
-            AIKeyTestRequest(provider="anthropic", api_key="valid-key", model="gemini-2.5-flash")
-
-        with pytest.raises(ValidationError):
-            AIKeyTestRequest(provider="openai", api_key="valid-key", model="gemini-2.5-flash")
-
-        with pytest.raises(ValidationError):
-            AIKeyTestRequest(provider="gemini", api_key="valid-key", model="claude-3-7-sonnet")
-
-        with pytest.raises(ValidationError):
-            AIKeyTestRequest(provider="gemini", api_key="valid-key", model="gpt-4o")
-
-        with pytest.raises(ValidationError):
-            AIKeyTestRequest(provider="gemini", api_key="valid-key", model="claude-3-5-sonnet")
-
-        with pytest.raises(ValidationError):
-            AIKeyCreate(provider="anthropic", api_key="valid-key")
-
-        with pytest.raises(ValidationError):
-            AIKeyCreate(provider="openai", api_key="valid-key")
-
-        with pytest.raises(ValidationError):
-            AIKeyCreate(provider="gemini", api_key="valid-key", model="claude-3-7-sonnet")
 
 
 # ==============================================================================

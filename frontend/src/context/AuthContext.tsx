@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
-import { authApi } from '../services/api';
+import { authApi, getApiErrorMessage } from '../services/api';
+import { useToast } from '../components/Toast';
 
 interface AuthContextType {
   user: User | null;
@@ -15,6 +16,9 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // ToastProvider bao ngoài AuthProvider trong App.tsx; showToast dùng useCallback nên
+  // tham chiếu ổn định, nên việc dùng trong effect khởi tạo (chạy đúng một lần) là an toàn.
+  const toast = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -30,19 +34,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userData = await authApi.getMe();
         setUser(userData);
       } catch (err: any) {
-        // Nếu lỗi 401/403, phiên đăng nhập đã hết hạn
-        if (err?.response?.status === 401 || err?.response?.status === 403) {
-          authApi.logout();
-          setUser(null);
-        } else {
-          // Lỗi mạng hoặc server offline, đọc thông tin lưu tạm từ localStorage
-          const cachedUser = authApi.getCurrentUser();
-          if (cachedUser) {
-            setUser(cachedUser);
-          } else {
-            authApi.logout();
-            setUser(null);
-          }
+        // KHÔNG được coi là "đã đăng nhập" khi không xác minh được với máy chủ.
+        // current_user trong localStorage là dữ liệu tự do, không phải bằng chứng phiên còn hiệu lực.
+        // Trước đây lỗi mạng rơi vào nhánh else và đọc chính dữ liệu đó: ai cũng có thể tự dựng
+        // app shell đã đăng nhập trên máy mình. Giờ: không xác minh được thì dứt phiên, hết quyền.
+        // 401/403 = phiên hết hạn/bị thu hồi (về trang đăng nhập là hành vi đúng).
+        // Mọi lỗi còn lại (mạng, timeout, 5xx) = KHÔNG xác minh được, cũng phải dứt phiên.
+        const status = err?.response?.status;
+        const isSessionRejected = status === 401 || status === 403;
+        authApi.logout();
+        setUser(null);
+        if (!isSessionRejected) {
+          // Thông báo chuẩn, dùng lại helper sẵn có của lớp api thay vì tự phức tạp.
+          toast.warning(
+            getApiErrorMessage(err),
+            'Không thể xác minh phiên đăng nhập - vui lòng đăng nhập lại'
+          );
         }
       } finally {
         setIsLoading(false);

@@ -11,15 +11,15 @@ def get_auth_headers(client, email: str, password: str) -> dict:
 
 
 def get_marketer_headers(client) -> dict:
-    return get_auth_headers(client, "marketer@ictu.edu.vn", "Marketer@123")
+    return get_auth_headers(client, "marketer@gmail.com", "Marketer@123")
 
 
 def get_manager_headers(client) -> dict:
-    return get_auth_headers(client, "manager@ictu.edu.vn", "Manager@123")
+    return get_auth_headers(client, "manager@gmail.com", "Manager@123")
 
 
 def get_approver_headers(client) -> dict:
-    return get_auth_headers(client, "approver@ictu.edu.vn", "Approver@123")
+    return get_auth_headers(client, "approver@gmail.com", "Approver@123")
 
 
 # ==============================================================================

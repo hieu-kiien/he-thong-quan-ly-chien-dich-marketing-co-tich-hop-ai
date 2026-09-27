@@ -8,7 +8,7 @@ def test_tc_pos_01_login_valid(client):
     """TC_POS_01: Đăng nhập hợp lệ cho Manager và Marketer, trả về JWT Token."""
     # 1. Đăng nhập Manager
     resp_mgr = client.post("/api/v1/auth/login", json={
-        "email": "manager@ictu.edu.vn",
+        "email": "manager@gmail.com",
         "password": "Manager@123"
     })
     assert resp_mgr.status_code == 200
@@ -18,7 +18,7 @@ def test_tc_pos_01_login_valid(client):
 
     # 2. Đăng nhập Marketer
     resp_mkt = client.post("/api/v1/auth/login", json={
-        "email": "marketer@ictu.edu.vn",
+        "email": "marketer@gmail.com",
         "password": "Marketer@123"
     })
     assert resp_mkt.status_code == 200
@@ -31,7 +31,7 @@ def test_tc_pos_02_create_campaign_valid(client):
     """TC_POS_02: Tạo chiến dịch hợp lệ (start_date < end_date, budget >= 0)."""
     # Lấy token marketer
     login_resp = client.post("/api/v1/auth/login", json={
-        "email": "marketer@ictu.edu.vn",
+        "email": "marketer@gmail.com",
         "password": "Marketer@123"
     })
     token = login_resp.json()["access_token"]
@@ -57,7 +57,7 @@ def test_tc_pos_02_create_campaign_valid(client):
 def test_tc_pos_03_ai_ideas_valid_schema(client):
     """TC_POS_03: AI sinh 5 ý tưởng theo schema JSON hợp lệ."""
     login_resp = client.post("/api/v1/auth/login", json={
-        "email": "marketer@ictu.edu.vn",
+        "email": "marketer@gmail.com",
         "password": "Marketer@123"
     })
     token = login_resp.json()["access_token"]
@@ -85,7 +85,7 @@ def test_tc_pos_04_manager_approve_content(client):
     """TC_POS_04: Manager phê duyệt nội dung đang ở trạng thái IN_REVIEW."""
     # Đăng nhập bằng Manager
     mgr_login = client.post("/api/v1/auth/login", json={
-        "email": "manager@ictu.edu.vn",
+        "email": "manager@gmail.com",
         "password": "Manager@123"
     })
     token = mgr_login.json()["access_token"]
@@ -101,7 +101,7 @@ def test_tc_pos_04_manager_approve_content(client):
 def test_tc_pos_05_calculate_kpi_correct(client):
     """TC_POS_05: Tính toán CTR, CPC, ROI chuẩn xác từ các metrics."""
     login_resp = client.post("/api/v1/auth/login", json={
-        "email": "marketer@ictu.edu.vn",
+        "email": "marketer@gmail.com",
         "password": "Marketer@123"
     })
     token = login_resp.json()["access_token"]
@@ -124,7 +124,7 @@ def test_tc_pos_05_calculate_kpi_correct(client):
 def test_tc_neg_01_login_invalid_password(client):
     """TC_NEG_01: Đăng nhập sai mật khẩu trả về HTTP 401 Unauthorized."""
     resp = client.post("/api/v1/auth/login", json={
-        "email": "manager@ictu.edu.vn",
+        "email": "manager@gmail.com",
         "password": "WrongPassword@999"
     })
     assert resp.status_code == 401
@@ -134,7 +134,7 @@ def test_tc_neg_01_login_invalid_password(client):
 def test_tc_neg_02_create_campaign_invalid_dates(client):
     """TC_NEG_02: Tạo chiến dịch có end_date < start_date trả về HTTP 422."""
     login_resp = client.post("/api/v1/auth/login", json={
-        "email": "marketer@ictu.edu.vn",
+        "email": "marketer@gmail.com",
         "password": "Marketer@123"
     })
     token = login_resp.json()["access_token"]
@@ -157,7 +157,7 @@ def test_tc_neg_03_marketer_delete_campaign_forbidden(client):
     """TC_NEG_03: Marketer xóa chiến dịch bị từ chối với HTTP 403 Forbidden."""
     # Đăng nhập với Marketer (không có quyền xóa)
     login_resp = client.post("/api/v1/auth/login", json={
-        "email": "marketer@ictu.edu.vn",
+        "email": "marketer@gmail.com",
         "password": "Marketer@123"
     })
     token = login_resp.json()["access_token"]
@@ -175,7 +175,7 @@ def test_tc_neg_03_marketer_delete_campaign_forbidden(client):
 def test_tc_bnd_01_zero_division_protection(client):
     """TC_BND_01: Chiến dịch 0 views và 0 clicks không crash ZeroDivisionError."""
     login_resp = client.post("/api/v1/auth/login", json={
-        "email": "manager@ictu.edu.vn",
+        "email": "manager@gmail.com",
         "password": "Manager@123"
     })
     token = login_resp.json()["access_token"]
@@ -195,7 +195,7 @@ def test_tc_bnd_01_zero_division_protection(client):
 def test_tc_bnd_02_zero_budget_campaign(client):
     """TC_BND_02: Chiến dịch với ngân sách 0đ là trường hợp biên hợp lệ."""
     login_resp = client.post("/api/v1/auth/login", json={
-        "email": "marketer@ictu.edu.vn",
+        "email": "marketer@gmail.com",
         "password": "Marketer@123"
     })
     token = login_resp.json()["access_token"]
@@ -218,7 +218,7 @@ def test_tc_bnd_02_zero_budget_campaign(client):
 def test_tc_bnd_03_metric_clicks_cannot_exceed_views(client):
     """TC_BND_03: Ràng buộc logic clicks không thể lớn hơn views."""
     login_resp = client.post("/api/v1/auth/login", json={
-        "email": "marketer@ictu.edu.vn",
+        "email": "marketer@gmail.com",
         "password": "Marketer@123"
     })
     token = login_resp.json()["access_token"]
@@ -246,7 +246,7 @@ def test_tc_pos_06_schedule_approved_content(client):
     """TC_POS_06: Lập lịch đăng hợp lệ cho nội dung đã được APPROVED."""
     # 1. Manager duyệt bài content 1
     mgr_login = client.post("/api/v1/auth/login", json={
-        "email": "manager@ictu.edu.vn",
+        "email": "manager@gmail.com",
         "password": "Manager@123"
     })
     token = mgr_login.json()["access_token"]
@@ -267,7 +267,7 @@ def test_tc_pos_06_schedule_approved_content(client):
 def test_tc_neg_04_schedule_unapproved_content_rejected(client):
     """TC_NEG_04: Lập lịch đăng cho nội dung chưa được duyệt (IN_REVIEW/DRAFT) bị từ chối với HTTP 400."""
     mkt_login = client.post("/api/v1/auth/login", json={
-        "email": "marketer@ictu.edu.vn",
+        "email": "marketer@gmail.com",
         "password": "Marketer@123"
     })
     token = mkt_login.json()["access_token"]
@@ -287,7 +287,7 @@ def test_tc_neg_04_schedule_unapproved_content_rejected(client):
 def test_tc_pos_07_filter_campaigns_by_channel_and_date(client):
     """TC_POS_07: Tra cứu chiến dịch theo kênh, khoảng thời gian và trạng thái (Mục 3.1.7)."""
     mkt_login = client.post("/api/v1/auth/login", json={
-        "email": "marketer@ictu.edu.vn",
+        "email": "marketer@gmail.com",
         "password": "Marketer@123"
     })
     token = mkt_login.json()["access_token"]
@@ -304,7 +304,7 @@ def test_tc_pos_07_filter_campaigns_by_channel_and_date(client):
 def test_tc_pos_08_get_channels_and_products(client):
     """TC_POS_08: Lấy danh sách kênh truyền thông và sản phẩm hợp lệ (Mục 3.1.3)."""
     mkt_login = client.post("/api/v1/auth/login", json={
-        "email": "marketer@ictu.edu.vn",
+        "email": "marketer@gmail.com",
         "password": "Marketer@123"
     })
     token = mkt_login.json()["access_token"]

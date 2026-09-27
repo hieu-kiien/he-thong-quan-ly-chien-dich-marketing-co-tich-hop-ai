@@ -183,9 +183,13 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   // Reject Content
   const handleRejectConfirm = async () => {
     if (!rejectModalContent) return;
+    if (rejectReason.trim().length < 3) {
+      toast.warning("Vui lòng nhập lý do từ chối cụ thể (tối thiểu 3 ký tự)!");
+      return;
+    }
     try {
       setRejectingAction(true);
-      await contentApi.reject(rejectModalContent.id, rejectReason);
+      await contentApi.reject(rejectModalContent.id, rejectReason.trim());
       toast.warning('Đã từ chối bài viết và gửi yêu cầu chỉnh sửa cho Marketer');
       setRejectModalContent(null);
       if (onRefreshData) onRefreshData();
@@ -1660,14 +1664,17 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
-                Lý do từ chối & Yêu cầu chỉnh sửa cụ thể cho Marketer:
+              <label className="text-xs font-bold text-slate-700 block mb-1 flex items-center justify-between">
+                <span>Lý do từ chối & Yêu cầu chỉnh sửa cụ thể cho Marketer (tối thiểu 3 ký tự):</span>
+                <span className={`text-[10px] font-semibold ${rejectReason.trim().length >= 3 ? 'text-emerald-600' : 'text-slate-500'}`}>
+                  {rejectReason.trim().length}/3
+                </span>
               </label>
               <textarea
                 rows={3}
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Nhập yêu cầu hiệu chỉnh (VD: Giọng điệu quá suồng sã, cần đổi CTA...)"
+                placeholder="Nhập yêu cầu hiệu chỉnh (VD: Giọng điệu quá suồng sã, cần đổi CTA - tối thiểu 3 ký tự)..."
                 className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-800 focus:outline-hidden focus:border-rose-500"
               />
             </div>
@@ -1683,8 +1690,8 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
               <button
                 type="button"
                 onClick={handleRejectConfirm}
-                disabled={rejectingAction}
-                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md shadow-rose-600/20"
+                disabled={rejectingAction || rejectReason.trim().length < 3}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md shadow-rose-600/20"
               >
                 {rejectingAction ? <RefreshCw className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
                 <span>Xác nhận Từ chối</span>

@@ -18,7 +18,7 @@ from app.services.ai.ai_service import ai_service
 # Authentication & Header Helpers
 # ==============================================================================
 
-def get_auth_headers_for(client, email: str = "marketer@ictu.edu.vn", password: str = "Marketer@123") -> dict:
+def get_auth_headers_for(client, email: str = "marketer@gmail.com", password: str = "Marketer@123") -> dict:
     """Helper to authenticate and return Bearer headers for a specific user."""
     resp = client.post("/api/v1/auth/login", json={"email": email, "password": password})
     assert resp.status_code == 200, f"Login failed for {email}: {resp.text}"
@@ -26,11 +26,11 @@ def get_auth_headers_for(client, email: str = "marketer@ictu.edu.vn", password: 
 
 
 def get_marketer_headers(client) -> dict:
-    return get_auth_headers_for(client, "marketer@ictu.edu.vn", "Marketer@123")
+    return get_auth_headers_for(client, "marketer@gmail.com", "Marketer@123")
 
 
 def get_manager_headers(client) -> dict:
-    return get_auth_headers_for(client, "manager@ictu.edu.vn", "Manager@123")
+    return get_auth_headers_for(client, "manager@gmail.com", "Manager@123")
 
 
 # ==============================================================================
@@ -125,7 +125,7 @@ class TestAuthenticationAndSecurityEdgeCases:
     def test_expired_jwt_token_returns_401(self, client):
         """Token JWT đã hết hạn (expired) trả về HTTP 401 Unauthorized."""
         expired_token = create_access_token(
-            data={"sub": "1", "email": "marketer@ictu.edu.vn", "role": "MARKETER"},
+            data={"sub": "1", "email": "marketer@gmail.com", "role": "MARKETER"},
             expires_delta=timedelta(seconds=-10)
         )
         headers = {"Authorization": f"Bearer {expired_token}"}
@@ -151,7 +151,7 @@ class TestAuthenticationAndSecurityEdgeCases:
 
         # 3. JWT ký bằng secret key khác (giả mạo signature)
         forged_token = jwt.encode(
-            {"sub": "1", "email": "marketer@ictu.edu.vn", "role": "MARKETER"},
+            {"sub": "1", "email": "marketer@gmail.com", "role": "MARKETER"},
             "FORGED_SECRET_KEY_LONGER_THAN_32_BYTES_FOR_HMAC_SHA256",
             algorithm="HS256"
         )
@@ -173,7 +173,7 @@ class TestAuthenticationAndSecurityEdgeCases:
         assert "không hợp lệ" in r1.json()["detail"].lower()
 
         # 2. Token không chứa trường 'sub'
-        token_no_sub = create_access_token(data={"email": "ghost@ictu.edu.vn", "role": "MARKETER"})
+        token_no_sub = create_access_token(data={"email": "ghost@gmail.com", "role": "MARKETER"})
         r2 = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token_no_sub}"})
         assert r2.status_code == 401
         assert "không chứa định danh" in r2.json()["detail"].lower()
@@ -186,7 +186,7 @@ class TestAuthenticationAndSecurityEdgeCases:
 
     def test_deactivated_user_receives_403_forbidden(self, client, db_session):
         """Người dùng có trạng thái DISABLED / INACTIVE bị chặn với HTTP 403 Forbidden."""
-        user = db_session.query(User).filter(User.email == "marketer@ictu.edu.vn").first()
+        user = db_session.query(User).filter(User.email == "marketer@gmail.com").first()
         user.status = "DISABLED"
         db_session.commit()
 
@@ -201,12 +201,12 @@ class TestAuthenticationAndSecurityEdgeCases:
 
     def test_login_with_deactivated_user_returns_403_forbidden(self, client, db_session):
         """Đăng nhập bằng tài khoản đã bị vô hiệu hóa trả về HTTP 403 Forbidden."""
-        user = db_session.query(User).filter(User.email == "marketer@ictu.edu.vn").first()
+        user = db_session.query(User).filter(User.email == "marketer@gmail.com").first()
         user.status = "DISABLED"
         db_session.commit()
 
         resp = client.post("/api/v1/auth/login", json={
-            "email": "marketer@ictu.edu.vn",
+            "email": "marketer@gmail.com",
             "password": "Marketer@123"
         })
         assert resp.status_code == 403
@@ -250,11 +250,15 @@ class TestBoundaryValueAndInputValidation:
         "SUPER_ADMIN",
         "NOT_A_STATUS"
     ])
-    def test_content_update_with_invalid_status_returns_422(self, client, invalid_status):
-        """ContentUpdate với status không hợp lệ trả về HTTP 422, KHÔNG BAO GIỜ là 500."""
+    def test_content_update_with_invalid_status_rejected(self, client, invalid_status):
+        """ContentUpdate với status không hợp lệ bị từ chối (400/422), KHÔNG BAO GIỜ là 500.
+
+        `status` đã bị gỡ khỏi ContentUpdate nên guard trả 400; 422 vẫn được chấp nhận
+        để test không phụ thuộc vào tầng lỗi cụ thể.
+        """
         headers = get_marketer_headers(client)
         resp = client.put("/api/v1/contents/1", json={"status": invalid_status}, headers=headers)
-        assert resp.status_code == 422
+        assert resp.status_code in (400, 422)
         assert resp.status_code != 500
 
     @pytest.mark.parametrize("bad_date", [

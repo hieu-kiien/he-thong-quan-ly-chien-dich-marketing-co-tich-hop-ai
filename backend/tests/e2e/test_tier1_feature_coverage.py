@@ -41,7 +41,7 @@ class TestTier1FeatureCoverageR1:
         data = resp.json()
         assert "access_token" in data
         assert data["token_type"].lower() == "bearer"
-        assert data["user"]["email"] in ("manager@gmail.com", "manager@ictu.edu.vn")
+        assert data["user"]["email"] in ("manager@gmail.com", "manager@gmail.com")
         assert data["user"]["role"] in ("ADMIN", "MANAGER", "AGENCY_MANAGER")
 
     def test_t1_r1_03_create_workspace(self, client: TestClient, manager_headers):

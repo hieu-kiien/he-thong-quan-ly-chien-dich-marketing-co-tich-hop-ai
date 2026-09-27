@@ -157,7 +157,11 @@ class Campaign(Base):
     __tablename__ = "campaigns"
 
     id = Column(Integer, primary_key=True, index=True)
-    workspace_id = Column(Integer, ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="SET NULL"), nullable=True, default=1)
+    # NULL van con ton tai trong schema de khong pha migration CSDL cu, nhung KHONG con duoc coi la
+    # hop le o tang kiem tra quyen: cac noi dung kiem tra phan quyen (check_campaign_access,
+    # check_workspace_boundary, check_content_access) quy tac FAIL-CLOSED, tu choi truy cap
+    # khi workspace_id IS NULL. Can migration dan de gan workspace cho du lieu cu.
+    workspace_id = Column(Integer, ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="SET NULL"), nullable=True)
     product_id = Column(Integer, ForeignKey("products.id", onupdate="CASCADE", ondelete="RESTRICT"), nullable=False)
     owner_id = Column(Integer, ForeignKey("users.id", onupdate="CASCADE", ondelete="RESTRICT"), nullable=False)
     name = Column(String(255), nullable=False)
@@ -207,7 +211,10 @@ class MarketingContent(Base):
     __tablename__ = "marketing_contents"
 
     id = Column(Integer, primary_key=True, index=True)
-    workspace_id = Column(Integer, ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="SET NULL"), nullable=True, default=1)
+    # NULL van con ton tai trong schema de khong pha migration CSDL cu, nhung KHONG con duoc coi la
+    # hop le o tang kiem tra quyen: check_content_access / check_workspace_boundary quy tac
+    # FAIL-CLOSED, tu choi truy cap khi workspace_id IS NULL. Can migration dan de gan workspace.
+    workspace_id = Column(Integer, ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="SET NULL"), nullable=True)
     campaign_id = Column(Integer, ForeignKey("campaigns.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     channel_id = Column(Integer, ForeignKey("marketing_channels.id", onupdate="CASCADE", ondelete="RESTRICT"), nullable=False)
     created_by = Column(Integer, ForeignKey("users.id", onupdate="CASCADE", ondelete="RESTRICT"), nullable=False)
@@ -356,4 +363,27 @@ class CustomApiKey(Base):
 
     user = relationship("User", back_populates="custom_api_keys")
     workspace = relationship("Workspace", back_populates="custom_api_keys")
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=True, index=True)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+    type = Column(String(50), nullable=False, default="info") # 'review', 'campaign', 'ai', 'warning', 'info'
+    read = Column(Boolean, nullable=False, default=False)
+    target_tab = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("idx_notifications_user_ws", "user_id", "workspace_id", "read"),
+        Index("idx_notifications_created", "created_at"),
+    )
+
+    user = relationship("User")
+    workspace = relationship("Workspace")
+
 

@@ -57,7 +57,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
   
   // Custom Inputs
   const [customTopic, setCustomTopic] = useState<string>('Chiến dịch Tuyển sinh Chuyên ngành AI & Khoa học Dữ liệu 2026');
-  const [customProduct, setCustomProduct] = useState<string>('Khóa đào tạo Kỹ sư Trí tuệ Nhân tạo Thực chiến ICTU');
+  const [customProduct, setCustomProduct] = useState<string>('Khóa đào tạo Kỹ sư Trí tuệ Nhân tạo Thực chiến');
   const [customUsp, setCustomUsp] = useState<string>('Chương trình chuẩn quốc tế, thực hành trên GPU hiệu năng cao, cam kết việc làm');
   const [tone, setTone] = useState<string>('Chuyên nghiệp, truyền cảm hứng, tin cậy');
   const [channelCode, setChannelCode] = useState<string>('facebook');
@@ -67,7 +67,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
   const [studioSection, setStudioSection] = useState<'omnichannel' | 'create' | 'doctor'>('omnichannel');
 
   // Omnichannel States (R2)
-  const [omniBrief, setOmniBrief] = useState<string>('Chiến dịch Tuyển sinh Kỹ sư Trí tuệ Nhân tạo ICTU 2026. Khán giả: Sinh viên CNTT, người chuyển ngành công nghệ. USP: Học thực hành GPU xịn, cam kết kết nối việc làm ngay khi tốt nghiệp.');
+  const [omniBrief, setOmniBrief] = useState<string>('Chiến dịch Tuyển sinh Kỹ sư Trí tuệ Nhân tạo 2026. Khán giả: Sinh viên CNTT, người chuyển ngành công nghệ. USP: Học thực hành GPU xịn, cam kết kết nối việc làm ngay khi tốt nghiệp.');
   const [omniData, setOmniData] = useState<OmnichannelResponse | null>(null);
   const [omniLoading, setOmniLoading] = useState<boolean>(false);
   const [omniFilter, setOmniFilter] = useState<'all' | 'facebook' | 'tiktok' | 'email'>('all');

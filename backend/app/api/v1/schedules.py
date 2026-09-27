@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.entities import MarketingSchedule, MarketingContent, User, Workspace, WorkspaceMember, Campaign, CampaignMember
-from app.schemas.schemas import ScheduleCreate, ScheduleResponse
+from app.schemas.schemas import ScheduleCreate, ScheduleUpdate, ScheduleResponse
 from app.api.v1.contents import check_content_access
+from app.services.scheduler.worker import process_due_schedules
 
 router = APIRouter(tags=["Quản lý Lịch đăng"])
 
@@ -18,7 +19,7 @@ def get_schedules(
     query = db.query(MarketingSchedule).join(MarketingContent, MarketingSchedule.content_id == MarketingContent.id)
 
     if workspace_id is not None:
-        if current_user.role != "ADMIN" and workspace_id > 1:
+        if current_user.role != "ADMIN":
             ws = db.query(Workspace).filter(Workspace.id == workspace_id).first()
             is_owner = ws is not None and ws.owner_id == current_user.id
             is_member = db.query(WorkspaceMember).filter(
@@ -43,9 +44,7 @@ def get_schedules(
             ).subquery()
             query = query.filter(
                 (MarketingContent.workspace_id.in_(user_workspaces.select())) |
-                (MarketingContent.workspace_id.in_(owned_workspaces.select())) |
-                (MarketingContent.workspace_id == 1) |
-                (MarketingContent.workspace_id.is_(None))
+                (MarketingContent.workspace_id.in_(owned_workspaces.select()))
             )
         else:
             allowed_campaigns = db.query(Campaign.id).filter(
@@ -97,3 +96,90 @@ def schedule_content(
     db.commit()
     db.refresh(schedule)
     return ScheduleResponse.model_validate(schedule)
+
+@router.delete("/schedules/{schedule_id}", response_model=ScheduleResponse)
+@router.post("/schedules/{schedule_id}/cancel", response_model=ScheduleResponse)
+def cancel_schedule(
+    schedule_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Hủy lịch đăng bài viết. Trạng thái lịch đổi sang CANCELLED, nội dung bài viết vẫn giữ APPROVED."""
+    schedule = db.query(MarketingSchedule).filter(MarketingSchedule.id == schedule_id).first()
+    if not schedule:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lịch đăng không tồn tại")
+
+    content = db.query(MarketingContent).filter(MarketingContent.id == schedule.content_id).first()
+    if not content:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nội dung liên kết không tồn tại")
+
+    check_content_access(content, current_user, db)
+
+    if schedule.status == "EXECUTED":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Không thể hủy lịch đăng đã thực thi (EXECUTED)."
+        )
+
+    schedule.status = "CANCELLED"
+    db.commit()
+    db.refresh(schedule)
+    return ScheduleResponse.model_validate(schedule)
+
+@router.put("/schedules/{schedule_id}", response_model=ScheduleResponse)
+@router.patch("/schedules/{schedule_id}", response_model=ScheduleResponse)
+def update_schedule(
+    schedule_id: int,
+    req: ScheduleUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Cập nhật thời gian hẹn đăng / múi giờ. Nếu lịch đã bị CANCELLED trước đó, đưa về PLANNED."""
+    schedule = db.query(MarketingSchedule).filter(MarketingSchedule.id == schedule_id).first()
+    if not schedule:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lịch đăng không tồn tại")
+
+    content = db.query(MarketingContent).filter(MarketingContent.id == schedule.content_id).first()
+    if not content:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nội dung liên kết không tồn tại")
+
+    check_content_access(content, current_user, db)
+
+    if schedule.status == "EXECUTED":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Không thể cập nhật hoặc dời lịch đăng đã thực thi (EXECUTED)."
+        )
+
+    if content.status != "APPROVED":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Chỉ có thể dời lịch cho nội dung đã được Quản lý phê duyệt (APPROVED). Trạng thái hiện tại: {content.status}"
+        )
+
+    if req.scheduled_at is not None:
+        schedule.scheduled_at = req.scheduled_at
+    if req.timezone is not None:
+        schedule.timezone = req.timezone
+
+    # Nếu lịch trước đó bị hủy (CANCELLED), kích hoạt lại thành PLANNED
+    if schedule.status == "CANCELLED":
+        schedule.status = "PLANNED"
+
+    db.commit()
+    db.refresh(schedule)
+    return ScheduleResponse.model_validate(schedule)
+
+@router.post("/schedules/trigger-worker")
+def trigger_scheduler_worker(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Kích hoạt thủ công tiến trình Scheduler Worker kiểm tra và thực thi các lịch đến hạn."""
+    processed_ids = process_due_schedules(db)
+    return {
+        "message": "Scheduler worker executed successfully",
+        "processed_schedule_ids": processed_ids,
+        "count": len(processed_ids)
+    }
+

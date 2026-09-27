@@ -14,11 +14,11 @@ def get_auth_headers(client: TestClient, email: str, password: str) -> Dict[str,
 
 @pytest.fixture
 def manager_headers(client: TestClient) -> Dict[str, str]:
-    return get_auth_headers(client, "manager@ictu.edu.vn", "Manager@123")
+    return get_auth_headers(client, "manager@gmail.com", "Manager@123")
 
 @pytest.fixture
 def marketer_headers(client: TestClient) -> Dict[str, str]:
-    return get_auth_headers(client, "marketer@ictu.edu.vn", "Marketer@123")
+    return get_auth_headers(client, "marketer@gmail.com", "Marketer@123")
 
 @pytest.fixture
 def approver_headers(client: TestClient, db_session) -> Dict[str, str]:

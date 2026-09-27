@@ -83,6 +83,25 @@ def ensure_sqlite_schema_compatibility(db_engine=engine):
                     conn.exec_driver_sql("ALTER TABLE custom_api_keys ADD COLUMN user_id INTEGER")
                 if "is_active" not in key_cols:
                     conn.exec_driver_sql("ALTER TABLE custom_api_keys ADD COLUMN is_active BOOLEAN DEFAULT 1")
+
+            # Cảnh báo toàn vẹn tenant: các bản ghi thiếu workspace_id sẽ bị từ chối
+            # truy cập ở tầng phân quyền (fail-closed). Cần migration để gán workspace.
+            try:
+                orphan_campaigns = conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM campaigns WHERE workspace_id IS NULL"
+                ).scalar()
+                orphan_contents = conn.exec_driver_sql(
+                    "SELECT COUNT(*) FROM marketing_contents WHERE workspace_id IS NULL"
+                ).scalar()
+                if orphan_campaigns or orphan_contents:
+                    logger.warning(
+                        "Tenant integrity: %s campaign(s) and %s content row(s) have NULL workspace_id "
+                        "and will be rejected by record-level authorization. Run a data migration.",
+                        orphan_campaigns, orphan_contents,
+                    )
+            except Exception:
+                logger.debug("Tenant integrity probe skipped", exc_info=True)
+
             conn.commit()
     except Exception as e:
         logger.error("Database schema migration failed: %s", e, exc_info=True)

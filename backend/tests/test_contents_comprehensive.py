@@ -97,7 +97,7 @@ class TestWorkspaceBoundaryEnforcement:
     def test_foreign_user_cannot_approve_workspace_content(self, client, db_session, setup_isolated_workspaces):
         """Manager / Approver thuộc Workspace 1 không được duyệt bài viết thuộc Workspace 2 (403 Forbidden)."""
         content_ws2 = setup_isolated_workspaces["content_ws2"]
-        user_ws1_manager = db_session.query(User).filter(User.email == "manager@ictu.edu.vn").first()
+        user_ws1_manager = db_session.query(User).filter(User.email == "manager@gmail.com").first()
         headers = get_headers_for_user(user_ws1_manager)
 
         resp = client.post(f"/api/v1/contents/{content_ws2.id}/approve", headers=headers)
@@ -107,7 +107,7 @@ class TestWorkspaceBoundaryEnforcement:
     def test_foreign_user_cannot_reject_workspace_content(self, client, db_session, setup_isolated_workspaces):
         """Manager / Approver thuộc Workspace 1 không được từ chối bài viết thuộc Workspace 2 (403 Forbidden)."""
         content_ws2 = setup_isolated_workspaces["content_ws2"]
-        user_ws1_approver = db_session.query(User).filter(User.email == "approver@ictu.edu.vn").first()
+        user_ws1_approver = db_session.query(User).filter(User.email == "approver@gmail.com").first()
         headers = get_headers_for_user(user_ws1_approver)
 
         resp = client.post(
@@ -124,7 +124,7 @@ class TestWorkspaceBoundaryEnforcement:
         content_ws2.status = "APPROVED"
         db_session.commit()
 
-        user_ws1_manager = db_session.query(User).filter(User.email == "manager@ictu.edu.vn").first()
+        user_ws1_manager = db_session.query(User).filter(User.email == "manager@gmail.com").first()
         headers = get_headers_for_user(user_ws1_manager)
 
         resp = client.post(f"/api/v1/contents/{content_ws2.id}/publish", headers=headers)
@@ -137,28 +137,58 @@ class TestWorkspaceBoundaryEnforcement:
         content_ws2.status = "DRAFT"
         db_session.commit()
 
-        user_ws1_marketer = db_session.query(User).filter(User.email == "marketer@ictu.edu.vn").first()
+        user_ws1_marketer = db_session.query(User).filter(User.email == "marketer@gmail.com").first()
         headers = get_headers_for_user(user_ws1_marketer)
 
         resp = client.post(f"/api/v1/contents/{content_ws2.id}/submit", headers=headers)
         assert resp.status_code == 403
         assert resp.json()["detail"] == "User does not have access to this workspace content"
 
-    def test_workspace_member_can_approve_and_publish_their_own_content(self, client, db_session, setup_isolated_workspaces):
-        """Thành viên hợp lệ của Workspace 2 thao tác thành công trên nội dung của chính họ."""
+    def test_separated_approver_can_approve_content_of_another_author(self, client, db_session, setup_isolated_workspaces):
+        """Happy path đúng nghiệp vụ: người DUYỆT khác người TẠO.
+
+        Nội dung do AGENCY_MANAGER (user A) tạo, CLIENT_APPROVER (user B - khác A, cùng
+        Workspace 2) phê duyệt. Đây là mô hình Human-in-the-loop / Separation of Duties:
+        người viết không được tự phê duyệt bài của chính mình.
+        """
         content_ws2 = setup_isolated_workspaces["content_ws2"]
         mgr2 = setup_isolated_workspaces["user_ws2_manager"]
+        approver2 = setup_isolated_workspaces["user_ws2_approver"]
+
+        # Người tạo và người duyệt phải là hai tài khoản KHÁC NHAU
+        assert content_ws2.created_by == mgr2.id
+        assert approver2.id != mgr2.id
+        assert approver2.role == "CLIENT_APPROVER"
+
+        headers_approver2 = get_headers_for_user(approver2)
         headers_mgr2 = get_headers_for_user(mgr2)
 
-        # 1. Approve
-        r_app = client.post(f"/api/v1/contents/{content_ws2.id}/approve", headers=headers_mgr2)
+        # 1. Approve bởi người duyệt độc lập -> thành công
+        r_app = client.post(f"/api/v1/contents/{content_ws2.id}/approve", headers=headers_approver2)
         assert r_app.status_code == 200
         assert r_app.json()["status"] == "APPROVED"
 
-        # 2. Publish
+        # 2. Publish (chỉ MANAGER/AGENCY_MANAGER được publish)
         r_pub = client.post(f"/api/v1/contents/{content_ws2.id}/publish", headers=headers_mgr2)
         assert r_pub.status_code == 200
         assert r_pub.json()["status"] == "PUBLISHED"
+
+    def test_author_cannot_approve_own_content(self, client, db_session, setup_isolated_workspaces):
+        """P0 regression: người TẠO bị cấm tự phê duyệt bài của chính mình (403 Forbidden)."""
+        content_ws2 = setup_isolated_workspaces["content_ws2"]
+        mgr2 = setup_isolated_workspaces["user_ws2_manager"]
+        assert content_ws2.created_by == mgr2.id
+
+        headers_mgr2 = get_headers_for_user(mgr2)
+        resp = client.post(f"/api/v1/contents/{content_ws2.id}/approve", headers=headers_mgr2)
+        assert resp.status_code == 403
+        assert "tự phê duyệt" in resp.json()["detail"].lower()
+
+        # Trạng thái trong DB phải được giữ nguyên ở IN_REVIEW
+        db_session.expire_all()
+        assert db_session.query(MarketingContent).filter(
+            MarketingContent.id == content_ws2.id
+        ).one().status == "IN_REVIEW"
 
 
 class TestHardenedRoleCheckerAndSubValidation:
@@ -184,7 +214,7 @@ class TestHardenedRoleCheckerAndSubValidation:
 
     def test_forged_payload_role_rejected_by_db_role_check(self, client, db_session):
         """Kẻ tấn công giả mạo payload role='MANAGER' nhưng tài khoản trong DB là MARKETER -> bị chặn 403."""
-        marketer = db_session.query(User).filter(User.email == "marketer@ictu.edu.vn").first()
+        marketer = db_session.query(User).filter(User.email == "marketer@gmail.com").first()
         assert marketer.role == "MARKETER"
 
         # Token giả mạo role MANAGER nhưng sub là marketer.id
@@ -199,7 +229,7 @@ class TestHardenedRoleCheckerAndSubValidation:
 
     def test_inactive_user_rejected_by_role_checker_with_exact_status(self, client, db_session):
         """Tài khoản có status != 'ACTIVE' bị RoleChecker từ chối 403 với thông báo chuẩn."""
-        manager = db_session.query(User).filter(User.email == "manager@ictu.edu.vn").first()
+        manager = db_session.query(User).filter(User.email == "manager@gmail.com").first()
         manager.status = "DISABLED"
         db_session.commit()
 

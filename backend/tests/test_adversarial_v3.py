@@ -53,7 +53,7 @@ class TestAdversarialRecordLevelAuthorization:
 
     def test_adv_marketer_access_foreign_campaign_forbidden(self, client, db_session):
         """Kẻ tấn công (Marketer sở hữu Camp 1) cố tình GET, PUT, DELETE chiến dịch của Manager (Camp 2)."""
-        token = get_auth_token(client, "marketer@ictu.edu.vn", "Marketer@123")
+        token = get_auth_token(client, "marketer@gmail.com", "Marketer@123")
         headers = get_headers(token)
 
         # GET foreign campaign -> 403 Forbidden
@@ -73,7 +73,7 @@ class TestAdversarialRecordLevelAuthorization:
     def test_adv_intruder_marketer_access_all_foreign_resources_forbidden(self, client, db_session):
         """Tạo một Marketer thứ hai (Intruder) không sở hữu Camp 1 và Camp 2, cố tình truy cập tài nguyên Camp 1."""
         intruder = User(
-            email="intruder@ictu.edu.vn",
+            email="intruder@gmail.com",
             full_name="Attacker Marketer",
             password_hash=hash_password("Intruder@123"),
             role="MARKETER",
@@ -83,7 +83,7 @@ class TestAdversarialRecordLevelAuthorization:
         db_session.commit()
         db_session.refresh(intruder)
 
-        token = get_auth_token(client, "intruder@ictu.edu.vn", "Intruder@123")
+        token = get_auth_token(client, "intruder@gmail.com", "Intruder@123")
         headers = get_headers(token)
 
         # Thử truy cập Campaign 1
@@ -109,7 +109,7 @@ class TestAdversarialRecordLevelAuthorization:
 
     def test_adv_marketer_metrics_and_kpi_tamper_forbidden(self, client, db_session):
         """Marketer cố tình xem hoặc ghi trộm số liệu KPI của chiến dịch người khác."""
-        token = get_auth_token(client, "marketer@ictu.edu.vn", "Marketer@123")
+        token = get_auth_token(client, "marketer@gmail.com", "Marketer@123")
         headers = get_headers(token)
 
         # Xem metrics của Campaign 2
@@ -136,7 +136,7 @@ class TestAdversarialRecordLevelAuthorization:
 
     def test_adv_marketer_ai_context_theft_forbidden(self, client, db_session):
         """Marketer cố tình sinh nội dung AI, tóm tắt hiệu suất hoặc đọc AI log của chiến dịch người khác."""
-        token = get_auth_token(client, "marketer@ictu.edu.vn", "Marketer@123")
+        token = get_auth_token(client, "marketer@gmail.com", "Marketer@123")
         headers = get_headers(token)
 
         # Gọi AI Ideas cho Campaign 2 -> 403 Forbidden
@@ -180,7 +180,7 @@ class TestAdversarialStateMachineBypass:
 
     def test_adv_direct_post_approved_rejected_with_400(self, client):
         """Cố tình tạo bài viết trực tiếp ở trạng thái APPROVED qua POST /contents -> HTTP 400 Bad Request."""
-        headers = get_headers(get_auth_token(client, "marketer@ictu.edu.vn", "Marketer@123"))
+        headers = get_headers(get_auth_token(client, "marketer@gmail.com", "Marketer@123"))
         payload = {
             "campaign_id": 1,
             "channel_id": 1,
@@ -196,7 +196,7 @@ class TestAdversarialStateMachineBypass:
 
     def test_adv_direct_post_published_rejected_with_400(self, client):
         """Cố tình tạo bài viết trực tiếp ở trạng thái PUBLISHED qua POST /contents -> HTTP 400 Bad Request."""
-        headers = get_headers(get_auth_token(client, "marketer@ictu.edu.vn", "Marketer@123"))
+        headers = get_headers(get_auth_token(client, "marketer@gmail.com", "Marketer@123"))
         payload = {
             "campaign_id": 1,
             "channel_id": 1,
@@ -210,9 +210,14 @@ class TestAdversarialStateMachineBypass:
         assert "không thể tạo bài viết trực tiếp ở trạng thái approved hoặc published" in resp.json()["detail"].lower() or \
                "cannot create content directly in approved or published" in resp.json()["detail"].lower()
 
-    def test_adv_direct_put_approved_from_draft_rejected(self, client):
-        """Cố tình cập nhật status='APPROVED' từ DRAFT qua PUT /contents/{id} -> HTTP 400 Bad Request."""
-        headers = get_headers(get_auth_token(client, "marketer@ictu.edu.vn", "Marketer@123"))
+    def test_adv_direct_put_approved_from_draft_rejected(self, client, db_session):
+        """Cố tình cập nhật status='APPROVED' từ DRAFT qua PUT /contents/{id} -> HTTP 400 Bad Request.
+
+        ContentUpdate không còn nhận tham số `status`, nên guard chặn sớm hơn trước cả khi
+        validator: mọi thay đổi trạng thái đều phải đi qua các endpoint chuyên dụng
+        (/submit, /approve, /reject, /publish) -> HTTP 400.
+        """
+        headers = get_headers(get_auth_token(client, "marketer@gmail.com", "Marketer@123"))
         # Tạo bài viết DRAFT hợp lệ
         res_create = client.post("/api/v1/contents", json={
             "campaign_id": 1,
@@ -227,11 +232,21 @@ class TestAdversarialStateMachineBypass:
         # Cố tình đổi sang APPROVED bằng PUT
         res_put = client.put(f"/api/v1/contents/{cid}", json={"status": "APPROVED"}, headers=headers)
         assert res_put.status_code == 400
-        assert "không thể chuyển trạng thái trực tiếp sang approved" in res_put.json()["detail"].lower()
+        detail = res_put.json()["detail"].lower()
+        assert "trạng thái" in detail, f"Thông báo lỗi phải nói rõ đây là lỗi trạng thái, nhận được: {detail!r}"
+        assert "put" in detail or "submit" in detail, (
+            f"Thông báo lỗi phải hướng dẫn dùng endpoint chuyên dụng, nhận được: {detail!r}"
+        )
+
+        # Quan trọng nhất: trạng thái trong DB KHÔNG được đổi sang APPROVED.
+        db_session.expire_all()
+        assert db_session.query(MarketingContent).filter(
+            MarketingContent.id == cid
+        ).one().status != "APPROVED"
 
     def test_adv_direct_put_published_from_draft_rejected(self, client):
         """Cố tình cập nhật status='PUBLISHED' từ DRAFT qua PUT /contents/{id} -> HTTP 400 Bad Request."""
-        headers = get_headers(get_auth_token(client, "marketer@ictu.edu.vn", "Marketer@123"))
+        headers = get_headers(get_auth_token(client, "marketer@gmail.com", "Marketer@123"))
         res_create = client.post("/api/v1/contents", json={
             "campaign_id": 1,
             "channel_id": 1,
@@ -250,8 +265,8 @@ class TestAdversarialStateMachineBypass:
 
     def test_adv_anti_tampering_approved_content_reverts_to_ai_draft(self, client):
         """Kiểm tra cơ chế Anti-tampering: Khi Manager đã duyệt APPROVED, nếu bài viết bị sửa đổi, nó phải tự động quay về AI_DRAFT."""
-        mkt_headers = get_headers(get_auth_token(client, "marketer@ictu.edu.vn", "Marketer@123"))
-        mgr_headers = get_headers(get_auth_token(client, "manager@ictu.edu.vn", "Manager@123"))
+        mkt_headers = get_headers(get_auth_token(client, "marketer@gmail.com", "Marketer@123"))
+        mgr_headers = get_headers(get_auth_token(client, "manager@gmail.com", "Manager@123"))
 
         # 1. Marketer tạo DRAFT
         r_c = client.post("/api/v1/contents", json={
@@ -292,7 +307,7 @@ class TestAdversarialInactiveAndSuspendedAccounts:
     def test_adv_inactive_user_token_rejected_with_403(self, client, db_session):
         """User có trạng thái DISABLED (không ACTIVE) trong CSDL cầm JWT token hợp lệ bị từ chối 403 Forbidden."""
         user = User(
-            email="adv_disabled_user@ictu.edu.vn",
+            email="adv_disabled_user@gmail.com",
             full_name="Disabled User",
             password_hash=hash_password("Pass@123"),
             role="MARKETER",
@@ -317,7 +332,7 @@ class TestAdversarialInactiveAndSuspendedAccounts:
     def test_adv_suspended_manager_cannot_approve_content(self, client, db_session):
         """Manager có trạng thái DISABLED cầm Token hợp lệ không thể duyệt nội dung qua RoleChecker (HTTP 403)."""
         mgr = User(
-            email="adv_disabled_mgr@ictu.edu.vn",
+            email="adv_disabled_mgr@gmail.com",
             full_name="Disabled Manager",
             password_hash=hash_password("Pass@123"),
             role="MANAGER",
@@ -341,7 +356,7 @@ class TestAdversarialInactiveAndSuspendedAccounts:
     def test_adv_suspended_marketer_cannot_mutate_data(self, client, db_session):
         """Marketer có trạng thái DISABLED không thể tạo mới nội dung hay chiến dịch."""
         user = User(
-            email="adv_disabled_mkt2@ictu.edu.vn",
+            email="adv_disabled_mkt2@gmail.com",
             full_name="Disabled Marketer",
             password_hash=hash_password("Pass@123"),
             role="MARKETER",

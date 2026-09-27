@@ -12,9 +12,9 @@ def get_token(client: TestClient, email: str, password: str) -> str:
 
 @pytest.fixture
 def auth_headers(client: TestClient):
-    marketer_token = get_token(client, "marketer@ictu.edu.vn", "Marketer@123")
-    manager_token = get_token(client, "manager@ictu.edu.vn", "Manager@123")
-    approver_token = get_token(client, "approver@ictu.edu.vn", "Approver@123")
+    marketer_token = get_token(client, "marketer@gmail.com", "Marketer@123")
+    manager_token = get_token(client, "manager@gmail.com", "Manager@123")
+    approver_token = get_token(client, "approver@gmail.com", "Approver@123")
     return {
         "marketer": {"Authorization": f"Bearer {marketer_token}"},
         "manager": {"Authorization": f"Bearer {manager_token}"},

@@ -13,6 +13,7 @@ import { MarketingCalendar } from './components/MarketingCalendar';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { BrandKitModal } from './components/BrandKitModal';
+import { ServerAwakeningIndicator } from './components/ServerAwakeningIndicator';
 import { ToastProvider, useToast } from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -311,6 +312,7 @@ export function App() {
   return (
     <ErrorBoundary>
       <ToastProvider>
+        <ServerAwakeningIndicator />
         <AuthProvider>
           <WorkspaceProvider>
             <AppContent />

@@ -27,11 +27,11 @@ def run_empirical_verification():
     client = TestClient(app)
 
     # 0. Authenticate as Manager
-    login_resp = client.post("/api/v1/auth/login", json={"email": "manager@ictu.edu.vn", "password": "Manager@123"})
+    login_resp = client.post("/api/v1/auth/login", json={"email": "manager@gmail.com", "password": "Manager@123"})
     assert login_resp.status_code == 200, f"Login failed: {login_resp.text}"
     token = login_resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
-    print("[AUTH] Successfully authenticated as manager@ictu.edu.vn.")
+    print("[AUTH] Successfully authenticated as manager@gmail.com.")
 
     # 1. Endpoint POST /api/v1/settings/test-ai-connection
     print("\n--- 1. Testing POST /api/v1/settings/test-ai-connection ---")

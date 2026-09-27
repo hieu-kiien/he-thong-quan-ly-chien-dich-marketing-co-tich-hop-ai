@@ -10,7 +10,7 @@ from app.services.ai.ai_service import ai_service
 # ==============================================================================
 def get_marketer_headers(client):
     resp = client.post("/api/v1/auth/login", json={
-        "email": "marketer@ictu.edu.vn",
+        "email": "marketer@gmail.com",
         "password": "Marketer@123"
     })
     assert resp.status_code == 200
@@ -18,7 +18,7 @@ def get_marketer_headers(client):
 
 def get_manager_headers(client):
     resp = client.post("/api/v1/auth/login", json={
-        "email": "manager@ictu.edu.vn",
+        "email": "manager@gmail.com",
         "password": "Manager@123"
     })
     assert resp.status_code == 200
@@ -42,13 +42,18 @@ def test_bug_be_01_content_create_invalid_status_rejected(client):
     assert resp.status_code == 422
 
 def test_bug_be_02_content_update_invalid_status_rejected(client):
-    """BUG-BE-02: ContentUpdate với status không hợp lệ trả về HTTP 422 thay vì HTTP 500."""
+    """BUG-BE-02: ContentUpdate với status không hợp lệ bị từ chối, KHÔNG BAO GIỜ trả HTTP 500.
+
+    Sau khi `status` bị gỡ khỏi ContentUpdate, guard chặn sớm hơn và trả HTTP 400
+    (thay vì 422 của FastAPI validator). Cả hai đều là hành vi từ chối hợp lệ.
+    """
     headers = get_marketer_headers(client)
     payload = {
         "status": "NON_EXISTENT_STATUS"
     }
     resp = client.put("/api/v1/contents/1", json=payload, headers=headers)
-    assert resp.status_code == 422
+    assert resp.status_code in (400, 422)
+    assert resp.status_code != 500
 
 # ==============================================================================
 # BUG-BE-03: Duplicate Metric Returns 409 Conflict Instead of HTTP 500
@@ -118,7 +123,7 @@ def test_bug_be_05_auth_me_with_invalid_sub_and_disabled_user(client, db_session
     assert "không hợp lệ" in resp_bad.json()["detail"]
 
     # 2. Token của user bị vô hiệu hóa (status='DISABLED')
-    user = db_session.query(User).filter(User.email == "marketer@ictu.edu.vn").first()
+    user = db_session.query(User).filter(User.email == "marketer@gmail.com").first()
     user.status = "DISABLED"
     db_session.commit()
 

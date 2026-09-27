@@ -12,18 +12,22 @@ from tests.e2e.conftest_e2e import assert_endpoint_or_skip_milestone
 class TestTier4RealWorldScenarios:
     """Tier 4: End-to-end real-world user journey scenarios."""
 
-    def test_t4_scenario_01_complete_agency_onboarding_to_kpi_doctor(self, client: TestClient, manager_headers, marketer_headers):
+    def test_t4_scenario_01_complete_agency_onboarding_to_kpi_doctor(self, client: TestClient, manager_headers, client_approver_headers):
         """Scenario 1: Full Enterprise Journey:
         1. Agency provisions client Workspace.
         2. Configures Brand Kit (USP, Tone, Blacklist).
         3. Creates Campaign for client.
         4. Marketer generates 3-Channel creative assets.
         5. Runs Compliance Pre-Check; verifies zero blacklist violations.
-        6. Attaches banner image and submits for review.
-        7. Manager inspects review queue and executes approval.
+        6. Manager attaches banner image and submits for review.
+        7. Client Approver (KHÁC người tạo) inspects review queue and executes approval.
         8. Schedules approved post onto marketing calendar.
         9. Records live campaign performance data.
         10. Analyzes ROAS and receives AI Doctor actionable recommendations.
+
+        Separation of Duties (P0): người viết nội dung KHÔNG được tự phê duyệt bài
+        của chính mình. Bài do Agency Manager soạn phải được Client Approver của
+        cùng workspace duyệt; tự duyệt sẽ bị chặn 403.
         """
         # Step 1: Provision client workspace
         ws_resp = client.post("/api/v1/workspaces", json={
@@ -37,12 +41,13 @@ class TestTier4RealWorldScenarios:
         bk_resp = client.put("/api/v1/brand-kit", json={
             "brand_name": "VinFast",
             "usp": "Xe điện thông minh nâng tầm cuộc sống",
-            "tone_of_voice": "Tiên phong, Đẳng cấp",
+            "tone_of_voice": "Tiên phong, Đẳng Cấp",
             "banned_keywords": ["cháy nổ", "kém an toàn", "cam kết 100%"]
         }, headers=manager_headers)
         assert_endpoint_or_skip_milestone(bk_resp, "/api/v1/brand-kit", "M1")
 
-        # Step 3: Create Campaign
+        # Step 3: Create Campaign inside the default agency workspace (id=1),
+        # nơi cả Manager (tác giả) và Client Approver (người duyệt) đều là thành viên.
         camp_resp = client.post("/api/v1/campaigns", json={
             "name": "Chiến Dịch Ra Mắt Xe Điện VF3 E2E",
             "product_id": 1,
@@ -51,8 +56,8 @@ class TestTier4RealWorldScenarios:
             "start_date": "2026-10-01",
             "end_date": "2026-10-31",
             "budget": 50000000.0
-        }, headers=manager_headers)
-        assert camp_resp.status_code == 201
+        }, headers={**manager_headers, "X-Workspace-Id": "1"})
+        assert camp_resp.status_code == 201, f"Campaign creation failed: {camp_resp.status_code} {camp_resp.text}"
         camp_id = camp_resp.json()["id"]
 
         # Step 4: Generate creative assets via AI
@@ -74,7 +79,8 @@ class TestTier4RealWorldScenarios:
         }, headers=manager_headers)
         assert_endpoint_or_skip_milestone(comp_resp, "/api/v1/contents/compliance-check", "M3")
 
-        # Step 6: Create Content and Attach Banner
+        # Step 6: Agency Manager (AUTHOR) creates Content, attaches Banner and submits
+        # Tác giả KHÔNG được tự phê duyệt -> bước duyệt phải do Client Approver thực hiện
         create_resp = client.post("/api/v1/contents", json={
             "campaign_id": camp_id,
             "channel_id": 1,
@@ -86,14 +92,14 @@ class TestTier4RealWorldScenarios:
         assert create_resp.status_code == 201
         content_id = create_resp.json()["id"]
 
-        # Submit to Review Queue
+        # Submit to Review Queue (tác giả nộp duyệt)
         sub_resp = client.post(f"/api/v1/contents/{content_id}/submit", headers=manager_headers)
         assert sub_resp.status_code == 200
         assert sub_resp.json()["status"] == "IN_REVIEW"
 
-        # Step 7: Manager Approves Content
-        appr_resp = client.post(f"/api/v1/contents/{content_id}/approve", headers=manager_headers)
-        assert appr_resp.status_code == 200
+        # Step 7: Client Approver (KHÁC tác giả, cùng workspace) phê duyệt nội dung
+        appr_resp = client.post(f"/api/v1/contents/{content_id}/approve", headers=client_approver_headers)
+        assert appr_resp.status_code == 200, f"Approve failed: {appr_resp.status_code} {appr_resp.text}"
         assert appr_resp.json()["status"] == "APPROVED"
 
         # Step 8: Schedule on Marketing Calendar

@@ -34,8 +34,8 @@ def check_campaign_access_for_metrics(campaign_id: int, user: User, db: Session)
     if user.role == "ADMIN":
         return campaign
 
-    # Kiểm tra Tenant Isolation đối với các workspace cụ thể (> 1)
-    if campaign.workspace_id is not None and campaign.workspace_id > 1:
+    # Kiểm tra Tenant Isolation đối với workspace (kể cả workspace_id == 1)
+    if campaign.workspace_id is not None:
         ws = db.query(Workspace).filter(Workspace.id == campaign.workspace_id).first()
         is_ws_owner = ws is not None and ws.owner_id == user.id
         is_ws_member = db.query(WorkspaceMember).filter(
@@ -150,6 +150,7 @@ def get_campaign_kpi(
     ctr = (total_clicks / total_views * 100.0) if total_views > 0 else 0.0
     cpc = (total_cost / total_clicks) if total_clicks > 0 else 0.0
     cvr = (total_conversions / total_clicks * 100.0) if total_clicks > 0 else 0.0
+    cpa = (total_cost / total_conversions) if total_conversions > 0 else 0.0
     roi = ((total_revenue - total_cost) / total_cost * 100.0) if total_cost > 0 else 0.0
     roas = (total_revenue / total_cost) if total_cost > 0 else 0.0
 
@@ -165,6 +166,7 @@ def get_campaign_kpi(
         ctr_percent=round(ctr, 2),
         cpc_avg=round(cpc, 2),
         cvr_percent=round(cvr, 2),
+        cpa_avg=round(cpa, 2),
         roi_percent=round(roi, 2),
         roas=round(roas, 2),
         channel_metrics=channel_metrics
@@ -196,6 +198,7 @@ def diagnose_campaign_doctor(
 
 @router.get("/analytics/dashboard")
 @router.get("/metrics/dashboard")
+@router.get("/metrics/overview")
 def get_global_dashboard(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -227,6 +230,7 @@ def get_global_dashboard(
     ctr = (total_clicks / total_views * 100.0) if total_views > 0 else 0.0
     cpc = (total_cost / total_clicks) if total_clicks > 0 else 0.0
     cvr = (total_conversions / total_clicks * 100.0) if total_clicks > 0 else 0.0
+    cpa = (total_cost / total_conversions) if total_conversions > 0 else 0.0
     roi = ((total_revenue - total_cost) / total_cost * 100.0) if total_cost > 0 else 0.0
     roas = (total_revenue / total_cost) if total_cost > 0 else 0.0
 
@@ -240,6 +244,7 @@ def get_global_dashboard(
             "ctr_percent": round(ctr, 2),
             "cpc_avg": round(cpc, 2),
             "cvr_percent": round(cvr, 2),
+            "cpa_avg": round(cpa, 2),
             "roi_percent": round(roi, 2),
             "roas": round(roas, 2),
         },
@@ -248,3 +253,6 @@ def get_global_dashboard(
             "active": active_campaigns
         }
     }
+
+
+get_metrics_overview = get_global_dashboard

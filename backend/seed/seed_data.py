@@ -45,12 +45,13 @@ def reset_db(db_engine=engine):
     print("[OK] Da xoa toan bo cac bang co so du lieu!")
 
 
-def init_db(reset: bool = False, db_engine=engine):
+def init_db(reset: bool = False, db_engine=engine, force: bool = False):
     """
     Khởi tạo cơ sở dữ liệu an toàn.
     - reset=False (mặc định): Tuyệt đối KHÔNG BAO GIỜ gọi drop_all(). Chỉ gọi create_all(),
       đảm bảo tương thích schema SQLite và nạp các thực thể mặc định nếu chưa tồn tại.
     - reset=True: Gọi reset_db() (bị chặn nếu production) trước khi khởi tạo lại.
+    - force=True: Ép nạp dữ liệu mẫu (demo) ngay cả khi đang ở môi trường production.
     """
     if reset:
         reset_db(db_engine=db_engine)
@@ -65,31 +66,39 @@ def init_db(reset: bool = False, db_engine=engine):
         CustomSession = sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
         session = CustomSession()
         try:
-            seed_data(session=session)
+            seed_data(session=session, force=force)
         finally:
             session.close()
     else:
-        seed_data()
+        seed_data(force=force)
 
 
-def seed_data(session=None):
-    """Nạp các thực thể mặc định nếu chưa tồn tại (Idempotent Non-Destructive Seeding)."""
+def seed_data(session=None, force: bool = False):
+    """Nạp các thực thể mặc định nếu chưa tồn tại (Idempotent Non-Destructive Seeding).
+
+    Tự bảo vệ: trên môi trường production, KHÔNG tạo tài khoản demo với mật khẩu mặc định.
+    Dùng force=True (ví dụ `python seed/seed_data.py --reset`) để ghi đè.
+    """
+    if not force and is_production_env():
+        # Không raise: Cloudflare runtime vẫn phải chạy được với DB rỗng.
+        print(
+            "[WARNING] APP_ENV=production: BO QUA nap du lieu mau (tai khoan demo mac dinh). "
+            "Dat force=True neu that su muon nap du lieu mau tren production."
+        )
+        return
+
     should_close = False
     if session is not None:
         db = session
     else:
-        db = SessionLocal()
+        from app.core.database import SessionLocal as DynamicSessionLocal
+        db = DynamicSessionLocal()
         should_close = True
     try:
         print("[*] Dang kiem tra va nap du lieu mau (Seed Data)...")
 
         # 1. Users
         manager = db.query(User).filter(User.email == "manager@gmail.com").first()
-        if not manager:
-            # Check legacy email fallback
-            manager = db.query(User).filter(User.email == "manager@ictu.edu.vn").first()
-            if manager:
-                manager.email = "manager@gmail.com"
         if not manager:
             manager = User(
                 email="manager@gmail.com",
@@ -102,11 +111,6 @@ def seed_data(session=None):
 
         marketer = db.query(User).filter(User.email == "marketer@gmail.com").first()
         if not marketer:
-            # Check legacy email fallback
-            marketer = db.query(User).filter(User.email == "marketer@ictu.edu.vn").first()
-            if marketer:
-                marketer.email = "marketer@gmail.com"
-        if not marketer:
             marketer = User(
                 email="marketer@gmail.com",
                 full_name="Trần Thị Marketing",
@@ -117,11 +121,6 @@ def seed_data(session=None):
             db.add(marketer)
 
         approver = db.query(User).filter(User.email == "approver@gmail.com").first()
-        if not approver:
-            # Check legacy email fallback
-            approver = db.query(User).filter(User.email == "approver@ictu.edu.vn").first()
-            if approver:
-                approver.email = "approver@gmail.com"
         if not approver:
             approver = User(
                 email="approver@gmail.com",
@@ -373,6 +372,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.reset:
-        init_db(reset=True)
+        init_db(reset=True, force=True)
     else:
-        init_db(reset=False)
+        init_db(reset=False, force=args.reset)

@@ -89,7 +89,7 @@ def test_register_creates_brand_kit(client, db_session):
 def test_register_duplicate_email_fails(client):
     """Đăng ký với email đã tồn tại bị từ chối với HTTP 400."""
     payload = {
-        "email": "manager@ictu.edu.vn", # Email đã có từ seed data
+        "email": "manager@gmail.com", # Email đã có từ seed data
         "password": "Password@123",
         "full_name": "Trùng Email"
     }

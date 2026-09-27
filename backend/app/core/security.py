@@ -1,7 +1,13 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional, List
+from typing import Dict, List, Optional
+import logging
+import threading
+import time
+from collections import defaultdict, deque
 import bcrypt
 import jwt
+
+logger = logging.getLogger(__name__)
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.config import settings
@@ -23,16 +29,28 @@ def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Xác minh mật khẩu bằng bcrypt.
+
+    KHÔNG BAO GIỜ có đường fallback trả về True khi bcrypt lỗi: đó là đường
+    vòng bỏ xác thực. Mọi lỗi bcrypt đều coi là thất bại đăng nhập.
+    """
+    if not plain_password or not hashed_password:
+        return False
+    raw = hashed_password.strip()
+    if raw.startswith(("$2a$", "$2b$", "$2y$")):
+        pass
+    elif raw.startswith(("$2$",)):
+        return False
+    else:
+        raw = "$2b$" + raw
     try:
-        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
-    except Exception:
-        # Fallback compatibility for seeded database demo accounts if static salt format differs across bcrypt versions
-        if hashed_password == "$2b$12$G6EPiSGdUb5O45H6LCWKpuB5pKM6gGWZstZfIp.ICWBqTGPfGcolO" and plain_password == "Manager@123":
-            return True
-        if hashed_password == "$2b$12$91sBduI4UGPeVc5FXpDgguz2S8sgnh6sQptdg4v859adK8.CkslAK" and plain_password == "Marketer@123":
-            return True
-        if hashed_password == "$2b$12$AbXRiJUxgPHMPMSwzQ0vRezMbpOWe4h6cOQLI00yq4vs2BXa4EHKa" and plain_password == "Approver@123":
-            return True
+        return bcrypt.checkpw(plain_password.encode("utf-8"), raw.encode("utf-8"))
+    except (ValueError, TypeError, RuntimeError):
+        # KHÔNG có nhánh nào trả về True ở đây. bcrypt có thể ném RuntimeError
+        # (vd: token quá dài, lỗi cấp phát bộ nhớ trong thư viện C) - nếu để lọt,
+        # lỗi sẽ nổi lên thành HTTP 500 thay vì 401, làm lộ chi tiết lỗi server.
+        # Bắt rộng ở đây để mọi lỗi bcrypt đều fail-closed thành "đăng nhập sai".
+        logger.warning("[Security] bcrypt rejected stored hash format; refusing login.")
         return False
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -209,4 +227,80 @@ def get_current_user(
         )
 
     return user
+
+
+# --- Login rate limiting (in-memory, per-process) ---------------------------------
+# Chống brute-force ở tầng ứng dụng: tối đa LOGIN_MAX_ATTEMPTS lần sai trong
+# LOGIN_RATE_LIMIT_WINDOW_SECONDS cho mỗi khoá (email, client host).
+# KHÔNG dùng thư viện ngoài. Lưu ý: bộ nhớ trong tiến trình, nên khi chạy nhiều
+# worker/instance thì mỗi instance có bộ đếm riêng; đây chỉ là lớp phòng thủ
+# bổ sung, không thay thế rate limiting ở tầng reverse proxy / Cloudflare.
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_RATE_LIMIT_WINDOW_SECONDS = 15 * 60
+
+_login_attempts: Dict[str, deque] = defaultdict(deque)
+# Uvicorn/Gunicorn chạy nhiều thread trong cùng tiến trình; deque.append/popleft là
+# atomic nhưng thao tác "đọc bộ đếm -> quyết định -> ghi" thì không. Lock giữ cho
+# việc kiểm đếm và ghi nhận là nguyên tử, tránh kẻ tấn công lách được ngạch bằng
+# việc gửi song song nhiều request.
+_login_attempts_lock = threading.Lock()
+
+
+def _prune_login_attempts(now: float) -> None:
+    """Dọn các khoá đã hết cửa sổ để tránh rò rỉ bộ nhớ theo thời gian."""
+    cutoff = now - LOGIN_RATE_LIMIT_WINDOW_SECONDS
+    for key in list(_login_attempts.keys()):
+        bucket = _login_attempts.get(key)
+        if not bucket:
+            _login_attempts.pop(key, None)
+            continue
+        while bucket and bucket[0] <= cutoff:
+            bucket.popleft()
+        if not bucket:
+            _login_attempts.pop(key, None)
+
+
+def check_login_rate_limit(identifier: str) -> None:
+    """Ném HTTPException(429) nếu khoá (email, host) đã vượt ngạch thử sai.
+
+    Gọi hàm này TRƯỚC khi kiểm tra mật khẩu trong endpoint đăng nhập.
+    """
+    if not identifier:
+        return
+    now = time.monotonic()
+    retry_after = 0
+    with _login_attempts_lock:
+        _prune_login_attempts(now)
+        bucket = _login_attempts.get(identifier)
+        if bucket and len(bucket) >= LOGIN_MAX_ATTEMPTS:
+            retry_after = max(1, int(LOGIN_RATE_LIMIT_WINDOW_SECONDS - (now - bucket[0])))
+            attempts = len(bucket)
+    if retry_after:
+        logger.warning(
+            "[Security] Login rate limit triggered for %s (attempts=%d, retry_after=%ds).",
+            identifier, attempts, retry_after,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
+def record_login_failure(identifier: str) -> None:
+    """Ghi nhận một lần đăng nhập sai cho khoá (email, host)."""
+    if not identifier:
+        return
+    now = time.monotonic()
+    with _login_attempts_lock:
+        _prune_login_attempts(now)
+        _login_attempts[identifier].append(now)
+
+
+def reset_login_rate_limit(identifier: str) -> None:
+    """Xoá bộ đếm sau khi đăng nhập thành công."""
+    if not identifier:
+        return
+    with _login_attempts_lock:
+        _login_attempts.pop(identifier, None)
 

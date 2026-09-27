@@ -6,14 +6,14 @@ from app.models.entities import AILog, Campaign, User, BrandKit
 
 @pytest.fixture
 def manager_headers(client: TestClient):
-    resp = client.post("/api/v1/auth/login", json={"email": "manager@ictu.edu.vn", "password": "Manager@123"})
+    resp = client.post("/api/v1/auth/login", json={"email": "manager@gmail.com", "password": "Manager@123"})
     token = resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture
 def marketer_headers(client: TestClient):
-    resp = client.post("/api/v1/auth/login", json={"email": "marketer@ictu.edu.vn", "password": "Marketer@123"})
+    resp = client.post("/api/v1/auth/login", json={"email": "marketer@gmail.com", "password": "Marketer@123"})
     token = resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 

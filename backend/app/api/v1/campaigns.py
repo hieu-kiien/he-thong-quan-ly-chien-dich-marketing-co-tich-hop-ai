@@ -1,5 +1,5 @@
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Header
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import RoleChecker, get_current_user
@@ -33,10 +33,11 @@ def check_campaign_access(campaign: Campaign, user: User, db: Session):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to access campaigns in this workspace"
             )
+        if user.role in ("MANAGER", "AGENCY_MANAGER"):
+            return
 
-    if user.role in ("MANAGER", "AGENCY_MANAGER"):
-        return
-
+    # Fail-closed: campaign không thuộc workspace nào thì không có ranh giới tenant để tin cậy,
+    # mọi role (kể cả MANAGER/AGENCY_MANAGER) đều phải là owner hoặc CampaignMember.
     if campaign.owner_id == user.id:
         return
 
@@ -110,6 +111,7 @@ def create_campaign(
     req: CampaignCreate,
     current_user: User = Depends(get_current_user),
     user_payload: dict = Depends(RoleChecker(allowed_roles=["MANAGER", "AGENCY_MANAGER", "MARKETER", "ADMIN"])),
+    x_workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id"),
     db: Session = Depends(get_db)
 ):
     if current_user.role not in ("MANAGER", "AGENCY_MANAGER", "MARKETER", "ADMIN"):
@@ -124,14 +126,25 @@ def create_campaign(
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sản phẩm không tồn tại")
 
-    # Phân giải workspace_id an toàn
-    ws_id = req.workspace_id
-    if ws_id:
+    # Phân giải workspace_id nghiêm ngặt: X-Workspace-Id hoặc req.workspace_id hoặc membership
+    target_ws_id: Optional[int] = req.workspace_id
+    if target_ws_id is None and x_workspace_id:
+        try:
+            target_ws_id = int(x_workspace_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Header X-Workspace-Id không hợp lệ"
+            )
+
+    if target_ws_id is not None:
         if current_user.role != "ADMIN":
-            ws = db.query(Workspace).filter(Workspace.id == ws_id).first()
+            ws = db.query(Workspace).filter(Workspace.id == target_ws_id).first()
+            if not ws:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace không tồn tại")
             is_ws_owner = ws is not None and ws.owner_id == user_id
             is_ws_member = db.query(WorkspaceMember).filter(
-                WorkspaceMember.workspace_id == ws_id,
+                WorkspaceMember.workspace_id == target_ws_id,
                 WorkspaceMember.user_id == user_id
             ).first() is not None
             if not (is_ws_owner or is_ws_member):
@@ -139,9 +152,22 @@ def create_campaign(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Not authorized to access campaigns in this workspace"
                 )
+        ws_id = target_ws_id
     else:
+        # Nếu không truyền workspace_id hay header, tìm active workspace của user
         membership = db.query(WorkspaceMember).filter(WorkspaceMember.user_id == user_id).first()
-        ws_id = membership.workspace_id if membership else 1
+        owned_ws = db.query(Workspace).filter(Workspace.owner_id == user_id).first()
+        if membership:
+            ws_id = membership.workspace_id
+        elif owned_ws:
+            ws_id = owned_ws.id
+        elif current_user.role == "ADMIN":
+            ws_id = 1
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Người dùng không thuộc bất kỳ workspace nào hoặc không có quyền truy cập."
+            )
 
     campaign = Campaign(
         workspace_id=ws_id,
@@ -153,7 +179,7 @@ def create_campaign(
         start_date=req.start_date,
         end_date=req.end_date,
         budget=req.budget,
-        status="PLANNING" if hasattr(req, "status") else "DRAFT"
+        status="DRAFT"
     )
     db.add(campaign)
     db.commit()
@@ -191,8 +217,15 @@ def update_campaign(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
     check_campaign_access(campaign, current_user, db)
 
+    # Allowlist tường minh: chỉ cho sửa các trường nghiệp vụ, không cho set owner_id/workspace_id.
     update_data = req.model_dump(exclude_unset=True)
+    allowed_fields = {"name", "objective", "audience", "start_date", "end_date", "budget", "status"}
     for field, value in update_data.items():
+        if field not in allowed_fields:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Không được cập nhật trường '{field}'.",
+            )
         setattr(campaign, field, value)
 
     # Validate lại ngày nếu có cập nhật

@@ -114,7 +114,7 @@ class TestP0PrivilegeEscalation:
     ):
         """Public self-registration with MARKETER or empty role succeeds and assigns MARKETER."""
         # 1. Explicit MARKETER
-        email1 = "legit_marketer_1@ictu.edu.vn"
+        email1 = "legit_marketer_1@gmail.com"
         resp1 = client.post("/api/v1/auth/register", json={
             "email": email1,
             "password": "SecurePassword@123",
@@ -127,7 +127,7 @@ class TestP0PrivilegeEscalation:
         assert u1.role == "MARKETER"
 
         # 2. Omitting role defaults to MARKETER
-        email2 = "legit_marketer_2@ictu.edu.vn"
+        email2 = "legit_marketer_2@gmail.com"
         resp2 = client.post("/api/v1/auth/register", json={
             "email": email2,
             "password": "SecurePassword@123",
@@ -143,7 +143,7 @@ class TestP0PrivilegeEscalation:
     ):
         """A user with MARKETER role cannot add members or elevate roles in a workspace."""
         new_target = User(
-            email="target_elevation@ictu.edu.vn",
+            email="target_elevation@gmail.com",
             full_name="Target User",
             password_hash=hash_password("Pass@123"),
             role="MARKETER",
@@ -166,7 +166,7 @@ class TestP0PrivilegeEscalation:
         """RoleChecker pulls user from DB dynamically: forged token claims are rejected."""
         # Genuine DB user has MARKETER role
         marketer_user = db_session.query(User).filter(
-            (User.email == "marketer@gmail.com") | (User.email == "marketer@ictu.edu.vn")
+            (User.email == "marketer@gmail.com") | (User.email == "marketer@gmail.com")
         ).first()
         assert marketer_user is not None
         assert marketer_user.role == "MARKETER"
@@ -194,7 +194,7 @@ class TestP0PrivilegeEscalation:
     ):
         """A user marked INACTIVE or DISABLED is rejected with 403 even if token is valid."""
         suspended_user = User(
-            email="suspended_marketer@ictu.edu.vn",
+            email="suspended_marketer@gmail.com",
             full_name="Suspended User",
             password_hash=hash_password("Pass@123"),
             role="MARKETER",

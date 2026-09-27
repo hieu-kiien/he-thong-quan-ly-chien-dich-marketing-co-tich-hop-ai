@@ -145,17 +145,28 @@ class AIService:
         self,
         db: Session,
         workspace_id: Optional[int] = None,
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
+        provider: str = "gemini",
+        **kwargs
     ) -> Dict[str, Any]:
         """Multi-tier Key Resolver (FEAT-BE-26):
         1. Workspace Custom Key (Ưu tiên cao nhất nếu is_active=True).
         2. User Personal Custom Key (Ưu tiên tiếp theo nếu Workspace không có).
-        3. System Default Key (Lấy từ GEMINI_API_KEY hoặc settings.AI_API_KEY).
+        3. System Default Key (Lấy từ GEMINI_API_KEY hoặc settings.AI_API_KEY / OPENROUTER / OPENAI).
         4. Smart Fallback Engine (Sinh dữ liệu mẫu khi không có key hoặc lỗi kết nối).
         """
         import os
         from app.models.entities import CustomApiKey
         from app.core.crypto import decrypt_api_key
+
+        if "workspace_id" in kwargs:
+            workspace_id = kwargs["workspace_id"]
+        if "user_id" in kwargs:
+            user_id = kwargs["user_id"]
+        if "provider" in kwargs:
+            provider = kwargs["provider"]
+
+        provider = (provider or "gemini").lower().strip()
 
         # Tier 1: Workspace Custom Key
         if workspace_id is not None:
@@ -163,17 +174,18 @@ class AIService:
                 ws_key = db.query(CustomApiKey).filter(
                     CustomApiKey.workspace_id == workspace_id,
                     CustomApiKey.is_active == True,
-                    CustomApiKey.provider == "gemini"
+                    CustomApiKey.provider == provider
                 ).order_by(CustomApiKey.updated_at.desc()).first()
 
                 if ws_key and ws_key.encrypted_key:
                     try:
                         plain = decrypt_api_key(ws_key.encrypted_key)
                         if plain and plain.strip():
+                            default_m = "gpt-4o" if provider == "openai" else ("meta-llama/llama-3.3-70b-instruct" if provider == "openrouter" else "gemini-2.5-flash")
                             return {
                                 "api_key": plain.strip(),
-                                "model": ws_key.model or "gemini-2.5-flash",
-                                "provider": "gemini",
+                                "model": ws_key.model or default_m,
+                                "provider": provider,
                                 "tier": "WORKSPACE",
                                 "source_id": ws_key.id
                             }
@@ -189,24 +201,25 @@ class AIService:
                     CustomApiKey.user_id == user_id,
                     CustomApiKey.workspace_id == None,
                     CustomApiKey.is_active == True,
-                    CustomApiKey.provider == "gemini"
+                    CustomApiKey.provider == provider
                 ).order_by(CustomApiKey.updated_at.desc()).first()
 
                 if not user_key:
                     user_key = db.query(CustomApiKey).filter(
                         CustomApiKey.user_id == user_id,
                         CustomApiKey.is_active == True,
-                        CustomApiKey.provider == "gemini"
+                        CustomApiKey.provider == provider
                     ).order_by(CustomApiKey.updated_at.desc()).first()
 
                 if user_key and user_key.encrypted_key:
                     try:
                         plain = decrypt_api_key(user_key.encrypted_key)
                         if plain and plain.strip():
+                            default_m = "gpt-4o" if provider == "openai" else ("meta-llama/llama-3.3-70b-instruct" if provider == "openrouter" else "gemini-2.5-flash")
                             return {
                                 "api_key": plain.strip(),
-                                "model": user_key.model or "gemini-2.5-flash",
-                                "provider": "gemini",
+                                "model": user_key.model or default_m,
+                                "provider": provider,
                                 "tier": "USER",
                                 "source_id": user_key.id
                             }
@@ -216,20 +229,32 @@ class AIService:
                 logger.error("[KeyResolver] Lỗi truy vấn User Key: %s", str(e))
 
         # Tier 3: System Default Key
-        env_gemini_key = os.environ.get("GEMINI_API_KEY") or getattr(settings, "GEMINI_API_KEY", None) or settings.AI_API_KEY
-        if env_gemini_key and env_gemini_key.strip():
+        env_key = None
+        system_model = settings.AI_MODEL or "gemini-2.5-flash"
+        if provider == "gemini":
+            env_key = os.environ.get("GEMINI_API_KEY") or getattr(settings, "GEMINI_API_KEY", None) or settings.AI_API_KEY
+            system_model = settings.AI_MODEL or "gemini-2.5-flash"
+        elif provider == "openrouter":
+            env_key = os.environ.get("OPENROUTER_API_KEY") or getattr(settings, "OPENROUTER_API_KEY", None)
+            system_model = "meta-llama/llama-3.3-70b-instruct"
+        elif provider == "openai":
+            env_key = os.environ.get("OPENAI_API_KEY") or getattr(settings, "OPENAI_API_KEY", None)
+            system_model = "gpt-4o"
+
+        if env_key and env_key.strip():
             return {
-                "api_key": env_gemini_key.strip(),
-                "model": settings.AI_MODEL or "gemini-2.5-flash",
-                "provider": "gemini",
+                "api_key": env_key.strip(),
+                "model": system_model,
+                "provider": provider,
                 "tier": "SYSTEM",
                 "source_id": None
             }
 
         # Tier 4: Fallback
+        default_fallback_model = "gpt-4o" if provider == "openai" else ("meta-llama/llama-3.3-70b-instruct" if provider == "openrouter" else (settings.AI_MODEL or "gemini-2.5-flash"))
         return {
             "api_key": None,
-            "model": settings.AI_MODEL or "gemini-2.5-flash",
+            "model": default_fallback_model,
             "provider": "template-fallback-engine",
             "tier": "FALLBACK",
             "source_id": None
@@ -240,16 +265,48 @@ class AIService:
         system_prompt: str,
         user_prompt: str,
         active_key: Optional[str] = None,
-        active_model: Optional[str] = None
+        active_model: Optional[str] = None,
+        provider: Optional[str] = None
     ) -> str:
         key_to_use = active_key if active_key is not None else self.api_key
         model_to_use = active_model if active_model is not None else self.model
+
+        # Determine effective provider
+        eff_provider = (provider or "").lower().strip()
+        if not eff_provider:
+            if key_to_use and (key_to_use.startswith("sk-or-") or (model_to_use and "/" in model_to_use)):
+                eff_provider = "openrouter"
+            elif key_to_use and (key_to_use.startswith("sk-proj-") or key_to_use.startswith("sk-")) and not key_to_use.startswith("sk-or-"):
+                eff_provider = "openai"
+            elif model_to_use and (model_to_use.startswith("gpt-") or model_to_use.startswith("o1") or model_to_use.startswith("o3")):
+                eff_provider = "openai"
+            elif (model_to_use and "gemini" in model_to_use.lower()) or (key_to_use and key_to_use.startswith("AIzaSy")):
+                eff_provider = "gemini"
+            else:
+                eff_provider = "gemini"
+
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {key_to_use}" if key_to_use else "",
-            "HTTP-Referer": "http://localhost:5173",
-            "X-Title": "MarketFlow AI",
         }
+
+        if eff_provider == "openrouter":
+            base_url = "https://openrouter.ai/api/v1"
+            headers["HTTP-Referer"] = "https://marketflow.ai"
+            headers["X-Title"] = "MarketFlow AI"
+        elif eff_provider == "openai":
+            base_url = "https://api.openai.com/v1"
+        elif eff_provider == "gemini":
+            base_url = "https://generativelanguage.googleapis.com/v1beta/openai" if "opencode.ai" in self.base_url else self.base_url
+            headers["HTTP-Referer"] = "http://localhost:5173"
+            headers["X-Title"] = "MarketFlow AI"
+        else:
+            base_url = self.base_url
+            headers["HTTP-Referer"] = "http://localhost:5173"
+            headers["X-Title"] = "MarketFlow AI"
+
+        url = f"{base_url}/chat/completions"
+
         payload = {
             "model": model_to_use,
             "messages": [
@@ -258,14 +315,6 @@ class AIService:
             ],
             "temperature": 0.7,
         }
-
-        # Tự động định tuyến endpoint nếu sử dụng Google Gemini hoặc BYOK Gemini
-        if (model_to_use and "gemini" in model_to_use.lower()) or (key_to_use and key_to_use.startswith("AIzaSy")):
-            base_url = "https://generativelanguage.googleapis.com/v1beta/openai" if "opencode.ai" in self.base_url else self.base_url
-        else:
-            base_url = self.base_url
-
-        url = f"{base_url}/chat/completions"
 
         last_error = None
         for attempt in range(self.max_retries + 1):
@@ -519,6 +568,7 @@ class AIService:
         active_model = self.model
         key_tier = "FALLBACK"
 
+        active_provider = "gemini"
         if self._api_key is not None:
             # 1. Test fixture override (Bảo tồn 100% zero regression cho 499 existing unit tests)
             active_key = self._api_key
@@ -536,9 +586,11 @@ class AIService:
                 except Exception:
                     pass
 
-            resolved = self.resolve_api_key(db=db, workspace_id=target_ws_id, user_id=user_id)
+            req_provider = context.get("provider") or "gemini"
+            resolved = self.resolve_api_key(db=db, workspace_id=target_ws_id, user_id=user_id, provider=req_provider)
             active_key = resolved.get("api_key")
             active_model = resolved.get("model") or self.model
+            active_provider = resolved.get("provider") or req_provider
             key_tier = resolved.get("tier", "FALLBACK")
 
         # Xử lý các token kiểm thử trong test suite (như test_t3_cross_05)
@@ -548,7 +600,7 @@ class AIService:
             latency_ms = int((time.time() - start_time) * 1000) or 15
             model_used = active_model
             is_fallback = False
-            model_provider = f"gemini-{key_tier.lower()}"
+            model_provider = f"{active_provider}-{key_tier.lower()}"
         # Nếu không có API Key và bật Fallback -> Dùng Fallback trực tiếp
         elif (not active_key or active_key.strip() == "") and self.fallback_enabled:
             logger.warning("[AI Service - Fallback Engine] No API key configured. Activating deterministic Smart Fallback for task %s.", task_code)
@@ -559,7 +611,11 @@ class AIService:
             model_provider = "template-fallback-engine"
         else:
             try:
-                raw_response = self._call_provider_with_retry(system_prompt, user_prompt, active_key=active_key, active_model=active_model)
+                raw_response = self._call_provider_with_retry(
+                    system_prompt, user_prompt,
+                    active_key=active_key, active_model=active_model,
+                    provider=active_provider
+                )
                 try:
                     output_data = self._clean_json_response(raw_response)
                     # BUG-BE-08: Kiểm tra tính hợp lệ của schema kết quả AI
@@ -567,7 +623,7 @@ class AIService:
                     latency_ms = int((time.time() - start_time) * 1000)
                     model_used = active_model
                     is_fallback = False
-                    model_provider = f"gemini-{key_tier.lower()}" if key_tier in ("WORKSPACE", "USER") else ("gemini-pro" if "gemini" in active_model.lower() else (settings.AI_PROVIDER or "gemini-pro"))
+                    model_provider = f"{active_provider}-{key_tier.lower()}" if key_tier in ("WORKSPACE", "USER") else (f"{active_provider}-pro" if active_model and "gemini" in str(active_model).lower() else (settings.AI_PROVIDER or "gemini-pro"))
                     logger.info("[AI Service - Live LLM] Successfully executed task %s via model %s in %d ms", task_code, active_model, latency_ms)
                 except (json.JSONDecodeError, ValidationError) as schema_err:
                     result_status = "SCHEMA_ERROR"

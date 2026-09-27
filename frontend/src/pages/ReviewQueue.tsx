@@ -16,7 +16,8 @@ import {
   Tag,
   Lock,
   Eye,
-  LayoutGrid
+  LayoutGrid,
+  Edit2
 } from 'lucide-react';
 import { MarketingContent } from '../types';
 import { contentApi, getApiErrorMessage } from '../services/api';
@@ -47,6 +48,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
   const [rejectReason, setRejectReason] = useState<string>('');
   const [isRejecting, setIsRejecting] = useState<boolean>(false);
   const [approvingId, setApprovingId] = useState<number | null>(null);
+  const [publishingId, setPublishingId] = useState<number | null>(null);
   const [submittingId, setSubmittingId] = useState<number | null>(null);
   const [showSocialPreview, setShowSocialPreview] = useState<boolean>(true);
 
@@ -61,13 +63,113 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
   const approverRoles = ['MANAGER', 'AGENCY_MANAGER', 'CLIENT_APPROVER'];
   const isApprover = approverRoles.includes(userRole || '');
 
-  const handleImageChange = async (contentId: number, newImageUrl: string) => {
+  // Confirmation Dialog State for Editing APPROVED / PUBLISHED Content (Brand Safety Warning)
+  interface PendingConfirmAction {
+    contentId: number;
+    type: 'image' | 'content';
+    newImageUrl?: string;
+    updateData?: { title?: string; body?: string; cta?: string; image_url?: string };
+    contentTitle: string;
+  }
+  const [confirmDialog, setConfirmDialog] = useState<PendingConfirmAction | null>(null);
+
+  // Edit Content Modal State
+  const [editingContent, setEditingContent] = useState<MarketingContent | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editBody, setEditBody] = useState('');
+  const [editCta, setEditCta] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const confirmModalRef = useFocusTrap<HTMLDivElement>({
+    isActive: !!confirmDialog,
+    onEscape: () => setConfirmDialog(null)
+  });
+
+  const editModalRef = useFocusTrap<HTMLDivElement>({
+    isActive: !!editingContent,
+    onEscape: () => setEditingContent(null)
+  });
+
+  const executeImageChange = async (contentId: number, newImageUrl: string) => {
     try {
       const updated = await contentApi.update(contentId, { image_url: newImageUrl });
       setContents(prev => prev.map(c => c.id === contentId ? { ...c, image_url: updated.image_url || newImageUrl, status: updated.status || c.status } : c));
       toast.success('Đã cập nhật ảnh sản phẩm / banner thành công!');
+      if (updated.status === 'AI_DRAFT') {
+        toast.info('Bài viết đã tự động chuyển về trạng thái Nháp (AI_DRAFT) để phê duyệt lại.');
+        await loadContents();
+      }
     } catch (e: any) {
       toast.error(getApiErrorMessage(e), 'Lỗi khi cập nhật ảnh');
+    }
+  };
+
+  const executeContentUpdate = async (contentId: number, updateData: { title?: string; body?: string; cta?: string; image_url?: string }) => {
+    try {
+      setIsUpdating(true);
+      const updated = await contentApi.update(contentId, updateData);
+      setContents(prev => prev.map(c => c.id === contentId ? { ...c, ...updated } : c));
+      setEditingContent(null);
+      toast.success('Đã cập nhật nội dung bài viết thành công!');
+      if (updated.status === 'AI_DRAFT') {
+        toast.info('Bài viết đã tự động chuyển về trạng thái Nháp (AI_DRAFT) để phê duyệt lại.');
+        await loadContents();
+      }
+    } catch (e: any) {
+      toast.error(getApiErrorMessage(e), 'Lỗi khi cập nhật bài viết');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleImageChange = async (contentId: number, newImageUrl: string) => {
+    const target = contents.find(c => c.id === contentId);
+    if (target && (target.status === 'APPROVED' || target.status === 'PUBLISHED')) {
+      setConfirmDialog({
+        contentId,
+        type: 'image',
+        newImageUrl,
+        contentTitle: target.title
+      });
+      return;
+    }
+    await executeImageChange(contentId, newImageUrl);
+  };
+
+  const handleStartEdit = (content: MarketingContent) => {
+    setEditingContent(content);
+    setEditTitle(content.title);
+    setEditBody(content.body);
+    setEditCta(content.cta || '');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingContent) return;
+    const updateData = {
+      title: editTitle.trim(),
+      body: editBody.trim(),
+      cta: editCta.trim() || undefined
+    };
+    if (editingContent.status === 'APPROVED' || editingContent.status === 'PUBLISHED') {
+      setConfirmDialog({
+        contentId: editingContent.id,
+        type: 'content',
+        updateData,
+        contentTitle: editingContent.title
+      });
+      return;
+    }
+    await executeContentUpdate(editingContent.id, updateData);
+  };
+
+  const handleConfirmAction = async () => {
+    if (!confirmDialog) return;
+    const action = confirmDialog;
+    setConfirmDialog(null);
+    if (action.type === 'image' && action.newImageUrl !== undefined) {
+      await executeImageChange(action.contentId, action.newImageUrl);
+    } else if (action.type === 'content' && action.updateData) {
+      await executeContentUpdate(action.contentId, action.updateData);
     }
   };
 
@@ -106,14 +208,32 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
     }
   };
 
+  const handlePublishNow = async (id: number) => {
+    if (!isApprover) {
+      toast.warning('Chỉ Quản lý (Manager, Agency Manager, Client Approver) mới có quyền xuất bản nội dung!');
+      return;
+    }
+    if (publishingId !== null) return;
+    setPublishingId(id);
+    try {
+      await contentApi.publish(id);
+      toast.success('Đã xuất bản bài viết thành công (PUBLISHED)!');
+      await loadContents();
+    } catch (e: any) {
+      toast.error(getApiErrorMessage(e), 'Lỗi khi xuất bản bài viết');
+    } finally {
+      setPublishingId(null);
+    }
+  };
+
   const handleReject = async (id: number) => {
     if (!isApprover) {
       toast.warning('Chỉ Quản lý mới có quyền từ chối bài viết!');
       return;
     }
     if (isRejecting) return;
-    if (rejectReason.trim().length < 5) {
-      toast.warning('Vui lòng nhập lý do từ chối cụ thể (tối thiểu 5 ký tự) để nhân viên có hướng điều chỉnh!');
+    if (rejectReason.trim().length < 3) {
+      toast.warning('Vui lòng nhập lý do từ chối cụ thể (tối thiểu 3 ký tự) để nhân viên có hướng điều chỉnh!');
       return;
     }
     setIsRejecting(true);
@@ -146,7 +266,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
 
   const pendingList = contents.filter(c => c.status === 'IN_REVIEW');
   const draftList = contents.filter(c => c.status === 'AI_DRAFT' || c.status === 'DRAFT' || c.status === 'REJECTED');
-  const historyList = contents.filter(c => c.status === 'APPROVED' || c.status === 'REJECTED');
+  const historyList = contents.filter(c => c.status === 'APPROVED' || c.status === 'REJECTED' || c.status === 'PUBLISHED');
   const rejectModalItem = contents.find(c => c.id === rejectId) || null;
 
   return (
@@ -303,6 +423,14 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                         {/* Actions for Manager / Approver */}
                         <div className="flex items-center gap-2 no-print review-actions">
                           <button
+                            onClick={() => handleStartEdit(item)}
+                            className="px-2.5 py-1.5 border border-slate-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all"
+                            title="Chỉnh sửa nội dung bài viết"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                            <span>Sửa</span>
+                          </button>
+                          <button
                             onClick={() => handleApprove(item.id)}
                             disabled={!isApprover || approvingId === item.id}
                             title={!isApprover ? 'Chỉ Quản lý (Manager, Agency Manager, Client Approver) mới có quyền duyệt' : 'Phê duyệt xuất bản'}
@@ -391,7 +519,15 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                         </div>
 
                         {/* Submit Action */}
-                        <div className="no-print review-actions">
+                        <div className="flex items-center gap-2 no-print review-actions">
+                          <button
+                            onClick={() => handleStartEdit(item)}
+                            className="px-2.5 py-1.5 border border-slate-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all"
+                            title="Chỉnh sửa nội dung bản nháp"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                            <span>Sửa</span>
+                          </button>
                           <button
                             onClick={() => handleSubmitDraft(item.id)}
                             disabled={submittingId === item.id}
@@ -465,6 +601,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                         <th className="py-3 px-4">Quyết định</th>
                         <th className="py-3 px-4">Ghi chú & Lý do kiểm duyệt</th>
                         <th className="py-3 px-4">Thời gian cập nhật</th>
+                        <th className="py-3 px-4 text-right">Thao tác</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -476,9 +613,10 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                           </td>
                           <td className="py-3 px-4 whitespace-nowrap">
                             <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold ${
+                              h.status === 'PUBLISHED' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
                               h.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
                             }`}>
-                              {h.status === 'APPROVED' ? '✓ ĐÃ PHÊ DUYỆT' : '✕ ĐÃ TỪ CHỐI'}
+                              {h.status === 'PUBLISHED' ? '✓ ĐÃ XUẤT BẢN' : h.status === 'APPROVED' ? '✓ ĐÃ PHÊ DUYỆT' : '✕ ĐÃ TỪ CHỐI'}
                             </span>
                           </td>
                           <td className="py-3 px-4 text-xs">
@@ -490,11 +628,39 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                             ) : (
                               <span className="text-emerald-700 text-[11px] flex items-center gap-1 font-medium">
                                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                Đã kiểm duyệt đạt tiêu chuẩn an toàn & chính sách
+                                {h.status === 'PUBLISHED' ? 'Đã xuất bản thành công lên kênh truyền thông' : 'Đã kiểm duyệt đạt tiêu chuẩn an toàn & chính sách'}
                               </span>
                             )}
                           </td>
                           <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{h.updated_at ? new Date(h.updated_at).toLocaleDateString('vi-VN') : 'Gần đây'}</td>
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => handleStartEdit(h)}
+                                className="px-2.5 py-1.5 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all"
+                                title="Chỉnh sửa bài viết (sẽ yêu cầu duyệt lại nếu đã duyệt)"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                                <span>Chỉnh sửa</span>
+                              </button>
+                              {h.status === 'APPROVED' && (
+                                <button
+                                  onClick={() => handlePublishNow(h.id)}
+                                  disabled={!isApprover || publishingId === h.id}
+                                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:cursor-not-allowed"
+                                  title="Xuất bản bài viết ngay lập tức"
+                                >
+                                  {publishingId === h.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                                  <span>Xuất bản ngay</span>
+                                </button>
+                              )}
+                              {h.status === 'PUBLISHED' && (
+                                <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-200">
+                                  ✓ Đã xuất bản
+                                </span>
+                              )}
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -508,14 +674,34 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
 
       {/* Dedicated Reject Modal with Quick Feedback Templates */}
       {rejectModalItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 no-print">
-          <div
-            ref={rejectModalRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="reject-modal-title"
-            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
-          >
+        <div 
+          className="fixed inset-0 z-50 overflow-y-auto pointer-events-auto no-print"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reject-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isRejecting) {
+              setRejectId(null);
+              setRejectReason('');
+            }
+          }}
+        >
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity cursor-pointer pointer-events-auto"
+            aria-hidden="true"
+            onClick={() => {
+              if (!isRejecting) {
+                setRejectId(null);
+                setRejectReason('');
+              }
+            }}
+          />
+          <div className="flex items-center justify-center min-h-screen p-4 pointer-events-none">
+            <div
+              ref={rejectModalRef}
+              className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-10 pointer-events-auto"
+            >
             <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-rose-50/60">
               <div className="flex items-center gap-2 text-rose-700">
                 <XCircle className="w-5 h-5 text-rose-600" />
@@ -557,9 +743,9 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
 
               <div>
                 <label htmlFor="reject-reason-input" className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                  <span>Chi tiết lý do từ chối & hướng dẫn sửa (tối thiểu 5 ký tự):</span>
-                  <span className={`text-[10px] font-semibold ${rejectReason.trim().length >= 5 ? 'text-emerald-700' : 'text-slate-600'}`}>
-                    {rejectReason.trim().length}/5
+                  <span>Chi tiết lý do từ chối & hướng dẫn sửa (tối thiểu 3 ký tự):</span>
+                  <span className={`text-[10px] font-semibold ${rejectReason.trim().length >= 3 ? 'text-emerald-700' : 'text-slate-600'}`}>
+                    {rejectReason.trim().length}/3
                   </span>
                 </label>
                 <textarea
@@ -588,13 +774,185 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
               </button>
               <button
                 type="button"
-                disabled={rejectReason.trim().length < 5 || isRejecting}
+                disabled={rejectReason.trim().length < 3 || isRejecting}
                 onClick={() => handleReject(rejectModalItem.id)}
                 className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 disabled:cursor-not-allowed rounded-lg shadow-sm transition-all flex items-center gap-1.5"
               >
                 {isRejecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
                 <span>Xác nhận Từ chối</span>
               </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      )}
+
+      {/* Edit Content Modal */}
+      {editingContent && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 no-print animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isUpdating) {
+              setEditingContent(null);
+            }
+          }}
+        >
+          <div
+            ref={editModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-modal-title"
+            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+          >
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-indigo-50/50">
+              <div className="flex items-center gap-2 text-indigo-700">
+                <Edit2 className="w-5 h-5 text-indigo-600" />
+                <h3 id="edit-modal-title" className="font-bold text-sm text-slate-900">Chỉnh sửa nội dung bài viết</h3>
+              </div>
+              <button
+                onClick={() => setEditingContent(null)}
+                aria-label="Đóng modal chỉnh sửa"
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {(editingContent.status === 'APPROVED' || editingContent.status === 'PUBLISHED') && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="block font-bold">Lưu ý An toàn Thương hiệu:</strong>
+                    <span>Bài viết này đã được phê duyệt. Việc chỉnh sửa sẽ tự động hủy phê duyệt và đưa bài viết về trạng thái Nháp (AI_DRAFT) để phê duyệt lại.</span>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Tiêu đề bài viết:</label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:border-indigo-500 focus:bg-white transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Nội dung bài viết:</label>
+                <textarea
+                  rows={5}
+                  value={editBody}
+                  onChange={(e) => setEditBody(e.target.value)}
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:border-indigo-500 focus:bg-white transition-colors leading-relaxed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Lời kêu gọi hành động (CTA):</label>
+                <input
+                  type="text"
+                  value={editCta}
+                  onChange={(e) => setEditCta(e.target.value)}
+                  placeholder="Ví dụ: Đăng ký ngay để nhận ưu đãi!"
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:border-indigo-500 focus:bg-white transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingContent(null)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEdit}
+                disabled={isUpdating || !editTitle.trim() || !editBody.trim()}
+                className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed rounded-lg shadow-sm transition-all flex items-center gap-1.5"
+              >
+                {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                <span>Lưu thay đổi</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Brand Safety Confirmation Dialog on Editing APPROVED Content (Task 2) */}
+      {confirmDialog && (
+        <div 
+          className="fixed inset-0 z-[60] overflow-y-auto pointer-events-auto no-print"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setConfirmDialog(null);
+            }
+          }}
+        >
+          {/* Dedicated Backdrop */}
+          <div 
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity cursor-pointer pointer-events-auto"
+            aria-hidden="true"
+            onClick={() => setConfirmDialog(null)}
+          />
+          <div className="flex items-center justify-center min-h-screen p-4 pointer-events-none">
+            <div
+              ref={confirmModalRef}
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="confirm-dialog-title"
+              aria-describedby="confirm-dialog-desc"
+              onClick={(e) => e.stopPropagation()}
+              className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full border border-amber-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-10 pointer-events-auto"
+            >
+              <div className="p-5 border-b border-amber-100 flex items-center gap-3 bg-amber-50">
+                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0 border border-amber-200">
+                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h3 id="confirm-dialog-title" className="font-bold text-sm text-slate-900">
+                    Cảnh báo An toàn Thương hiệu
+                  </h3>
+                  <p className="text-[11px] text-amber-700 font-medium">
+                    Hủy phê duyệt nội dung & đưa về trạng thái Nháp
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-5 space-y-3">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+                  <span className="text-[10px] font-bold uppercase text-slate-400">Bài viết đang chỉnh sửa:</span>
+                  <p className="font-bold text-slate-800 line-clamp-1 mt-0.5">{confirmDialog.contentTitle}</p>
+                </div>
+
+                <div id="confirm-dialog-desc" className="text-xs text-slate-700 leading-relaxed bg-amber-50/50 p-3.5 rounded-xl border border-amber-100">
+                  <p className="font-medium text-slate-800">
+                    Bài viết này đã được phê duyệt. Việc chỉnh sửa sẽ tự động hủy phê duyệt và đưa bài viết về trạng thái Nháp (AI_DRAFT) để phê duyệt lại. Bạn có chắc chắn muốn tiếp tục?
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDialog(null)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmAction}
+                  className="px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg shadow-sm transition-all flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Xác nhận tiếp tục</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
