@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     
     # CORS Origins
+    # 4173 là cổng `vite preview` mà Playwright dùng làm baseURL
+    # (xem frontend/playwright.config.ts). Không khai báo origin này thì MỌI request
+    # API của bộ test E2E chạy trên backend thật (E2E_MODE=live) sẽ bị CORS chặn.
     ALLOWED_ORIGINS: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
@@ -37,6 +40,8 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "http://localhost:8080",
         "http://127.0.0.1:8080",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
         "http://localhost",
         "http://localhost:80",
         "https://kienhieu.id.vn",

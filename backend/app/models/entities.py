@@ -161,6 +161,11 @@ class Campaign(Base):
     # hop le o tang kiem tra quyen: cac noi dung kiem tra phan quyen (check_campaign_access,
     # check_workspace_boundary, check_content_access) quy tac FAIL-CLOSED, tu choi truy cap
     # khi workspace_id IS NULL. Can migration dan de gan workspace cho du lieu cu.
+    # M4: migration idempotent trong app/core/database.py (_backfill_tenant_workspace_ids,
+    # chay tu ensure_sqlite_schema_compatibility) da gan workspace_id cho du lieu legacy
+    # (content lay tu campaign cha; campaign lay tu workspace ma owner so huu, neu khong
+    # thi workspace dau tien owner la thanh vien). Con lai NULL => tieu de muc do chung
+    # va van bi fail-closed o moi endpoint.
     workspace_id = Column(Integer, ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="SET NULL"), nullable=True)
     product_id = Column(Integer, ForeignKey("products.id", onupdate="CASCADE", ondelete="RESTRICT"), nullable=False)
     owner_id = Column(Integer, ForeignKey("users.id", onupdate="CASCADE", ondelete="RESTRICT"), nullable=False)
@@ -214,6 +219,9 @@ class MarketingContent(Base):
     # NULL van con ton tai trong schema de khong pha migration CSDL cu, nhung KHONG con duoc coi la
     # hop le o tang kiem tra quyen: check_content_access / check_workspace_boundary quy tac
     # FAIL-CLOSED, tu choi truy cap khi workspace_id IS NULL. Can migration dan de gan workspace.
+    # M4: migration idempotent trong app/core/database.py (_backfill_tenant_workspace_ids,
+    # chay tu ensure_sqlite_schema_compatibility) da gan workspace_id cho du lieu legacy tu
+    # campaign cha. Con lai NULL => muc do chung va van bi fail-closed o moi endpoint.
     workspace_id = Column(Integer, ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="SET NULL"), nullable=True)
     campaign_id = Column(Integer, ForeignKey("campaigns.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     channel_id = Column(Integer, ForeignKey("marketing_channels.id", onupdate="CASCADE", ondelete="RESTRICT"), nullable=False)

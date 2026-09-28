@@ -30,7 +30,7 @@ from app.models.entities import (
 from seed.seed_data import init_db as seed_init_db, reset_db
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-LIVE_DB_FILE = BASE_DIR / "marketing_campaigns.db"
+LIVE_DB_FILE = BASE_DIR / "data" / "marketing_campaigns.db"
 
 
 # ==============================================================================

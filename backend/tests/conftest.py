@@ -33,7 +33,7 @@ from app.models.entities import (
 # 1. LIVE DATABASE GUARD & CONFIGURATION SAFETY
 # ==============================================================================
 TEST_DB_URL = "sqlite:///:memory:"
-LIVE_DB_PATH = BASE_DIR / "marketing_campaigns.db"
+LIVE_DB_PATH = BASE_DIR / "data" / "marketing_campaigns.db"
 
 # Redirect global settings and database.SessionLocal to memory engine
 settings.DATABASE_URL = TEST_DB_URL

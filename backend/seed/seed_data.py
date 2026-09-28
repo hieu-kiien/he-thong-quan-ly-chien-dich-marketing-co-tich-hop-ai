@@ -94,6 +94,34 @@ def seed_data(session=None, force: bool = False):
         from app.core.database import SessionLocal as DynamicSessionLocal
         db = DynamicSessionLocal()
         should_close = True
+
+    def resolve_password(env_name: str, default: str) -> str:
+        """Chuyen gia tri env thanh mat khau an toan.
+
+        PHAI dung `or` chu KHONG dung `os.getenv(name, default)`: khi bien env
+        duoc khai bao nhung RONG (dung trong docker-compose: `${VAR:-}`), os.getenv
+        tra ve chuoi rong chu KHONG phai gia tri mac dinh. Ket qua: tai khoan demo
+        duoc tao voi mat khau RONG, khong ai dang nhap duoc nhung mat khau "trong"
+        tai lieu la mat khau sai.
+
+        Nen production KHONG nap du lieu mau (da chan o tren bang is_production_env),
+        nen fallback ve mat khau mac dinh o day chi ap dung cho moi truong dev/test
+        va co canh bao ro de lau bat ky ai do doc code.
+        """
+        raw = os.getenv(env_name)
+        if raw is not None and not raw.strip():
+            print(
+                f"[WARNING] {env_name} duoc dat thanh chuoi RONG -> dung mat khau mac dinh "
+                f"'{default}' cho tai khoan demo. Hay dat {env_name} that neu khong muon dung."
+            )
+            raw = None
+        resolved = (raw or default).strip()
+        if len(resolved) < 8:
+            raise RuntimeError(
+                f"{env_name} qua ngan ({len(resolved)} ky tu). Mat khau toi thieu 8 ky tu."
+            )
+        return resolved
+
     try:
         print("[*] Dang kiem tra va nap du lieu mau (Seed Data)...")
 
@@ -103,7 +131,7 @@ def seed_data(session=None, force: bool = False):
             manager = User(
                 email="manager@gmail.com",
                 full_name="Nguyễn Văn Quản Lý",
-                password_hash=hash_password(os.getenv("MARKETFLOW_MANAGER_PASSWORD", "Manager@123")),
+                password_hash=hash_password(resolve_password("MARKETFLOW_MANAGER_PASSWORD", "Manager@123")),
                 role="MANAGER",
                 status="ACTIVE"
             )
@@ -114,7 +142,7 @@ def seed_data(session=None, force: bool = False):
             marketer = User(
                 email="marketer@gmail.com",
                 full_name="Trần Thị Marketing",
-                password_hash=hash_password(os.getenv("MARKETFLOW_MARKETER_PASSWORD", "Marketer@123")),
+                password_hash=hash_password(resolve_password("MARKETFLOW_MARKETER_PASSWORD", "Marketer@123")),
                 role="MARKETER",
                 status="ACTIVE"
             )
@@ -125,7 +153,7 @@ def seed_data(session=None, force: bool = False):
             approver = User(
                 email="approver@gmail.com",
                 full_name="Đại Diện Khách Hàng (Approver)",
-                password_hash=hash_password(os.getenv("MARKETFLOW_APPROVER_PASSWORD", "Approver@123")),
+                password_hash=hash_password(resolve_password("MARKETFLOW_APPROVER_PASSWORD", "Approver@123")),
                 role="CLIENT_APPROVER",
                 status="ACTIVE"
             )

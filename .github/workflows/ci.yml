@@ -89,11 +89,27 @@ jobs:
 
   # =========================================================================
   # Gate 3: Playwright E2E Business Flows & Interaction Probes Gate
+  #
+  # CHAY HAI CHE DO (xem frontend/scripts/start-e2e.mjs):
+  #  - E2E_MODE=mock: nhanh, offline, bat loi UI regression tren du lieu gia.
+  #  - E2E_MODE=live: backend FastAPI THAT + SQLite THAT, dang nhap that, du lieu
+  #    that. Day moi la bang chung he thong thuc su chay.
+  # Gate fail neu MOT trong hai che do fail.
   # =========================================================================
   playwright-e2e-business-flows:
     name: "Gate 3: Playwright E2E & Interaction Probes Gate"
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Live mode phai build frontend + khoi dong uvicorn + nap seed truoc khi test
+    # chay, nên budget phai lon hon mock mode.
+    timeout-minutes: 25
+
+    env:
+      APP_ENV: test
+      SECRET_KEY: ci-secret-key-marketflow-ai-testing-32chars
+      JWT_SECRET_KEY: ci-jwt-secret-marketflow-ai-testing-32c
+      BYOK_ENCRYPTION_KEY: ci-byok-secret-marketflow-ai-testing-32
+      DATABASE_URL: sqlite:///./data/marketing_campaigns.db
+      AI_ENABLE_FALLBACK: "true"
 
     steps:
       - name: Checkout code
@@ -106,6 +122,18 @@ jobs:
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Set up Python 3.12 (cho backend that o E2E_MODE=live)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
       - name: Install frontend dependencies
         run: npm ci
         working-directory: frontend
@@ -114,17 +142,94 @@ jobs:
         run: npx playwright install --with-deps chromium
         working-directory: frontend
 
+      - name: Seed database that (idempotent) cho E2E_MODE=live
+        working-directory: backend
+        run: |
+          mkdir -p data
+          python seed/seed_data.py
+          echo "::notice title=Seed data::Da nap du lieu mau (manager@gmail.com / Manager@123 vao se)"
+
       - name: Build frontend preview bundle
         run: npm run build
         working-directory: frontend
 
-      - name: Run Playwright E2E business flows (tests/e2e)
-        run: npx playwright test tests/e2e
+      - name: Log E2E modes that su chay
+        run: |
+          echo "=============================================================="
+          echo " Gate 3 - Playwright E2E"
+          echo "   Lan chay 1: E2E_MODE=mock  -> du lieu gia, khong backend, nhanh"
+          echo "               (tests/e2e/*.spec.ts; live spec + probe tu skip)"
+          echo "   Lan chay 2: E2E_MODE=live  -> uvicorn that + SQLite that, KHONG intercept API"
+          echo "               (probe backend-health + live-backend.spec.ts)"
+          echo "   Backend that: http://127.0.0.1:8000 (do scripts/start-e2e.mjs bat)"
+          echo "   Frontend:    http://127.0.0.1:4173"
+          echo "=============================================================="
+
+      # ---------------------------------------------------------------------
+      # Lan chay 1: MOCK - toan bo tests/e2e (UI regression nhanh, offline).
+      # tests/e2e/live-backend.spec.ts va backend-health.spec.ts tu skip ban thanh.
+      # ---------------------------------------------------------------------
+      - name: "Playwright run 1/2 - E2E_MODE=mock (tests/e2e)"
+        run: npx playwright test tests/e2e --reporter=list
         working-directory: frontend
+        env:
+          E2E_MODE: mock
+          E2E_LOG_MODE: "1"
+
+      # ---------------------------------------------------------------------
+      # Lan chay 2: LIVE - backend that, khong intercept API.
+      # Chi chay cac spec viet cho du lieu that. Cac spec con lai assert du lieu
+      # cua mock-api.ts nen khong co y nghia khi thay bang du lieu that.
+      # ---------------------------------------------------------------------
+      - name: "Playwright run 2/2a - E2E_MODE=live (backend readiness probe)"
+        id: backend_probe
+        run: npx playwright test tests/e2e/backend-health.spec.ts --reporter=list
+        working-directory: frontend
+        env:
+          E2E_MODE: live
+          E2E_LOG_MODE: "1"
+          E2E_BACKEND_PORT: "8000"
+          E2E_PYTHON: python
+          PYTHONUNBUFFERED: "1"
+
+      - name: "Playwright run 2/2b - E2E_MODE=live (live-backend.spec.ts)"
+        run: npx playwright test tests/e2e/live-backend.spec.ts --reporter=list
+        working-directory: frontend
+        env:
+          E2E_MODE: live
+          E2E_LOG_MODE: "1"
+          E2E_BACKEND_PORT: "8000"
+          E2E_PYTHON: python
+          PYTHONUNBUFFERED: "1"
+
+      - name: Verify seed data that da san sang (live mode)
+        if: ${{ !cancelled() }}
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          import sqlite3, os, sys
+          url = os.environ.get("DATABASE_URL", "sqlite:///./data/marketing_campaigns.db")
+          path = url.replace("sqlite:///", "", 1)
+          print("DATABASE_URL =", url, "->", os.path.abspath(path))
+          if not os.path.exists(path):
+              print("ERROR: file CSDL khong ton tai")
+              sys.exit(1)
+          con = sqlite3.connect(path)
+          users = [r[0] for r in con.execute("SELECT email FROM users ORDER BY email")]
+          print("Users trong CSDL that:", users)
+          for required in ("manager@gmail.com", "marketer@gmail.com", "approver@gmail.com"):
+              if required not in users:
+                  print("ERROR: thieu tai khoan seed", required)
+                  sys.exit(1)
+          print("OK: du lieu seed cho E2E_MODE=live da san sang.")
+          PY
 
       - name: Run Playwright Visual & Interaction Probes (tests/adversarial-interaction-probes.spec.ts)
         run: npx playwright test tests/adversarial-interaction-probes.spec.ts
         working-directory: frontend
+        env:
+          E2E_MODE: mock
+          E2E_LOG_MODE: "1"
 
       - name: Upload Playwright E2E artifact report on failure
         if: failure()
@@ -136,11 +241,31 @@ jobs:
 
   # =========================================================================
   # Gate 4: WCAG 2.2 AA Accessibility Audit Gate
+  #
+  # Uu tien chay tren du lieu THAT (E2E_MODE=live). Neu backend that khong
+  # khoi dong duoc (mo truong CI doc, port bi chiem...) thi FALLBACK ve mock
+  # va ghi ro vao log - khong bao gio "pass" xanh khi khong co gi kiem chung.
+  #
+  # LUU Y (cap nhat 2026-09-28): Gate nay CHAY DO tren du lieu that va dang
+  # FAIL that vi mot loi WCAG CO SAN trong app khong lien quan den E2E:
+  # `AttributionTrendChart.tsx` render `<rect aria-label="...">` ma khong co
+  # `role` -> axe bao loi `aria-prohibited-attr` muc SERIOUS. Loi nay da ton tai
+  # o ca E2E_MODE=mock truoc khi sua doi nay, nen day la loi that chu khong phai
+  # do hien thuc. Gate 4 se xanh lai khi them `role="img"` (hoac bo aria-label
+  # va dung <title>/<desc>) cho cac <rect> do.
   # =========================================================================
   wcag-accessibility-audit:
     name: "Gate 4: WCAG 2.2 AA Accessibility Audit Gate"
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+
+    env:
+      APP_ENV: test
+      SECRET_KEY: ci-secret-key-marketflow-ai-testing-32chars
+      JWT_SECRET_KEY: ci-jwt-secret-marketflow-ai-testing-32c
+      BYOK_ENCRYPTION_KEY: ci-byok-secret-marketflow-ai-testing-32
+      DATABASE_URL: sqlite:///./data/marketing_campaigns.db
+      AI_ENABLE_FALLBACK: "true"
 
     steps:
       - name: Checkout code
@@ -153,6 +278,18 @@ jobs:
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Set up Python 3.12 (cho backend that o E2E_MODE=live)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
       - name: Install frontend dependencies
         run: npm ci
         working-directory: frontend
@@ -161,13 +298,57 @@ jobs:
         run: npx playwright install --with-deps chromium
         working-directory: frontend
 
+      - name: Seed database that (idempotent) cho E2E_MODE=live
+        working-directory: backend
+        run: |
+          mkdir -p data
+          python seed/seed_data.py
+
       - name: Build frontend preview bundle
         run: npm run build
         working-directory: frontend
 
-      - name: Run WCAG accessibility audit (tests/a11y/wcag.spec.ts)
-        run: npx playwright test tests/a11y/wcag.spec.ts
+      - name: Log WCAG mode + backend health
+        run: |
+          echo "=============================================================="
+          echo " Gate 4 - WCAG 2.2 AA"
+          echo "   Che do uu tien: E2E_MODE=live (du lieu that)"
+          echo "   Backend that:   http://127.0.0.1:8000/health"
+          echo "   Frontend:       http://127.0.0.1:4173"
+          echo "=============================================================="
+
+      - name: "Gate 4 pre-check - backend THAT co that su healthy khong?"
+        id: backend_probe
+        run: npx playwright test tests/e2e/backend-health.spec.ts --reporter=list
         working-directory: frontend
+        env:
+          E2E_MODE: live
+          E2E_LOG_MODE: "1"
+          E2E_BACKEND_PORT: "8000"
+          E2E_PYTHON: python
+          PYTHONUNBUFFERED: "1"
+
+      - name: "WCAG audit - E2E_MODE=live (du lieu that)"
+        run: npx playwright test tests/a11y/wcag.spec.ts --reporter=list
+        working-directory: frontend
+        env:
+          E2E_MODE: live
+          E2E_LOG_MODE: "1"
+          E2E_BACKEND_PORT: "8000"
+          E2E_PYTHON: python
+          PYTHONUNBUFFERED: "1"
+
+      # Fallback CHI chay khi probe that that bat (khong phai khi test that fail).
+      # Neu test that fail thi do la loi WCAG that -> Gate 4 phai FAIL that.
+      - name: "WCAG audit - fallback E2E_MODE=mock (chi khi backend that that bat)"
+        if: steps.backend_probe.outcome == 'failure'
+        run: |
+          echo "::warning title=WCAG live fallback::Backend that khong healthy (probe 'Gate 4 pre-check' that bat). Chay lai WCAG voi du lieu gia de bao dam bao WCAG khong bi bo qua."
+          npx playwright test tests/a11y/wcag.spec.ts --reporter=list
+        working-directory: frontend
+        env:
+          E2E_MODE: mock
+          E2E_LOG_MODE: "1"
 
       - name: Upload WCAG report on failure
         if: failure()

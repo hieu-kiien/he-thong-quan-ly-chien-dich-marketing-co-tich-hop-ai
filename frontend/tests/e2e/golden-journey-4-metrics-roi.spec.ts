@@ -25,6 +25,14 @@ test.describe('Golden Journey 4: Metrics, ROI & AI Doctor Analytics', () => {
     await expect(managerPage.locator('text=ROAS Xuất sắc').or(managerPage.locator('text=3.0x')).first()).toBeVisible();
 
     // 3. Verify Multi-channel Attribution Breakdown
+    //
+    // PHẢI chuyển sang tab "Phân Bổ Kênh Tiếp Thị" trước. Chart này có 2 tab và
+    // tab mặc định là "Dòng Tiền Chi Phí & Doanh Thu" (biểu đồ đường) — tên kênh
+    // (Facebook/TikTok/Email) CHỈ render ở tab thứ hai. Không click tab thì các
+    // assertion dưới đây luôn fail, dù ứng dụng hoạt động đúng.
+    await managerPage.getByRole('button', { name: /Phân Bổ Kênh Tiếp Thị/i }).click();
+    await expect(managerPage.getByRole('button', { name: /Phân Bổ Kênh Tiếp Thị/i })).toBeVisible();
+
     await expect(managerPage.locator('text=Facebook Ads').first()).toBeVisible();
     await expect(managerPage.locator('text=TikTok Video').first()).toBeVisible();
     await expect(managerPage.locator('text=Email Sequence').first()).toBeVisible();

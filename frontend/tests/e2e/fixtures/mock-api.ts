@@ -945,7 +945,57 @@ export async function setupMockApiRoutes(page: Page, options: SetupMockOptions =
       });
     }
 
-    // Default fallback: pass through or return 200 empty
-    return route.continue();
+    // -------------------------------------------------------------------------
+    // HAI endpoint chua duoc handler o tren - giu them o day de mock mode HERMETIC
+    // (khong bao gio cham toi mang that).
+    // -------------------------------------------------------------------------
+    if (path.endsWith('/notifications') && (method === 'GET' || method === 'HEAD')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      });
+    }
+
+    if (/\/campaigns\/\d+\/metrics$/.test(path) && (method === 'GET' || method === 'HEAD')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // Default fallback: BAY KHUONG cua toan bo API.
+    //
+    // Truoc day la `route.continue()` - nghia la bat ky endpoint nao chua duoc
+    // handler se GOC toi mang that. O E2E_MODE=mock khong co backend that, nen
+    // app nhan AxiosError, render trang loi/empty, va cac test a11y/E2E fail
+    // vi ly do hoan toan khong lien quan den UI can sua. Hon nua, no lam che
+    // mau: test "xanh" vi data rong chu khong phai vi dung.
+    //
+    // Bay gio tra 200 voi shape rong dung theo method, va CANH BAO mot lan cho
+    // moi path de kho gap cua mock la bat quang ngay trong log thay vi im lang.
+    // -------------------------------------------------------------------------
+    const warnOnce = (p: string) => {
+      const cache = setupMockApiRoutes._warned || (setupMockApiRoutes._warned = new Set<string>());
+      if (!cache.has(p)) {
+        cache.add(p);
+        console.warn(`[mock-api] CHUA CO HANDLER cho ${method} ${p} -> tra 200 shape rong. ` +
+          `Neu test fail do thieu du lieu, hay bo sung handler o mock-api.ts.`);
+      }
+    };
+    warnOnce(path);
+
+    const emptyBody = method === 'GET' || method === 'HEAD'
+      ? '[]'
+      : JSON.stringify({ detail: 'Mock response (chua co handler)' });
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: emptyBody,
+    });
   });
 }
+
+setupMockApiRoutes._warned = new Set<string>();

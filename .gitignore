@@ -57,3 +57,18 @@ test-results/
 cloudflare/worker-configuration.d.ts
 cloudflare/.local-credentials.txt
 
+# Test / coverage artifacts
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+
+# Local database (được mount vào container qua docker-compose).
+# Dùng `/*` thay vì `/` để git vẫn descend vào thư mục, nhờ vậy .gitkeep được track.
+backend/data/*
+!backend/data/.gitkeep
+
+# Local credentials that must never be committed
+*.sqlite
+*.sqlite3
+

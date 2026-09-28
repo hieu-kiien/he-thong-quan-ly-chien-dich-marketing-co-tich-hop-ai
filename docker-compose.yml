@@ -1,4 +1,36 @@
-version: '3.8'
+# =============================================================================
+# Marketing Campaign Management System with AI - Docker Compose (he thong anh)
+#
+# YEU cau ve khi chay `docker compose up` (uu tien cao):
+#
+#  1) FILE .env PHIA HOST LA BAT BUOC.
+#     - SECRET_KEY, JWT_SECRET_KEY, BYOK_ENCRYPTION_KEY co `${...?}` nen Compose
+#       se FAIL ngay (exit != 0) neu thieu 3 bien nay. Moi cai >= 48 ky tu.
+#     - AI_API_KEY: neu bo trong, tinh nang AI tu dong rot ve Smart Fallback
+#       (khong co loi, nhung ket qua AI co chat luong thap). Dat key that de bat
+#       AI that su chay. KHONG bao gio hardcode key vao file nay.
+#     - MARKETFLOW_MANAGER_PASSWORD / MARKETFLOW_MARKETER_PASSWORD /
+      #       MARKETFLOW_APPROVER_PASSWORD: mac dinh rong (nhu hien tai) de KHONG co
+#       ai vo tinh chay production bang mat khau demo. Trong moi truong that,
+#       BAT BUOC dat 3 bien nay qua .env.
+#
+#  2) THU MUC backend/data/ LÀ DUNG LUONG DU LIEU (bao gom file SQLite).
+#     - Mount NGUYEN THU MUC `./backend/data` vao `/app/data` (khong phai file
+#       `.db` le). Ly do: backend/app/core/database.py bat `PRAGMA
+#       journal_mode=WAL`, nen SQLite sinh them 2 file can ke: `*.db-wal` va
+#       `*.db-shm`. Neu chi mount file `.db`, 2 file do KHONG nam trong volume
+#       -> container recreate se mat WAL -> du lieu chua flush co the bien mat.
+#     - Thu muc nay duoc Docker tao tu dong neu chua co. KHONG COMMIT data
+#       production vao git: `.gitignore` da co san `**/*.db`, `**/*.db-wal`,
+#       `**/*.db-shm` nen da che ho data, nhung van nen them `.gitkeep` rong neu
+#       muon mang cau truc thu muc.
+#     - MIGRATION 1 LAN: neu DB cu dang nam o `backend/marketing_campaigns.db`,
+#       hay chuyen file do (ca `-wal`/`-shm` neu co) vao `backend/data/` truoc
+#       lan `docker compose up` dau tien, neu khong se bat dau bang DB rong.
+#
+#  3) `version:` da duoc go bo - Compose Specification v2 khong con can
+#     dong nay va warning "version is obsolete".
+# =============================================================================
 
 services:
   backend:
@@ -7,25 +39,57 @@ services:
       dockerfile: Dockerfile
     container_name: aia331_backend
     restart: unless-stopped
+    # Cho scheduler (APScheduler) co thoi gian dung trong: cancel job dang chay
+    # va flush SQLite/WAL truoc khi container bi SIGKILL.
+    stop_grace_period: 20s
     ports:
       - "127.0.0.1:8000:8000"
     environment:
       - APP_NAME=Marketing Campaign Management System with AI
       - APP_ENV=${APP_ENV:-production}
       - API_V1_PREFIX=/api/v1
-      - DATABASE_URL=sqlite:////app/marketing_campaigns.db
+      # File DB nam trong thu muc da mount o duoi -> moi thay doi path DB thi
+      # doi ca `volumes` ben duoi, khong tach hai cai ra.
+      - DATABASE_URL=sqlite:////app/data/marketing_campaigns.db
       - "SECRET_KEY=${SECRET_KEY:?Error: SECRET_KEY required}"
       - "JWT_SECRET_KEY=${JWT_SECRET_KEY:?Error: JWT_SECRET_KEY required}"
       - "BYOK_ENCRYPTION_KEY=${BYOK_ENCRYPTION_KEY:?Error: BYOK_ENCRYPTION_KEY required}"
+      # --- AI (P0) ---
+      # Truoc day AI_API_KEY khong duoc truyen vao container nen moi cau hoi
+      # AI trong Docker deu im lang rot ve Smart Fallback. Mac dinh rong de
+      # `docker compose up` van chay duoc, nhung de AI that su hoat dong thi
+      # phai dat AI_API_KEY trong .env.
+      - AI_API_KEY=${AI_API_KEY:-}
       - AI_PROVIDER=${AI_PROVIDER:-gemini}
       - AI_BASE_URL=${AI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai}
       - AI_MODEL=${AI_MODEL:-gemini-2.5-flash}
       - AI_TIMEOUT_SECONDS=10
       - AI_ENABLE_FALLBACK=true
+      # --- Role passwords (P0) ---
+      # Mac dinh RONG. Root user trong backend co fallback ve mat khau demo neu
+      # bien nay rong - xem backend/app/core/config.py. Dat rong o day de khong
+      # bao gio deploy production ma van chay bang mat khau demo.
+      - MARKETFLOW_MANAGER_PASSWORD=${MARKETFLOW_MANAGER_PASSWORD:-}
+      - MARKETFLOW_MARKETER_PASSWORD=${MARKETFLOW_MARKETER_PASSWORD:-}
+      - MARKETFLOW_APPROVER_PASSWORD=${MARKETFLOW_APPROVER_PASSWORD:-}
     volumes:
-      - ./backend/marketing_campaigns.db:/app/marketing_campaigns.db
+      # MOUNT THU MUC, khong phai file `.db`: giu duoc ca `-wal` va `-shm`.
+      # Xem README-style comment o dau file nay.
+      - ./backend/data:/app/data
+    # Can ghi DB nen read_only phai false (noi ro de khong nguoi sua thanh
+    # `true` roi lam container khong khoi dong).
+    read_only: false
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      # 127.0.0.1 thay vì `localhost` để tránh rơi vào ::1 (IPv6) - xem ghi chú
+      # ở healthcheck của frontend.
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\" || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -39,13 +103,26 @@ services:
       dockerfile: Dockerfile
     container_name: aia331_frontend
     restart: unless-stopped
+    # Dockerfile stage 2 chay `nginxinc/nginx-unprivileged:alpine` (non-root),
+    # nen container nghe port 8080 thay vi 80.
     ports:
-      - "3000:80"
+      - "3000:8080"
     depends_on:
       backend:
         condition: service_healthy
+    read_only: false
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/"]
+      # PHẢI dùng 127.0.0.1 chứ không phải `localhost`: trong container, `localhost`
+      # resolve ra ::1 (IPv6) trước, còn nginx chỉ LẮNG NGHE IPv4 0.0.0.0:8080
+      # -> "Connection refused" -> container bị đánh dấu unhealthy dù app vẫn chạy.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
       interval: 10s
       timeout: 5s
       retries: 3

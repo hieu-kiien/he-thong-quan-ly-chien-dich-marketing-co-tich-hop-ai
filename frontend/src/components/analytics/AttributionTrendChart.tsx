@@ -148,7 +148,48 @@ export const AttributionTrendChart: React.FC<AttributionTrendChartProps> = ({
     return dynamicDailyMetrics;
   }, [dynamicDailyMetrics, timeRange]);
 
-  const activeChannels = dynamicChannels.length > 0 ? dynamicChannels : (propChannels || []);
+  const rawChannels = dynamicChannels.length > 0 ? dynamicChannels : (propChannels || []);
+
+  // CHUẨN HOÁ DỮ LIỆU ĐẦU VÀO — sửa lỗi làm sập cả Dashboard.
+  //
+  // Interface `ChannelAttribution` khai báo mọi trường số là `number` bắt buộc, nhưng
+  // dữ liệu thực tế từ API (hoặc từ mock) có thể THIẾU trường -> `undefined`. Component
+  // này gọi `.toFixed()` / `.toLocaleString()` / `Math.round()` trực tiếp lên
+  // ch.revenue, ch.cost, ch.roas, ch.roi_percent, ch.cpc_avg... Một trường `undefined`
+  // làm ném `TypeError: Cannot read properties of undefined (reading 'toFixed')`,
+  // và ErrorBoundary nuốt LUÔN cả trang Dashboard.
+  //
+  // Sửa ở MỘT chỗ duy nhất thay vì bọc 8 chỗ sử dụng: mọi trường số trở thành số hữu
+  // hạn, NaN/Infinity cũng được ép về 0. Cách này đúng ở gốc vấn đề và giữ component
+  // miễn nhiễm với payload thiếu trường.
+  const activeChannels = useMemo<ChannelAttribution[]>(
+    () =>
+      rawChannels.map((ch) => {
+        const num = (v: unknown, fallback = 0): number => {
+          const n = typeof v === 'number' ? v : Number(v);
+          return Number.isFinite(n) ? n : fallback;
+        };
+        return {
+          ...ch,
+          channel_id: num(ch.channel_id),
+          channel_name: ch.channel_name ?? 'Kênh không tên',
+          channel_slug: ch.channel_slug,
+          views: num(ch.views),
+          clicks: num(ch.clicks),
+          conversions: num(ch.conversions),
+          cost: num(ch.cost),
+          revenue: num(ch.revenue),
+          ctr_percent: num(ch.ctr_percent),
+          cpc_avg: num(ch.cpc_avg),
+          cvr_percent: num(ch.cvr_percent),
+          roas: num(ch.roas),
+          roi_percent: num(ch.roi_percent),
+          share_of_cost: num(ch.share_of_cost),
+          share_of_revenue: num(ch.share_of_revenue),
+        };
+      }),
+    [rawChannels]
+  );
 
   // Aggregated totals
   const totalCost = propTotalCost !== undefined
@@ -454,7 +495,12 @@ export const AttributionTrendChart: React.FC<AttributionTrendChartProps> = ({
                         className="transition-all"
                       />
 
-                      {/* Interactive Focusable Target */}
+                      {/* Interactive Focusable Target.
+                          `role="img"` là BẮT BUỘC: mà không có nó, `aria-label` bị
+                          axe chặn theo luật `aria-prohibited-attr` (serious) vì
+                          `<rect>` mặc định là generic role, generic không được mang
+                          nhãn trợ năng. Khai báo img biến nó thành một điểm dữ liệu
+                          có nhãn đọc được, đồng thời vẫn focus được bằng bàn phím. */}
                       <rect 
                         x={rPt.x - 20} 
                         y={paddingY} 
@@ -463,6 +509,7 @@ export const AttributionTrendChart: React.FC<AttributionTrendChartProps> = ({
                         fill="transparent" 
                         className="cursor-pointer focus:outline-hidden"
                         tabIndex={0}
+                        role="img"
                         aria-label={`Ngày ${d.date}: Doanh thu ${d.revenue.toLocaleString('vi-VN')} đ, Chi phí ${d.cost.toLocaleString('vi-VN')} đ`}
                         onMouseEnter={() => setHoveredIndex(i)}
                         onMouseLeave={() => setHoveredIndex(null)}

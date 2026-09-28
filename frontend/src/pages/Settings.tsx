@@ -12,7 +12,7 @@ const PROVIDER_CONFIGS = {
   gemini: {
     name: 'Google Gemini',
     initials: 'G',
-    initialsColor: 'text-indigo-600',
+    initialsColor: 'text-indigo-700',
     badge: 'Chính thức',
     badgeColor: 'bg-emerald-100 text-emerald-800',
     desc: 'Hệ sinh thái Gemini tối ưu tốc độ và chi phí với cửa sổ ngữ cảnh lớn.',
@@ -54,7 +54,7 @@ const PROVIDER_CONFIGS = {
   openrouter: {
     name: 'OpenRouter',
     initials: 'OR',
-    initialsColor: 'text-purple-600',
+    initialsColor: 'text-purple-700',
     badge: 'Đa mô hình',
     badgeColor: 'bg-purple-100 text-purple-800',
     desc: 'Cổng Gateway kết nối hàng trăm mô hình mã nguồn mở và thương mại.',
@@ -96,7 +96,7 @@ const PROVIDER_CONFIGS = {
   openai: {
     name: 'OpenAI',
     initials: 'OA',
-    initialsColor: 'text-emerald-600',
+    initialsColor: 'text-emerald-700',
     badge: 'Tiêu chuẩn',
     badgeColor: 'bg-blue-100 text-blue-800',
     desc: 'Dòng mô hình GPT và o-series hàng đầu thế giới từ OpenAI.',

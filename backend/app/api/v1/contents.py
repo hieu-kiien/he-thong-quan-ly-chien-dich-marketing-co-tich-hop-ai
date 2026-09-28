@@ -13,6 +13,7 @@ from app.schemas.schemas import (
 )
 from app.services.compliance.compliance_service import ComplianceScanner
 from app.api.v1.notifications import create_notification
+from app.api.v1.campaigns import _apply_tenant_scope
 
 router = APIRouter(prefix="/contents", tags=["Quản lý Nội dung Marketing"])
 
@@ -147,6 +148,13 @@ def get_contents(
     db: Session = Depends(get_db)
 ):
     query = db.query(MarketingContent)
+
+    # Tenant scope (fail-closed): mọi role trừ ADMIN chỉ thấy nội dung thuộc workspace
+    # họ thực sự có quyền (owner / WorkspaceMember), cộng nội dung legacy
+    # workspace_id IS NULL do chính họ tạo. Trước đây MANAGER/AGENCY_MANAGER bỏ qua
+    # mọi lọc bản ghi nên nhìn thấy nội dung của tenant khác.
+    if current_user.role != "ADMIN":
+        query = _apply_tenant_scope(query, MarketingContent, current_user, db, MarketingContent.created_by)
 
     # Record-level filtering cho Marketer
     if current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER"):

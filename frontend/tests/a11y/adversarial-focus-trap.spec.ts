@@ -394,7 +394,7 @@ test.describe('Adversarial Focus Trap & Keyboard Navigation Probe', () => {
   // =========================================================================
   test.describe('6. In-Context AI Drawer Failure Mode Audit', () => {
 
-    test('Empirical Bug Verification: Navbar AI Copilot trigger triggers React Hooks invariant #310 error due to conditional hooks in AIDrawer.tsx', async ({ marketerPage: page }) => {
+    test('Navbar AI Copilot opens AIDrawer without a React Hooks error', async ({ marketerPage: page }) => {
       await page.setViewportSize({ width: 1280, height: 800 });
 
       // Find AI Copilot trigger in Navbar by aria-label
@@ -403,15 +403,12 @@ test.describe('Adversarial Focus Trap & Keyboard Navigation Probe', () => {
 
       await aiDrawerTrigger.click();
 
-      // Assert ErrorBoundary caught React Error #310 (Rendered more hooks than during previous render)
+      const drawer = page.getByRole('dialog');
+      await expect(drawer).toBeVisible();
+      await expect(drawer.getByRole('button', { name: 'Đóng AI Assistant' })).toBeVisible();
+
       const errorBoundaryHeading = page.locator('h2:has-text("Đã xảy ra sự cố giao diện")');
-      const isErrorCaught = await errorBoundaryHeading.isVisible({ timeout: 4000 }).catch(() => false);
-      
-      // If error is caught, verify it is indeed the React #310 hook violation
-      if (isErrorCaught) {
-        const errorText = await page.locator('text=Minified React error #310').isVisible();
-        expect(errorText, 'React Error #310 caught by ErrorBoundary due to AIDrawer.tsx lines 256-257 after line 88 early return').toBe(true);
-      }
+      await expect(errorBoundaryHeading).toHaveCount(0);
     });
   });
 });

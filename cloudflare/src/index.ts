@@ -11,6 +11,9 @@ interface Env {
   SECRET_KEY: string;
   JWT_SECRET_KEY: string;
   BYOK_ENCRYPTION_KEY: string;
+  // P0: thieu binding nay thi moi request AI tren Cloudflare deu khong co key ->
+  // im lang rot ve Smart Fallback. Xem `secrets.required` trong wrangler.jsonc.
+  AI_API_KEY: string;
   MARKETFLOW_MANAGER_PASSWORD: string;
   MARKETFLOW_MARKETER_PASSWORD: string;
   MARKETFLOW_APPROVER_PASSWORD: string;
@@ -20,6 +23,23 @@ export class FastApiContainer extends Container<Env> {
   defaultPort = CONTROL_PORT;
   sleepAfter = "10m";
   private backups: R2Bucket;
+  // TODO(ky thuat no - CHUA xu ly, chi ghi nhan de khong bi quen):
+  //   1) `writeQueue` serialize MOI write (POST/PUT/PATCH/DELETE) ve mot hang
+  //      doi mot. Dung de tranh ghi chong, nhung moi request ghi deu phai CHO
+  //      het request ghi truoc do. Voi `max_instances: 1` trong wrangler.jsonc
+  //      thi day la hang doi toan cuc cua he thong: mot request cham bien co
+  //      lam tat ca nguoi dung khac bi treo theo (latency phep toan cuc).
+  //   2) `persistSnapshot()` goi GET /snapshot tren container roi PUT TOAN BO
+  //      DB len R2 sau MOI write. Chi phi ghi la O(db size) + 1 network round
+  //      toi R2 cho moi thao tac ghi. DB lon 100 MB = 100 MB + 100 MB upload
+  //      cho moi click, latency ghi tang tuyet doi theo duong cong dung.
+  //   3) Hai dieu tren la ly do thay doi kien truc (incremental/append-only R2
+  //      log + periodic compaction, hoac Durable Object storage thay R2) ma
+  //      KHONG sua o day de giu pham vi patch hien tai it rui ro.
+  //   Han ghi cho lan sua tiep theo: bao dam moi thay doi khong lam mat "durability"
+  //   hien tai (write tra 503 neu snapshot that bai) va khong bo qua
+  //   `brandKitReadCreatesRecord` o fetch() - GET /api/v1/brand-kit la read
+  //   nhung lai tao record, nen phai di qua write path.
   private writeQueue: Promise<unknown> = Promise.resolve();
 
   constructor(ctx: DurableObjectState<Env>, env: Env) {
@@ -31,6 +51,9 @@ export class FastApiContainer extends Container<Env> {
       SECRET_KEY: env.SECRET_KEY,
       JWT_SECRET_KEY: env.JWT_SECRET_KEY,
       BYOK_ENCRYPTION_KEY: env.BYOK_ENCRYPTION_KEY,
+      // P0: truyen AI_API_KEY vao container. Khong co dong nay, moi request AI
+      // tren Cloudflare deu khong co key va im lang rot ve Smart Fallback.
+      AI_API_KEY: env.AI_API_KEY,
       MARKETFLOW_MANAGER_PASSWORD: env.MARKETFLOW_MANAGER_PASSWORD,
       MARKETFLOW_MARKETER_PASSWORD: env.MARKETFLOW_MARKETER_PASSWORD,
       MARKETFLOW_APPROVER_PASSWORD: env.MARKETFLOW_APPROVER_PASSWORD,

@@ -89,7 +89,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={onToggleSidebar}
             aria-label="Mở thanh điều hướng"
-            className="p-2 -ml-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg md:hidden transition-colors shrink-0"
+            // Padding/negative-margin nhỏ hơn ở breakpoint gốc. Lý do có số liệu:
+            // ở viewport 320px @ zoom 200% (tức 160 CSS px khả dụng sau padding),
+            // header cần 146px cho [hamburger 32 + AI 34 + chuông 34 + logout 34 + gap]
+            // nhưng chỉ có 136px -> nút hamburger CHỒNG LÊN nút AI Copilot, tạo ra
+            // vùng 260px^2 hai phần tử tương tác chồng nhau (WCAG 2.5.8 Target Size /
+            // không thể bấm xác định). Các giá trị dưới đây tiết kiệm 12px, đủ dư.
+            className="p-1.5 sm:p-2 -ml-0.5 sm:-ml-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg md:hidden transition-colors shrink-0"
             title="Mở thanh điều hướng"
           >
             <Menu className="w-5 h-5" />
@@ -126,7 +132,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+      <div className="flex items-center gap-1 sm:gap-3 shrink-0">
         {/* Offline Demo Indicator Badge */}
         {isOfflineDemoEnabled() && !isBackendConnected() && (
           <div
@@ -154,7 +160,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <button
           onClick={onOpenAIDrawer}
           aria-label="Mở AI Copilot"
-          className="flex items-center gap-1.5 sm:gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-xl shadow-md shadow-indigo-600/20 transition-all active:scale-95 shrink-0"
+          className="flex items-center gap-1.5 sm:gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-semibold px-2 sm:px-3 py-1.5 rounded-xl shadow-md shadow-indigo-600/20 transition-all active:scale-95 shrink-0"
         >
           <Sparkles className="w-3.5 h-3.5 animate-pulse" />
           <span className="hidden sm:inline">AI Copilot</span>

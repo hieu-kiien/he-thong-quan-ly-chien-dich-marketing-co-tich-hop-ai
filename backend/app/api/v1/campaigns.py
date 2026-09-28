@@ -1,12 +1,49 @@
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Header
 from sqlalchemy.orm import Session
+from sqlalchemy import and_, false, or_
 from app.core.database import get_db
 from app.core.security import RoleChecker, get_current_user
 from app.models.entities import Campaign, Product, User, CampaignMember, WorkspaceMember, Workspace, MarketingContent
 from app.schemas.schemas import CampaignCreate, CampaignUpdate, CampaignResponse, ContentResponse
 
 router = APIRouter(prefix="/campaigns", tags=["Quản lý Chiến dịch"])
+
+
+def _accessible_workspace_ids(user: User, db: Session) -> List[int]:
+    """Danh sách workspace_id mà user thực sự có quyền: workspace họ làm chủ
+    (Workspace.owner_id) hoặc họ là thành viên (WorkspaceMember).
+
+    Dùng chung cho các endpoint list (campaigns/contents) để vai trò MANAGER /
+    AGENCY_MANAGER KHÔNG còn bỏ qua mọi lọc bản ghi và nhìn thấy dữ liệu của
+    tenant khác. Chỉ ADMIN mới được phạm vi toàn cục.
+    """
+    owned_ids = [row[0] for row in db.query(Workspace.id).filter(Workspace.owner_id == user.id).all()]
+    member_ids = [
+        row[0]
+        for row in db.query(WorkspaceMember.workspace_id)
+        .filter(WorkspaceMember.user_id == user.id)
+        .all()
+    ]
+    return sorted({int(ws_id) for ws_id in set(owned_ids) | set(member_ids) if ws_id is not None})
+
+
+def _apply_tenant_scope(query, model, user: User, db: Session, null_owner_column):
+    """Giới hạn truy vấn theo tenant thực sự của user (fail-closed).
+
+    - Bản ghi có workspace_id: chỉ thấy nếu workspace đó user là owner/member.
+    - Bản ghi legacy workspace_id IS NULL: chỉ thấy nếu chính user là người tạo
+      (null_owner_column), tránh mất dữ liệu của chính mình trong lúc dữ liệu
+      legacy chưa được migration gán workspace.
+    """
+    ws_ids = _accessible_workspace_ids(user, db)
+    in_ws = model.workspace_id.in_(ws_ids) if ws_ids else false()
+    return query.filter(
+        or_(
+            in_ws,
+            and_(model.workspace_id.is_(None), null_owner_column == user.id),
+        )
+    )
 
 def check_campaign_access(campaign: Campaign, user: User, db: Session):
     """Xác thực phân quyền mức bản ghi và cách ly đa người thuê (Tenant Isolation):
@@ -65,6 +102,11 @@ def get_campaigns(
     db: Session = Depends(get_db)
 ):
     query = db.query(Campaign)
+
+    # Tenant scope (fail-closed): mọi role trừ ADMIN chỉ thấy campaign thuộc workspace
+    # họ thực sự có quyền, cộng campaign legacy workspace_id IS NULL do chính họ sở hữu.
+    if current_user.role != "ADMIN":
+        query = _apply_tenant_scope(query, Campaign, current_user, db, Campaign.owner_id)
 
     # Phân quyền record-level: Marketer chỉ xem được chiến dịch của mình hoặc mình là thành viên
     if current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER"):
@@ -267,6 +309,11 @@ def get_campaign_contents(
     check_campaign_access(campaign, current_user, db)
 
     query = db.query(MarketingContent).filter(MarketingContent.campaign_id == campaign_id)
+
+    # Tenant scope (fail-closed): check_campaign_access đã chặn ở cấp chiến dịch, nhưng
+    # các dòng nội dung gắn nhầm workspace khác (legacy/sai dữ liệu) vẫn phải bị lọc.
+    if current_user.role != "ADMIN":
+        query = _apply_tenant_scope(query, MarketingContent, current_user, db, MarketingContent.created_by)
 
     # Record-level authorization cho Marketer
     if current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER", "CLIENT_APPROVER"):

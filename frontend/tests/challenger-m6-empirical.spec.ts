@@ -74,7 +74,7 @@ test.describe('Challenger M6: Empirical Audit & Oracle Validation', () => {
     expect(recoveredHit.text).toContain('Tạo Chiến Dịch Mới');
   });
 
-  test('Oracle Flaw 2: ReviewQueue Rejection Modal lacks backdrop click dismissal handler', async ({ managerPage: page }) => {
+  test('ReviewQueue rejection modal dismisses on backdrop click', async ({ managerPage: page }) => {
     await page.goto('/');
     const targetBtn = page.locator('aside button:has-text("Hàng Đợi Phê Duyệt")').first();
     await targetBtn.click({ force: true });
@@ -90,12 +90,6 @@ test.describe('Challenger M6: Empirical Audit & Oracle Validation', () => {
     // Click outside on backdrop (top-left 20, 20)
     await page.mouse.click(20, 20);
 
-    // Modal STILL remains visible because ReviewQueue.tsx line 677 backdrop div has no onClick
-    const isStillVisible = await rejectModal.isVisible();
-    expect(isStillVisible).toBe(true);
-
-    // Close via close button to clean up
-    await page.locator('button[aria-label="Đóng modal từ chối"]').click();
     await expect(rejectModal).not.toBeVisible();
   });
 

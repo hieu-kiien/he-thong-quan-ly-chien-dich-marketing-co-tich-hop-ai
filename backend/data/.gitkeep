@@ -1,0 +1,2 @@
+# Giữ thư mục này trong git để `docker compose up` luôn có thư mọc để mount
+# vào /app/data. Database thật (marketing_campaigns.db + -wal/-shm) bị .gitignore loại bỏ.
