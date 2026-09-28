@@ -50,7 +50,7 @@ jobs:
           pip install -r backend/requirements.txt
 
       - name: Install coverage tooling
-        run: pip install pytest-cov
+        run: pip install pytest-cov pytest-timeout
 
       - name: Run Full Backend Test Suite (pytest backend/tests/ -v)
         run: pytest backend/tests/ -v --timeout=180 --timeout-method=thread --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=0
