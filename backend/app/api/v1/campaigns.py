@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, false, or_
 from app.core.database import get_db
 from app.core.security import RoleChecker, get_current_user
-from app.models.entities import Campaign, Product, User, CampaignMember, WorkspaceMember, Workspace, MarketingContent
-from app.schemas.schemas import CampaignCreate, CampaignUpdate, CampaignResponse, ContentResponse
+from app.models.entities import Campaign, Product, User, CampaignMember, WorkspaceMember, Workspace, MarketingContent, CampaignBudgetAllocation, CampaignKPITarget, MarketingChannel
+from app.schemas.schemas import CampaignCreate, CampaignUpdate, CampaignResponse, ContentResponse, BudgetAllocationCreate, BudgetAllocationResponse, KPITargetCreate, KPITargetResponse
+
 
 router = APIRouter(prefix="/campaigns", tags=["Quản lý Chiến dịch"])
 
@@ -322,4 +323,130 @@ def get_campaign_contents(
 
     contents = query.order_by(MarketingContent.id.desc()).all()
     return [ContentResponse.model_validate(c) for c in contents]
+
+
+# --- BUDGET ALLOCATION ENDPOINTS ---
+
+@router.get("/{campaign_id}/budget-allocations", response_model=List[BudgetAllocationResponse])
+def get_campaign_budget_allocations(
+    campaign_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Lấy danh sách phân bổ ngân sách theo kênh của chiến dịch."""
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
+    check_campaign_access(campaign, current_user, db)
+
+    allocations = db.query(CampaignBudgetAllocation).filter(
+        CampaignBudgetAllocation.campaign_id == campaign_id
+    ).all()
+    return allocations
+
+
+@router.put("/{campaign_id}/budget-allocations", response_model=List[BudgetAllocationResponse])
+def update_campaign_budget_allocations(
+    campaign_id: int,
+    allocations_in: List[BudgetAllocationCreate],
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Cập nhật phân bổ ngân sách theo kênh (Owner, Manager, Admin)."""
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
+    check_campaign_access(campaign, current_user, db)
+
+    # Chỉ owner hoặc manager/admin được phân bổ ngân sách
+    if current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER") and campaign.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền phân bổ ngân sách")
+
+    # Xác thực các kênh tiếp thị tồn tại
+    channel_ids = [a.channel_id for a in allocations_in]
+    if channel_ids:
+        existing_channels = db.query(MarketingChannel.id).filter(MarketingChannel.id.in_(channel_ids)).all()
+        existing_ids = {c[0] for c in existing_channels}
+        missing = set(channel_ids) - existing_ids
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Các kênh tiếp thị không tồn tại: {list(missing)}"
+            )
+
+    # Xóa phân bổ cũ và tạo mới
+    db.query(CampaignBudgetAllocation).filter(CampaignBudgetAllocation.campaign_id == campaign_id).delete()
+
+    created_allocations = []
+    for a in allocations_in:
+        item = CampaignBudgetAllocation(
+            campaign_id=campaign_id,
+            channel_id=a.channel_id,
+            planned_amount=a.planned_amount
+        )
+        db.add(item)
+        created_allocations.append(item)
+
+    db.commit()
+    for item in created_allocations:
+        db.refresh(item)
+
+    return created_allocations
+
+
+# --- KPI TARGETS ENDPOINTS ---
+
+@router.get("/{campaign_id}/kpi-targets", response_model=List[KPITargetResponse])
+def get_campaign_kpi_targets(
+    campaign_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Lấy danh sách mục tiêu KPI của chiến dịch."""
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
+    check_campaign_access(campaign, current_user, db)
+
+    targets = db.query(CampaignKPITarget).filter(
+        CampaignKPITarget.campaign_id == campaign_id
+    ).all()
+    return targets
+
+
+@router.put("/{campaign_id}/kpi-targets", response_model=List[KPITargetResponse])
+def update_campaign_kpi_targets(
+    campaign_id: int,
+    targets_in: List[KPITargetCreate],
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Cập nhật danh sách mục tiêu KPI của chiến dịch."""
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
+    check_campaign_access(campaign, current_user, db)
+
+    if current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER") and campaign.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền cập nhật KPI mục tiêu")
+
+    db.query(CampaignKPITarget).filter(CampaignKPITarget.campaign_id == campaign_id).delete()
+
+    created_targets = []
+    for t in targets_in:
+        item = CampaignKPITarget(
+            campaign_id=campaign_id,
+            metric_name=t.metric_name,
+            target_value=t.target_value,
+            unit=t.unit
+        )
+        db.add(item)
+        created_targets.append(item)
+
+    db.commit()
+    for item in created_targets:
+        db.refresh(item)
+
+    return created_targets
+
 

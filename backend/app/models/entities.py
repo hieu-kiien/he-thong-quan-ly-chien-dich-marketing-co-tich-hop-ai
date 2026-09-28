@@ -176,6 +176,10 @@ class Campaign(Base):
     end_date = Column(String(50), nullable=False)   # YYYY-MM-DD
     budget = Column(Numeric(12, 2), nullable=False, default=0)
     status = Column(String(50), nullable=False, default="DRAFT")
+    key_message = Column(Text, nullable=True)
+    primary_cta = Column(String(255), nullable=True)
+    target_kpi_name = Column(String(50), nullable=True)
+    target_kpi_value = Column(Numeric(12, 2), nullable=True)
     created_at = Column(DateTime, default=utc_now, nullable=False)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
@@ -193,6 +197,9 @@ class Campaign(Base):
     members = relationship("CampaignMember", back_populates="campaign", cascade="all, delete-orphan")
     contents = relationship("MarketingContent", back_populates="campaign", cascade="all, delete-orphan")
     metrics = relationship("CampaignMetric", back_populates="campaign", cascade="all, delete-orphan")
+    tasks = relationship("Task", back_populates="campaign", cascade="all, delete-orphan")
+    budget_allocations = relationship("CampaignBudgetAllocation", back_populates="campaign", cascade="all, delete-orphan")
+    kpi_targets = relationship("CampaignKPITarget", back_populates="campaign", cascade="all, delete-orphan")
     ai_logs = relationship("AILog", back_populates="campaign")
 
 
@@ -393,5 +400,76 @@ class Notification(Base):
 
     user = relationship("User")
     workspace = relationship("Workspace")
+
+
+class Task(Base):
+    __tablename__ = "campaign_tasks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    task_type = Column(String(50), nullable=False, default="OTHER") # CONTENT, DESIGN, VIDEO, ADS, RESEARCH, OTHER
+    assignee_id = Column(Integer, ForeignKey("users.id", onupdate="CASCADE", ondelete="SET NULL"), nullable=True, index=True)
+    creator_id = Column(Integer, ForeignKey("users.id", onupdate="CASCADE", ondelete="RESTRICT"), nullable=False)
+    status = Column(String(50), nullable=False, default="TODO") # TODO, IN_PROGRESS, IN_REVIEW, DONE
+    priority = Column(String(50), nullable=False, default="MEDIUM") # LOW, MEDIUM, HIGH, URGENT
+    due_date = Column(String(50), nullable=True) # YYYY-MM-DD
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("task_type IN ('CONTENT', 'DESIGN', 'VIDEO', 'ADS', 'RESEARCH', 'OTHER')", name="chk_task_type"),
+        CheckConstraint("status IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')", name="chk_task_status"),
+        CheckConstraint("priority IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')", name="chk_task_priority"),
+        Index("idx_tasks_campaign_status", "campaign_id", "status"),
+        Index("idx_tasks_assignee_status", "assignee_id", "status"),
+    )
+
+    campaign = relationship("Campaign", back_populates="tasks")
+    workspace = relationship("Workspace")
+    assignee = relationship("User", foreign_keys=[assignee_id])
+    creator = relationship("User", foreign_keys=[creator_id])
+
+
+class CampaignBudgetAllocation(Base):
+    __tablename__ = "campaign_budget_allocations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False, index=True)
+    channel_id = Column(Integer, ForeignKey("marketing_channels.id", onupdate="CASCADE", ondelete="RESTRICT"), nullable=False)
+    planned_amount = Column(Numeric(12, 2), nullable=False, default=0)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("planned_amount >= 0", name="chk_planned_amount_nonneg"),
+        UniqueConstraint("campaign_id", "channel_id", name="uq_campaign_channel_budget"),
+        Index("idx_budget_alloc_campaign", "campaign_id"),
+    )
+
+    campaign = relationship("Campaign", back_populates="budget_allocations")
+    channel = relationship("MarketingChannel")
+
+
+class CampaignKPITarget(Base):
+    __tablename__ = "campaign_kpi_targets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False, index=True)
+    metric_name = Column(String(50), nullable=False) # 'leads', 'conversions', 'ctr', 'cpl', 'roas', 'revenue'
+    target_value = Column(Numeric(12, 2), nullable=False)
+    unit = Column(String(20), nullable=True, default="count") # 'count', 'vnd', 'percent', 'ratio'
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("campaign_id", "metric_name", name="uq_campaign_metric_target"),
+        Index("idx_kpi_target_campaign", "campaign_id"),
+    )
+
+    campaign = relationship("Campaign", back_populates="kpi_targets")
+
 
 

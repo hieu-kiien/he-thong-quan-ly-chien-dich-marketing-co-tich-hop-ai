@@ -9,10 +9,12 @@ from app.api.v1.schedules import router as schedules_router
 from app.api.v1.workspaces import router as workspaces_router
 from app.api.v1.brand_kit import router as brand_kit_router
 from app.api.v1.settings import router as settings_router
+from app.api.v1.tasks import router as tasks_router
 
 api_router = APIRouter()
 api_router.include_router(auth_router)
 api_router.include_router(campaigns_router)
+api_router.include_router(tasks_router)
 api_router.include_router(contents_router)
 api_router.include_router(metrics_router)
 api_router.include_router(ai_router)
@@ -21,4 +23,5 @@ api_router.include_router(schedules_router)
 api_router.include_router(workspaces_router)
 api_router.include_router(brand_kit_router)
 api_router.include_router(settings_router)
+
 
