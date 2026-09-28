@@ -393,6 +393,9 @@ jobs:
       - name: Run performance and API latency benchmark (measure_api_latency.py)
         run: python scripts/measure_api_latency.py
 
+      - name: Run AI Grounding, Schema Adherence, and Anti-Hallucination benchmark (evaluate_ai_grounding.py)
+        run: python scripts/evaluate_ai_grounding.py
+
   # =========================================================================
   # Gate 6: Secret & Dependency Safety
   # =========================================================================
