@@ -6,8 +6,11 @@ import {
   ComplianceCheckRequest, ComplianceCheckResponse, ComplianceViolation, 
   ContentReview, ChannelAttribution, AIDoctorReport,
   CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse,
-  AppNotification
+  AppNotification,
+  Task, TaskCreate, TaskUpdate, BudgetAllocation, KPITarget,
+  CommandCenterResponse, CommandCenterAttentionItem, CommandCenterMyWorkItem, CommandCenterCampaignHealth
 } from '../types';
+
 import { 
   MOCK_PRODUCTS, 
   MOCK_CAMPAIGNS, 
@@ -1322,5 +1325,177 @@ export const notificationApi = {
     }
   }
 };
+
+// --- TASK & OPERATIONS API SERVICES ---
+
+export const taskApi = {
+  getCampaignTasks: async (campaignId: number, filters?: { status?: string; priority?: string; assignee_id?: number }): Promise<Task[]> => {
+    try {
+      const res = await apiClient.get(`/campaigns/${campaignId}/tasks`, { params: filters });
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      const tasks = getStoredList<Task>('mf_tasks', []);
+      return tasks.filter(t => t.campaign_id === campaignId);
+    }
+  },
+
+  createTask: async (campaignId: number, data: TaskCreate): Promise<Task> => {
+    try {
+      const res = await apiClient.post(`/campaigns/${campaignId}/tasks`, data);
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      const tasks = getStoredList<Task>('mf_tasks', []);
+      const newTask: Task = {
+        id: Date.now(),
+        campaign_id: campaignId,
+        workspace_id: 1,
+        creator_id: 1,
+        assignee_id: data.assignee_id,
+        title: data.title,
+        description: data.description,
+        task_type: data.task_type || 'OTHER',
+        status: data.status || 'TODO',
+        priority: data.priority || 'MEDIUM',
+        due_date: data.due_date,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      tasks.push(newTask);
+      setStoredList('mf_tasks', tasks);
+      return newTask;
+    }
+  },
+
+  getMyTasks: async (filters?: { status?: string; priority?: string; include_completed?: boolean }): Promise<Task[]> => {
+    try {
+      const res = await apiClient.get('/tasks/my-tasks', { params: filters });
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      return getStoredList<Task>('mf_tasks', []);
+    }
+  },
+
+  getTask: async (taskId: number): Promise<Task> => {
+    try {
+      const res = await apiClient.get(`/tasks/${taskId}`);
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      const tasks = getStoredList<Task>('mf_tasks', []);
+      const t = tasks.find(x => x.id === taskId);
+      if (!t) throw new Error('Task not found');
+      return t;
+    }
+  },
+
+  updateTask: async (taskId: number, data: TaskUpdate): Promise<Task> => {
+    try {
+      const res = await apiClient.patch(`/tasks/${taskId}`, data);
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      const tasks = getStoredList<Task>('mf_tasks', []);
+      const idx = tasks.findIndex(x => x.id === taskId);
+      if (idx !== -1) {
+        tasks[idx] = { ...tasks[idx], ...data, updated_at: new Date().toISOString() };
+        setStoredList('mf_tasks', tasks);
+        return tasks[idx];
+      }
+      throw new Error('Task not found');
+    }
+  },
+
+  deleteTask: async (taskId: number): Promise<void> => {
+    try {
+      await apiClient.delete(`/tasks/${taskId}`);
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      const tasks = getStoredList<Task>('mf_tasks', []).filter(t => t.id !== taskId);
+      setStoredList('mf_tasks', tasks);
+    }
+  }
+};
+
+export const budgetApi = {
+  getBudgetAllocations: async (campaignId: number): Promise<BudgetAllocation[]> => {
+    try {
+      const res = await apiClient.get(`/campaigns/${campaignId}/budget-allocations`);
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      return [];
+    }
+  },
+
+  updateBudgetAllocations: async (campaignId: number, data: { channel_id: number; planned_amount: number }[]): Promise<BudgetAllocation[]> => {
+    try {
+      const res = await apiClient.put(`/campaigns/${campaignId}/budget-allocations`, data);
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      return data.map((d, i) => ({ id: i + 1, campaign_id: campaignId, ...d }));
+    }
+  }
+};
+
+export const kpiApi = {
+  getKPITargets: async (campaignId: number): Promise<KPITarget[]> => {
+    try {
+      const res = await apiClient.get(`/campaigns/${campaignId}/kpi-targets`);
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      return [];
+    }
+  },
+
+  updateKPITargets: async (campaignId: number, data: { metric_name: string; target_value: number; unit: string }[]): Promise<KPITarget[]> => {
+    try {
+      const res = await apiClient.put(`/campaigns/${campaignId}/kpi-targets`, data);
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      return data.map((d, i) => ({ id: i + 1, campaign_id: campaignId, ...d }));
+    }
+  }
+};
+
+export const commandCenterApi = {
+  getCommandCenter: async (): Promise<CommandCenterResponse> => {
+    try {
+      const res = await apiClient.get('/analytics/command-center');
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      return {
+        attention_items: [],
+        my_work_today: [],
+        campaigns_health: [],
+        summary_counts: {
+          total_active_campaigns: 0,
+          total_my_tasks: 0,
+          total_overdue_tasks: 0,
+          total_pending_approvals: 0,
+          critical_issues: 0
+        }
+      };
+    }
+  }
+};
+
 
 
