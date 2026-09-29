@@ -2,7 +2,7 @@
 
 **Hệ thống**: MarketFlow AI — Hệ thống quản lý chiến dịch marketing có tích hợp AI  
 **Thời gian đánh giá**: 2026-09-29 12:37:52  
-**Môi trường thực nghiệm**: Local Testbed, SQLite Isolated Database  
+**Môi trường thực nghiệm**: GitHub Actions runner (Gate 5 - Performance & API Latency), SQLite Isolated Database  
 
 ---
 
@@ -13,7 +13,7 @@
 | **Tỷ lệ Tuân Thủ Schema (Schema Adherence)** | $\ge 95.0\%$ | **100.00%** | ✅ ĐẠT (VƯỢT CHỈ TIÊU) |
 | **Tỷ lệ Ảo Giác Dữ Liệu (Hallucination Rate)** | $= 0.0\%$ | **0.00%** | ✅ ĐẠT (ZERO HALLUCINATION) |
 | **Khả Năng Chống Chịu Khi Mất Kết Nối (Failover)** | $\ge 99.0\%$ | **100.00%** | ✅ ĐẠT (SMART FALLBACK) |
-| **Độ Trễ Chẩn Đoán Xác Định (p95 Latency)** | $\le 50.0\text{ ms}$ | **9.86 ms** | ✅ ĐẠT (HIGH PERFORMANCE) |
+| **Độ Trễ Chẩn Đoán Xác Định (p95 Latency)** | $\le 50.0\text{ ms}$ | **3.36 ms** | ✅ ĐẠT (HIGH PERFORMANCE) |
 
 ---
 
@@ -42,10 +42,10 @@
 
 ### 2.4 Hiệu Năng Phản Hồi (Latency Benchmark)
 - **Số lượt đo**: 50 iterations liên tục.
-- **Độ trễ trung bình**: 8.20 ms.
-- **p50 (Median)**: 7.94 ms.
-- **p95**: 9.86 ms.
-- **Thời gian phản hồi tối đa**: 11.41 ms.
+- **Độ trễ trung bình**: 3.20 ms.
+- **p50 (Median)**: 3.14 ms.
+- **p95**: 3.36 ms.
+- **Thời gian phản hồi tối đa**: 4.98 ms.
 - Toàn bộ thuật toán phân rã đóng góp doanh thu đa kênh và chẩn đoán sức khỏe vận hành hoàn toàn trong bộ nhớ máy chủ với tốc độ tức thì.
 
 ---

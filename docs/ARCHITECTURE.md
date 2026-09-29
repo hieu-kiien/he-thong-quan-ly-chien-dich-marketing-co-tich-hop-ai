@@ -132,6 +132,6 @@ Các chỉ số kỹ thuật đo lường thực tế trên môi trường kiể
 - **Tỷ lệ tuân thủ Schema AI**: $100.00\%$ ($\ge 95\%$ target).
 - **Tỷ lệ ảo giác (Hallucination Rate)**: $0.00\%$ ($= 0\%$ target).
 - **Khả năng chịu lỗi mất kết nối (Failover Resilience)**: $100.00\%$ ($\ge 99\%$ target).
-- **Độ trễ API non-AI p95**: $14.69\text{ ms}$ (SLA $\le 800\text{ ms}$; đo tại HEAD bằng `scripts/measure_api_latency.py`, 50 lần lặp mỗi endpoint).
-- **Độ trễ chẩn đoán Bác sĩ AI p95**: $9.86\text{ ms}$ (SLA $\le 50\text{ ms}$).
-- **Tổng số ca kiểm thử tự động**: **1.263 backend tests** (1.262 pass + 1 skip hợp lệ vì runner CI không có file live DB bị `.gitignore`), độ phủ câu lệnh **86%** so với ngưỡng CI `--cov-fail-under=80`.
+- **Độ trễ API non-AI p95**: $6.84\text{ ms}$ (SLA $\le 800\text{ ms}$; đo tại HEAD bằng `scripts/measure_api_latency.py`, 50 lần lặp mỗi endpoint).
+- **Độ trễ chẩn đoán Bác sĩ AI p95**: $3.36\text{ ms}$ (SLA $\le 50\text{ ms}$).
+- **Tổng số ca kiểm thử tự động**: **1.263 backend tests** (1.262 pass + 1 skip hợp lệ vì runner CI không có file live DB bị `.gitignore`), độ phủ câu lệnh **86.20%** so với ngưỡng CI `--cov-fail-under=80`.

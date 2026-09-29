@@ -74,9 +74,9 @@ Bản phát hành **v9.5** đánh dấu bước chuyển dịch mang tính chi�
 | **Tỷ lệ tuân thủ Schema AI** | $\ge 95.0\%$ | **100.00%** (60/60 mẫu hợp lệ) | ✅ VƯỢT CHỈ TIÊU |
 | **Tỷ lệ ảo giác dữ liệu (Hallucination)** | $= 0.0\%$ | **0.00%** (0/40 vi phạm) | ✅ ZERO HALLUCINATION |
 | **Khả năng dự phòng mất mạng (Failover)** | $\ge 99.0\%$ | **100.00%** (3/3 kịch bản pass) | ✅ HOÀN HẢO |
-| **Độ trễ Bác sĩ AI p95** | $\le 50.0\text{ ms}$ | **9.86 ms** | ✅ TỨC THÌ |
-| **Độ trễ API non-AI p95** | $\le 800.0\text{ ms}$ | **14.69 ms** (X-Process-Time = 9.82 ms) | ✅ VƯỢT CHỈ TIÊU |
-| **Kiểm thử tự động Pytest** | 100% Pass | **1.263 ca** (1.262 pass + 1 skip hợp lệ do runner CI không có live DB bị `.gitignore`) | ✅ ĐỘ PHỦ 86% ≥ 80% |
+| **Độ trễ Bác sĩ AI p95** | $\le 50.0\text{ ms}$ | **3.36 ms** | ✅ TỨC THÌ |
+| **Độ trễ API non-AI p95** | $\le 800.0\text{ ms}$ | **6.84 ms** (X-Process-Time = 3.14 ms) | ✅ VƯỢT CHỈ TIÊU |
+| **Kiểm thử tự động Pytest** | 100% Pass | **1.263 ca** (1.262 pass + 1 skip hợp lệ do runner CI không có live DB bị `.gitignore`) | ✅ ĐỘ PHỦ 86.20% ≥ 80% |
 | **Playwright E2E (mock)** | 100% Pass | **38/38 passed** | ✅ |
 | **Playwright E2E (live backend thật)** | 100% Pass | **7/7 passed** | ✅ |
 | **WCAG 2.2 AA (live backend thật)** | 0 lỗi Critical/Serious | **25/25 passed**, 0 violation | ✅ |
