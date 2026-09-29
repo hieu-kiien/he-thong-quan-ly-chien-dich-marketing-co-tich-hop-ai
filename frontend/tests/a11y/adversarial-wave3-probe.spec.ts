@@ -12,7 +12,7 @@ import { test as authTest } from '../e2e/fixtures/auth.fixture';
  */
 
 const CORE_TABS = [
-  { label: 'Bảng Điều Khiển', selector: 'text=Tổng quan Chiến dịch' },
+  { label: 'Bảng Điều Khiển', selector: 'text=Command Center Điều Phối' },
   { label: 'Quản Lý Chiến Dịch', selector: 'text=Quản trị Chiến dịch' },
   { label: 'Xưởng Sáng Tạo AI', selector: 'text=AI Marketing Copilot' },
   { label: 'Lịch Xuất Bản', selector: 'text=Lịch Xuất Bản' },

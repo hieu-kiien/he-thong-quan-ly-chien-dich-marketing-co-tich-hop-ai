@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 import logging
+import re
 import threading
 import time
 from collections import defaultdict, deque
@@ -24,6 +25,19 @@ from app.core.crypto import (
 
 security_bearer = HTTPBearer(auto_error=False)
 
+# Định dạng bcrypt hợp lệ: $2<version>$<cost 2 chữ số>$<salt 22 ký tự><digest 31 ký tự>
+_BCRYPT_RE = re.compile(r"^\$2[abxy]\$\d{2}\$[./A-Za-z0-9]{53}$")
+
+
+def _is_bcrypt_hash_wellformed(raw: str) -> bool:
+    """Chặn hash bcrypt hỏng TRƯỚC khi gọi checkpw.
+
+    pyo3-bcrypt panic (không phải exception) khi salt/digest sai độ dài, nên phải
+    kiểm tra định dạng bằng regex thay vì chỉ bắt lỗi.
+    """
+    return bool(_BCRYPT_RE.match(raw))
+
+
 def hash_password(password: str) -> str:
     salt = bcrypt.gensalt()
     return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
@@ -43,10 +57,14 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
     else:
         raw = "$2b$" + raw
+    if not _is_bcrypt_hash_wellformed(raw):
+        logger.warning("[Security] stored hash is not a well-formed bcrypt hash; refusing login.")
+        return False
     try:
         return bcrypt.checkpw(plain_password.encode("utf-8"), raw.encode("utf-8"))
-    except Exception:
-        # Bắt tất cả exception để mọi lỗi bcrypt / hash dị thường đều fail-closed an toàn trả về False
+    except BaseException:
+        # bcrypt (pyo3) panic trên hash hỏng là BaseException, không phải Exception.
+        # Bắt BaseException để mọi lỗi bcrypt / hash dị thường đều fail-closed an toàn trả về False.
         logger.warning("[Security] bcrypt rejected stored hash format; refusing login.")
         return False
 

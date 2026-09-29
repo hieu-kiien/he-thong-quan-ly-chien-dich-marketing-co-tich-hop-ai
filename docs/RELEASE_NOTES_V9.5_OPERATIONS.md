@@ -74,10 +74,13 @@ Bản phát hành **v9.5** đánh dấu bước chuyển dịch mang tính chi�
 | **Tỷ lệ tuân thủ Schema AI** | $\ge 95.0\%$ | **100.00%** (60/60 mẫu hợp lệ) | ✅ VƯỢT CHỈ TIÊU |
 | **Tỷ lệ ảo giác dữ liệu (Hallucination)** | $= 0.0\%$ | **0.00%** (0/40 vi phạm) | ✅ ZERO HALLUCINATION |
 | **Khả năng dự phòng mất mạng (Failover)** | $\ge 99.0\%$ | **100.00%** (3/3 kịch bản pass) | ✅ HOÀN HẢO |
-| **Độ trễ Bác sĩ AI p95** | $\le 50.0\text{ ms}$ | **9.34 ms** | ✅ TỨC THÌ |
-| **Độ trễ API non-AI p95** | $\le 800.0\text{ ms}$ | **23.29 ms** (X-Process-Time = 14.39 ms) | ✅ VƯỢT CHỈ TIÊU |
-| **Kiểm thử tự động Pytest** | 100% Pass | **69/69 passed** (3.63 giây) | ✅ ZERO REGRESSION |
-| **Frontend TypeScript Build** | Exit Code 0 | **Biên dịch sạch trong 6.49 giây** | ✅ 0 TS ERRORS |
+| **Độ trễ Bác sĩ AI p95** | $\le 50.0\text{ ms}$ | **9.86 ms** | ✅ TỨC THÌ |
+| **Độ trễ API non-AI p95** | $\le 800.0\text{ ms}$ | **14.69 ms** (X-Process-Time = 9.82 ms) | ✅ VƯỢT CHỈ TIÊU |
+| **Kiểm thử tự động Pytest** | 100% Pass | **1.263 ca** (1.262 pass + 1 skip hợp lệ do runner CI không có live DB bị `.gitignore`) | ✅ ĐỘ PHỦ 86% ≥ 80% |
+| **Playwright E2E (mock)** | 100% Pass | **38/38 passed** | ✅ |
+| **Playwright E2E (live backend thật)** | 100% Pass | **7/7 passed** | ✅ |
+| **WCAG 2.2 AA (live backend thật)** | 0 lỗi Critical/Serious | **25/25 passed**, 0 violation | ✅ |
+| **Frontend TypeScript Build** | Exit Code 0 | Biên dịch sạch, main chunk 108 kB (ngưỡng < 500 kB) | ✅ 0 TS ERRORS |
 
 ---
 

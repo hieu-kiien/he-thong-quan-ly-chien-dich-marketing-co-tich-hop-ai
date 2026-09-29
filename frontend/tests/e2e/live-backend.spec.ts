@@ -75,7 +75,7 @@ async function readPendingCount(page: Page): Promise<number> {
 
 /** Tao 1 chi danhich qua wizard 4 buoc cua trang "Quan Ly Chien Dich". */
 async function createCampaignViaUi(page: Page, name: string): Promise<void> {
-  await page.getByRole('button', { name: 'Quản Lý Chiến Dịch' }).click();
+  await page.getByTestId('sidebar-tab-campaigns').click();
   await expect(page.getByRole('heading', { name: /Quản trị Chiến dịch Tiếp thị/ })).toBeVisible();
 
   await page.getByRole('button', { name: 'Tạo Chiến Dịch Mới' }).click();
@@ -125,7 +125,7 @@ test.describe('LIVE E2E: quy trinh nghiep vu tren backend that', () => {
     await expect(managerPage.locator('#login-email')).toHaveCount(0);
 
     // Dashboard la tab mac dinh, so lieu do tu GET /analytics/dashboard that.
-    await expect(managerPage.getByRole('heading', { name: 'Tổng quan Chiến dịch' })).toBeVisible();
+    await expect(managerPage.getByRole('heading', { name: 'Command Center Điều Phối' })).toBeVisible();
     await expect(managerPage.getByText(LIVE_USERS.manager.email).first()).toBeVisible();
     await expect(managerPage.getByText('Quản lý (Manager)')).toBeVisible();
 
@@ -136,7 +136,7 @@ test.describe('LIVE E2E: quy trinh nghiep vu tren backend that', () => {
     expect(String(token).split('.')).toHaveLength(3);
 
     // Danh sach chien dich doc tu GET /campaigns that (khong phai mock-api.ts).
-    await managerPage.getByRole('button', { name: 'Quản Lý Chiến Dịch' }).click();
+    await managerPage.getByTestId('sidebar-tab-campaigns').click();
     await expect(managerPage.getByRole('heading', { name: /Quản trị Chiến dịch Tiếp thị/ })).toBeVisible();
     // Ten chien dich co stamp la duy nhat theo tung lan chay => chua ton tai.
     await expect(campaignCell(managerPage, MANAGER_CAMPAIGN)).toHaveCount(0);
@@ -150,7 +150,7 @@ test.describe('LIVE E2E: quy trinh nghiep vu tren backend that', () => {
     // Reload lau thu du lieu thay dung state React => chung minh backend da ghi
     // xuong CSDL that (khong phai state tam trong bo nho).
     await managerPage.reload();
-    await managerPage.getByRole('button', { name: 'Quản Lý Chiến Dịch' }).click();
+    await managerPage.getByTestId('sidebar-tab-campaigns').click();
 
     const cell = campaignCell(managerPage, MANAGER_CAMPAIGN);
     await expect(cell).toHaveCount(1, { timeout: 30_000 });
@@ -181,7 +181,7 @@ test.describe('LIVE E2E: quy trinh nghiep vu tren backend that', () => {
     const pendingBefore = await readPendingCount(marketerPage);
 
     // --- Tao noi dung qua AI Studio: POST /ai/draft -> POST /contents -> POST /contents/{id}/submit
-    await marketerPage.getByRole('button', { name: 'Xưởng Sáng Tạo AI' }).click();
+    await marketerPage.getByTestId('sidebar-tab-ai_studio').click();
     await marketerPage.getByRole('button', { name: /Đơn kênh \(AIDA\/PAS\)/ }).click();
 
     const campaignSelect = marketerPage.locator('#ai-studio-campaign-select');
@@ -274,6 +274,6 @@ test.describe('LIVE E2E: quy trinh nghiep vu tren backend that', () => {
     // Vao lai trang: van bi chan o trang dang nhap, khong loi ra app shell da dang nhap.
     await managerPage.goto('/');
     await expect(managerPage.locator('#login-email')).toBeVisible();
-    await expect(managerPage.getByRole('button', { name: 'Quản Lý Chiến Dịch' })).toHaveCount(0);
+    await expect(managerPage.getByTestId('sidebar-tab-campaigns')).toHaveCount(0);
   });
 });

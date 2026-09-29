@@ -927,7 +927,12 @@ export const Campaigns: React.FC<CampaignsProps> = ({
 
           {/* Desktop Data Table (>=768px) */}
           <div className="hidden md:block bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
-            <div className="overflow-x-auto">
+            <div
+              className="overflow-x-auto"
+              role="region"
+              aria-label="Bảng dữ liệu phân phối chiến dịch"
+              tabIndex={0}
+            >
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">

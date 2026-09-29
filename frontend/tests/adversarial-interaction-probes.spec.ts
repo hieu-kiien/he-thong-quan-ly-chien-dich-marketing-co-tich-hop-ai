@@ -460,11 +460,11 @@ test.describe('Milestone M6: Adversarial Interaction Probes & Visual Testing Loo
 
       // Once the 4.2s delay finishes, the indicator transitions to success ("Máy chủ đã sẵn sàng!")
       await expect(
-        page.locator('text=Máy chủ đã sẵn sàng!').or(page.locator('text=Tổng quan Chiến dịch')).first()
+        page.locator('text=Máy chủ đã sẵn sàng!').or(page.locator('text=Command Center Điều Phối')).first()
       ).toBeVisible({ timeout: 8000 });
 
       // UI gracefully settles and renders campaigns / dashboard
-      await expect(page.locator('text=Tổng quan Chiến dịch')).toBeVisible();
+      await expect(page.locator('text=Command Center Điều Phối')).toBeVisible();
     });
 
     test('Latency Resilience Probe: Delayed API response exercises server awakening indicator and recovers gracefully', async ({ marketerPage: page }) => {

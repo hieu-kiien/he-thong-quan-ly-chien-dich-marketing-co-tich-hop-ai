@@ -118,7 +118,7 @@ authTest.describe('WCAG 2.2 AA Accessibility & UX Suite', () => {
 
         // 1. Dashboard View
         await navigateToTab(marketerPage, 'Bảng Điều Khiển');
-        await expect(marketerPage.locator('text=Tổng quan Chiến dịch').or(marketerPage.locator('text=Chỉ Số Hiệu Suất')).first()).toBeVisible({ timeout: 10000 });
+        await expect(marketerPage.locator('text=Command Center Điều Phối').first()).toBeVisible({ timeout: 10000 });
         await assertNoCriticalOrSeriousViolations(marketerPage, `Dashboard (${vp.name})`);
 
         // 2. Campaigns View
@@ -277,7 +277,7 @@ authTest.describe('WCAG 2.2 AA Accessibility & UX Suite', () => {
       await marketerPage.setViewportSize({ width: 320, height: 568 });
 
       const tabs = [
-        { label: 'Bảng Điều Khiển', text: 'Tổng quan Chiến dịch' },
+        { label: 'Bảng Điều Khiển', text: 'Command Center Điều Phối' },
         { label: 'Quản Lý Chiến Dịch', text: 'Quản trị Chiến dịch' },
         { label: 'Xưởng Sáng Tạo AI', text: 'AI Marketing Copilot' },
         { label: 'Lịch Xuất Bản', text: 'Lịch Xuất Bản' },
@@ -287,7 +287,7 @@ authTest.describe('WCAG 2.2 AA Accessibility & UX Suite', () => {
 
       for (const tab of tabs) {
         await navigateToTab(marketerPage, tab.label);
-        await expect(marketerPage.locator(`text=${tab.text}`).or(marketerPage.locator('text=Chỉ Số Hiệu Suất')).first()).toBeVisible({ timeout: 10000 });
+        await expect(marketerPage.locator(`text=${tab.text}`).first()).toBeVisible({ timeout: 10000 });
 
         const isOverflowing = await marketerPage.evaluate(() => {
           return document.documentElement.scrollWidth > window.innerWidth;

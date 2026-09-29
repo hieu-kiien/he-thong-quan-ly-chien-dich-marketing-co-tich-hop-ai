@@ -98,6 +98,16 @@ def validate_security_configuration(
             return True
         return False
 
+    # 0. SECRET_KEY phải tự nó an toàn trong production.
+    # Nó không chỉ là fallback: get_multi_fernet() dùng nó làm legacy decryption
+    # key (xem app/core/crypto.py), nên SECRET_KEY yếu vẫn là lỗ hổng dù
+    # JWT_SECRET_KEY / BYOK_ENCRYPTION_KEY đã được tách riêng và an toàn.
+    if is_prod and _is_insecure(target.SECRET_KEY):
+        raise RuntimeError(
+            "FATAL: SECRET_KEY không được để trống, dùng giá trị mặc định, "
+            "chứa placeholder không an toàn hoặc độ dài nhỏ hơn 32 ký tự trên Production!"
+        )
+
     # 1. Kiểm tra JWT Secret Key (hoặc fallback SECRET_KEY)
     effective_jwt = target.JWT_SECRET_KEY if (target.JWT_SECRET_KEY and target.JWT_SECRET_KEY.strip()) else target.SECRET_KEY
     if not effective_jwt or not str(effective_jwt).strip():

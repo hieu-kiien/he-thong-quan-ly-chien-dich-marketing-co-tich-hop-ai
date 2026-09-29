@@ -170,7 +170,12 @@ export const ChannelROIComparison: React.FC<ChannelROIComparisonProps> = ({
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        <div
+          className="overflow-x-auto"
+          role="region"
+          aria-label="Bảng so sánh ROI theo kênh tiếp thị"
+          tabIndex={0}
+        >
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50/70 border-b border-slate-200 text-slate-500 font-semibold text-[11px]">
               <tr>

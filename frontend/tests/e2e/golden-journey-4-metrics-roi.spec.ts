@@ -6,7 +6,7 @@ test.describe('Golden Journey 4: Metrics, ROI & AI Doctor Analytics', () => {
     test.setTimeout(60000);
     // 1. Manager visits Dashboard
     await managerPage.goto('/');
-    await expect(managerPage.locator('text=Tổng quan Chiến dịch')).toBeVisible();
+    await expect(managerPage.locator('text=Command Center Điều Phối')).toBeVisible();
 
     // 2. Verify 9-KPI Cards
     await expect(managerPage.locator('text=Chi phí Tiếp thị').first()).toBeVisible();
@@ -63,7 +63,7 @@ test.describe('Golden Journey 4: Metrics, ROI & AI Doctor Analytics', () => {
     });
 
     await marketerPage.goto('/');
-    await expect(marketerPage.locator('text=Tổng quan Chiến dịch')).toBeVisible();
+    await expect(marketerPage.locator('text=Command Center Điều Phối')).toBeVisible();
 
     // 2. Verify 0 values render properly and page doesn't show NaN
     const content = await marketerPage.content();
@@ -76,10 +76,10 @@ test.describe('Golden Journey 4: Metrics, ROI & AI Doctor Analytics', () => {
   test('AI Doctor: Diagnostic report displays health score, recommendations and model identifier', async ({ managerPage }) => {
     test.setTimeout(60000);
     await managerPage.goto('/');
-    await expect(managerPage.locator('text=Tổng quan Chiến dịch')).toBeVisible();
+    await expect(managerPage.locator('text=Command Center Điều Phối')).toBeVisible();
 
     // 1. Verify AI Doctor Widget is present
-    const doctorWidget = managerPage.locator('text=AI Doctor & Chiến Lược').first();
+    const doctorWidget = managerPage.locator('text=Bác Sĩ Chiến Dịch AI').first();
     await expect(doctorWidget).toBeVisible();
 
     // 2. Verify Health Score & Status

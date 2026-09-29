@@ -279,7 +279,9 @@ class TestAuthenticationSecurityBoundary:
         db_session.refresh(disabled_user)
 
         expire = datetime.now(timezone.utc) + timedelta(hours=1)
-        token = jwt.encode({"sub": str(disabled_user.id), "exp": expire}, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+        # Dùng create_access_token để ký đúng key mà app thực sự dùng
+        # (get_jwt_secret_key ưu tiên JWT_SECRET_KEY, không phải SECRET_KEY).
+        token = create_access_token({"sub": str(disabled_user.id)}, expires_delta=timedelta(hours=1))
         resp = client.post("/api/v1/ai/omnichannel", json={
             "campaign_id": 1,
             "brief": "Thử nghiệm tài khoản bị vô hiệu hóa"

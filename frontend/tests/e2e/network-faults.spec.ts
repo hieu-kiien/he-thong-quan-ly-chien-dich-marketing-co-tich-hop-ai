@@ -5,7 +5,7 @@ test.describe('Network Fault Simulation & Resilience Suite', () => {
   test('401 Unauthorized: Session expiration triggers logout and redirects to LoginPage', async ({ marketerPage }) => {
     // 1. Visit app with authenticated marketer
     await marketerPage.goto('/');
-    await expect(marketerPage.locator('text=Tổng quan Chiến dịch')).toBeVisible();
+    await expect(marketerPage.locator('text=Command Center Điều Phối')).toBeVisible();
 
     // 2. Intercept /api/v1/auth/me to return 401 Unauthorized
     await marketerPage.route('**/api/v1/auth/me', async (route) => {
@@ -74,7 +74,7 @@ test.describe('Network Fault Simulation & Resilience Suite', () => {
 
     // 2. UI should render gracefully without crashing
     await expect(managerPage.locator('aside')).toBeVisible();
-    await expect(managerPage.locator('text=Tổng quan Chiến dịch')).toBeVisible();
+    await expect(managerPage.locator('text=Command Center Điều Phối')).toBeVisible();
     const content = await managerPage.content();
     expect(content.includes('Cannot read properties of undefined')).toBeFalsy();
   });
@@ -187,7 +187,7 @@ test.describe('Network Fault Simulation & Resilience Suite', () => {
   test('Offline & Reconnect: Browser network cut shows authentic offline UI notification and recovers', async ({ marketerPage }) => {
     // 1. Visit app online
     await marketerPage.goto('/');
-    await expect(marketerPage.locator('text=Tổng quan Chiến dịch')).toBeVisible();
+    await expect(marketerPage.locator('text=Command Center Điều Phối')).toBeVisible();
 
     const initialOnline = await marketerPage.evaluate(() => window.navigator.onLine);
     expect(initialOnline).toBeTruthy();
@@ -216,7 +216,7 @@ test.describe('Network Fault Simulation & Resilience Suite', () => {
 
     await expect(
       marketerPage.locator('text=Kết nối mạng đã được khôi phục')
-        .or(marketerPage.locator('text=Tổng quan Chiến dịch'))
+        .or(marketerPage.locator('text=Command Center Điều Phối'))
         .first()
     ).toBeVisible({ timeout: 7000 });
 

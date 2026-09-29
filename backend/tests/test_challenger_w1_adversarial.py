@@ -55,7 +55,12 @@ class TestAdversarialLiveDBProtection:
         Việc "test có sửa live DB hay không" đã được bảo vệ chặt hơn bởi fixture
         autouse `live_db_guard` trong conftest.py (so sánh size + mtime_ns).
         """
-        assert LIVE_DB_FILE.exists(), f"Live DB {LIVE_DB_FILE} must exist!"
+        if not LIVE_DB_FILE.exists():
+            pytest.skip(
+                f"Live DB {LIVE_DB_FILE} không tồn tại (file bị .gitignore nên CI runner "
+                "không có). Guard 'test sửa live DB' vẫn được chạy bởi fixture autouse "
+                "`live_db_guard` trong conftest.py."
+            )
 
         raw = LIVE_DB_FILE.read_bytes()
         assert len(raw) > 0, "Live DB rỗng"

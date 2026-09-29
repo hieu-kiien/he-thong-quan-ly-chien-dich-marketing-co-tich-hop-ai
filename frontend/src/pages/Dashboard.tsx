@@ -295,7 +295,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">Tác Vụ Hôm Nay Của Tôi (My Work Today)</h3>
-                  <p className="text-[11px] text-slate-400">Các đầu việc cần bạn hoàn thiện để chiến dịch không bị trễ tiến độ</p>
+                  <p className="text-[11px] text-slate-500">Các đầu việc cần bạn hoàn thiện để chiến dịch không bị trễ tiến độ</p>
                 </div>
               </div>
               <button
@@ -307,7 +307,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {myWorkToday.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 text-xs">
+              <div className="py-8 text-center text-slate-500 text-xs">
                 <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-emerald-500" />
                 Bạn không có tác vụ nào đang tồn đọng. Hãy thư giãn hoặc nhận thêm việc mới!
               </div>
@@ -342,7 +342,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             {task.task_type}
                           </span>
                         </div>
-                        <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                        <p className="text-[10px] text-slate-500 truncate mt-0.5">
                           {task.campaign_name} {task.due_date && `• Hạn: ${task.due_date}`}
                         </p>
                       </div>
@@ -386,7 +386,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">Sức Khỏe Chiến Dịch (Campaign Health)</h3>
-                  <p className="text-[11px] text-slate-400">Đánh giá theo luật tất định: Tác vụ quá hạn, tỷ lệ giải ngân và tiến độ</p>
+                  <p className="text-[11px] text-slate-500">Đánh giá theo luật tất định: Tác vụ quá hạn, tỷ lệ giải ngân và tiến độ</p>
                 </div>
               </div>
               <button
@@ -398,7 +398,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {campaignsHealth.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 text-xs">
+              <div className="py-8 text-center text-slate-500 text-xs">
                 Chưa có chiến dịch nào đang hoạt động. Hãy tạo chiến dịch mới!
               </div>
             ) : (
@@ -456,7 +456,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
                         <span>Hoàn thành: {ch.completed_tasks}/{ch.total_tasks} tác vụ</span>
                         {ch.overdue_tasks > 0 && (
                           <span className="text-rose-600 font-bold">{ch.overdue_tasks} tác vụ quá hạn</span>
@@ -555,7 +555,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {pendingContents.length === 0 ? (
-              <p className="text-xs text-slate-400 py-3 text-center">Không có bài viết nào đang chờ duyệt</p>
+              <p className="text-xs text-slate-500 py-3 text-center">Không có bài viết nào đang chờ duyệt</p>
             ) : (
               <div className="space-y-2.5">
                 {pendingContents.slice(0, 3).map((item) => (

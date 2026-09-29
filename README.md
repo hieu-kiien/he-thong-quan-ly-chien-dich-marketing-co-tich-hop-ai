@@ -38,13 +38,18 @@ Khác biệt hoàn toàn với các "AI Prompt Demo" thông thường chỉ dừ
    - Kỹ thuật **Context Whitelisting**: Chỉ nạp vào prompt các dữ liệu đã kiểm duyệt (sản phẩm, mục tiêu, kênh, số liệu metrics); lọc sạch thông tin nhạy cảm.
    - **Động cơ Smart Fallback De-hallucination**: Tự động kích hoạt khi mất kết nối mạng hoặc timeout ($< 50$ms); loại bỏ hoàn toàn các nhận định ảo giác (0% suy diễn về khung giờ vàng hay hành vi cuối tuần khi dữ liệu chỉ có số liệu tổng).
 
-4. **Bộ Kiểm thử Tự động Toàn diện & Ma trận 5 Đợt Kiểm thử (5 Waves Matrix — 100% Pass, 0 Errors)**:
-   - **Đợt 1 (Wave 1 — P0 Security & Multi-tenant Fixture Isolation)**: **153/153 tests passed** (43 tests bảo mật ma trận P0, 54 tests challenger đối kháng, 56 tests adversarial hardening; khóa cứng RBAC, cô lập không gian làm việc Workspace, máy trạng thái duyệt bài HITL, từ chối khóa mặc định, bảo toàn CSDL bit-for-bit).
-   - **Đợt 2 (Wave 2 — Playwright E2E Business Flows & 5 Golden Journeys)**: **24/24 tests passed** (**48/48 tests** trên chế độ kiểm thử áp lực lặp lại `--repeat-each 2`; 0 flakiness, 0 socket leaks, bao phủ trọn vẹn 5 Golden Journeys và ma trận lỗi mạng 401/403/404/409/500/offline).
-   - **Đợt 3 (Wave 3 — Chất lượng UX & Chuẩn Tiếp cận WCAG 2.2 AA)**: **40/40 tests passed** (23 tests WCAG 2.2 AA với `@axe-core/playwright`, 12 tests bẫy tiêu điểm bàn phím Focus Trap, 5 tests đối kháng probe; 0 lỗi Critical/Serious, kiểm tra reflow 320px tại zoom 200%, điều hướng bàn phím toàn phần).
-   - **Đợt 4 (Wave 4 — Hiệu năng Web, Độ trễ API & Tải đồng thời)**: **20-session load test** (1,800 thao tác đồng thời qua 20 phiên trong 10 phút, **0 lock errors**, 0 lỗi 500), độ trễ API nghiệp vụ non-AI $p95 \le 800$ms (đo thực tế $\approx 320.8$ms trên 50 lần lặp), bộ kiểm thử Core Web Vitals tự động (LCP $\le 2.5$s, INP $\le 200$ms, CLS $\le 0.1$), cơ chế debounce và chống gửi lặp (idempotency).
-   - **Đợt 5 (Wave 5 — CI Pipeline Gating & Khử Rò rỉ Thông tin Nhạy cảm)**: Phân tách CI thành 5 cổng độc lập, khử triệt để token API key / `?key=...` trong log và phản hồi lỗi, **10/10 tests** khử rò rỉ (`test_wave5_credential_sanitization.py`) đạt 100%.
-   - **Tổng cộng**: Hơn **1,260 ca kiểm thử tự động backend** đạt 100% Passed (độ phủ kiểm thử câu lệnh đạt **87%**, ngưỡng bảo đảm chất lượng CI `--cov-fail-under=80`), cùng bộ kiểm thử Playwright E2E/WCAG 2.2 AA và kiểm định hiệu năng Core Web Vitals.
+4. **Bộ Kiểm thử Tự động Toàn diện & Ma trận 5 Đợt Kiểm thử (5 Waves Matrix)**:
+
+   Số liệu dưới đây là kết quả chạy thật tại commit HEAD, được kiểm chứng lại bởi
+   GitHub Actions (xem `.github/workflows/ci.yml`).
+
+   - **Đợt 1 (Wave 1 — P0 Security & Multi-tenant Fixture Isolation)**: ma trận bảo mật P0, challenger đối kháng và adversarial hardening; khóa cứng RBAC, cô lập không gian làm việc Workspace, máy trạng thái duyệt bài HITL, từ chối khóa mặc định, bảo toàn CSDL bit-for-bit.
+   - **Đợt 2 (Wave 2 — Playwright E2E Business Flows & 5 Golden Journeys)**: **38/38 tests passed** ở chế độ mock (45 test được khai báo; 7 test chỉ dành cho dữ liệu thật tự skip) và **7/7 passed** ở chế độ live (FastAPI thật + SQLite thật, không intercept business API) — bao phủ 5 Golden Journeys cùng ma trận lỗi mạng 401/403/404/409/500/offline.
+   - **Đợt 3 (Wave 3 — Chất lượng UX & Chuẩn Tiếp cận WCAG 2.2 AA)**: bộ kiểm thử `tests/a11y/` gồm **40 test** (WCAG 2.2 AA với `@axe-core/playwright`, bẫy tiêu điểm bàn phím Focus Trap, đối kháng probe). Lần chạy thật trên backend thật: **25/25 passed**, **0 lỗi Critical/Serious**, kiểm tra reflow 320px và 5 viewport.
+   - **Đợt 4 (Wave 4 — Hiệu năng Web, Độ trễ API & Tải đồng thời)**: độ trễ API nghiệp vụ non-AI đo bằng `scripts/measure_api_latency.py` trên 50 lần lặp cho từng endpoint — **p95 tổng = 14.69 ms** (ngưỡng SLA 800 ms), **0 lỗi 500**; kèm 12/12 adversarial interaction probes (cold-start, latency resilience, multi-role HITL).
+   - **Đợt 5 (Wave 5 — CI Pipeline Gating & Khử Rò rỉ Thông tin Nhạy cảm)**: CI chia thành 6 cổng độc lập + cổng Docker; khử triệt để token API key / `?key=...` trong log và phản hồi lỗi.
+   - **Tổng cộng**: **1.263 ca kiểm thử tự động backend** đạt 100% Passed (độ phủ câu lệnh **86%**, ngưỡng chất lượng CI `--cov-fail-under=80`), cùng bộ kiểm thử Playwright E2E và WCAG 2.2 AA.
+
 
 
 ---
@@ -263,7 +268,7 @@ cd frontend
 npx playwright test tests/a11y/wcag.spec.ts tests/a11y/adversarial-focus-trap.spec.ts tests/a11y/adversarial-wave3-probe.spec.ts
 cd ..
 
-# Wave 4: Performance & API Latency SLA (p95 <= 800ms, ~320.8ms thực tế) & Core Web Vitals:
+# Wave 4: Performance & API Latency SLA (p95 <= 800ms; đo thực tế tại HEAD: p95 = 14.69ms) & Core Web Vitals:
 python scripts/measure_api_latency.py
 cd frontend && npx playwright test tests/perf/web-vitals.spec.ts
 cd ..

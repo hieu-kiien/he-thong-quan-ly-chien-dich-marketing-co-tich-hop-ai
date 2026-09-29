@@ -144,9 +144,14 @@ def test_save_and_retrieve_multi_provider_keys(client: TestClient, rbac_headers,
     assert "openai" in providers_listed
 
 
-def test_resolve_api_key_multi_provider_hierarchy(db_session: Session):
+def test_resolve_api_key_multi_provider_hierarchy(db_session: Session, monkeypatch):
     """Test multi-tier hierarchy in AIService.resolve_api_key for various providers."""
     ai_service = AIService()
+
+    # Che key hệ thống từ .env/CI env để tầng SYSTEM là xác định được,
+    # nếu không test sẽ cho kết quả khác giữa máy dev và CI.
+    monkeypatch.setenv("GEMINI_API_KEY", "sk-system-gemini-key")
+    monkeypatch.setattr("app.services.ai.ai_service.settings.GEMINI_API_KEY", "sk-system-gemini-key", raising=False)
 
     # User 1 with personal OpenAI key
     user = db_session.query(User).filter(User.id == 1).first()

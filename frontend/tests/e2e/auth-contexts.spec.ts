@@ -12,7 +12,7 @@ test.describe('RBAC 4 Distinct Browser Contexts & Storage States', () => {
     await expect(roleBadge).toBeVisible();
 
     // 3. Verify Marketer sees dashboard
-    await expect(marketerPage.locator('text=Tổng quan Chiến dịch')).toBeVisible();
+    await expect(marketerPage.locator('text=Command Center Điều Phối')).toBeVisible();
 
     // 4. Marketer can access AI Studio tab
     await marketerPage.click('button:has-text("Xưởng Sáng Tạo AI")');
