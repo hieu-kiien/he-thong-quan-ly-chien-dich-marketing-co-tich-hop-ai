@@ -367,15 +367,26 @@ def get_command_center(
             due_date=None
         ))
 
-    # 4. Attention Items - Budget Overruns & Proximity to Deadline
+    # 4. Attention Items - Budget Overruns, Budget Risk & Proximity to Deadline
     spent_by_campaign = {}
+    actual_metrics_by_campaign = {}
     metrics_sums = db.query(
         CampaignMetric.campaign_id,
-        func.sum(CampaignMetric.cost).label("total_cost")
+        func.sum(CampaignMetric.cost).label("total_cost"),
+        func.sum(CampaignMetric.conversions).label("total_conversions"),
+        func.sum(CampaignMetric.clicks).label("total_clicks"),
+        func.sum(CampaignMetric.revenue).label("total_revenue"),
+        func.sum(CampaignMetric.views).label("total_views")
     ).filter(CampaignMetric.campaign_id.in_(camp_ids)).group_by(CampaignMetric.campaign_id).all()
 
-    for cid, total_cost in metrics_sums:
+    for cid, total_cost, total_conv, total_clicks, total_rev, total_views in metrics_sums:
         spent_by_campaign[cid] = float(total_cost or 0.0)
+        actual_metrics_by_campaign[cid] = {
+            "conversions": float(total_conv or 0.0),
+            "clicks": float(total_clicks or 0.0),
+            "revenue": float(total_rev or 0.0),
+            "views": float(total_views or 0.0),
+        }
 
     all_campaign_tasks = db.query(Task).filter(Task.campaign_id.in_(camp_ids)).all()
     tasks_by_campaign: Dict[int, List[Task]] = {}
@@ -392,6 +403,27 @@ def get_command_center(
 
         budget_pct = (c_spent / c_budget * 100.0) if c_budget > 0 else 0.0
 
+        # KPI Tracking
+        c_kpi_target = float(c.target_kpi_value or 0.0)
+        kpi_name_lower = (c.target_kpi_name or "conversions").lower()
+        camp_metrics = actual_metrics_by_campaign.get(c.id, {})
+        if "click" in kpi_name_lower:
+            c_kpi_actual = camp_metrics.get("clicks", 0.0)
+        elif "rev" in kpi_name_lower or "doanh thu" in kpi_name_lower:
+            c_kpi_actual = camp_metrics.get("revenue", 0.0)
+        elif "view" in kpi_name_lower or "xem" in kpi_name_lower:
+            c_kpi_actual = camp_metrics.get("views", 0.0)
+        else:
+            c_kpi_actual = camp_metrics.get("conversions", 0.0)
+
+        if c_kpi_target > 0:
+            c_kpi_achievement_pct = round((c_kpi_actual / c_kpi_target) * 100.0, 1)
+        else:
+            c_kpi_achievement_pct = 100.0 if c_kpi_actual > 0 else 0.0
+
+        # Budget Risk rule: budget_utilization > 80% AND kpi_achievement < 60%
+        is_budget_risk = (budget_pct > 80.0 and c_kpi_achievement_pct < 60.0)
+
         if c_budget > 0 and c_spent > c_budget:
             attention_items.append(CommandCenterAttentionItem(
                 id=f"budget-overrun-{c.id}",
@@ -404,9 +436,21 @@ def get_command_center(
                 link=f"/campaigns/{c.id}",
                 due_date=c.end_date
             ))
-        elif c_budget > 0 and budget_pct >= 90.0:
+        elif is_budget_risk:
             attention_items.append(CommandCenterAttentionItem(
                 id=f"budget-risk-{c.id}",
+                type="BUDGET_RISK",
+                severity="HIGH",
+                title=f"Rủi ro ngân sách: {c.name}",
+                message=f"Đã tiêu thụ {budget_pct:.1f}% ngân sách nhưng tiến độ KPI mới đạt {c_kpi_achievement_pct:.1f}%.",
+                campaign_id=c.id,
+                campaign_name=c.name,
+                link=f"/campaigns/{c.id}",
+                due_date=c.end_date
+            ))
+        elif c_budget > 0 and budget_pct >= 90.0:
+            attention_items.append(CommandCenterAttentionItem(
+                id=f"budget-warning-{c.id}",
                 type="BUDGET_OVERRUN",
                 severity="HIGH",
                 title=f"Sắp chạm trần ngân sách: {c.name}",
@@ -426,6 +470,9 @@ def get_command_center(
                 health_score -= 30
             elif budget_pct > 90:
                 health_score -= 15
+
+        if is_budget_risk:
+            health_score -= 20
 
         if c_total_tasks > 0 and (c_completed / c_total_tasks) < 0.2 and c.status == "ACTIVE":
             health_score -= 10
@@ -452,14 +499,21 @@ def get_command_center(
                 health_status=health_status,
                 health_score=health_score,
                 start_date=c.start_date,
-                end_date=c.end_date
+                end_date=c.end_date,
+                kpi_target=c_kpi_target if c_kpi_target > 0 else None,
+                kpi_actual=c_kpi_actual,
+                kpi_achievement_pct=c_kpi_achievement_pct,
+                budget_risk=is_budget_risk
             ))
 
-    # 5. My Work Today
-    user_tasks = db.query(Task).filter(
+    # 5. My Work Today - Ngăn ngừa rò rỉ cross-tenant (chỉ lấy task trong campaign/workspace được cấp quyền)
+    user_tasks_query = db.query(Task).filter(
         Task.assignee_id == current_user.id,
         Task.status.notin_(["DONE", "COMPLETED"])
-    ).all()
+    )
+    if current_user.role != "ADMIN":
+        user_tasks_query = user_tasks_query.filter(Task.campaign_id.in_(camp_ids))
+    user_tasks = user_tasks_query.all()
 
     for ut in user_tasks:
         c_name = camp_map.get(ut.campaign_id).name if ut.campaign_id in camp_map else "Chiến dịch"

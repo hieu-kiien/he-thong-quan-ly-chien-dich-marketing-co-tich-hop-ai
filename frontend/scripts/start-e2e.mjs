@@ -32,10 +32,35 @@
  *                                 da duoc build dung cach)
  */
 
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+function killPort(port) {
+  try {
+    if (process.platform === 'win32') {
+      const out = execSync(`netstat -ano -p tcp`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      const lines = out.split(/\r?\n/).filter(line => line.includes(`:${port}`) && line.includes('LISTENING'));
+      for (const line of lines) {
+        const parts = line.trim().split(/\s+/);
+        const pid = parts[parts.length - 1];
+        if (pid && pid !== '0' && Number(pid) !== process.pid) {
+          try {
+            execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore' });
+          } catch {}
+        }
+      }
+    } else {
+      try {
+        execSync(`fuser -k -9 ${port}/tcp 2>/dev/null || true`, { stdio: 'ignore' });
+      } catch {}
+      try {
+        execSync(`lsof -ti:${port} | xargs -r kill -9 2>/dev/null || true`, { stdio: 'ignore' });
+      } catch {}
+    }
+  } catch {}
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -171,6 +196,10 @@ async function shutdown(code = 0) {
   for (const { child } of managed.reverse()) {
     killTree(child);
   }
+  if (IS_LIVE) {
+    killPort(BACKEND_PORT);
+  }
+  killPort(FRONTEND_PORT);
   // Cho uvicorn/vite dong file DB va flush stdout truoc khi process cha bi ket.
   await sleep(700);
   process.exit(code);
@@ -293,6 +322,12 @@ async function main() {
   log('config', `E2E_MODE=${MODE}`);
   log('config', `frontend preview -> http://${FRONTEND_HOST}:${FRONTEND_PORT}`);
   log('config', IS_LIVE ? `backend that     -> ${API_BASE_URL}` : 'backend that     -> (khong bat, test dung mock)');
+
+  // Clean stale ports before launch
+  if (IS_LIVE) {
+    killPort(BACKEND_PORT);
+  }
+  killPort(FRONTEND_PORT);
 
   if (IS_LIVE) {
     await startBackend();

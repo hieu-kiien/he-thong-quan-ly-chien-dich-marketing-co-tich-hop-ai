@@ -63,9 +63,26 @@ def _get_task_and_check_access(task_id: int, user: User, db: Session, for_edit: 
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch của tác vụ không tồn tại")
 
+    # Fail-closed: workspace NULL
+    if campaign.workspace_id is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chiến dịch không thuộc workspace hợp lệ")
+
+    # Workspace boundary: caller must belong to the workspace
+    ws = db.query(Workspace).filter(Workspace.id == campaign.workspace_id).first()
+    is_ws_owner = ws is not None and ws.owner_id == user.id
+    is_ws_member = db.query(WorkspaceMember).filter(
+        WorkspaceMember.workspace_id == campaign.workspace_id,
+        WorkspaceMember.user_id == user.id
+    ).first() is not None
+    if not (is_ws_owner or is_ws_member):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access tasks in this workspace"
+        )
+
     # Nếu chỉ đọc
     if not for_edit:
-        # User là assignee hoặc creator luôn được xem
+        # User là assignee hoặc creator luôn được xem trong workspace
         if task.assignee_id == user.id or task.creator_id == user.id:
             return task
         _check_campaign_access(campaign, user, db)
@@ -76,16 +93,9 @@ def _get_task_and_check_access(task_id: int, user: User, db: Session, for_edit: 
     # Creator, Campaign Owner, Workspace Manager được phép chỉnh sửa toàn diện
     is_creator = task.creator_id == user.id
     is_campaign_owner = campaign.owner_id == user.id
-    is_ws_manager = False
-    if campaign.workspace_id is not None:
-        ws = db.query(Workspace).filter(Workspace.id == campaign.workspace_id).first()
-        is_ws_owner = ws is not None and ws.owner_id == user.id
-        is_ws_manager = is_ws_owner or (
-            user.role in ("MANAGER", "AGENCY_MANAGER") and db.query(WorkspaceMember).filter(
-                WorkspaceMember.workspace_id == campaign.workspace_id,
-                WorkspaceMember.user_id == user.id
-            ).first() is not None
-        )
+    is_ws_manager = is_ws_owner or (
+        user.role in ("MANAGER", "AGENCY_MANAGER") and is_ws_member
+    )
 
     if not (is_creator or is_campaign_owner or is_ws_manager or task.assignee_id == user.id):
         raise HTTPException(
@@ -139,15 +149,37 @@ def create_campaign_task(
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
 
+    # Fail-closed: workspace NULL
+    if campaign.workspace_id is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chiến dịch không thuộc workspace hợp lệ")
+
     _check_campaign_access(campaign, current_user, db)
 
-    # Xác thực assignee nếu có
+    # Xác thực assignee nếu có: phải thuộc workspace hoặc chiến dịch
     if task_in.assignee_id:
         assignee = db.query(User).filter(User.id == task_in.assignee_id).first()
         if not assignee:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Người được giao việc không tồn tại")
 
-    workspace_id = campaign.workspace_id or 1
+        ws = db.query(Workspace).filter(Workspace.id == campaign.workspace_id).first()
+        is_assignee_ws_owner = ws is not None and ws.owner_id == task_in.assignee_id
+        is_assignee_ws_member = db.query(WorkspaceMember).filter(
+            WorkspaceMember.workspace_id == campaign.workspace_id,
+            WorkspaceMember.user_id == task_in.assignee_id
+        ).first() is not None
+        is_assignee_campaign_member = db.query(CampaignMember).filter(
+            CampaignMember.campaign_id == campaign.id,
+            CampaignMember.user_id == task_in.assignee_id
+        ).first() is not None
+        is_assignee_campaign_owner = campaign.owner_id == task_in.assignee_id
+
+        if not (is_assignee_ws_owner or is_assignee_ws_member or is_assignee_campaign_member or is_assignee_campaign_owner or assignee.role == "ADMIN"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Người được giao việc không thuộc workspace hoặc chiến dịch này"
+            )
+
+    workspace_id = campaign.workspace_id
 
     new_task = Task(
         campaign_id=campaign.id,
@@ -187,6 +219,8 @@ def get_my_tasks(
         ws_ids = _accessible_workspace_ids(current_user, db)
         if ws_ids:
             query = query.filter(Task.workspace_id.in_(ws_ids))
+        else:
+            query = query.filter(false())
 
     if status_filter:
         query = query.filter(Task.status == status_filter)
@@ -243,11 +277,29 @@ def update_task(
                 detail=f"Người thực hiện chỉ có quyền cập nhật trạng thái (status) hoặc độ ưu tiên (priority). Không thể sửa: {', '.join(attempted_restrictions)}"
             )
 
-    # Xác thực assignee nếu được thay đổi
+    # Xác thực assignee nếu được thay đổi: phải thuộc workspace hoặc chiến dịch
     if "assignee_id" in update_data and update_data["assignee_id"] is not None:
         assignee = db.query(User).filter(User.id == update_data["assignee_id"]).first()
         if not assignee:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Người được giao việc không tồn tại")
+        if campaign and campaign.workspace_id is not None:
+            ws = db.query(Workspace).filter(Workspace.id == campaign.workspace_id).first()
+            is_assignee_ws_owner = ws is not None and ws.owner_id == update_data["assignee_id"]
+            is_assignee_ws_member = db.query(WorkspaceMember).filter(
+                WorkspaceMember.workspace_id == campaign.workspace_id,
+                WorkspaceMember.user_id == update_data["assignee_id"]
+            ).first() is not None
+            is_assignee_campaign_member = db.query(CampaignMember).filter(
+                CampaignMember.campaign_id == campaign.id,
+                CampaignMember.user_id == update_data["assignee_id"]
+            ).first() is not None
+            is_assignee_campaign_owner = campaign.owner_id == update_data["assignee_id"]
+
+            if not (is_assignee_ws_owner or is_assignee_ws_member or is_assignee_campaign_member or is_assignee_campaign_owner or assignee.role == "ADMIN"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Người được giao việc không thuộc workspace hoặc chiến dịch này"
+                )
 
     for key, value in update_data.items():
         setattr(task, key, value)
@@ -270,6 +322,25 @@ def delete_task(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tác vụ không tồn tại")
 
     campaign = db.query(Campaign).filter(Campaign.id == task.campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch của tác vụ không tồn tại")
+
+    # DELETE task phải verify workspace access
+    if current_user.role != "ADMIN":
+        if campaign.workspace_id is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chiến dịch không thuộc workspace hợp lệ")
+        ws = db.query(Workspace).filter(Workspace.id == campaign.workspace_id).first()
+        is_ws_owner = ws is not None and ws.owner_id == current_user.id
+        is_ws_member = db.query(WorkspaceMember).filter(
+            WorkspaceMember.workspace_id == campaign.workspace_id,
+            WorkspaceMember.user_id == current_user.id
+        ).first() is not None
+        if not (is_ws_owner or is_ws_member):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access tasks in this workspace"
+            )
+
     is_authorized = (
         current_user.role == "ADMIN"
         or task.creator_id == current_user.id

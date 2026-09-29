@@ -59,10 +59,14 @@ import {
   campaignApi, contentApi, aiApi, scheduleApi, taskApi, budgetApi, kpiApi, evaluateMarketingCompliance, getApiErrorMessage 
 } from '../services/api';
 import { useToast } from './Toast';
-
-import { MarketingCalendar } from './MarketingCalendar';
-import { ChannelROIComparison } from './ChannelROIComparison';
-import { AttributionTrendChart, AIDoctorWidget } from './analytics';
+import { 
+  OverviewTab, 
+  TasksTab, 
+  ContentTab, 
+  CalendarTab, 
+  BudgetTab, 
+  PerformanceTab 
+} from './campaign-hub';
 
 interface WorkflowCanvasProps {
   campaign: Campaign | null;
@@ -795,794 +799,92 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         </div>
       </div>
 
-      {/* 2.1 TAB BRIEF & MỤC TIÊU VẬN HÀNH */}
+      {/* 2.1 TAB BRIEF & MỤC TIÊU VẬN HÀNH (OVERVIEW TAB) */}
       {activeTab === 'brief' && (
-        <div className="space-y-6">
-          {/* Header Action Bar */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
-                  <Target className="w-5 h-5" />
-                </span>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">Brief & Mục Tiêu Vận Hành Chiến Dịch</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Thông điệp định hướng nội dung cốt lõi, lời kêu gọi hành động (CTA) và chỉ tiêu định lượng bắt buộc.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              {isEditingBrief ? (
-                <>
-                  <button
-                    onClick={() => {
-                      setIsEditingBrief(false);
-                      setBriefKeyMessage(campaign?.key_message || '');
-                      setBriefPrimaryCta(campaign?.primary_cta || '');
-                      setBriefTargetKpiName(campaign?.target_kpi_name || '');
-                      setBriefTargetKpiValue(campaign?.target_kpi_value || 0);
-                    }}
-                    className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    onClick={handleSaveBrief}
-                    disabled={isSavingBrief}
-                    className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-60"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>{isSavingBrief ? 'Đang lưu...' : 'Lưu Thay Đổi'}</span>
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => setIsEditingBrief(true)}
-                  className="px-4 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100 text-xs font-bold transition-colors flex items-center gap-1.5"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  <span>Chỉnh Sửa Brief</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* 2-Column Grid: Strategic Message & Quantified KPI Target */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Box 1: Core Message & CTA */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-indigo-600" />
-                  Thông Điệp Cốt Lõi & Kêu Gọi Hành Động
-                </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                  Brand Messaging
-                </span>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Thông điệp chủ đạo (Key Message)
-                </label>
-                {isEditingBrief ? (
-                  <textarea
-                    rows={3}
-                    value={briefKeyMessage}
-                    onChange={(e) => setBriefKeyMessage(e.target.value)}
-                    placeholder="Ví dụ: Giảm giá 30% cho 100 khách hàng đầu tiên đăng ký dùng thử phần mềm trong tháng 10..."
-                    className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800"
-                  />
-                ) : (
-                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-800 leading-relaxed font-medium min-h-[72px] flex items-center">
-                    {campaign?.key_message || briefKeyMessage ? (
-                      <span className="italic">"{campaign?.key_message || briefKeyMessage}"</span>
-                    ) : (
-                      <span className="text-slate-400 italic">Chưa thiết lập thông điệp cốt lõi cho chiến dịch này. Nhấn "Chỉnh Sửa Brief" để bổ sung.</span>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Lời kêu gọi hành động chính (Primary CTA)
-                </label>
-                {isEditingBrief ? (
-                  <input
-                    type="text"
-                    value={briefPrimaryCta}
-                    onChange={(e) => setBriefPrimaryCta(e.target.value)}
-                    placeholder="Ví dụ: Đăng ký trải nghiệm ngay, Nhận ưu đãi 30%..."
-                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800"
-                  />
-                ) : (
-                  <div className="flex items-center gap-3">
-                    <span className="px-3.5 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-xs shadow-xs inline-flex items-center gap-1.5">
-                      <span>{campaign?.primary_cta || briefPrimaryCta || 'Chưa thiết lập CTA'}</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </span>
-                    <span className="text-[11px] text-slate-500">CTA này sẽ được AI Copilot tự động chèn vào mọi nội dung sinh ra.</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Box 2: Quantified Target & Metrics */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-emerald-600" />
-                  Mục Tiêu Định Lượng (Quantified KPI Target)
-                </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Target Outcome
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Tên chỉ tiêu KPI chính
-                  </label>
-                  {isEditingBrief ? (
-                    <input
-                      type="text"
-                      value={briefTargetKpiName}
-                      onChange={(e) => setBriefTargetKpiName(e.target.value)}
-                      placeholder="Ví dụ: Khách hàng tiềm năng (Leads)"
-                      className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-800"
-                    />
-                  ) : (
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs font-bold text-slate-800">
-                      {campaign?.target_kpi_name || briefTargetKpiName || 'Chưa đặt tên KPI'}
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Chỉ tiêu cam kết (Mục tiêu)
-                  </label>
-                  {isEditingBrief ? (
-                    <input
-                      type="number"
-                      value={briefTargetKpiValue || ''}
-                      onChange={(e) => setBriefTargetKpiValue(Number(e.target.value))}
-                      placeholder="1000"
-                      className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-800 font-bold"
-                    />
-                  ) : (
-                    <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200/80 text-xs font-bold text-emerald-700 flex items-center justify-between">
-                      <span className="text-base font-extrabold">
-                        {(campaign?.target_kpi_value || briefTargetKpiValue || 0).toLocaleString('vi-VN')}
-                      </span>
-                      <span className="text-[10px] text-emerald-600 font-semibold uppercase">Đơn vị mục tiêu</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* KPI Performance summary */}
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-600 font-medium">Tiến độ chuyển đổi thực tế:</span>
-                  <span className="font-bold text-slate-900">
-                    {(campaignKpi?.total_conversions || 0).toLocaleString('vi-VN')} / {(campaign?.target_kpi_value || briefTargetKpiValue || 1).toLocaleString('vi-VN')}
-                  </span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        Math.round(((campaignKpi?.total_conversions || 0) / ((campaign?.target_kpi_value || briefTargetKpiValue) || 1)) * 100)
-                      )}%`
-                    }}
-                  />
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-slate-500">
-                  <span>Tỷ lệ hoàn thành:</span>
-                  <span className="font-bold text-slate-800">
-                    {Math.min(
-                      100,
-                      Math.round(((campaignKpi?.total_conversions || 0) / ((campaign?.target_kpi_value || briefTargetKpiValue) || 1)) * 100)
-                    )}%
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 3: Channel Budget Allocation */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-              <div>
-                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                  <DollarSign className="w-4 h-4 text-amber-500" />
-                  Kế Hoạch Phân Bổ Ngân Sách Theo Kênh (Channel Budget Planning)
-                </span>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Phân chia tổng ngân sách chiến dịch cho từng kênh truyền thông trọng điểm.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="text-right">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Tổng ngân sách:</span>
-                  <span className="text-sm font-extrabold text-slate-900">
-                    {campaign ? Number(campaign.budget).toLocaleString('vi-VN') : 0} ₫
-                  </span>
-                </div>
-                {isEditingBudget ? (
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => setIsEditingBudget(false)}
-                      className="px-3 py-1 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                    >
-                      Hủy
-                    </button>
-                    <button
-                      onClick={handleSaveBudgetAllocations}
-                      className="px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1"
-                    >
-                      <Save className="w-3 h-3" />
-                      <span>Lưu Phân Bổ</span>
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setIsEditingBudget(true)}
-                    className="px-3 py-1.5 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-bold flex items-center gap-1"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    <span>Chỉnh Sửa Kênh</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {channelAllocations.map((ch) => {
-                const totalBudget = campaign ? Number(campaign.budget) : 1;
-                const pct = totalBudget > 0 ? Math.round((ch.planned_amount / totalBudget) * 100) : 0;
-                return (
-                  <div key={ch.channel_id} className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-800">{ch.name}</span>
-                      <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
-                        {pct}%
-                      </span>
-                    </div>
-
-                    {isEditingBudget ? (
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="number"
-                          value={ch.planned_amount || ''}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            setChannelAllocations(prev =>
-                              prev.map(c => c.channel_id === ch.channel_id ? { ...c, planned_amount: val } : c)
-                            );
-                          }}
-                          placeholder="0"
-                          className="w-full text-xs p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-bold text-slate-800"
-                        />
-                        <span className="text-xs text-slate-500">₫</span>
-                      </div>
-                    ) : (
-                      <div className="text-sm font-extrabold text-slate-900">
-                        {ch.planned_amount.toLocaleString('vi-VN')} ₫
-                      </div>
-                    )}
-
-                    <div className="w-full h-1.5 rounded-full bg-slate-200 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-amber-500 transition-all duration-300"
-                        style={{ width: `${Math.min(100, pct)}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+        <OverviewTab
+          campaign={campaign}
+          campaignKpi={campaignKpi}
+          isEditingBrief={isEditingBrief}
+          setIsEditingBrief={setIsEditingBrief}
+          briefKeyMessage={briefKeyMessage}
+          setBriefKeyMessage={setBriefKeyMessage}
+          briefPrimaryCta={briefPrimaryCta}
+          setBriefPrimaryCta={setBriefPrimaryCta}
+          briefTargetKpiName={briefTargetKpiName}
+          setBriefTargetKpiName={setBriefTargetKpiName}
+          briefTargetKpiValue={briefTargetKpiValue}
+          setBriefTargetKpiValue={setBriefTargetKpiValue}
+          isSavingBrief={isSavingBrief}
+          handleSaveBrief={handleSaveBrief}
+          channelAllocations={channelAllocations}
+          setChannelAllocations={setChannelAllocations}
+          isEditingBudget={isEditingBudget}
+          setIsEditingBudget={setIsEditingBudget}
+          handleSaveBudgetAllocations={handleSaveBudgetAllocations}
+        />
       )}
 
-      {/* 2.2 TAB TÁC VỤ CHIẾN DỊCH (TASKS) */}
+      {/* 2.2 TAB TÁC VỤ CHIẾN DỊCH (TASKS TAB) */}
       {activeTab === 'tasks' && (
-        <div className="space-y-6">
-          {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Tổng Tác Vụ</span>
-              <span className="text-xl font-extrabold text-slate-900 mt-1 block">{campaignTasks.length}</span>
-            </div>
-            <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
-              <span className="text-[11px] font-bold text-rose-600 uppercase tracking-wider block">Quá Hạn</span>
-              <span className="text-xl font-extrabold text-rose-600 mt-1 block">
-                {campaignTasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'DONE').length}
-              </span>
-            </div>
-            <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
-              <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider block">Đang Làm</span>
-              <span className="text-xl font-extrabold text-blue-600 mt-1 block">
-                {campaignTasks.filter(t => t.status === 'IN_PROGRESS').length}
-              </span>
-            </div>
-            <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
-              <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider block">Đã Xong</span>
-              <span className="text-xl font-extrabold text-emerald-600 mt-1 block">
-                {campaignTasks.filter(t => t.status === 'DONE').length}
-              </span>
-            </div>
-          </div>
-
-          {/* Quick Create Task Form */}
-          <form onSubmit={handleCreateCampaignTask} className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                <Plus className="w-4 h-4 text-indigo-600" />
-                Thêm Tác Vụ Mới Cho Chiến Dịch Này
-              </span>
-              <span className="text-[10px] text-slate-500 font-medium">Phân công nhanh cho nhân sự marketing</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-              <div className="lg:col-span-2">
-                <input
-                  type="text"
-                  required
-                  placeholder="Tên tác vụ (vd: Thiết kế key visual Facebook Ads)..."
-                  value={newTaskTitle}
-                  onChange={(e) => setNewTaskTitle(e.target.value)}
-                  className="w-full text-xs p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800"
-                />
-              </div>
-
-              <div>
-                <select
-                  value={newTaskType}
-                  onChange={(e) => setNewTaskType(e.target.value as TaskType)}
-                  className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white text-slate-700 font-medium"
-                >
-                  <option value="CONTENT">Nội dung (Content)</option>
-                  <option value="DESIGN">Thiết kế (Design)</option>
-                  <option value="VIDEO">Video / Reels</option>
-                  <option value="ADS">Chạy Ads</option>
-                  <option value="RESEARCH">Nghiên cứu thị trường</option>
-                  <option value="OTHER">Khác</option>
-                </select>
-              </div>
-
-              <div>
-                <select
-                  value={newTaskPriority}
-                  onChange={(e) => setNewTaskPriority(e.target.value as TaskPriority)}
-                  className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white text-slate-700 font-medium"
-                >
-                  <option value="LOW">Ưu tiên Thấp</option>
-                  <option value="MEDIUM">Ưu tiên Vừa</option>
-                  <option value="HIGH">Ưu tiên Cao</option>
-                  <option value="URGENT">Khẩn cấp (Urgent)</option>
-                </select>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  value={newTaskDueDate}
-                  onChange={(e) => setNewTaskDueDate(e.target.value)}
-                  className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white text-slate-700"
-                />
-                <button
-                  type="submit"
-                  disabled={isCreatingTask || !newTaskTitle.trim()}
-                  className="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-colors shrink-0 disabled:opacity-50"
-                >
-                  {isCreatingTask ? '...' : '+ Thêm'}
-                </button>
-              </div>
-            </div>
-          </form>
-
-          {/* Task List / Table */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-            <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                Danh Sách Tác Vụ ({campaignTasks.length})
-              </span>
-              <span className="text-[11px] text-slate-500">
-                1-click vào hộp kiểm hoặc menu trạng thái để chuyển giai đoạn
-              </span>
-            </div>
-
-            {loadingTasks ? (
-              <div className="p-8 text-center text-xs text-slate-500">Đang tải danh sách tác vụ...</div>
-            ) : campaignTasks.length === 0 ? (
-              <div className="p-10 text-center space-y-2">
-                <ListTodo className="w-8 h-8 text-slate-300 mx-auto" />
-                <p className="text-xs font-bold text-slate-700">Chưa có tác vụ nào trong chiến dịch này</p>
-                <p className="text-xs text-slate-500">
-                  Tạo tác vụ đầu tiên ở biểu mẫu phía trên để bắt đầu giao việc cho đội ngũ.
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {campaignTasks.map((t) => {
-                  const isDone = t.status === 'DONE';
-                  const isOverdue = t.due_date && new Date(t.due_date) < new Date() && !isDone;
-                  return (
-                    <div
-                      key={t.id}
-                      className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors ${
-                        isDone ? 'opacity-60 bg-slate-50/30' : ''
-                      }`}
-                    >
-                      <div className="flex items-start sm:items-center gap-3">
-                        <button
-                          onClick={() => handleUpdateCampaignTaskStatus(t.id, isDone ? 'TODO' : 'DONE')}
-                          className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 transition-colors ${
-                            isDone
-                              ? 'bg-emerald-600 border-emerald-600 text-white'
-                              : 'border-slate-300 hover:border-indigo-500 bg-white'
-                          }`}
-                        >
-                          {isDone && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                        </button>
-
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                              {t.task_type}
-                            </span>
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                                t.priority === 'URGENT'
-                                  ? 'bg-rose-100 text-rose-700'
-                                  : t.priority === 'HIGH'
-                                  ? 'bg-amber-100 text-amber-700'
-                                  : t.priority === 'MEDIUM'
-                                  ? 'bg-blue-100 text-blue-700'
-                                  : 'bg-slate-100 text-slate-600'
-                              }`}
-                            >
-                              {t.priority}
-                            </span>
-                            {isOverdue && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
-                                Quá hạn
-                              </span>
-                            )}
-                          </div>
-                          <h4 className={`text-xs font-bold text-slate-800 mt-1 ${isDone ? 'line-through text-slate-400' : ''}`}>
-                            {t.title}
-                          </h4>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 self-end sm:self-center">
-                        {t.due_date && (
-                          <div className={`text-[11px] flex items-center gap-1 font-medium ${isOverdue ? 'text-rose-600 font-bold' : 'text-slate-500'}`}>
-                            <Clock className="w-3.5 h-3.5" />
-                            <span>{new Date(t.due_date).toLocaleDateString('vi-VN')}</span>
-                          </div>
-                        )}
-
-                        <select
-                          value={t.status}
-                          onChange={(e) => handleUpdateCampaignTaskStatus(t.id, e.target.value as TaskStatus)}
-                          className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${
-                            t.status === 'DONE'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : t.status === 'IN_PROGRESS'
-                              ? 'bg-blue-50 text-blue-700 border-blue-200'
-                              : t.status === 'IN_REVIEW'
-                              ? 'bg-purple-50 text-purple-700 border-purple-200'
-                              : 'bg-slate-50 text-slate-700 border-slate-200'
-                          }`}
-                        >
-                          <option value="TODO">Cần Làm</option>
-                          <option value="IN_PROGRESS">Đang Làm</option>
-                          <option value="IN_REVIEW">Đang Duyệt</option>
-                          <option value="DONE">Hoàn Thành</option>
-                        </select>
-
-                        <button
-                          onClick={() => handleDeleteCampaignTask(t.id)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                          title="Xóa tác vụ"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
+        <TasksTab
+          campaign={campaign}
+          campaignTasks={campaignTasks}
+          loadingTasks={loadingTasks}
+          newTaskTitle={newTaskTitle}
+          setNewTaskTitle={setNewTaskTitle}
+          newTaskType={newTaskType}
+          setNewTaskType={setNewTaskType}
+          newTaskPriority={newTaskPriority}
+          setNewTaskPriority={setNewTaskPriority}
+          newTaskDueDate={newTaskDueDate}
+          setNewTaskDueDate={setNewTaskDueDate}
+          isCreatingTask={isCreatingTask}
+          handleCreateCampaignTask={handleCreateCampaignTask}
+          handleUpdateCampaignTaskStatus={handleUpdateCampaignTaskStatus}
+          handleDeleteCampaignTask={handleDeleteCampaignTask}
+        />
       )}
 
-      {/* 3. TAB 1: BẢNG ĐIỀU PHỐI NỘI DUNG (CONTENT PIPELINE KANBAN) */}
+      {/* 3. TAB 1: BẢNG ĐIỀU PHỐI NỘI DUNG (CONTENT TAB) */}
       {activeTab === 'pipeline' && (
-        <div className="space-y-4">
-          {/* Operational Guidance Card for Step 3: Sau đó làm gì? */}
-          <div className="bg-gradient-to-r from-indigo-50 via-blue-50 to-emerald-50 p-4 rounded-xl border border-indigo-200/80 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs shadow-2xs">
-            <div className="flex items-start sm:items-center gap-3">
-              <span className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0 mt-0.5 sm:mt-0">
-                3
-              </span>
-              <div>
-                <span className="font-bold text-slate-900">Chu trình Kiểm duyệt: "Duyệt bài xong thì sau đó làm gì?"</span>
-                <p className="text-slate-600 text-[11px] mt-0.5 leading-relaxed">
-                  Khi Quản lý phê duyệt bài viết ở cột <strong>"Đã phê duyệt"</strong>, hệ thống tự động kích hoạt nút <strong className="text-indigo-700">"🚀 Xếp lịch phát sóng vào Giờ vàng"</strong>. Sau khi xếp lịch, bài viết tự động chuyển sang cột LIVE và được Bác sĩ AI giám sát dòng tiền.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={() => setActiveTab('copilot')}
-                className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs shadow-2xs transition-colors"
-              >
-                + Sáng tạo bài mới
-              </button>
-              <button
-                onClick={() => setActiveTab('calendar')}
-                className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs shadow-xs transition-colors flex items-center gap-1"
-              >
-                <span>Xem Lịch Đa Kênh</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
-            {/* Column 1: Bản nháp / AI Draft & Rejected */}
-            <div className="bg-slate-50 rounded-xl border border-slate-200/80 p-3 space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-blue-500" /> Bản nháp ({draftContents.length + rejectedContents.length})
-                </span>
-                <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">DRAFT</span>
-              </div>
-
-              {/* Rejected items waiting for marketer fix */}
-              {rejectedContents.map((item) => (
-                <div key={`rej-${item.id}`} className="bg-rose-50/70 rounded-lg p-3 border border-rose-200 shadow-xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    {getChannelBadge(item.channel_id)}
-                    <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded">Bị Sếp từ chối</span>
-                  </div>
-                  <h4 className="text-xs font-bold text-slate-800 line-clamp-1">{item.title}</h4>
-                  <div className="p-2 bg-white/80 rounded border border-rose-200 text-[10px] text-rose-800">
-                    <strong>Góp ý của Sếp:</strong> {item.warnings_json ? item.warnings_json : 'Cần chỉnh sửa lại CTA và phong cách bài viết.'}
-                  </div>
-                  <button
-                    onClick={() => handleAskAIToFixRejection(item)}
-                    className="w-full py-1 text-[11px] font-bold text-white bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 rounded transition-all flex items-center justify-center gap-1"
-                  >
-                    <Wand2 className="w-3 h-3" /> Nhờ AI sửa bài theo góp ý Sếp
-                  </button>
-                </div>
-              ))}
-
-              {/* Draft items */}
-              {draftContents.map((item) => (
-                <div key={item.id} className="bg-white rounded-lg p-3 border border-slate-200 shadow-xs space-y-2 hover:border-indigo-300 transition-colors">
-                  <div className="flex items-center justify-between">
-                    {getChannelBadge(item.channel_id)}
-                    <span className="text-[10px] font-semibold text-slate-400">#{item.id}</span>
-                  </div>
-                  <h4 className="text-xs font-bold text-slate-800 line-clamp-1">{item.title}</h4>
-                  <p className="text-[11px] text-slate-500 line-clamp-2">{item.body}</p>
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-[10px] text-slate-400">{item.body.split(/\s+/).length} từ</span>
-                    <button
-                      onClick={() => handleSubmitContent(item.id)}
-                      disabled={submittingId === item.id}
-                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded transition-colors flex items-center gap-1"
-                    >
-                      <Send className="w-3 h-3" />
-                      <span>{submittingId === item.id ? 'Đang gửi...' : 'Gửi Sếp duyệt'}</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              {draftContents.length === 0 && rejectedContents.length === 0 && (
-                <div className="p-6 text-center text-[11px] text-slate-500 bg-white rounded-lg border border-dashed border-slate-200">
-                  Chưa có bản nháp nào. Bấm nút phía trên để AI gợi ý nội dung.
-                </div>
-              )}
-            </div>
-
-            {/* Column 2: Chờ Sếp duyệt (IN_REVIEW) */}
-            <div className="bg-amber-50/60 rounded-xl border border-amber-200/80 p-3 space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-amber-200">
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-800 flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-600" /> Chờ Sếp duyệt ({inReviewContents.length})
-                </span>
-                <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">HITL GATE</span>
-              </div>
-
-              {inReviewContents.length === 0 ? (
-                <div className="p-6 text-center text-[11px] text-slate-500 bg-white/80 rounded-lg border border-dashed border-amber-200">
-                  Không có nội dung nào chờ phê duyệt.
-                </div>
-              ) : (
-                inReviewContents.map((item) => (
-                  <div key={item.id} className="bg-white rounded-lg p-3 border border-amber-200 shadow-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      {getChannelBadge(item.channel_id)}
-                      <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Chờ duyệt</span>
-                    </div>
-                    <h4 className="text-xs font-bold text-slate-800 line-clamp-1">{item.title}</h4>
-                    <p className="text-[11px] text-slate-500 line-clamp-2">{item.body}</p>
-                    
-                    <div className="pt-2 border-t border-slate-100">
-                      {isApprover ? (
-                        <div className="grid grid-cols-2 gap-1.5">
-                          <button
-                            onClick={() => handleApproveContentItem(item.id)}
-                            disabled={approvingId === item.id}
-                            className="text-center text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 py-1.5 rounded transition-all flex items-center justify-center gap-1 shadow-xs"
-                          >
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>{approvingId === item.id ? 'Đang duyệt...' : 'Phê duyệt'}</span>
-                          </button>
-                          <button
-                            onClick={() => setRejectModalContent(item)}
-                            className="text-center text-[11px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 py-1.5 rounded transition-all flex items-center justify-center gap-1 border border-rose-200"
-                          >
-                            <XCircle className="w-3 h-3" />
-                            <span>Từ chối</span>
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                          <Clock className="w-3 h-3 text-amber-500" />
-                          <span>Đang đợi tài khoản Quản lý thẩm định</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Column 3: Đã phê duyệt (APPROVED) */}
-            <div className="bg-emerald-50/60 rounded-xl border border-emerald-200/80 p-3 space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-emerald-200">
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Đã phê duyệt ({approvedContents.length})
-                </span>
-                <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">READY</span>
-              </div>
-
-              {approvedContents.length === 0 ? (
-                <div className="p-6 text-center text-[11px] text-slate-500 bg-white/80 rounded-lg border border-dashed border-emerald-200">
-                  Chưa có bài viết nào được cấp phép xuất bản.
-                </div>
-              ) : (
-                approvedContents.map((item) => (
-                  <div key={item.id} className="bg-white rounded-lg p-3 border border-emerald-200 shadow-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      {getChannelBadge(item.channel_id)}
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Hợp lệ</span>
-                    </div>
-                    <h4 className="text-xs font-bold text-slate-800 line-clamp-1">{item.title}</h4>
-                    <p className="text-[11px] text-slate-500 line-clamp-2">{item.body}</p>
-                    <div className="pt-2 border-t border-slate-100">
-                      <button
-                        onClick={() => setScheduleModalContent(item)}
-                        className="w-full text-center text-[11px] font-bold text-white bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-95"
-                      >
-                        <CalendarCheck className="w-3.5 h-3.5 text-white" />
-                        <span>🚀 Xếp lịch phát sóng vào Giờ vàng</span>
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Column 4: Đã xuất bản / Đang chạy (PUBLISHED) */}
-            <div className="bg-indigo-50/60 rounded-xl border border-indigo-200/80 p-3 space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-indigo-200">
-                <span className="text-xs font-bold uppercase tracking-wider text-indigo-800 flex items-center gap-1.5">
-                  <TrendingUp className="w-3.5 h-3.5 text-indigo-600" /> Đã xuất bản ({publishedContents.length})
-                </span>
-                <span className="text-[10px] font-bold bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">LIVE</span>
-              </div>
-
-              {publishedContents.length === 0 ? (
-                <div className="p-6 text-center text-[11px] text-slate-500 bg-white/80 rounded-lg border border-dashed border-indigo-200">
-                  Chưa có bài viết nào được phát tán tới kênh.
-                </div>
-              ) : (
-                publishedContents.map((item) => (
-                  <div key={item.id} className="bg-white rounded-lg p-3 border border-indigo-200 shadow-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      {getChannelBadge(item.channel_id)}
-                      <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">Đang chạy</span>
-                    </div>
-                    <h4 className="text-xs font-bold text-slate-800 line-clamp-1">{item.title}</h4>
-                    <p className="text-[11px] text-slate-500 line-clamp-2">{item.body}</p>
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                      <span className="text-slate-500">CTA: <strong>{item.cta || 'Đăng ký'}</strong></span>
-                      <button
-                        onClick={() => setActiveTab('doctor')}
-                        className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded transition-colors flex items-center gap-1 border border-indigo-200"
-                      >
-                        <Zap className="w-3 h-3 text-indigo-600" />
-                        <span>⚡ Theo dõi & Tối ưu AI</span>
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
+        <ContentTab
+          draftContents={draftContents}
+          rejectedContents={rejectedContents}
+          inReviewContents={inReviewContents}
+          approvedContents={approvedContents}
+          publishedContents={publishedContents}
+          isApprover={isApprover}
+          submittingId={submittingId}
+          approvingId={approvingId}
+          getChannelBadge={getChannelBadge}
+          handleAskAIToFixRejection={handleAskAIToFixRejection}
+          handleSubmitContent={handleSubmitContent}
+          handleApproveContentItem={handleApproveContentItem}
+          setRejectModalContent={setRejectModalContent}
+          setScheduleModalContent={setScheduleModalContent}
+          onOpenCopilot={() => setActiveTab('copilot')}
+          onOpenCalendar={() => setActiveTab('calendar')}
+          onOpenDoctor={() => setActiveTab('doctor')}
+        />
       )}
 
       {/* 4. TAB 2: LỊCH TIẾP THỊ ĐA KÊNH (MARKETING CALENDAR) */}
       {activeTab === 'calendar' && (
-        <div className="space-y-4">
-          <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-emerald-50 p-4 rounded-xl border border-blue-200/80 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs shadow-2xs">
-            <div className="flex items-start sm:items-center gap-3">
-              <span className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0 mt-0.5 sm:mt-0">
-                4
-              </span>
-              <div>
-                <span className="font-bold text-slate-900">Giai đoạn 04: Lịch Tiếp thị Giờ Vàng & Chu trình Vận hành</span>
-                <p className="text-slate-600 text-[11px] mt-0.5 leading-relaxed">
-                  Sau khi xếp lịch phát sóng vào các khung giờ vàng có tỷ lệ chuyển đổi cao nhất, hệ thống tự động đẩy bài lên các kênh và chuyển sang <strong>Giai đoạn 05: Vận hành & Giám sát dòng tiền AI</strong>.
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setActiveTab('doctor')}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs shadow-xs transition-colors flex items-center gap-1.5 shrink-0"
-            >
-              <Stethoscope className="w-4 h-4" />
-              <span>Chuyển sang Bác sĩ AI Vận hành</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <MarketingCalendar
-            campaigns={campaigns.length > 0 ? campaigns : [campaign]}
-            contents={contents}
-            selectedCampaign={campaign}
-            onSelectCampaign={onSelectCampaign || (() => {})}
-          />
-        </div>
+        <CalendarTab
+          campaign={campaign}
+          campaigns={campaigns}
+          contents={contents}
+          onSelectCampaign={onSelectCampaign}
+          onNavigateToDoctor={() => setActiveTab('doctor')}
+        />
       )}
 
       {/* 5. TAB 3: PHÂN BỔ NGÂN SÁCH & ROI KÊNH (CHANNEL ATTRIBUTION) */}
       {activeTab === 'attribution' && (
-        <div className="space-y-6">
-          <AttributionTrendChart
-            channels={campaignKpi?.channel_metrics || []}
-            totalCost={campaignKpi?.total_cost}
-            totalRevenue={campaignKpi?.total_revenue}
-          />
-          <ChannelROIComparison
-            campaign={campaign}
-            kpi={campaignKpi}
-          />
-        </div>
+        <BudgetTab
+          campaign={campaign}
+          campaignKpi={campaignKpi}
+        />
       )}
 
       {/* 6. TAB 4: AI SÁNG TẠO NỘI DUNG CHIẾN DỊCH (AI MARKETING COPILOT) */}
@@ -1999,79 +1301,14 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         </div>
       )}
 
-      {/* 7. TAB 5: BÁC SĨ AI: CHẨN ĐOÁN & TỐI ƯU HIỆU QUẢ (AI PERFORMANCE DOCTOR) */}
+      {/* 7. TAB 5: BÁC SĨ AI: CHẨN ĐOÁN & TỐI ƯU HIỆU QUẢ (PERFORMANCE TAB) */}
       {activeTab === 'doctor' && (
-        <div className="space-y-6">
-          {/* Current Live Campaign Metrics Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
-              <span className="text-[11px] font-bold uppercase text-slate-400">Lượt hiển thị (Views)</span>
-              <p className="text-xl font-black text-slate-900 mt-1">
-                {campaignKpi?.total_views ? campaignKpi.total_views.toLocaleString('vi-VN') : '15,700'}
-              </p>
-              <span className="text-[10px] text-slate-400">Độ phủ toàn chiến dịch</span>
-            </div>
-
-            <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
-              <span className="text-[11px] font-bold uppercase text-slate-400">Tương tác Click & CTR</span>
-              <p className="text-xl font-black text-emerald-600 mt-1">
-                {campaignKpi?.total_clicks ? campaignKpi.total_clicks.toLocaleString('vi-VN') : '1,260'} 
-                <span className="text-xs text-slate-500 font-semibold ml-1">
-                  ({campaignKpi?.ctr_percent || 8.0}%)
-                </span>
-              </p>
-              <span className="text-[10px] text-emerald-600 font-medium">CTR trung bình đạt chuẩn</span>
-            </div>
-
-            <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
-              <span className="text-[11px] font-bold uppercase text-slate-400">Chi phí mỗi Click (CPC)</span>
-              <p className="text-xl font-black text-slate-900 mt-1">
-                {campaignKpi?.cpc_avg ? Math.round(campaignKpi.cpc_avg).toLocaleString('vi-VN') : '2,500'} đ
-              </p>
-              <span className="text-[10px] text-slate-400">Mức tối ưu trên kênh</span>
-            </div>
-
-            <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
-              <span className="text-[11px] font-bold uppercase text-slate-400">Tỷ suất sinh lời (ROI)</span>
-              <p className="text-xl font-black text-indigo-600 mt-1">
-                +{campaignKpi?.roi_percent || 410}%
-              </p>
-              <span className="text-[10px] text-indigo-600 font-medium">Doanh thu / Chi phí</span>
-            </div>
-          </div>
-
-          {/* Actionable AI Performance Doctor Widget */}
-          <AIDoctorWidget
-            campaignId={campaign.id}
-            onOpenAIStudio={() => setActiveTab('copilot')}
-          />
-
-          {/* Next Step Guidance: Stage 5 -> Stage 6 Closed Loop */}
-          <div className="bg-gradient-to-r from-teal-50 via-emerald-50 to-indigo-50 border border-teal-200 p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
-            <div className="flex items-start gap-3">
-              <span className="w-9 h-9 rounded-xl bg-teal-600 text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0 mt-0.5">
-                5→6
-              </span>
-              <div>
-                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <span>Bước tiếp theo sau khi Bác sĩ AI chẩn đoán</span>
-                  <span className="bg-teal-100 text-teal-800 text-[10px] px-2 py-0.5 rounded-full font-bold">Closed-Loop</span>
-                </h4>
-                <p className="text-slate-600 text-xs mt-1 leading-relaxed">
-                  Dựa trên chẩn đoán của Bác sĩ AI, chuyển sang <strong>Giai đoạn 06: Đóng gói Tri thức & Tối ưu Phân bổ Ngân sách</strong> để thực hiện 1-Click Tối ưu ngân sách kênh và lưu góc bài chiến thắng vào Kho tri thức (Retrospective Vault).
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setActiveTab('attribution')}
-              className="px-5 py-2.5 bg-gradient-to-r from-teal-600 to-indigo-600 hover:from-teal-700 hover:to-indigo-700 text-white font-bold rounded-xl text-xs shadow-sm transition-all flex items-center justify-center gap-2 shrink-0 active:scale-95"
-            >
-              <PieChart className="w-4 h-4" />
-              <span>Mở Phân bổ Ngân sách & Kho Tri thức</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+        <PerformanceTab
+          campaign={campaign}
+          campaignKpi={campaignKpi}
+          onOpenCopilot={() => setActiveTab('copilot')}
+          onOpenAttribution={() => setActiveTab('attribution')}
+        />
       )}
 
       {/* 8. TAB 6: SƠ ĐỒ CHU TRÌNH VÒNG ĐỜI (VISUAL LIFECYCLE FLOW) */}

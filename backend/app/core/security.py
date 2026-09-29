@@ -45,11 +45,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         raw = "$2b$" + raw
     try:
         return bcrypt.checkpw(plain_password.encode("utf-8"), raw.encode("utf-8"))
-    except (ValueError, TypeError, RuntimeError):
-        # KHÔNG có nhánh nào trả về True ở đây. bcrypt có thể ném RuntimeError
-        # (vd: token quá dài, lỗi cấp phát bộ nhớ trong thư viện C) - nếu để lọt,
-        # lỗi sẽ nổi lên thành HTTP 500 thay vì 401, làm lộ chi tiết lỗi server.
-        # Bắt rộng ở đây để mọi lỗi bcrypt đều fail-closed thành "đăng nhập sai".
+    except Exception:
+        # Bắt tất cả exception để mọi lỗi bcrypt / hash dị thường đều fail-closed an toàn trả về False
         logger.warning("[Security] bcrypt rejected stored hash format; refusing login.")
         return False
 

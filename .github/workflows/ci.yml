@@ -53,7 +53,7 @@ jobs:
         run: pip install pytest-cov pytest-timeout
 
       - name: Run Full Backend Test Suite (pytest backend/tests/ -v)
-        run: pytest backend/tests/ -v --timeout=180 --timeout-method=thread --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=0
+        run: pytest backend/tests/ -v --timeout=180 --timeout-method=thread --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=80
 
   # =========================================================================
   # Gate 2: Frontend Build & Typecheck Gate
@@ -181,19 +181,8 @@ jobs:
       # Chi chay cac spec viet cho du lieu that. Cac spec con lai assert du lieu
       # cua mock-api.ts nen khong co y nghia khi thay bang du lieu that.
       # ---------------------------------------------------------------------
-      - name: "Playwright run 2/2a - E2E_MODE=live (backend readiness probe)"
-        id: backend_probe
-        run: npx playwright test tests/e2e/backend-health.spec.ts --reporter=list
-        working-directory: frontend
-        env:
-          E2E_MODE: live
-          E2E_LOG_MODE: "1"
-          E2E_BACKEND_PORT: "8000"
-          E2E_PYTHON: python
-          PYTHONUNBUFFERED: "1"
-
-      - name: "Playwright run 2/2b - E2E_MODE=live (live-backend.spec.ts)"
-        run: npx playwright test tests/e2e/live-backend.spec.ts --reporter=list
+      - name: "Playwright run 2/2 - E2E_MODE=live (backend readiness probe + live-backend.spec.ts)"
+        run: npx playwright test tests/e2e/backend-health.spec.ts tests/e2e/live-backend.spec.ts --reporter=list
         working-directory: frontend
         env:
           E2E_MODE: live
@@ -317,9 +306,8 @@ jobs:
           echo "   Frontend:       http://127.0.0.1:4173"
           echo "=============================================================="
 
-      - name: "Gate 4 pre-check - backend THAT co that su healthy khong?"
-        id: backend_probe
-        run: npx playwright test tests/e2e/backend-health.spec.ts --reporter=list
+      - name: "WCAG audit - E2E_MODE=live (readiness probe + wcag.spec.ts)"
+        run: npx playwright test tests/e2e/backend-health.spec.ts tests/a11y/wcag.spec.ts --reporter=list
         working-directory: frontend
         env:
           E2E_MODE: live
@@ -328,27 +316,7 @@ jobs:
           E2E_PYTHON: python
           PYTHONUNBUFFERED: "1"
 
-      - name: "WCAG audit - E2E_MODE=live (du lieu that)"
-        run: npx playwright test tests/a11y/wcag.spec.ts --reporter=list
-        working-directory: frontend
-        env:
-          E2E_MODE: live
-          E2E_LOG_MODE: "1"
-          E2E_BACKEND_PORT: "8000"
-          E2E_PYTHON: python
-          PYTHONUNBUFFERED: "1"
 
-      # Fallback CHI chay khi probe that that bat (khong phai khi test that fail).
-      # Neu test that fail thi do la loi WCAG that -> Gate 4 phai FAIL that.
-      - name: "WCAG audit - fallback E2E_MODE=mock (chi khi backend that that bat)"
-        if: steps.backend_probe.outcome == 'failure'
-        run: |
-          echo "::warning title=WCAG live fallback::Backend that khong healthy (probe 'Gate 4 pre-check' that bat). Chay lai WCAG voi du lieu gia de bao dam bao WCAG khong bi bo qua."
-          npx playwright test tests/a11y/wcag.spec.ts --reporter=list
-        working-directory: frontend
-        env:
-          E2E_MODE: mock
-          E2E_LOG_MODE: "1"
 
       - name: Upload WCAG report on failure
         if: failure()

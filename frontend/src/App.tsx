@@ -1,18 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
-import { Dashboard } from './pages/Dashboard';
-import { Campaigns } from './pages/Campaigns';
-import { ReviewQueue } from './pages/ReviewQueue';
-import { WorkflowCanvas } from './components/WorkflowCanvas';
 import { AIDrawer } from './components/AIDrawer';
-import { AIStudio } from './pages/AIStudio';
-import { MyTasksPage } from './pages/MyTasksPage';
-import { Settings } from './pages/Settings';
-import { MarketingCalendar } from './components/MarketingCalendar';
-import { LoginPage } from './pages/LoginPage';
-import { RegisterPage } from './pages/RegisterPage';
 import { BrandKitModal } from './components/BrandKitModal';
 import { ServerAwakeningIndicator } from './components/ServerAwakeningIndicator';
 import { ToastProvider, useToast } from './components/Toast';
@@ -21,6 +11,27 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { WorkspaceProvider, useWorkspace } from './context/WorkspaceContext';
 import { Campaign, MarketingContent } from './types';
 import { campaignApi, contentApi, taskApi, getApiErrorMessage, isOfflineDemoEnabled, isBackendConnected } from './services/api';
+
+const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
+const Campaigns = lazy(() => import('./pages/Campaigns').then(m => ({ default: m.Campaigns })));
+const ReviewQueue = lazy(() => import('./pages/ReviewQueue').then(m => ({ default: m.ReviewQueue })));
+const WorkflowCanvas = lazy(() => import('./components/WorkflowCanvas').then(m => ({ default: m.WorkflowCanvas })));
+const AIStudio = lazy(() => import('./pages/AIStudio').then(m => ({ default: m.AIStudio })));
+const MyTasksPage = lazy(() => import('./pages/MyTasksPage').then(m => ({ default: m.MyTasksPage })));
+const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
+const MarketingCalendar = lazy(() => import('./components/MarketingCalendar').then(m => ({ default: m.MarketingCalendar })));
+const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
+const RegisterPage = lazy(() => import('./pages/RegisterPage').then(m => ({ default: m.RegisterPage })));
+
+const PageFallback: React.FC = () => (
+  <div className="flex h-full w-full min-h-[400px] items-center justify-center p-12">
+    <div className="flex flex-col items-center gap-3 text-slate-500">
+      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <span className="text-xs font-semibold">Đang tải phân hệ...</span>
+    </div>
+  </div>
+);
+
 
 function AppContent() {
   const toast = useToast();
@@ -132,11 +143,17 @@ function AppContent() {
             <strong>[CHẾ ĐỘ DEMO OFFLINE]</strong> Hệ thống đang chạy giả lập offline với LocalStorage. Bạn có thể sử dụng email demo để trải nghiệm.
           </div>
         )}
-        {authMode === 'register' ? (
-          <RegisterPage onNavigateToLogin={() => setAuthMode('login')} />
-        ) : (
-          <LoginPage onNavigateToRegister={() => setAuthMode('register')} />
-        )}
+        <Suspense fallback={
+          <div className="flex min-h-screen items-center justify-center bg-slate-900">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          </div>
+        }>
+          {authMode === 'register' ? (
+            <RegisterPage onNavigateToLogin={() => setAuthMode('login')} />
+          ) : (
+            <LoginPage onNavigateToRegister={() => setAuthMode('register')} />
+          )}
+        </Suspense>
       </div>
     );
   }
@@ -195,119 +212,121 @@ function AppContent() {
         />
 
         <main className="flex-1 overflow-y-auto">
-          {currentTab === 'dashboard' && (
-            <Dashboard
-              onSelectCampaign={(c) => {
-                setSelectedCampaign(c);
-                setCurrentTab('workflow');
-              }}
-              onOpenWorkflow={handleOpenWorkflow}
-              onOpenAI={handleOpenAI}
-              onNavigateTab={(t) => setCurrentTab(t)}
-              userRole={userRole || undefined}
-            />
-          )}
-
-          {currentTab === 'campaigns' && (
-            <Campaigns
-              onSelectCampaign={(c) => {
-                setSelectedCampaign(c);
-                setCurrentTab('workflow');
-              }}
-              onOpenWorkflow={handleOpenWorkflow}
-              onOpenAI={handleOpenAI}
-              onNavigateTab={(t) => setCurrentTab(t)}
-              onRefreshData={() => loadCampaignsAndContents(currentWorkspace?.id)}
-              userRole={userRole || undefined}
-            />
-          )}
-
-          {currentTab === 'calendar' && (
-            <div className="p-8 max-w-7xl mx-auto space-y-6">
-              <MarketingCalendar
-                campaigns={campaigns}
-                contents={contents}
-                selectedCampaign={selectedCampaign}
-                onSelectCampaign={setSelectedCampaign}
-              />
-            </div>
-          )}
-
-          {currentTab === 'workflow' && (
-            <div className="p-8 max-w-7xl mx-auto space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-black text-slate-900 tracking-tight">Trung tâm Điều phối Chiến dịch & Pipeline</h2>
-                  <p className="text-xs text-slate-500 mt-1">Không gian điều phối chiến dịch toàn diện: Quản lý Pipeline nội dung, AI Copilot đa kênh, Bác sĩ AI chẩn đoán và Sơ đồ vòng đời.</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={selectedCampaign?.id || ''}
-                    onChange={(e) => {
-                      const found = campaigns.find(c => c.id === Number(e.target.value));
-                      if (found) setSelectedCampaign(found);
-                    }}
-                    aria-label="Chọn chiến dịch điều phối"
-                    className="text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 font-semibold text-slate-700 shadow-xs outline-hidden"
-                  >
-                    {campaigns.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <WorkflowCanvas
-                campaign={selectedCampaign}
-                contents={contents}
-                campaigns={campaigns}
-                onSelectCampaign={setSelectedCampaign}
+          <Suspense fallback={<PageFallback />}>
+            {currentTab === 'dashboard' && (
+              <Dashboard
+                onSelectCampaign={(c) => {
+                  setSelectedCampaign(c);
+                  setCurrentTab('workflow');
+                }}
+                onOpenWorkflow={handleOpenWorkflow}
                 onOpenAI={handleOpenAI}
-                onApproveContent={handleApproveContent}
-                onSubmitForReview={() => loadCampaignsAndContents(currentWorkspace?.id)}
+                onNavigateTab={(t) => setCurrentTab(t)}
+                userRole={userRole || undefined}
+              />
+            )}
+
+            {currentTab === 'campaigns' && (
+              <Campaigns
+                onSelectCampaign={(c) => {
+                  setSelectedCampaign(c);
+                  setCurrentTab('workflow');
+                }}
+                onOpenWorkflow={handleOpenWorkflow}
+                onOpenAI={handleOpenAI}
+                onNavigateTab={(t) => setCurrentTab(t)}
                 onRefreshData={() => loadCampaignsAndContents(currentWorkspace?.id)}
                 userRole={userRole || undefined}
               />
-            </div>
-          )}
+            )}
 
-          {currentTab === 'my_tasks' && (
-            <MyTasksPage
-              onNavigateToCampaign={(cId) => {
-                const c = campaigns.find(x => x.id === cId);
-                if (c) {
-                  setSelectedCampaign(c);
-                  setCurrentTab('workflow');
-                } else {
-                  setCurrentTab('campaigns');
-                }
-              }}
-            />
-          )}
+            {currentTab === 'calendar' && (
+              <div className="p-8 max-w-7xl mx-auto space-y-6">
+                <MarketingCalendar
+                  campaigns={campaigns}
+                  contents={contents}
+                  selectedCampaign={selectedCampaign}
+                  onSelectCampaign={setSelectedCampaign}
+                />
+              </div>
+            )}
 
-          {currentTab === 'reviews' && (
-            <ReviewQueue userRole={userRole || undefined} />
-          )}
+            {currentTab === 'workflow' && (
+              <div className="p-8 max-w-7xl mx-auto space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-black text-slate-900 tracking-tight">Trung tâm Điều phối Chiến dịch & Pipeline</h2>
+                    <p className="text-xs text-slate-500 mt-1">Không gian điều phối chiến dịch toàn diện: Quản lý Pipeline nội dung, AI Copilot đa kênh, Bác sĩ AI chẩn đoán và Sơ đồ vòng đời.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selectedCampaign?.id || ''}
+                      onChange={(e) => {
+                        const found = campaigns.find(c => c.id === Number(e.target.value));
+                        if (found) setSelectedCampaign(found);
+                      }}
+                      aria-label="Chọn chiến dịch điều phối"
+                      className="text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 font-semibold text-slate-700 shadow-xs outline-hidden"
+                    >
+                      {campaigns.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
+                <WorkflowCanvas
+                  campaign={selectedCampaign}
+                  contents={contents}
+                  campaigns={campaigns}
+                  onSelectCampaign={setSelectedCampaign}
+                  onOpenAI={handleOpenAI}
+                  onApproveContent={handleApproveContent}
+                  onSubmitForReview={() => loadCampaignsAndContents(currentWorkspace?.id)}
+                  onRefreshData={() => loadCampaignsAndContents(currentWorkspace?.id)}
+                  userRole={userRole || undefined}
+                />
+              </div>
+            )}
 
-          {currentTab === 'ai_studio' && (
-            <AIStudio
-              campaigns={campaigns}
-              selectedCampaign={selectedCampaign}
-              onSelectCampaign={setSelectedCampaign}
-              onContentCreated={() => loadCampaignsAndContents(currentWorkspace?.id)}
-              onNavigateToReviews={() => setCurrentTab('reviews')}
-            />
-          )}
-
-          {currentTab === 'settings' && (
-            <div className="p-8 max-w-7xl mx-auto">
-              <Settings 
-                currentUser={user} 
-                currentWorkspace={currentWorkspace} 
+            {currentTab === 'my_tasks' && (
+              <MyTasksPage
+                onNavigateToCampaign={(cId) => {
+                  const c = campaigns.find(x => x.id === cId);
+                  if (c) {
+                    setSelectedCampaign(c);
+                    setCurrentTab('workflow');
+                  } else {
+                    setCurrentTab('campaigns');
+                  }
+                }}
               />
-            </div>
-          )}
+            )}
+
+            {currentTab === 'reviews' && (
+              <ReviewQueue userRole={userRole || undefined} />
+            )}
+
+
+            {currentTab === 'ai_studio' && (
+              <AIStudio
+                campaigns={campaigns}
+                selectedCampaign={selectedCampaign}
+                onSelectCampaign={setSelectedCampaign}
+                onContentCreated={() => loadCampaignsAndContents(currentWorkspace?.id)}
+                onNavigateToReviews={() => setCurrentTab('reviews')}
+              />
+            )}
+
+            {currentTab === 'settings' && (
+              <div className="p-8 max-w-7xl mx-auto">
+                <Settings 
+                  currentUser={user} 
+                  currentWorkspace={currentWorkspace} 
+                />
+              </div>
+            )}
+          </Suspense>
         </main>
       </div>
 

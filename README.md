@@ -44,7 +44,7 @@ Khác biệt hoàn toàn với các "AI Prompt Demo" thông thường chỉ dừ
    - **Đợt 3 (Wave 3 — Chất lượng UX & Chuẩn Tiếp cận WCAG 2.2 AA)**: **40/40 tests passed** (23 tests WCAG 2.2 AA với `@axe-core/playwright`, 12 tests bẫy tiêu điểm bàn phím Focus Trap, 5 tests đối kháng probe; 0 lỗi Critical/Serious, kiểm tra reflow 320px tại zoom 200%, điều hướng bàn phím toàn phần).
    - **Đợt 4 (Wave 4 — Hiệu năng Web, Độ trễ API & Tải đồng thời)**: **20-session load test** (1,800 thao tác đồng thời qua 20 phiên trong 10 phút, **0 lock errors**, 0 lỗi 500), độ trễ API nghiệp vụ non-AI $p95 \le 800$ms (đo thực tế $\approx 320.8$ms trên 50 lần lặp), bộ kiểm thử Core Web Vitals tự động (LCP $\le 2.5$s, INP $\le 200$ms, CLS $\le 0.1$), cơ chế debounce và chống gửi lặp (idempotency).
    - **Đợt 5 (Wave 5 — CI Pipeline Gating & Khử Rò rỉ Thông tin Nhạy cảm)**: Phân tách CI thành 5 cổng độc lập, khử triệt để token API key / `?key=...` trong log và phản hồi lỗi, **10/10 tests** khử rò rỉ (`test_wave5_credential_sanitization.py`) đạt 100%.
-   - **Tổng cộng**: Hơn **827+ ca kiểm thử tự động** trên toàn hệ thống (bao gồm 691 backend unit/security/sanitization tests, 136 Opaque-Box E2E tests và 64+ Playwright frontend/a11y/perf tests) — 100% Passed, 0 Errors.
+   - **Tổng cộng**: Hơn **1,260 ca kiểm thử tự động backend** đạt 100% Passed (độ phủ kiểm thử câu lệnh đạt **87%**, ngưỡng bảo đảm chất lượng CI `--cov-fail-under=80`), cùng bộ kiểm thử Playwright E2E/WCAG 2.2 AA và kiểm định hiệu năng Core Web Vitals.
 
 
 ---

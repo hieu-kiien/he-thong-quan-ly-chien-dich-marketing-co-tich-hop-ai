@@ -262,7 +262,10 @@ def update_campaign(
 
     # Allowlist tường minh: chỉ cho sửa các trường nghiệp vụ, không cho set owner_id/workspace_id.
     update_data = req.model_dump(exclude_unset=True)
-    allowed_fields = {"name", "objective", "audience", "start_date", "end_date", "budget", "status"}
+    allowed_fields = {
+        "name", "objective", "audience", "start_date", "end_date", "budget", "status",
+        "key_message", "primary_cta", "target_kpi_name", "target_kpi_value"
+    }
     for field, value in update_data.items():
         if field not in allowed_fields:
             raise HTTPException(

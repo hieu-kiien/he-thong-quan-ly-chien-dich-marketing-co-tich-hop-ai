@@ -1,0 +1,114 @@
+\begin{tikzpicture}[
+  font=\sffamily\footnotesize,
+  >=Latex,
+  entity/.style={
+    matrix of nodes,
+    nodes={
+      draw=black!70,
+      fill=white,
+      minimum width=3.8cm,
+      minimum height=0.40cm,
+      text width=3.5cm,
+      align=left,
+      inner sep=2pt,
+      font=\sffamily\scriptsize
+    },
+    row sep=-0.5pt,
+    column sep=0pt
+  },
+  header/.style={nodes={fill=ictunavy,text=white,font=\sffamily\bfseries\scriptsize,align=center,minimum height=0.52cm}},
+  rel/.style={draw=black!85,line width=0.75pt,-{Latex[length=2mm]}},
+  card/.style={font=\sffamily\bfseries\tiny,text=black,fill=white,inner sep=1.2pt}
+]
+
+% Hàng 1 (y = 2.0): product_categories, products, marketing_channels
+\matrix (cats) [entity,row 1/.style={header}] at (2.2, 2.0) {
+  product\_categories (Nhóm SP)\\
+  \textbf{PK} id : INTEGER\\
+  name : VARCHAR(100)\\
+  description : TEXT\\
+};
+
+\matrix (products) [entity,row 1/.style={header}] at (7.1, 2.0) {
+  products (Sản phẩm)\\
+  \textbf{PK} id : INTEGER\\
+  \textbf{FK} category\_id : INT\\
+  name : VARCHAR(150)\\
+  price : NUMERIC(12,2)\\
+  status : VARCHAR(20)\\
+};
+
+\matrix (channels) [entity,row 1/.style={header}] at (12.0, 2.0) {
+  marketing\_channels (Kênh)\\
+  \textbf{PK} id : INTEGER\\
+  name : VARCHAR(80)\\
+  code : VARCHAR(30)\\
+  format\_rules : JSON\\
+  status : VARCHAR(20)\\
+};
+
+% Hàng 2 (y = -2.6): users, campaigns, marketing_contents
+\matrix (users) [entity,row 1/.style={header}] at (2.2, -2.6) {
+  users (Tài khoản)\\
+  \textbf{PK} id : INTEGER\\
+  email : VARCHAR(120)\\
+  password\_hash : TEXT\\
+  role : VARCHAR(20)\\
+  status : VARCHAR(20)\\
+};
+
+\matrix (campaigns) [entity,row 1/.style={header}] at (7.1, -2.6) {
+  campaigns (Chiến dịch)\\
+  \textbf{PK} id : INTEGER\\
+  \textbf{FK} product\_id : INT\\
+  \textbf{FK} owner\_id : INT\\
+  title : VARCHAR(200)\\
+  objective : TEXT\\
+  budget : NUMERIC(15,2)\\
+  start\_date, end\_date : DATE\\
+  status : VARCHAR(20)\\
+};
+
+\matrix (contents) [
+  matrix of nodes,
+  nodes={
+    draw=black!70,
+    fill=white,
+    minimum width=4.0cm,
+    minimum height=0.40cm,
+    text width=3.7cm,
+    align=left,
+    inner sep=2pt,
+    font=\sffamily\scriptsize
+  },
+  row sep=-0.5pt,
+  column sep=0pt,
+  row 1/.style={nodes={fill=ictunavy,text=white,font=\sffamily\bfseries\scriptsize,align=center,minimum height=0.52cm}}
+] at (12.0, -2.6) {
+  marketing\_contents (Nội dung)\\
+  \textbf{PK} id : INTEGER\\
+  \textbf{FK} campaign\_id : INTEGER\\
+  \textbf{FK} channel\_id : INTEGER\\
+  \textbf{FK} created\_by : INTEGER\\
+  title : VARCHAR(200)\\
+  status : VARCHAR(20)\\
+  body, prompt : TEXT\\
+};
+
+% Các quan hệ thẳng hàng 100%, không giao nhau, không đi qua thực thể khác
+% 1. Categories -> Products (ngang)
+\draw[rel] (cats) -- node[card,above,pos=0.2]{1} node[card,above,pos=0.8]{0..*} (products);
+
+% 2. Products -> Campaigns (dọc)
+\draw[rel] (products) -- node[card,right,pos=0.2]{1} node[card,right,pos=0.8]{0..*} (campaigns);
+
+% 3. Users -> Campaigns (ngang)
+\draw[rel] (users) -- node[card,above,pos=0.2]{1} node[card,above,pos=0.8]{0..*} (campaigns);
+
+% 4. Campaigns -> Contents (ngang)
+\draw[rel] (campaigns) -- node[card,above,pos=0.2]{1} node[card,above,pos=0.8]{0..*} (contents);
+
+% 5. Channels -> Contents (dọc)
+\draw[rel] (channels) -- node[card,right,pos=0.2]{1} node[card,right,pos=0.8]{0..*} (contents);
+
+\end{tikzpicture}

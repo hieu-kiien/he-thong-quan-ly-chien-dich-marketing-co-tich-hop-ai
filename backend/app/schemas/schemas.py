@@ -1076,6 +1076,10 @@ class CommandCenterCampaignHealth(BaseModel):
     health_score: int # 0 to 100
     start_date: str
     end_date: str
+    kpi_target: Optional[float] = None
+    kpi_actual: Optional[float] = None
+    kpi_achievement_pct: Optional[float] = None
+    budget_risk: bool = False
 
 class CommandCenterResponse(BaseModel):
     attention_items: List[CommandCenterAttentionItem]

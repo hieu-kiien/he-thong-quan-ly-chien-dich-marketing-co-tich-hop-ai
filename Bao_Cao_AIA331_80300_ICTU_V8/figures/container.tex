@@ -1,0 +1,97 @@
+\begin{tikzpicture}[
+  font=\sffamily\footnotesize,
+  >=Latex,
+  container/.style={
+    draw=ictunavy,
+    fill=white,
+    rounded corners=4pt,
+    minimum width=3.8cm,
+    minimum height=1.35cm,
+    align=center,
+    line width=0.85pt,
+    text width=3.6cm,
+    inner sep=2.5pt
+  },
+  db_box/.style={
+    draw=ictunavy,
+    fill=black!3,
+    rounded corners=4pt,
+    minimum width=3.8cm,
+    minimum height=1.35cm,
+    align=center,
+    line width=0.85pt,
+    text width=3.6cm,
+    inner sep=2.5pt
+  },
+  ext/.style={
+    draw=black!70,
+    fill=white,
+    rounded corners=4pt,
+    minimum width=2.6cm,
+    minimum height=1.35cm,
+    align=center,
+    dashed,
+    line width=0.75pt,
+    text width=2.4cm,
+    inner sep=2.5pt
+  },
+  rel/.style={-{Latex[length=2.2mm]},draw=black!85,line width=0.75pt},
+  lab/.style={font=\sffamily\tiny,fill=white,inner sep=1.5pt,align=center,text=black}
+]
+
+% Ranh giới hệ thống (Tổng thể: x từ 0.3 đến 10.2, y từ -2.75 đến 2.6)
+\draw[draw=black!50,fill=black!1,rounded corners=6pt,line width=0.8pt] (0.3,-2.75) rectangle (10.2,2.6);
+
+% Hàng 1 (y = 0.85cm): Web SPA và CSDL (cách tiêu đề 0.85cm thông thoáng)
+\node[container] (web) at (2.5, 0.85) {
+  \textbf{Ứng dụng Web (SPA)}\\[2pt]
+  {\tiny [React, TypeScript, Tailwind]}\\[1pt]
+  {\tiny Dashboard, quản lý chiến dịch}
+};
+
+\node[db_box] (db) at (7.9, 0.85) {
+  \textbf{Cơ sở Dữ liệu}\\[2pt]
+  {\tiny [PostgreSQL / SQLite]}\\[1pt]
+  {\tiny Dữ liệu chiến dịch, chỉ số, AI log}
+};
+
+% Hàng 2 (y = -1.75cm): Backend API và AI Subsystem (thông thủy giữa 2 hàng là 1.4cm)
+\node[container] (api) at (2.5, -1.75) {
+  \textbf{Máy chủ API Backend}\\[2pt]
+  {\tiny [FastAPI, Python]}\\[1pt]
+  {\tiny REST API, xác thực JWT, RBAC}
+};
+
+\node[container] (ai) at (7.9, -1.75) {
+  \textbf{Điều phối AI (Subsystem)}\\[2pt]
+  {\tiny [Python Service Engine]}\\[1pt]
+  {\tiny Lắp prompt, kiểm định JSON}
+};
+
+% Hệ thống bên ngoài (Cột bên phải: x = 12.6cm)
+\node[ext] (ext_soc) at (12.6, 0.85) {
+  \textbf{Mạng Xã Hội}\\[2pt]
+  {\tiny [Dịch vụ bên ngoài]}\\[1pt]
+  {\tiny Facebook, TikTok}
+};
+
+\node[ext] (ext_ai) at (12.6, -1.75) {
+  \textbf{Dịch vụ AI Ngoài}\\[2pt]
+  {\tiny [Dịch vụ bên ngoài]}\\[1pt]
+  {\tiny OpenAI, Gemini}
+};
+
+% Luồng dữ liệu nội bộ
+\draw[rel] (web) -- node[lab,right=2pt]{HTTPS / REST} (api);
+\draw[rel] (api) -- node[lab,above=2pt]{Điều phối AI} (ai);
+\draw[rel] (api.north east) -- node[lab,sloped,above=1pt]{SQL ORM} (db.south west);
+\draw[rel] (ai.north) -- node[lab,right=2pt]{Ghi Audit Log} (db.south);
+
+% Luồng kết nối ra ngoài
+\draw[rel] (ai) -- node[lab,above=2pt]{HTTPS / JSON} (ext_ai);
+\draw[rel] (db.east) -- node[lab,above=2pt]{Xuất bản} (ext_soc.west);
+
+% Tiêu đề hệ thống (Vẽ sau cùng để luôn nằm trên cùng layer)
+\node[font=\sffamily\bfseries\scriptsize,text=ictunavy,anchor=north west] at (0.6,2.35) {HỆ THỐNG QUẢN LÝ CHIẾN DỊCH MARKETING [Software System]};
+
+\end{tikzpicture}

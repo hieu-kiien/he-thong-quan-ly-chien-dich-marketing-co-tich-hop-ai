@@ -43,6 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: ListTodo,
       badge: tasksCount && tasksCount > 0 ? `${tasksCount}` : undefined
     },
+    { id: 'ai_studio', label: 'Xưởng Sáng Tạo AI', icon: Sparkles },
     { 
       id: 'reviews', 
       label: 'Hàng Đợi Phê Duyệt', 
@@ -126,6 +127,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             return (
               <button
                 key={item.id}
+                data-testid={`sidebar-tab-${item.id}`}
+                aria-label={item.label}
                 onClick={() => {
                   onSelectTab(item.id);
                   if (onClose) onClose();
