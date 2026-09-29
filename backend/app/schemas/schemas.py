@@ -195,6 +195,10 @@ class CampaignBase(BaseModel):
     start_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$") # YYYY-MM-DD
     end_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")   # YYYY-MM-DD
     budget: float = Field(0.0, ge=0.0)
+    key_message: Optional[str] = None
+    primary_cta: Optional[str] = None
+    target_kpi_name: Optional[str] = None
+    target_kpi_value: Optional[float] = None
 
     @field_validator("start_date", "end_date")
     @classmethod
@@ -222,6 +226,10 @@ class CampaignUpdate(BaseModel):
     end_date: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     budget: Optional[float] = Field(None, ge=0.0)
     status: Optional[str] = Field(None, pattern="^(DRAFT|PLANNED|ACTIVE|PAUSED|COMPLETED|ARCHIVED)$")
+    key_message: Optional[str] = None
+    primary_cta: Optional[str] = None
+    target_kpi_name: Optional[str] = None
+    target_kpi_value: Optional[float] = None
 
     @field_validator("start_date", "end_date")
     @classmethod
@@ -239,6 +247,34 @@ class CampaignUpdate(BaseModel):
             raise ValueError("Ngày kết thúc (end_date) không được nhỏ hơn ngày bắt đầu (start_date)")
         return self
 
+# --- BUDGET ALLOCATION ---
+class BudgetAllocationBase(BaseModel):
+    channel_id: int
+    planned_amount: float = Field(..., ge=0.0)
+
+class BudgetAllocationCreate(BudgetAllocationBase):
+    pass
+
+class BudgetAllocationResponse(BudgetAllocationBase):
+    id: int
+    campaign_id: int
+    channel: Optional[ChannelResponse] = None
+    model_config = ConfigDict(from_attributes=True)
+
+# --- KPI TARGET ---
+class KPITargetBase(BaseModel):
+    metric_name: str = Field(..., min_length=1, max_length=100)
+    target_value: float = Field(..., ge=0.0)
+    unit: str = Field("%", max_length=50)
+
+class KPITargetCreate(KPITargetBase):
+    pass
+
+class KPITargetResponse(KPITargetBase):
+    id: int
+    campaign_id: int
+    model_config = ConfigDict(from_attributes=True)
+
 class CampaignResponse(CampaignBase):
     id: int
     owner_id: int
@@ -247,7 +283,68 @@ class CampaignResponse(CampaignBase):
     updated_at: datetime
     owner: Optional[UserResponse] = None
     product: Optional[ProductResponse] = None
+    budget_allocations: Optional[List[BudgetAllocationResponse]] = None
+    kpi_targets: Optional[List[KPITargetResponse]] = None
     model_config = ConfigDict(from_attributes=True)
+
+# --- CAMPAIGN TASKS ---
+class TaskBase(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = None
+    task_type: str = Field("OTHER", pattern="^(CONTENT|DESIGN|VIDEO|ADS|RESEARCH|OTHER)$")
+    assignee_id: Optional[int] = None
+    status: str = Field("TODO", pattern="^(TODO|IN_PROGRESS|IN_REVIEW|DONE)$")
+    priority: str = Field("MEDIUM", pattern="^(LOW|MEDIUM|HIGH|URGENT)$")
+    due_date: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+    @field_validator("due_date")
+    @classmethod
+    def validate_date(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            try:
+                datetime.strptime(v, "%Y-%m-%d")
+            except ValueError:
+                raise ValueError(f"Ngày không hợp lệ: '{v}'. Định dạng yêu cầu là YYYY-MM-DD.")
+        return v
+
+class TaskCreate(TaskBase):
+    campaign_id: int
+    workspace_id: Optional[int] = None
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = None
+    task_type: Optional[str] = Field(None, pattern="^(CONTENT|DESIGN|VIDEO|ADS|RESEARCH|OTHER)$")
+    assignee_id: Optional[int] = None
+    status: Optional[str] = Field(None, pattern="^(TODO|IN_PROGRESS|IN_REVIEW|DONE)$")
+    priority: Optional[str] = Field(None, pattern="^(LOW|MEDIUM|HIGH|URGENT)$")
+    due_date: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+
+    @field_validator("due_date")
+    @classmethod
+    def validate_date(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            try:
+                datetime.strptime(v, "%Y-%m-%d")
+            except ValueError:
+                raise ValueError(f"Ngày không hợp lệ: '{v}'. Định dạng yêu cầu là YYYY-MM-DD.")
+        return v
+
+class TaskResponse(TaskBase):
+    id: int
+    campaign_id: int
+    workspace_id: int
+    creator_id: int
+    created_at: datetime
+    updated_at: datetime
+    assignee: Optional[UserResponse] = None
+    creator: Optional[UserResponse] = None
+    campaign: Optional[CampaignResponse] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class CampaignDetailResponse(CampaignResponse):
+    tasks: Optional[List[TaskResponse]] = None
 
 # --- MARKETING CONTENT ---
 class ContentCreate(BaseModel):
@@ -942,3 +1039,46 @@ class NotificationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+# --- COMMAND CENTER ---
+class CommandCenterAttentionItem(BaseModel):
+    id: str
+    type: str # "OVERDUE_TASK", "PENDING_APPROVAL", "BUDGET_OVERRUN", "CAMPAIGN_DEADLINE"
+    severity: str # "HIGH", "CRITICAL", "MEDIUM"
+    title: str
+    message: str
+    campaign_id: Optional[int] = None
+    campaign_name: Optional[str] = None
+    link: str
+    due_date: Optional[str] = None
+
+class CommandCenterMyWorkItem(BaseModel):
+    id: int
+    task_type: str
+    title: str
+    status: str
+    priority: str
+    due_date: Optional[str] = None
+    campaign_id: int
+    campaign_name: str
+    is_overdue: bool
+
+class CommandCenterCampaignHealth(BaseModel):
+    campaign_id: int
+    campaign_name: str
+    status: str
+    budget: float
+    spent: float
+    budget_utilization_pct: float
+    total_tasks: int
+    completed_tasks: int
+    overdue_tasks: int
+    health_status: str # "ON_TRACK", "AT_RISK", "CRITICAL"
+    health_score: int # 0 to 100
+    start_date: str
+    end_date: str
+
+class CommandCenterResponse(BaseModel):
+    attention_items: List[CommandCenterAttentionItem]
+    my_work_today: List[CommandCenterMyWorkItem]
+    campaigns_health: List[CommandCenterCampaignHealth]
+    summary_counts: Dict[str, int]

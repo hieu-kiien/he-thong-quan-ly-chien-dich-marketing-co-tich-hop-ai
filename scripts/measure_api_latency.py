@@ -40,6 +40,8 @@ BACKEND_DIR = ROOT_DIR / "backend"
 sys.path.insert(0, str(BACKEND_DIR))
 
 LIVE_DB_PATH = BACKEND_DIR / "marketing_campaigns.db"
+if not LIVE_DB_PATH.exists() and (BACKEND_DIR / "data" / "marketing_campaigns.db").exists():
+    LIVE_DB_PATH = BACKEND_DIR / "data" / "marketing_campaigns.db"
 EXPECTED_LIVE_SHA256 = "5283845BC15EFA66DEE866262229D6C003E56B2A45098CA692AC903DFF8BBB3B"
 
 
@@ -116,6 +118,9 @@ def run_benchmark():
         core_database.SessionLocal = BenchSessionLocal
 
         # Initialize schema compatibility & seed if needed
+        import app.models.entities
+        from seed.seed_data import init_db as seed_init_db
+        seed_init_db(reset=False, db_engine=bench_engine)
         core_database.ensure_sqlite_schema_compatibility(bench_engine)
 
         import app.main as app_main

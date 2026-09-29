@@ -43,10 +43,18 @@ export interface Campaign {
   end_date: string;
   budget: number;
   status: 'DRAFT' | 'PLANNED' | 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'ARCHIVED';
+  key_message?: string;
+  primary_cta?: string;
+  target_kpi_name?: string;
+  target_kpi_value?: number;
   created_at: string;
   updated_at: string;
   product?: Product;
+  tasks?: Task[];
+  budget_allocations?: BudgetAllocation[];
+  kpi_targets?: KPITarget[];
 }
+
 
 export interface Product {
   id: number;
@@ -438,5 +446,124 @@ export interface AppNotification {
   targetTab?: string;
   actionLabel?: string;
 }
+
+// --- TASK & OPERATIONS TYPES ---
+export type TaskType = 'CONTENT' | 'DESIGN' | 'VIDEO' | 'ADS' | 'RESEARCH' | 'OTHER';
+export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+
+export interface Task {
+  id: number;
+  campaign_id: number;
+  workspace_id: number;
+  creator_id: number;
+  assignee_id?: number | null;
+  title: string;
+  description?: string | null;
+  task_type: TaskType;
+  status: TaskStatus;
+  priority: TaskPriority;
+  due_date?: string | null;
+  created_at: string;
+  updated_at: string;
+  assignee?: User | null;
+  creator?: User | null;
+  campaign?: Campaign | null;
+}
+
+export interface TaskCreate {
+  title: string;
+  description?: string;
+  task_type?: TaskType;
+  assignee_id?: number | null;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  due_date?: string | null;
+}
+
+export interface TaskUpdate {
+  title?: string;
+  description?: string;
+  task_type?: TaskType;
+  assignee_id?: number | null;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  due_date?: string | null;
+}
+
+export interface BudgetAllocation {
+  id?: number;
+  campaign_id?: number;
+  channel_id: number;
+  planned_amount: number;
+  channel?: {
+    id: number;
+    code: string;
+    name: string;
+  };
+}
+
+export interface KPITarget {
+  id?: number;
+  campaign_id?: number;
+  metric_name: string;
+  target_value: number;
+  unit: string;
+}
+
+export interface CommandCenterAttentionItem {
+  id: string;
+  type: 'OVERDUE_TASK' | 'PENDING_APPROVAL' | 'BUDGET_OVERRUN' | 'CAMPAIGN_DEADLINE' | string;
+  severity: 'HIGH' | 'CRITICAL' | 'MEDIUM';
+  title: string;
+  message: string;
+  campaign_id?: number | null;
+  campaign_name?: string | null;
+  link: string;
+  due_date?: string | null;
+}
+
+export interface CommandCenterMyWorkItem {
+  id: number;
+  task_type: string;
+  title: string;
+  status: string;
+  priority: string;
+  due_date?: string | null;
+  campaign_id: number;
+  campaign_name: string;
+  is_overdue: boolean;
+}
+
+export interface CommandCenterCampaignHealth {
+  campaign_id: number;
+  campaign_name: string;
+  status: string;
+  budget: number;
+  spent: number;
+  budget_utilization_pct: number;
+  total_tasks: number;
+  completed_tasks: number;
+  overdue_tasks: number;
+  health_status: 'ON_TRACK' | 'AT_RISK' | 'CRITICAL';
+  health_score: number;
+  start_date: string;
+  end_date: string;
+}
+
+export interface CommandCenterResponse {
+  attention_items: CommandCenterAttentionItem[];
+  my_work_today: CommandCenterMyWorkItem[];
+  campaigns_health: CommandCenterCampaignHealth[];
+  summary_counts: {
+    total_active_campaigns: number;
+    total_my_tasks: number;
+    total_overdue_tasks: number;
+    total_pending_approvals: number;
+    critical_issues: number;
+    [key: string]: number;
+  };
+}
+
 
 

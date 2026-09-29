@@ -22,6 +22,8 @@ from app.api.v1.workspaces import router as workspaces_router
 from app.api.v1.brand_kit import router as brand_kit_router
 from app.api.v1.settings import router as settings_router
 from app.api.v1.notifications import router as notifications_router
+from app.api.v1.tasks import router as tasks_router
+
 
 
 @asynccontextmanager
@@ -88,6 +90,8 @@ app.include_router(workspaces_router, prefix=settings.API_V1_PREFIX)
 app.include_router(brand_kit_router, prefix=settings.API_V1_PREFIX)
 app.include_router(settings_router, prefix=settings.API_V1_PREFIX)
 app.include_router(notifications_router, prefix=settings.API_V1_PREFIX)
+app.include_router(tasks_router, prefix=settings.API_V1_PREFIX)
+
 
 
 from app.core.database import init_db, DatabaseMigrationError

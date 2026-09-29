@@ -5,9 +5,22 @@ Hệ thống được thiết kế và hiện thực hóa theo tiêu chuẩn cô
 
 ---
 
-## 1. Điểm Nổi bật Kiến trúc & Kỹ thuật Hệ thống (MarketFlow AI V9 Release)
+## 1. Cải Tổ Nền Tảng Vận Hành Tiếp Thị (Marketing Operations Platform Revamp)
 
-1. **Bảo mật Phân quyền Mức Bản ghi (Record-Level Authorization - NFR01)**:
+Khác biệt hoàn toàn với các "AI Prompt Demo" thông thường chỉ dừng ở việc gọi API sinh văn bản, **MarketFlow AI** được nâng cấp thành **Nền tảng Vận hành Tiếp thị B2B SaaS (Marketing Operations Platform)** giải quyết trực tiếp 4 bài toán sống còn mỗi ngày của doanh nghiệp:
+
+1. **Trung Tâm Điều Hành Tác Vụ (Operational Command Center)**:
+   - **Việc cần chú ý ngay (What Needs Attention)**: Tự động tổng hợp cảnh báo nguy kịch: chiến dịch thâm hụt ngân sách, tỷ lệ sinh lời ROAS dưới điểm hòa vốn (< 1.0x), tác vụ bị trễ hạn.
+   - **Tác vụ hôm nay của tôi (My Work Today)**: Danh sách công việc ưu tiên cao trong ngày của cá nhân, hỗ trợ 1-click đổi trạng thái trực tiếp từ Dashboard.
+   - **Sức khỏe chiến dịch xác định (Deterministic Health Score 0-100)**: Công thức toán học minh bạch dựa trên số tác vụ quá hạn, tỷ lệ vượt trần ngân sách kênh và tiến độ hoàn thành (hoàn toàn không để LLM suy đoán ngẫu nhiên).
+   - **Phân trang Tác Vụ Của Tôi (My Tasks Page)**: Trang quản lý tác vụ độc lập với bộ lọc đa chiều (trạng thái, độ ưu tiên, chiến dịch), thống kê thẻ KPI tức thì và modal tạo nhanh tác vụ.
+
+2. **Quản Trị Tác Vụ & Brief Vận Hành Định Lượng**:
+   - **Quản lý Tác vụ Chiến dịch (Campaign Tasks)**: 6 loại hình tác vụ tiếp thị chuyên sâu (`CONTENT`, `DESIGN`, `VIDEO`, `ADS`, `RESEARCH`, `OTHER`) với 4 cấp độ ưu tiên (`LOW`, `MEDIUM`, `HIGH`, `URGENT`).
+   - **Phân quyền cấp bản ghi (Record-Level RBAC)**: Người được giao việc (Assignee) chỉ có thể cập nhật trạng thái/tiến độ; Quản lý (Manager/Creator) có toàn quyền phân công và điều phối.
+   - **Brief & Mục tiêu Vận hành (Operational Brief & KPI Target)**: Quản lý thông điệp cốt lõi (Key Message), lời kêu gọi hành động (Primary CTA), chỉ tiêu định lượng (Target KPI Value & Name) và phân bổ ngân sách từng kênh (Channel Budget Allocation).
+
+3. **Bảo Mật Phân Quyền Mức Bản Ghi & Ranh Giới Đa Doanh Nghiệp (Multi-Tenant RBAC - NFR01)**:
    - Khắc phục triệt để lỗ hổng leo quyền ngang IDOR (Insecure Direct Object Reference).
    - Tài khoản vai trò **Marketer** chỉ có quyền xem, soạn nội dung, gọi AI và ghi nhận metrics trên các chiến dịch mà mình là người tạo (`owner_id`) hoặc được chỉ định thành viên thông qua bảng liên kết `CampaignMember`.
    - Tài khoản vai trò **Manager** có toàn quyền quản trị, duyệt nội dung và xem báo cáo tổng thể toàn doanh nghiệp.
@@ -223,7 +236,13 @@ pytest backend/tests/test_attribution_ai_doctor.py backend/tests/test_challenger
 # 6. Cài đặt BYOK, Bảo vệ & Xoay vòng khóa bí mật (R6):
 pytest backend/tests/test_settings_byok.py backend/tests/test_challenger_m6_2_boundary_stress.py -v
 
-# 7. Kiểm thử bảo mật mức bản ghi, State Machine & Đối kháng chuyên sâu:
+# 7. Quản trị Tác vụ Vận hành, Phân bổ Ngân sách & Command Center (Sprint 1-3):
+pytest backend/tests/test_tasks_and_operations.py -v
+
+# 8. Benchmark Kiểm định AI Grounding & Khử Ảo Giác (Sprint 4):
+python scripts/evaluate_ai_grounding.py
+
+# 9. Kiểm thử bảo mật mức bản ghi, State Machine & Đối kháng chuyên sâu:
 pytest backend/tests/test_backend_remediation.py backend/tests/test_extended_coverage.py backend/tests/test_ieee829_cases.py backend/tests/test_marketflow_deep_scenarios.py backend/tests/test_v3_security_and_state_machine.py backend/tests/test_adversarial_v3.py backend/tests/test_tier5_security_and_concurrency.py backend/tests/test_tier5_adversarial_hardening.py -v
 ```
 
@@ -264,11 +283,14 @@ npm run build
 
 ## 7. Hồ sơ Học thuật & Ma trận Truy xuất Nguồn gốc (Traceability Matrix)
 
-Tài liệu học thuật chính thức V9 được lưu trữ trong thư mục `Bao_Cao_AIA331_80300_ICTU_V9` và bản PDF gốc tại thư mục gốc dự án:
+Tài liệu học thuật chính thức V9 và hồ sơ bảo vệ đồ án đại học:
+* **Hướng dẫn Bảo vệ & Căn chỉnh Khung đánh giá Đại học**: `docs/UNIVERSITY_DEFENSE_RUBRIC_ALIGNMENT.md` (Giải trình chi tiết BTTX1, BTTX2, BTTX3 và 5 câu hỏi phản biện hội đồng).
+* **Báo cáo Thực nghiệm Đo lường AI Grounding**: `docs/AI_EVALUATION_REPORT.md` (100% Schema Adherence, 0.00% Hallucination, < 10ms p95 latency).
 * **Báo cáo PDF chính thức (62 trang)**:
   - Bản tại thư mục gốc: `Bao_Cao_AIA331_80300_ICTU_V9.pdf`
   - Bản trong thư mục tài liệu: `Bao_Cao_AIA331_80300_ICTU_V9/Bao_Cao_AIA331_80300_ICTU_V9.pdf` hoặc `Bao_Cao_AIA331_80300_ICTU_V9/main.pdf`
 * **Ma trận truy xuất nguồn gốc (RTM)**: `Bao_Cao_AIA331_80300_ICTU_V9/research_pack/requirements-traceability.csv`
   - 100% các yêu cầu chức năng (FR01--FR14) và yêu cầu phi chức năng (NFR01--NFR06) đạt trạng thái `IMPLEMENTED`, `TESTED`, `MEASURED`.
   - Ánh xạ trực tiếp tới từng file mã nguồn cài đặt và Test Case ID kiểm chứng cụ thể trong 817+ test cases.
+
 

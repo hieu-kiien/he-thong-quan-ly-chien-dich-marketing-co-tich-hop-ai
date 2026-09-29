@@ -8,6 +8,7 @@ import { ReviewQueue } from './pages/ReviewQueue';
 import { WorkflowCanvas } from './components/WorkflowCanvas';
 import { AIDrawer } from './components/AIDrawer';
 import { AIStudio } from './pages/AIStudio';
+import { MyTasksPage } from './pages/MyTasksPage';
 import { Settings } from './pages/Settings';
 import { MarketingCalendar } from './components/MarketingCalendar';
 import { LoginPage } from './pages/LoginPage';
@@ -19,7 +20,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WorkspaceProvider, useWorkspace } from './context/WorkspaceContext';
 import { Campaign, MarketingContent } from './types';
-import { campaignApi, contentApi, getApiErrorMessage, isOfflineDemoEnabled, isBackendConnected } from './services/api';
+import { campaignApi, contentApi, taskApi, getApiErrorMessage, isOfflineDemoEnabled, isBackendConnected } from './services/api';
 
 function AppContent() {
   const toast = useToast();
@@ -30,7 +31,9 @@ function AppContent() {
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [contents, setContents] = useState<MarketingContent[]>([]);
+  const [myTasksCount, setMyTasksCount] = useState<number>(0);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
   const [isBrandKitModalOpen, setIsBrandKitModalOpen] = useState<boolean>(false);
@@ -57,12 +60,14 @@ function AppContent() {
 
   const loadCampaignsAndContents = useCallback(async (wsId?: number) => {
     try {
-      const [cList, ctList] = await Promise.all([
+      const [cList, ctList, myTasks] = await Promise.all([
         campaignApi.getAll(undefined, undefined, wsId),
-        contentApi.getAll(undefined, undefined, wsId)
+        contentApi.getAll(undefined, undefined, wsId),
+        taskApi.getMyTasks({ include_completed: false }).catch(() => [])
       ]);
       setCampaigns(cList);
       setContents(ctList);
+      setMyTasksCount(myTasks.length);
       if (cList.length > 0) {
         setSelectedCampaign(cList[0]);
       } else {
@@ -147,7 +152,9 @@ function AppContent() {
         onLogout={logout}
         isOpen={isMobileSidebarOpen}
         onClose={() => setIsMobileSidebarOpen(false)}
+        tasksCount={myTasksCount}
       />
+
 
       {/* Main Content Viewport */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -264,9 +271,24 @@ function AppContent() {
             </div>
           )}
 
+          {currentTab === 'my_tasks' && (
+            <MyTasksPage
+              onNavigateToCampaign={(cId) => {
+                const c = campaigns.find(x => x.id === cId);
+                if (c) {
+                  setSelectedCampaign(c);
+                  setCurrentTab('workflow');
+                } else {
+                  setCurrentTab('campaigns');
+                }
+              }}
+            />
+          )}
+
           {currentTab === 'reviews' && (
             <ReviewQueue userRole={userRole || undefined} />
           )}
+
 
           {currentTab === 'ai_studio' && (
             <AIStudio

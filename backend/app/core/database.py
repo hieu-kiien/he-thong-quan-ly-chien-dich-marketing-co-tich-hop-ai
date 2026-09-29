@@ -202,6 +202,33 @@ def ensure_sqlite_schema_compatibility(db_engine=engine):
                 if "is_active" not in key_cols:
                     conn.exec_driver_sql("ALTER TABLE custom_api_keys ADD COLUMN is_active BOOLEAN DEFAULT 1")
 
+            # 3. Bổ sung các cột Brief & Target cho campaigns (Idempotent Migration)
+            res_camp = conn.exec_driver_sql("PRAGMA table_info(campaigns)")
+            camp_cols = [row[1] for row in res_camp.fetchall()]
+            if camp_cols:
+                if "key_message" not in camp_cols:
+                    conn.exec_driver_sql("ALTER TABLE campaigns ADD COLUMN key_message TEXT")
+                if "primary_cta" not in camp_cols:
+                    conn.exec_driver_sql("ALTER TABLE campaigns ADD COLUMN primary_cta VARCHAR(255)")
+                if "target_kpi_name" not in camp_cols:
+                    conn.exec_driver_sql("ALTER TABLE campaigns ADD COLUMN target_kpi_name VARCHAR(50)")
+                if "target_kpi_value" not in camp_cols:
+                    conn.exec_driver_sql("ALTER TABLE campaigns ADD COLUMN target_kpi_value NUMERIC(12, 2)")
+
+            # 4. Tạo bảng mới cho Tasks, Budget Allocations, KPI Targets (Zero Migration Failure)
+            from app.models.entities import Task, CampaignBudgetAllocation, CampaignKPITarget
+            table_task_check = conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='campaign_tasks'")
+            if not table_task_check.fetchone():
+                Task.__table__.create(bind=conn)
+
+            table_budget_check = conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='campaign_budget_allocations'")
+            if not table_budget_check.fetchone():
+                CampaignBudgetAllocation.__table__.create(bind=conn)
+
+            table_kpi_check = conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='campaign_kpi_targets'")
+            if not table_kpi_check.fetchone():
+                CampaignKPITarget.__table__.create(bind=conn)
+
             # Backfill tenant: gán workspace_id cho dữ liệu legacy còn NULL để không
             # rơi vào vùng fail-closed của tầng phân quyền (idempotent, bọc try/except).
             _backfill_tenant_workspace_ids(db_engine=db_engine, conn=conn)

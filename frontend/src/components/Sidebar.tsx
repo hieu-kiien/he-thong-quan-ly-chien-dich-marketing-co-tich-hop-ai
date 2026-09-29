@@ -10,7 +10,8 @@ import {
   ShieldCheck,
   X,
   Settings,
-  Calendar
+  Calendar,
+  ListTodo
 } from 'lucide-react';
 import { User } from '../types';
 
@@ -21,6 +22,7 @@ interface SidebarProps {
   onLogout: () => void;
   isOpen?: boolean;
   onClose?: () => void;
+  tasksCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
@@ -29,11 +31,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentUser,
   onLogout,
   isOpen = false,
-  onClose
+  onClose,
+  tasksCount
 }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Bảng Điều Khiển', icon: LayoutDashboard },
     { id: 'campaigns', label: 'Quản Lý Chiến Dịch', icon: Megaphone, highlight: true },
+    { 
+      id: 'my_tasks', 
+      label: 'Tác Vụ Của Tôi', 
+      icon: ListTodo,
+      badge: tasksCount && tasksCount > 0 ? `${tasksCount}` : undefined
+    },
     { 
       id: 'reviews', 
       label: 'Hàng Đợi Phê Duyệt', 
@@ -41,9 +50,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: currentUser?.role === 'MANAGER' || currentUser?.role === 'AGENCY_MANAGER' ? 'Duyệt bài' : undefined 
     },
     { id: 'calendar', label: 'Lịch Xuất Bản', icon: Calendar },
-    { id: 'ai_studio', label: 'Xưởng Sáng Tạo AI', icon: Sparkles },
     { id: 'settings', label: 'Cài Đặt & Brand Kit', icon: Settings }
   ];
+
 
   return (
     <>

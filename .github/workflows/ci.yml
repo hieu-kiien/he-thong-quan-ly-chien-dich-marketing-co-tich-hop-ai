@@ -50,7 +50,7 @@ jobs:
           pip install -r backend/requirements.txt
 
       - name: Install coverage tooling
-        run: pip install pytest-cov
+        run: pip install pytest-cov pytest-timeout
 
       - name: Run Full Backend Test Suite (pytest backend/tests/ -v)
         run: pytest backend/tests/ -v --timeout=180 --timeout-method=thread --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=0
@@ -392,6 +392,9 @@ jobs:
 
       - name: Run performance and API latency benchmark (measure_api_latency.py)
         run: python scripts/measure_api_latency.py
+
+      - name: Run AI Grounding, Schema Adherence, and Anti-Hallucination benchmark (evaluate_ai_grounding.py)
+        run: python scripts/evaluate_ai_grounding.py
 
   # =========================================================================
   # Gate 6: Secret & Dependency Safety
