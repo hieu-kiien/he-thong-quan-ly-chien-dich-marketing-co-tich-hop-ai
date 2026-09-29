@@ -137,6 +137,36 @@ def encrypt_api_key(plain_key: str) -> str:
     return encrypted_bytes.decode("utf-8")
 
 
+def _is_canonical_fernet_token(token: str) -> bool:
+    """Kiểm tra chuỗi ciphertext có đúng cấu trúc Fernet chuẩn hay không.
+
+    Cấu trúc byte của một Fernet token hợp lệ:
+        version(1) || timestamp(8) || IV(16) || ciphertext(N*16) || HMAC(32)
+
+    nên tổng độ dài luôn là 57 + k*16. Bất kỳ độ dài nào khác (bị cắt cụt, bị
+    nối thêm rác, bị chèn padding) đều bị từ chối trước khi gọi MultiFernet.
+
+    Việc kiểm tra này là bắt buộc vì hành vi của thư viện `cryptography` khác nhau
+    giữa các phiên bản với input base64 không chuẩn: một số bản bỏ qua phần đuôi
+    thừa, khiến ciphertext bị can thiệp lọt qua thay vì bị từ chối.
+    """
+    if not token or not token.isascii():
+        return False
+    try:
+        raw = base64.urlsafe_b64decode(token.encode("ascii"))
+    except Exception:
+        return False
+    if len(raw) < 57:
+        return False
+    if raw[0] != 0x80:  # version byte
+        return False
+    if (len(raw) - 57) % 16 != 0:  # ciphertext luôn là bội số của 16 byte
+        return False
+    # base64 phải ở dạng chuẩn hóa: mọi byte thừa đều bị phát hiện ở bước trên,
+    # bước này chỉ chặn padding/ký tự thừa mà vẫn giải mã được.
+    return base64.urlsafe_b64encode(raw).decode("ascii") == token
+
+
 def decrypt_api_key(encrypted_key: str) -> str:
     """Giải mã chuỗi ciphertext về khóa API gốc sử dụng MultiFernet.
     
@@ -146,9 +176,12 @@ def decrypt_api_key(encrypted_key: str) -> str:
     """
     if not encrypted_key or not encrypted_key.strip():
         raise ValueError("Chuỗi khóa mã hóa không hợp lệ.")
+    token = encrypted_key.strip()
+    if not _is_canonical_fernet_token(token):
+        raise ValueError("Tampered or invalid key")
     cipher = get_multi_fernet()
     try:
-        decrypted_bytes = cipher.decrypt(encrypted_key.strip().encode("utf-8"))
+        decrypted_bytes = cipher.decrypt(token.encode("utf-8"))
         return decrypted_bytes.decode("utf-8")
     except (InvalidToken, Exception) as exc:
         raise ValueError("Tampered or invalid key") from exc
