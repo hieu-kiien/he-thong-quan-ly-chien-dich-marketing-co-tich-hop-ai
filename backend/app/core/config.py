@@ -30,9 +30,11 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     
     # CORS Origins
-    # 4173 là cổng `vite preview` mà Playwright dùng làm baseURL
-    # (xem frontend/playwright.config.ts). Không khai báo origin này thì MỌI request
-    # API của bộ test E2E chạy trên backend thật (E2E_MODE=live) sẽ bị CORS chặn.
+    # 4173 la cong `vite preview` mac dinh cua Playwright. Workflow CI cap rieng
+    # mot port cho MOI invocation (4173 mock, 4174 live, 4175 probes, 4180 WCAG)
+    # de cac lan chay khong trung port, nen danh sach origin E2E phai bao phu
+    # tap cac cong do. Neu thieu, moi request API cua bo test E2E chay tren
+    # backend that (E2E_MODE=live) se bi CORS chan.
     ALLOWED_ORIGINS: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
@@ -42,6 +44,13 @@ class Settings(BaseSettings):
         "http://127.0.0.1:8080",
         "http://localhost:4173",
         "http://127.0.0.1:4173",
+        # Cong rieng cho cac invocation Playwright khac trong CI (xem .github/workflows/ci.yml).
+        "http://localhost:4174",
+        "http://127.0.0.1:4174",
+        "http://localhost:4175",
+        "http://127.0.0.1:4175",
+        "http://localhost:4180",
+        "http://127.0.0.1:4180",
         "http://localhost",
         "http://localhost:80",
         "https://kienhieu.id.vn",

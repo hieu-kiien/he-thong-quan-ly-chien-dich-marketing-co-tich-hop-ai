@@ -1,4 +1,4 @@
-import { test, expect, Page, STORAGE_STATES } from './e2e/fixtures/auth.fixture';
+import { test, expect, Page, STORAGE_STATES, storageStateForCurrentOrigin } from './e2e/fixtures/auth.fixture';
 import { setupMockApiRoutes, INITIAL_CONTENTS, INITIAL_CAMPAIGNS, USERS } from './e2e/fixtures/mock-api';
 
 /**
@@ -586,7 +586,7 @@ test.describe('Milestone M6: Adversarial Interaction Probes & Visual Testing Loo
 
       // --- PHASE 1: MARKETER PREPARES / SUBMITS CONTENT ---
       const marketerContext = await browser.newContext({
-        storageState: STORAGE_STATES.marketer,
+        storageState: storageStateForCurrentOrigin(STORAGE_STATES.marketer),
         locale: 'vi-VN',
         timezoneId: 'Asia/Ho_Chi_Minh',
       });
@@ -614,7 +614,7 @@ test.describe('Milestone M6: Adversarial Interaction Probes & Visual Testing Loo
 
       // --- PHASE 2: MANAGER APPROVES CONTENT ---
       const managerContext = await browser.newContext({
-        storageState: STORAGE_STATES.manager,
+        storageState: storageStateForCurrentOrigin(STORAGE_STATES.manager),
         locale: 'vi-VN',
         timezoneId: 'Asia/Ho_Chi_Minh',
       });

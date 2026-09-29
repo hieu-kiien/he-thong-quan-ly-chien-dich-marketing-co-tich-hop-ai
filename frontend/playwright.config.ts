@@ -22,6 +22,14 @@ import { defineConfig, devices } from '@playwright/test';
 const E2E_MODE = (process.env.E2E_MODE || 'mock').toLowerCase();
 const IS_LIVE = E2E_MODE === 'live';
 
+// Port preview phai co the tach biet cho TUNG invocation Playwright.
+// Playwright kiem tra `webServer.url` TRUOC khi chay command, va neu port
+// con bi giu boi invocation truoc do no abort ngay voi "is already used" - hanh
+// dong nay chay truoc `killPort` cua start-e2e.mjs nen script khong bao gio
+// co co hoi dua port. Moi luon chay trong mot workflow deu phai cap port rieng.
+const FRONTEND_PORT = Number(process.env.E2E_FRONTEND_PORT || 4173);
+const BASE_URL = `http://127.0.0.1:${FRONTEND_PORT}`;
+
 // Live mode phai build + khoi dong uvicorn + doi database truoc khi test bat dau,
 // nen budget thoi gian cho webServer lon hon nhieu lan so voi mock mode.
 const WEBSERVER_TIMEOUT_MS = Number(
@@ -32,7 +40,7 @@ if (process.env.E2E_LOG_MODE !== '0') {
   // eslint-disable-next-line no-console
   console.log(
     `[playwright] E2E_MODE=${E2E_MODE} (${IS_LIVE ? 'du lieu that, backend that' : 'du lieu gia, khong backend'})` +
-      ` | webServer timeout=${WEBSERVER_TIMEOUT_MS}ms | baseURL=http://127.0.0.1:4173`
+      ` | webServer timeout=${WEBSERVER_TIMEOUT_MS}ms | baseURL=${BASE_URL}`
   );
 }
 
@@ -51,7 +59,7 @@ export default defineConfig({
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
   ],
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: BASE_URL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'off',
@@ -77,10 +85,14 @@ export default defineConfig({
   ],
   webServer: {
     command: 'node scripts/start-e2e.mjs',
-    url: 'http://127.0.0.1:4173',
+    url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: WEBSERVER_TIMEOUT_MS,
     stdout: 'pipe',
     stderr: 'pipe',
+    env: {
+      ...process.env,
+      E2E_FRONTEND_PORT: String(FRONTEND_PORT),
+    },
   },
 });

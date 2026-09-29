@@ -1,5 +1,6 @@
 import { test as base, Page, Browser, BrowserContext } from '@playwright/test';
 import * as path from 'path';
+import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { setupMockApiRoutes, USERS, MockUser } from './mock-api';
 
@@ -50,6 +51,46 @@ export const STORAGE_STATES = {
   approver: path.join(AUTH_DIR, 'client-approver.json'),
   agencyManager: path.join(AUTH_DIR, 'agency-manager.json'),
 };
+
+/**
+ * Origin cua frontend trong lan chay hien tai.
+ *
+ * Doc tu `E2E_FRONTEND_PORT` (mot bien moi ma moi invocation Playwright trong CI
+ * duoc cap) thay vi hardcode, de storage state khong phu thuoc mot port co dinh.
+ */
+function currentBaseURL(): string {
+  const port = Number(process.env.E2E_FRONTEND_PORT || 4173);
+  return `http://127.0.0.1:${port}`;
+}
+
+/**
+ * Storage state cho origin HIEN TAI.
+ *
+ * Playwright chi ap dung `storageState` cho origin ghi trong file, nen mot file
+ * commit cung voi `origin` cu nhan (vid du 4173) se bi bo qua hoan toan khi
+ * chay o port khac - app thoi sang trang dang nhap va moi test tuy thuoc
+ * storage state deu do la fail, du backend va app hoan toan binh thuong.
+ *
+ * Do workflow can nhieu invocation Playwright chay song song tren cac port
+ * khac nhau de tranh trung port, phai sinh storage state theo `baseURL` hien tai
+ * thay vi dua vao mot port co dinh. Noi dung localStorage trong file goc duoc
+ * giu nguyen; chi `origin` duoc gan lai.
+ */
+export function storageStateForCurrentOrigin(file: string) {
+  const raw = readFileSync(file, 'utf-8');
+  const state = JSON.parse(raw) as {
+    cookies?: unknown[];
+    origins?: { localStorage?: unknown[] }[];
+  };
+  const baseURL = process.env.E2E_BASE_URL || currentBaseURL();
+  const origins = (state.origins ?? []).map((o) => ({ ...o, origin: baseURL }));
+  if (origins.length === 0) {
+    throw new Error(
+      `Auth storage state ${file} khong co origin nao de gan lai baseURL ${baseURL}.`
+    );
+  }
+  return { ...state, origins };
+}
 
 type AuthFixtures = {
   marketerPage: Page;
@@ -129,7 +170,10 @@ async function createRolePageWithCleanup(
     return { context, page };
   }
 
-  const context = await browser.newContext({ ...baseOptions, storageState: STORAGE_STATES[storageStateKey] });
+  const context = await browser.newContext({
+    ...baseOptions,
+    storageState: storageStateForCurrentOrigin(STORAGE_STATES[storageStateKey]),
+  });
   const page = await context.newPage();
   await setupMockApiRoutes(page, { userRole: setup.mockUserRole });
   await page.goto('/');

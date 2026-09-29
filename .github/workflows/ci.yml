@@ -162,8 +162,19 @@ jobs:
           echo "   Lan chay 2: E2E_MODE=live  -> uvicorn that + SQLite that, KHONG intercept API"
           echo "               (probe backend-health + live-backend.spec.ts)"
           echo "   Backend that: http://127.0.0.1:8000 (do scripts/start-e2e.mjs bat)"
-          echo "   Frontend:    http://127.0.0.1:4173"
+          echo "   Frontend:    http://127.0.0.1:4173 (lan 1) / 4174 (lan 2) / 4175 (probes)"
           echo "=============================================================="
+
+      # Playwright Kiem tra webServer.url TRUOC khi chay command. Neu port con
+      # bi giu boi invocation truoc, no abort ngay ("is already used") va
+      # scripts/start-e2e.mjs khong bao gio co co hoi dua port. Cap port rieng
+      # cho tung invocation la cach loai bo hoan toan xung dot nay.
+      - name: Free stale E2E ports before the first run
+        run: |
+          for p in 4173 4174 4175 4180 8000; do
+            fuser -k -9 ${p}/tcp 2>/dev/null || true
+          done
+          echo "Stale E2E ports cleared."
 
       # ---------------------------------------------------------------------
       # Lan chay 1: MOCK - toan bo tests/e2e (UI regression nhanh, offline).
@@ -175,6 +186,7 @@ jobs:
         env:
           E2E_MODE: mock
           E2E_LOG_MODE: "1"
+          E2E_FRONTEND_PORT: "4173"
 
       # ---------------------------------------------------------------------
       # Lan chay 2: LIVE - backend that, khong intercept API.
@@ -188,6 +200,7 @@ jobs:
           E2E_MODE: live
           E2E_LOG_MODE: "1"
           E2E_BACKEND_PORT: "8000"
+          E2E_FRONTEND_PORT: "4174"
           E2E_PYTHON: python
           PYTHONUNBUFFERED: "1"
 
@@ -219,6 +232,7 @@ jobs:
         env:
           E2E_MODE: mock
           E2E_LOG_MODE: "1"
+          E2E_FRONTEND_PORT: "4175"
 
       - name: Upload Playwright E2E artifact report on failure
         if: failure()
@@ -235,13 +249,15 @@ jobs:
   # khoi dong duoc (mo truong CI doc, port bi chiem...) thi FALLBACK ve mock
   # va ghi ro vao log - khong bao gio "pass" xanh khi khong co gi kiem chung.
   #
-  # LUU Y (cap nhat 2026-09-28): Gate nay CHAY DO tren du lieu that va dang
-  # FAIL that vi mot loi WCAG CO SAN trong app khong lien quan den E2E:
-  # `AttributionTrendChart.tsx` render `<rect aria-label="...">` ma khong co
-  # `role` -> axe bao loi `aria-prohibited-attr` muc SERIOUS. Loi nay da ton tai
-  # o ca E2E_MODE=mock truoc khi sua doi nay, nen day la loi that chu khong phai
-  # do hien thuc. Gate 4 se xanh lai khi them `role="img"` (hoac bo aria-label
-  # va dung <title>/<desc>) cho cac <rect> do.
+  # Cap rieng E2E_FRONTEND_PORT (khac 4173 cua Gate 3) de khong bao gio trung
+  # port voi cac invocation Playwright khac trong cung mot workflow.
+  #
+  # Trang thai hien tai: gate nay XANH tren du lieu that. Hai loi WCAG da duoc
+  # sua tai app (khong phai dua test): mau chu text-slate-400 (#94a3b8, tuong
+  # phan 2.56:1 tren nen trang) da doi sang text-slate-500 (4.76:1), va 4 vung
+  # bang cua chay ngang da duoc them role/aria-label/tabIndex de ban phim
+  # truy cap duoc theo WCAG 2.1.1. Ket qua do la 0 violation muc
+  # critical/serious tren ca 5 viewport.
   # =========================================================================
   wcag-accessibility-audit:
     name: "Gate 4: WCAG 2.2 AA Accessibility Audit Gate"
@@ -303,7 +319,7 @@ jobs:
           echo " Gate 4 - WCAG 2.2 AA"
           echo "   Che do uu tien: E2E_MODE=live (du lieu that)"
           echo "   Backend that:   http://127.0.0.1:8000/health"
-          echo "   Frontend:       http://127.0.0.1:4173"
+          echo "   Frontend:       http://127.0.0.1:4180"
           echo "=============================================================="
 
       - name: "WCAG audit - E2E_MODE=live (readiness probe + wcag.spec.ts)"
@@ -313,6 +329,7 @@ jobs:
           E2E_MODE: live
           E2E_LOG_MODE: "1"
           E2E_BACKEND_PORT: "8000"
+          E2E_FRONTEND_PORT: "4180"
           E2E_PYTHON: python
           PYTHONUNBUFFERED: "1"
 
