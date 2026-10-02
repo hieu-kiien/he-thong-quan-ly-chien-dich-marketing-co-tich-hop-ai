@@ -4,19 +4,19 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-09-25",
   "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    // Backend FastAPI chay o Render. Worker proxy /api/* va /health sang day.
+    // Gia tri mac dinh la domain cua Render; doi o day neu backend doi ten.
+    // KHONG dat trong `secrets`: day la dia chi cong khai, khong phai bi mat.
+    // Ghi chu: dong comment phai nam TREN gia tri, vi comment cung hang
+    // duoc bo qua khi parse JSONC.
+    "BACKEND_ORIGIN": "https://marketflow-api.onrender.com"
+  },
   "secrets": {
-    "required": [
-      "SECRET_KEY",
-      "JWT_SECRET_KEY",
-      "BYOK_ENCRYPTION_KEY",
-      "AI_API_KEY",
-      "MARKETFLOW_MANAGER_PASSWORD",
-      "MARKETFLOW_MARKETER_PASSWORD",
-      "MARKETFLOW_APPROVER_PASSWORD",
-      // Cron 5 phút/lần gọi POST /api/v1/schedules/trigger-worker. Thiếu
-      // secret này thì scheduler bỏ qua mọi lần chạy (có log cảnh báo).
-      "SCHEDULER_SECRET"
-    ]
+    // Chi con hai secret. Secret key/AI key/password da chuyen sang bien moi
+    // truong cua Render (render.yaml) — Worker khong can chung them nua.
+    // BACKEND_ORIGIN nam trong `vars` o tren.
+    "required": ["SCHEDULER_SECRET"]
   },
   "assets": {
     "directory": "../frontend/dist",
@@ -24,38 +24,14 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*", "/health"]
   },
-  "containers": [
-    {
-      "class_name": "FastApiContainer",
-      "image": "../backend/cloudflare.Dockerfile",
-      "max_instances": 1
-    }
-  ],
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "API",
-        "class_name": "FastApiContainer"
-      }
-    ]
-  },
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_sqlite_classes": ["FastApiContainer"]
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "DATABASE_BACKUPS",
-      "bucket_name": "marketflow-production-data"
-    }
-  ],
-  // Cron Trigger đẩy việc xử lý lịch đăng xuống Durable Object.
-  // Bắt buộc vì scheduler trong container đã bị tắt (SCHEDULER_ENABLED=false) để
-  // các thay đổi do scheduler ghi vào SQLite luôn được snapshot lên R2. Thiếu
-  // trigger này thì lịch đăng sẽ không bao giờ chạy trên Cloudflare.
+  // Khong con `containers` / `durable_objects` / `r2_buckets`:
+  // tai khoan nay khong co Workers Paid plan nen Cloudflare Containers khong
+  // deploy duoc (tra 401 "requires the Workers Paid plan"). Da xac nhan bang
+  // len deploy that: Worker upload duoc nhung moi route /api/* tra 404 vi
+  // container khong khoi dong. Backend chay o Render thay cho.
   "triggers": {
+    // Scheduler chay trong container cua Render nen bi tu tat; Worker danh thuc
+    // no moi 5 phut qua POST /api/v1/schedules/trigger-worker.
     "crons": ["*/5 * * * *"]
   },
   "routes": [

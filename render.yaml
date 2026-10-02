@@ -1,0 +1,96 @@
+# =============================================================================
+# Render Blueprint — backend FastAPI của MarketFlow AI
+#
+# VÌ SAO CẦN FILE NÀY
+# Cloudflare Worker chỉ phục vụ frontend tĩnh + proxy /api/*, không chạy được
+# backend trong Cloudflare Containers vì tài khoản này không có Workers Paid
+# plan (Cloudflare trả 401 "requires the Workers Paid plan"). Backend chạy ở đây.
+#
+# CÁCH DÙNG
+#   1. Đẩy code lên GitHub (đã làm).
+#   2. Render Dashboard → New → Blueprint → chọn repo này → Apply.
+#      Render đọc file này và tự tạo service.
+#   3. Trong dashboard, điền các giá trị `sync: false` (Render sẽ báo thiếu):
+#      - SECRET_KEY, JWT_SECRET_KEY, BYOK_ENCRYPTION_KEY
+#      - AI_API_KEY
+#      - SCHEDULER_SECRET
+#      Ba mật khẩu demo có thể để trống rồi sinh sau; xem README mục "Tài khoản demo".
+#   4. Lấy URL service (vd https://marketflow-api.onrender.com), dán vào
+#      `BACKEND_ORIGIN` trong cloudflare/wrangler.jsonc, rồi `npm run deploy`.
+#   5. Thêm CORS: Render tự thêm domain của service vào danh sách? KHÔNG —
+#      phải tự thêm vào ALLOWED_ORIGIN_REGEXES trong backend/app/core/config.py
+#      (đã có sẵn regex cho *.onrender.com).
+#
+# LƯU Ý SQLite + DISK
+#   Database là SQLite trong /app/data. Render chỉ giữ được dữ liệu khi gắn
+#   Persistent Disk; không gắn thì mọi thay đổi mất khi service restart/deploy
+#   lại (filesystem là ephemeral). Blueprint dưới đây đã khai báo disk.
+#   Free plan KHÔNG cho gắn disk → phải dùng plan có disk (Starter trở lên).
+#   Nếu cần plan free để demo: bỏ `disk:` và chấp nhận dữ liệu mất mỗi lần
+#   restart, hoặc đổi DATABASE_URL sang Postgres (repo đã có psycopg2-binary).
+# =============================================================================
+
+services:
+  - type: web
+    name: marketflow-api
+    runtime: python
+    plan: starter
+    region: singapore
+    # Không đổi `dockerfile` -> Render tự dò. Dockerfile nằm ở backend/Dockerfile
+    # nên phải chỉ rõ rootDir.
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    # SQLite cần nhiều thời gian cold-start; Render cần biet khi nao service
+    # da san sang. Timeout mac dinh la 30s, dat 60s cho phep.
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: API_V1_PREFIX
+        value: /api/v1
+
+      # SQLite nam tren persistent disk.
+      - key: DATABASE_URL
+        value: sqlite:////app/data/marketing_campaigns.db
+      - key: MARKETFLOW_DATA_DIR
+        value: /app/data
+
+      # --- AI that: OpenCode Zen ---
+      # AI_BASE_URL mac dinh trong config.py la Gemini. Backend tren Render
+      # phai tro ve OpenCode de khop voi cai da deploy o local/CI.
+      - key: AI_PROVIDER
+        value: opencode
+      - key: AI_BASE_URL
+        value: https://opencode.ai/zen/v1
+      - key: AI_MODEL
+        value: space-bunny-free
+      # OpenCode zen phai 83-214 giay cho mot lan goi. Mac dinh 10 giay se
+      # fail lien tuc; dat 420 nhu da xac nhan khi chay that.
+      - key: AI_TIMEOUT_SECONDS
+        value: "420"
+      - key: AI_ENABLE_FALLBACK
+        value: "true"
+
+      # --- Biat khoa gia tri ngay tu Render Dashboard ---
+      - key: SECRET_KEY
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: BYOK_ENCRYPTION_KEY
+        sync: false
+      - key: AI_API_KEY
+        sync: false
+      - key: SCHEDULER_SECRET
+        sync: false
+      - key: MARKETFLOW_MANAGER_PASSWORD
+        sync: false
+      - key: MARKETFLOW_MARKETER_PASSWORD
+        sync: false
+      - key: MARKETFLOW_APPROVER_PASSWORD
+        sync: false
+
+    disk:
+      name: marketflow-data
+      mountPath: /app/data
+      sizeGB: 1
