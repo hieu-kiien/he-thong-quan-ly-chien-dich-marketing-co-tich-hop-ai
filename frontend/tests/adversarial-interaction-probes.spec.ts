@@ -430,14 +430,22 @@ test.describe('Milestone M6: Adversarial Interaction Probes & Visual Testing Loo
 
       let awakeningRequestDelayed = false;
 
-      // Intercept campaigns endpoint to introduce 4200ms latency (exceeds the 3500ms cold-start threshold in api.ts)
-      await page.route('**/api/v1/campaigns**', async (route) => {
+      // Giữ chậm request 4.2s để vượt ngưỡng 3.5s trong `api.ts`.
+      //
+      // Phải dùng `route.fallback()` chứ không phải `route.continue()`. Handler ở
+      // đây được đăng ký SAU `**/api/v1/**` của mock nên nó chạy trước; `continue`
+      // bỏ qua toàn bộ handler còn lại và gửi thẳng ra network thật, nơi không có
+      // backend và trả 401. 401 đó làm `api.ts` xoá token, bắn
+      // `auth:unauthorized`, `AuthProvider` remount và huỷ các request đang chờ
+      // — bộ đếm về 0, timer đánh thức bị xoá, banner không kịp hiện. `fallback`
+      // chuyển xử lý về đúng lớp mock nên dữ liệu vẫn là dữ liệu, chỉ chậm lại.
+      await page.route('**/api/v1/analytics/dashboard**', async (route) => {
         if (!awakeningRequestDelayed && route.request().method() === 'GET') {
           awakeningRequestDelayed = true;
           // Hold request for 4.2 seconds simulating cold-start container spinup
           await new Promise(resolve => setTimeout(resolve, 4200));
         }
-        return route.continue();
+        return route.fallback();
       });
 
       // Navigate to app; triggers campaigns fetch with delay
@@ -473,13 +481,14 @@ test.describe('Milestone M6: Adversarial Interaction Probes & Visual Testing Loo
       await navigateToCampaigns(page);
 
       let delayedRequestFired = false;
+      // `fallback` chứ không phải `continue`: xem giải thích ở Cold-Start Probe.
       await page.route('**/api/v1/analytics/dashboard**', async (route) => {
         if (!delayedRequestFired && route.request().method() === 'GET') {
           delayedRequestFired = true;
           // Hold request for 4.2 seconds to exercise server-awakening timer
           await new Promise(resolve => setTimeout(resolve, 4200));
         }
-        return route.continue();
+        return route.fallback();
       });
 
       // Navigate to Dashboard

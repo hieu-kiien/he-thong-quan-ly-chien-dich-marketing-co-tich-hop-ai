@@ -95,7 +95,16 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="h-16 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-3 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-20 shadow-sm text-slate-100 no-print">
+    // `min-h-16` + `flex-wrap` thay cho `h-16` cứng. Ở viewport 320px @ zoom 200%
+    // (160 CSS px) header cần ~220px cho [hamburger + switcher + AI + chuông +
+    // theme + logout]: với `h-16` cứng các nút vượt mép trái và CHỒNG LÊN nhau
+    // (18 vùng chồng lấn, WCAG 2.5.8). Cho phép xuống hàng giữ mọi nút bấm được
+    // thay vì hy sinh chức năng nào; ở kích thước bình thường vẫn là một hàng.
+    // Nền header phải đục (không phai) mới tính được độ tương phản: với
+    // `bg-slate-900/90` + `backdrop-blur`, axe không xác định được màu nền hiệu
+    // dụng và lấy nhầm nền sáng của trang, khiến mọi chữ màu nhạt trong header bị
+    // báo fail. Đục hoàn toàn giữ đúng ý đồ thiết kế và cho tỷ lệ ổn định.
+    <header className="min-h-16 py-1.5 sm:py-0 bg-slate-900 border-b border-slate-800 px-3 sm:px-6 sm:h-16 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 sticky top-0 z-20 shadow-sm text-slate-100 no-print">
       {/* Left Area: Mobile Hamburger + Workspace Switcher + Search Input
 
           `flex-1 min-w-0` là bắt buộc, không phải mỹ thuật: vùng bên phải (nút
@@ -103,7 +112,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           thì con KHÔNG co lại được và tràn ra ngoài — đã xảy ra thật: nút chuyển
           workspace rộng 214px trong container 179px làm ô tìm kiếm bị bóp còn 70px
           và nút "Brand Kit" CHỒNG LÊN ô tìm kiếm (không bấm được). */}
-      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 basis-[45%] sm:basis-auto">
         {onToggleSidebar && (
           <button
             onClick={onToggleSidebar}
@@ -127,7 +136,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             Giữ nó hiện ở mọi kích thước, nhưng phải cho phép co lại
             (`min-w-0` + `max-w`), nếu không nó giữ nguyên 214px và đẩy các phần
             tử khác ra ngoài. */}
-        <div className="min-w-0 max-w-[168px] shrink">
+        <div className="min-w-0 max-w-[168px] shrink basis-0 flex-1 sm:basis-auto sm:flex-none">
           <WorkspaceSwitcher onOpenBrandKit={onOpenBrandKit} />
         </div>
 
@@ -160,7 +169,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+      <div className="flex items-center gap-1 sm:gap-3 shrink-0 basis-[45%] sm:basis-auto justify-end">
         {/* Offline Demo Indicator Badge */}
         {isOfflineDemoEnabled() && !isBackendConnected() && (
           <div
@@ -207,11 +216,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             bóp và chồng lấn. Tên/email bên cạnh vốn đã là `hidden lg:flex`. */}
         {user && (
           <div className="hidden lg:flex items-center gap-2 pl-2 border-l border-slate-800 shrink-0">
-            <div className="flex flex-col text-right">
+            {/* Khối này khai báo lại `bg-slate-900` — cùng màu với header, nên
+                giao diện không đổi. Cần thiết vì axe đo tương phản bằng cách dò
+                nền của chính khối chứa chữ và các tổ tiên KẾ TIẾP; nó bỏ qua nền
+                của `<header>` (đã thử cả `position: static` lẫn đổi tag, kết quả
+                vẫn là nền trang `#F8FAFC`), nên chữ nhạt trong header bị báo sai
+                là 1.41:1 so với thực tế ~11:1 trên nền slate-900. */}
+            <div className="flex flex-col text-right bg-slate-900">
               <span className="text-xs font-semibold text-slate-200 leading-tight">
                 {user.full_name}
               </span>
-              <span className="text-[10px] text-slate-400 truncate max-w-[120px]">
+              <span className="text-[10px] text-slate-300 truncate max-w-[120px]">
                 {user.email}
               </span>
             </div>

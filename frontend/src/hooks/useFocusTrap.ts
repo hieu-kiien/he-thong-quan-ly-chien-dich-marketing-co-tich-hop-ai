@@ -35,6 +35,20 @@ const ALWAYS_LIVE_SELECTOR =
 const isAlwaysLive = (el: HTMLElement): boolean => el.matches(ALWAYS_LIVE_SELECTOR);
 
 /**
+ * Các handler phím đang hoạt động, theo thứ tự mở. Handler của hộp thoại mở
+ * sau nằm cuối mảng và là hộp thoại "trên cùng" — chỉ nó được quyền xử lý
+ * Escape/Tab khi nhiều hộp thoại lồng nhau.
+ */
+const trapStack: Array<(e: KeyboardEvent) => void> = [];
+
+/** Lớp phủ nền của hộp thoại: `aria-hidden` + `position: fixed` phủ viewport. */
+const isInteractiveOverlay = (el: HTMLElement): boolean => {
+  if (!el.hasAttribute('aria-hidden')) return false;
+  const cs = window.getComputedStyle(el);
+  return cs.position === 'fixed' || cs.position === 'absolute';
+};
+
+/**
  * Hook quản lý focus trap cho modal/dialog theo WCAG 2.1/2.2 AA.
  *
  * Ba lỗi đã sửa so với bản cũ:
@@ -93,15 +107,36 @@ export function useFocusTrap<T extends HTMLElement = HTMLDivElement>({
     }
 
     // `inert` cho mọi anh chị em của hộp thoại ở cấp <body>.
+    //
+    // Ranh giới phải là CHÍNH hộp thoại (`role="dialog"` / `role="alertdialog"`
+    // / `aria-modal`), không phải `container`. Nhiều màn hình đặt ref lên panel
+    // trong khi thuộc tính role đặt trên lớp bọc ngoài một cấp; nếu leo từ
+    // `container` thì vòng lặp đánh dấu `inert` luôn cả backdrop của hộp thoại
+    // (nó là anh em của `container` dưới lớp bọc đó). `inert` khiến phần tử mất
+    // khả năng hit-test lẫn bàn phím — click ra vùng ngoài và click backdrop
+    // im lặng không làm gì, đúng triệu chứng đã gặp.
+    const boundary: HTMLElement | null =
+      container?.closest<HTMLElement>('[role="dialog"], [role="alertdialog"], [aria-modal="true"]') ??
+      container;
+
     const inerted: HTMLElement[] = [];
-    if (inertSiblings && container) {
-      let node: HTMLElement | null = container;
+    if (inertSiblings && boundary) {
+      let node: HTMLElement | null = boundary;
       while (node?.parentElement) {
         const parent: HTMLElement = node.parentElement;
         for (const child of Array.from(parent.children) as HTMLElement[]) {
-          if (child === node || child.contains(container)) continue;
+          if (child === node || child.contains(boundary)) continue;
           if (child.hasAttribute('inert')) continue;
           if (isAlwaysLive(child)) continue;
+          // Lớp phủ nền tương tác được (backdrop) KHÔNG được inert. Cách nhận diện
+          // theo đúng định nghĩa, không phụ thuộc vị trí cây DOM: nó là phần tử
+          // `aria-hidden` + `position: fixed` phủ toàn viewport. Cần điều này vì
+          // hai hộp thoại kiểm tra này đặt `role` khác nhau — Campaigns đặt
+          // `role="dialog"` trên lớp bọc (backdrop nằm trong đó, được miễn khi
+          // leo từ `role`), còn ReviewQueue đặt `role="alertdialog"` trên chính
+          // panel nên backdrop lại nằm NGOÀI `role`. Inert làm mất hit-test, tức
+          // là click ra ngoài im lặng không đóng hộp thoại.
+          if (isInteractiveOverlay(child)) continue;
           child.setAttribute('inert', '');
           inerted.push(child);
         }
@@ -130,6 +165,14 @@ export function useFocusTrap<T extends HTMLElement = HTMLDivElement>({
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (!isActive || !containerRef.current) return;
+
+      // Chỉ hộp thoại trên cùng mới xử lý phím. Các handler đều đăng ký ở
+      // `document` nên với hộp thoại lồng nhau (vd: modal sửa bài chứa hộp thoại
+      // xác nhận Brand Safety) một lần Escape sẽ chạy mọi handler cùng lúc và
+      // đóng cả hai, khiến người dùng mất luôn nội dung đang sửa. Đồng thời Tab
+      // cũng bị hai hộp thoại cùng giành nhau và người dùng có thể tab ra
+      // khỏi hộp thoại đang mở.
+      if (trapStack[trapStack.length - 1] !== handleKeyDown) return;
 
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -168,8 +211,11 @@ export function useFocusTrap<T extends HTMLElement = HTMLDivElement>({
 
   useEffect(() => {
     if (!isActive) return;
+    trapStack.push(handleKeyDown);
     document.addEventListener('keydown', handleKeyDown, true);
     return () => {
+      const i = trapStack.indexOf(handleKeyDown);
+      if (i !== -1) trapStack.splice(i, 1);
       document.removeEventListener('keydown', handleKeyDown, true);
     };
   }, [isActive, handleKeyDown]);

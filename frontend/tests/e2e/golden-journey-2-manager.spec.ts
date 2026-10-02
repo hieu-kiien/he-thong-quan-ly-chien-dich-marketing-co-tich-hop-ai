@@ -32,10 +32,16 @@ test.describe('Golden Journey 2: Manager Review Queue, Rejection & Approval Work
     // 7. Verify toast notification
     await expect(managerPage.locator('text=Đã gửi phản hồi từ chối bài viết (REJECTED)').first()).toBeVisible({ timeout: 7000 });
 
-    // 8. Switch to "Lịch sử duyệt bài" tab and verify the rejected item is recorded
+    // 8. Tab "Lịch sử duyệt bài" chỉ chứa APPROVED/PUBLISHED.
+    //
+    // Bài bị từ chối cố ý KHÔNG nằm ở đây: nó cần marketer sửa và gửi lại nên
+    // thuộc tab nháp (xem `historyList`/`draftList` trong ReviewQueue.tsx — trước
+    // đây REJECTED nằm ở cả hai tab, bị đếm hai lần và hiện trùng). Vì vậy bước
+    // này chỉ xác nhận bài đã từ chối KHÔNG lọt sang lịch sử; nội dung và phản
+    // hồi của nó được kiểm ở bước 9.
     await managerPage.click('button:has-text("Lịch sử duyệt bài")');
-    await expect(managerPage.locator('text=ĐÃ TỪ CHỐI').first()).toBeVisible();
-    await expect(managerPage.locator('text=Sai lệch thông điệp thương hiệu').first()).toBeVisible();
+    await expect(managerPage.locator('text=Lịch sử Phê duyệt').first()).toBeVisible();
+    await expect(managerPage.locator('text=ĐÃ TỪ CHỐI')).toHaveCount(0);
 
     // 9. Switch to "Bản nháp chờ gửi duyệt" tab to see rejected item with feedback
     await managerPage.click('button:has-text("Bản nháp chờ gửi duyệt")');

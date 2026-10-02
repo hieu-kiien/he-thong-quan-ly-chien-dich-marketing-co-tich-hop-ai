@@ -116,7 +116,16 @@ def decode_access_token(token: str) -> dict:
         )
 
 from sqlalchemy.orm import Session
-from app.core.database import get_db, SessionLocal
+# Import dạng module (không phải `from app.core.database import SessionLocal`).
+# `RoleChecker` tự mở session khi được gọi trực tiếp ngoài vòng đời request
+# FastAPI. Nếu bind tên `SessionLocal` vào namespace của module này lúc import,
+# thì việc conftest gán lại `core_database.SessionLocal` cho session kiểm thử sẽ
+# không có tác dụng ở đây — RoleChecker âm thầm truy vấn CSDL thật (SQLite file
+# hoặc Postgres production) thay vì CSDL test. Triệu chứng: test pass khi chạy
+# cục bộ (CSDL thật tình cờ có bảng `users`) nhưng fail trên CI với
+# "no such table: users".
+from app.core import database as _database
+from app.core.database import get_db
 from app.models.entities import User
 
 class UserStatus:
@@ -171,7 +180,8 @@ class RoleChecker:
         # Chỉ loại đúng `Depends` (không dùng isinstance(Session)) để vẫn giữ được
         # session giả/mock trong test, vốn chỉ cần interface `query`.
         if active_db is None or isinstance(active_db, params.Depends):
-            active_db = SessionLocal()
+            # Đọc qua module để conftest gán session kiểm thử có tác dụng.
+            active_db = _database.SessionLocal()
             close_db = True
 
         try:

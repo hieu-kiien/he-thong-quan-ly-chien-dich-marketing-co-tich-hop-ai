@@ -1153,22 +1153,15 @@ useEffect(() => {
               return (
                 <div
                   key={`mobile-${c.id}`}
-                  onClick={() => setSelectedDrawerCampaign(c)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setSelectedDrawerCampaign(c);
-                    }
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer space-y-3"
+                  role="group"
+                  aria-label={`Chiến dịch ${c.name}`}
+                  className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-shadow space-y-3"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 truncate max-w-[140px]">
                       {c.product?.name || `Sản phẩm #${c.product_id}`}
                     </span>
-                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()} role="none">
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
                         disabled={isUpdating}
@@ -1196,12 +1189,23 @@ useEffect(() => {
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900 line-clamp-1">
-                      {c.name}
-                    </h3>
-                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                      {c.objective}
-                    </p>
+                    {/* Tên chiến dịch là nút thật thay vì bấm vào cả thẻ: thẻ chứa
+                        switch trạng thái và các nút hành động khác, nên bọc nó trong
+                        `role="button"` tạo ra `nested-interactive` (WCAG serious) và
+                        chặn trình đọc màn hình. */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDrawerCampaign(c)}
+                      aria-label={`Xem chi tiết chiến dịch ${c.name}`}
+                      className="block w-full text-left"
+                    >
+                      <h3 className="text-sm font-bold text-slate-900 line-clamp-1">
+                        {c.name}
+                      </h3>
+                      <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                        {c.objective}
+                      </p>
+                    </button>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
@@ -1244,8 +1248,9 @@ useEffect(() => {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()} role="none">
+                    <div className="flex items-center gap-1">
                       <button
+                        type="button"
                         onClick={() => setSelectedDrawerCampaign(c)}
                         aria-label={`Xem chi tiết chiến dịch ${c.name}`}
                         title="Xem chi tiết & Mẫu quảng cáo"
@@ -1401,7 +1406,7 @@ useEffect(() => {
                               })}
                             </div>
                           ) : (
-                            <span className="text-[10px] text-slate-400 italic">Chưa có nội dung</span>
+                            <span className="text-[10px] text-slate-500 italic">Chưa có nội dung</span>
                           )}
                         </td>
 
@@ -1443,7 +1448,11 @@ useEffect(() => {
                               </div>
                             </>
                           ) : (
-                            <span className="text-[10px] text-slate-400 italic">Chưa ghi nhận chỉ số</span>
+                            // `text-slate-400` trên nền trắng chỉ đạt ~2.6:1, dưới
+                            // ngưỡng 4.5:1 của WCAG AA cho chữ 10px. Dùng
+                            // `text-slate-500` (~4.8:1) — vẫn là chữ nhỏ chìm về
+                            // thị giác nhưng đọc được bằng công cụ hỗ trợ.
+                            <span className="text-[10px] text-slate-500 italic">Chưa ghi nhận chỉ số</span>
                           )}
                         </td>
 
@@ -1457,7 +1466,7 @@ useEffect(() => {
 
                         {/* Column 7: AI Doctor Health — không có báo cáo thì không hiện điểm bịa */}
                         <td className="py-3.5 px-4 text-center">
-                          <span className="text-[10px] text-slate-400 italic">Mở Bác sĩ AI</span>
+                          <span className="text-[10px] text-slate-500 italic">Mở Bác sĩ AI</span>
                         </td>
 
                         {/* Column 8: Quick Actions */}
@@ -1518,17 +1527,9 @@ useEffect(() => {
             return (
               <div
                 key={c.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => setSelectedDrawerCampaign(c)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setSelectedDrawerCampaign(c);
-                  }
-                }}
-                aria-label={`Xem chi tiết chiến dịch ${c.name}`}
-                className="bg-white rounded-2xl border border-slate-200/90 hover:border-indigo-400 p-5 shadow hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                role="group"
+                aria-label={`Chiến dịch ${c.name}`}
+                className="bg-white rounded-2xl border border-slate-200/90 hover:border-indigo-400 p-5 shadow hover:shadow-md transition-all flex flex-col justify-between group"
               >
                 <div>
                   {/* Card Header with Status Toggle */}
@@ -1537,7 +1538,7 @@ useEffect(() => {
                       {c.product?.name || `Sản phẩm #${c.product_id}`}
                     </span>
 
-                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()} role="none">
+                    <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         disabled={isUpdatingStatusId === c.id}
@@ -1563,12 +1564,22 @@ useEffect(() => {
                     </div>
                   </div>
 
-                  <h3 className="text-sm font-black text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
-                    {c.name}
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                    {c.objective}
-                  </p>
+                  {/* Tên là nút thật: thẻ chứa switch và các nút hành động khác nên
+                      không thể để cả thẻ là `role="button"` (xem giải thích ở thẻ
+                      mobile cùng danh sách). */}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDrawerCampaign(c)}
+                    aria-label={`Xem chi tiết chiến dịch ${c.name}`}
+                    className="block w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded"
+                  >
+                    <h3 className="text-sm font-black text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
+                      {c.name}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                      {c.objective}
+                    </p>
+                  </button>
 
                   {/* Budget & Date */}
                   <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs">
@@ -1597,8 +1608,9 @@ useEffect(() => {
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()} role="none">
+                  <div className="flex items-center gap-1.5">
                     <button
+                      type="button"
                       onClick={(e) => handleDuplicateCampaign(c, e)}
                       aria-label={`Nhân bản chiến dịch ${c.name}`}
                       title="Nhân bản để thử nghiệm A/B"
@@ -1633,10 +1645,15 @@ useEffect(() => {
           aria-modal="true"
           aria-labelledby="campaign-drawer-title"
         >
-          {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm transition-opacity cursor-pointer pointer-events-auto"
-            aria-hidden="true"
+          {/* Backdrop là `<button>` thật, đứng trước panel trong DOM. Xem giải
+              thích ở backdrop của wizard (mục 6) về vì sao không dùng
+              `<div onClick>`: bọc trong vùng `pointer-events: none` thì sự kiện
+              chuột ở góc không tới được lớp backdrop. */}
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label="Đóng bằng cách nhấn ra vùng ngoài"
+            className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm transition-opacity cursor-pointer"
             onClick={() => setSelectedDrawerCampaign(null)}
           />
 
@@ -2190,14 +2207,24 @@ useEffect(() => {
           aria-modal="true"
           aria-labelledby="campaign-wizard-title"
         >
+          {/* Backdrop là một `<button>` thật, không phải `<div onClick>`.
+              Nó là phần tử tương tác duy nhất nằm ngoài panel nên nhận được cả
+              chuột lẫn bàn phím (Escape/Enter đóng được), và không vướng rule
+              a11y `no-noninteractive-element-interactions`.
+              Bố cục DOM: backdrop là con trực tiếp của container `role="dialog"`,
+              đứng TRƯỚC wrapper của panel — nếu đặt bên trong wrapper
+              `pointer-events: none` thì ở các điểm góc sự kiện chuột rơi về
+              container chứ không tới backdrop (đo bằng `elementsFromPoint`). */}
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label="Đóng bằng cách nhấn ra vùng ngoài"
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity cursor-pointer"
+            onClick={() => {
+              if (!isSubmitting && !isGeneratingAI) setIsWizardOpen(false);
+            }}
+          />
           <div className="flex items-center justify-center min-h-screen px-4 py-8 pointer-events-none">
-            <div 
-              className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity cursor-pointer pointer-events-auto"
-              aria-hidden="true"
-              onClick={() => {
-                if (!isSubmitting && !isGeneratingAI) setIsWizardOpen(false);
-              }}
-            />
 
             <div ref={wizardModalRef} className="relative bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 z-10 space-y-6 pointer-events-auto">
               {/* Wizard Header */}
@@ -2915,12 +2942,16 @@ useEffect(() => {
           aria-modal="true"
           aria-labelledby="delete-dialog-title"
         >
+          {/* Backdrop là `<button>` thật, đứng trước panel. Xem giải thích ở
+              backdrop của wizard (mục 6). */}
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label="Đóng bằng cách nhấn ra vùng ngoài"
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity cursor-pointer"
+            onClick={() => setDeletingId(null)}
+          />
           <div className="flex items-center justify-center min-h-screen px-4 pointer-events-none">
-            <div 
-              className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity cursor-pointer pointer-events-auto" 
-              aria-hidden="true"
-              onClick={() => setDeletingId(null)} 
-            />
             <div ref={deleteModalRef} className="relative bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 z-10 space-y-4 text-center pointer-events-auto">
               <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
                 <Trash2 className="w-6 h-6" />

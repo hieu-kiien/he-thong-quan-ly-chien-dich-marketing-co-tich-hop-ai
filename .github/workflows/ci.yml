@@ -451,6 +451,14 @@ jobs:
 
       # Worker nằm ngoài backend + frontend nên trước đây KHÔNG có gate nào
       # typecheck nó — lỗi TS trong đường Cron chỉ lộ ra lúc deploy.
+      # `worker-configuration.d.ts` là file sinh tự động (không commit) và là nơi
+      # wrangler khai báo các global type của runtime: DurableObjectNamespace,
+      # R2Bucket, Fetcher, ScheduledController, ExecutionContext. Thiếu bước này
+      # thì `tsc` báo "Cannot find name 'R2Bucket'" v.v dù code hoàn toàn đúng.
+      - name: Generate Worker types (wrangler types)
+        run: npx wrangler types
+        working-directory: cloudflare
+
       - name: Type-check Worker
         run: npx tsc --noEmit
         working-directory: cloudflare

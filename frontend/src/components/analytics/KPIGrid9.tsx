@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import {
   Coins,
   TrendingUp,
@@ -38,29 +38,41 @@ interface CardShellProps {
 
 const CardShell: React.FC<CardShellProps> = ({
   title, hint, icon, iconClass, value, footer
-}) => (
-  <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-sm hover:shadow-md transition-all group">
-    <div className="flex items-center justify-between mb-2">
-      <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-        <span>{title}</span>
-        <span
-          className="group-hover:opacity-100 opacity-60 transition-opacity"
-          title={hint}
-          aria-label={hint}
-        >
-          <Info className="w-3.5 h-3.5 text-slate-400" />
+}) => {
+  // `useId` sinh id ổn định và duy nhất theo thứ tự render, nên `sr-only` +
+  // `aria-describedby` không đụng nhau giữa 9 thẻ (id viết tay dễ trùng khi
+  // thẻ được render lại hoặc thêm/bớt).
+  const hintId = useId();
+  return (
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-sm hover:shadow-md transition-all group">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+          <span>{title}</span>
+          {/* Icon trang trí KHÔNG được mang `aria-label`: `<span>` mặc định có
+              role "generic", mà ARIA cấm mọi thuộc tính aria-* trên role đó ->
+              axe báo `aria-prohibited-attr` mức serious. Giải thích cho trình đọc
+              màn hình đi qua `aria-describedby` trỏ tới phần tử `sr-only`; icon
+              đánh dấu `aria-hidden` vì không mang thông tin riêng. */}
+          <span
+            className="group-hover:opacity-100 opacity-60 transition-opacity"
+            title={hint}
+            aria-describedby={hintId}
+          >
+            <Info className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+          </span>
+          <span id={hintId} className="sr-only">{hint}</span>
         </span>
-      </span>
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${iconClass}`}>
-        {icon}
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${iconClass}`}>
+          {icon}
+        </div>
+      </div>
+      {value}
+      <div className="mt-3 flex items-center justify-between gap-2 text-xs pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
+        {footer}
       </div>
     </div>
-    {value}
-    <div className="mt-3 flex items-center justify-between gap-2 text-xs pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
-      {footer}
-    </div>
-  </div>
-);
+  );
+};
 
 /**
  * Lưới 9 KPI. Trước đây mỗi ô gắn một mức tăng/giảm so với kỳ trước viết cứng
@@ -134,7 +146,9 @@ export const KPIGrid9: React.FC<KPIGrid9Props> = ({ kpi, loading = false, error,
 
   // Không có mốc kỳ trước trong API nên không được bịa delta.
   const noComparison = (
-    <span className="text-slate-400 dark:text-slate-500 text-[10px] font-normal">
+    // `text-slate-400` trên nền trắng ~2.6:1, dưới ngưỡng 4.5:1 của WCAG AA cho
+    // chữ 10px. `text-slate-500` (~4.8:1) vẫn chìm về thị giác nhưng đạt chuẩn.
+    <span className="text-slate-500 dark:text-slate-400 text-[10px] font-normal">
       chưa có dữ liệu kỳ so sánh
     </span>
   );

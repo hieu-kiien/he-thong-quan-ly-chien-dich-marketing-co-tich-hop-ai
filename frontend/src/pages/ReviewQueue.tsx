@@ -1199,7 +1199,12 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
 
                             }`}>
 
-                              {h.status === 'PUBLISHED' ? '✓ ĐÃ XUẤT BẢN' : h.status === 'APPROVED' ? '✓ ĐÃ PHÊ DUYỆT' : '✕ ĐÃ TỪ CHỐI'}
+                              {/* `historyList` chỉ chứa APPROVED/PUBLISHED nên
+                                  nhánh else không bao giờ chạy; giữ "ĐÃ TỪ CHỐI" ở
+                                  đây là nhãn chết dễ gây hiểu nhầm khi ai đó đọc
+                                  template. Bài bị từ chối hiển thị ở tab "Cần chỉnh
+                                  sửa" với nhãn CẦN CHỈNH SỬA (REJECTED). */}
+                              {h.status === 'PUBLISHED' ? '✓ ĐÃ XUẤT BẢN' : '✓ ĐÃ PHÊ DUYỆT'}
 
                             </span>
 

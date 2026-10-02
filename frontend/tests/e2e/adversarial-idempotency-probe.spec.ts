@@ -164,8 +164,14 @@ test.describe('Adversarial Frontend Debounce & Idempotency Probes', () => {
     await expect(managerPage.locator('text=Sinh trọn bộ Mẫu Quảng Cáo Đa Kênh')).toBeVisible();
 
     // Advance to Step 4
+    //
+    // Bước 4 giờ hiển thị kết quả kiểm tra tuân thủ THẬT thay vì chữ
+    // "Đạt Tiêu chuẩn" viết cứng trước đây. Ở luồng này chưa bấm sinh Mẫu QC ở
+    // bước 3 nên chưa có nội dung để quét — trạng thái đúng là
+    // "Chưa có nội dung để kiểm tra", không phải "Đạt". Assert vào trạng thái
+    // thật để test không lại đòi một kết luận tuân thủ bịa đặt.
     await managerPage.click('button:has-text("Tiếp theo")');
-    await expect(managerPage.locator('text=Đạt Tiêu chuẩn Quảng cáo Meta & TikTok')).toBeVisible();
+    await expect(managerPage.locator('text=Chưa có nội dung để kiểm tra')).toBeVisible();
 
     // 4. Intercept campaign creation endpoint with 1200ms latency and counter
     let campaignCreateCount = 0;
@@ -326,8 +332,12 @@ test.describe('Adversarial Frontend Debounce & Idempotency Probes', () => {
     // 4. Adversarial Action: Rapid double-click
     await generateBtn.click({ noWaitAfter: true });
 
-    // Verify button disabled during in-flight with spinner text ("Gemini đang sáng tạo 3 kênh...")
-    const inFlightBtn = managerPage.locator('button:has-text("Gemini đang sáng tạo 3 kênh...")');
+    // Verify button disabled during in-flight with spinner text.
+    //
+    // Nhãn in-flight không còn hardcode "Gemini": provider thật có thể là OpenCode
+    // hoặc provider khác, nên UI hiện "AI đang sáng tạo 3 kênh (có thể mất vài
+    // phút)...". Assert vào nhãn trung lập này, không assert vào tên provider.
+    const inFlightBtn = managerPage.locator('button:has-text("AI đang sáng tạo 3 kênh")');
     await expect(inFlightBtn).toBeVisible({ timeout: 2000 });
     await expect(inFlightBtn).toBeDisabled();
 
@@ -335,7 +345,13 @@ test.describe('Adversarial Frontend Debounce & Idempotency Probes', () => {
     await inFlightBtn.click({ force: true, noWaitAfter: true }).catch(() => {});
 
     // 5. Wait for success toast
-    await expect(managerPage.locator('text=Đã tạo thành công nội dung sáng tạo cho cả 3 kênh tiếp thị').first()).toBeVisible({ timeout: 7000 });
+    //
+    // Toast giờ kèm provider/model thật của backend nên không còn chuỗi cố định
+    // "...cho cả 3 kênh tiếp thị". Assert vào phần ổn định và kiểm tra provider
+    // đi kèm để vẫn bắt được việc toast phải nói đúng nguồn sinh nội dung.
+    const successToast = managerPage.locator('text=Đã tạo thành công nội dung cho cả 3 kênh').first();
+    await expect(successToast).toBeVisible({ timeout: 7000 });
+    await expect(successToast).toContainText('/');
 
     // 6. Empirical Invariant Assertion:
     expect(studioAiCount).toBe(1);
