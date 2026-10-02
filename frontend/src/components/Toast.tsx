@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, ReactNode } from 'react';
 import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -32,9 +32,24 @@ export const useToast = (): ToastContextType => {
 
 export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    const timer = timersRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      timersRef.current.delete(id);
+    }
+  }, []);
+
+  // Dọn toàn bộ hẹn giờ khi provider unmount, tránh setState sau unmount.
+  useEffect(() => {
+    const timers = timersRef.current;
+    return () => {
+      timers.forEach((timer) => clearTimeout(timer));
+      timers.clear();
+    };
   }, []);
 
   const showToast = useCallback(
@@ -45,12 +60,16 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setToasts((prev) => [...prev, newToast]);
 
       if (duration > 0) {
-        setTimeout(() => {
-          removeToast(id);
-        }, duration);
+        timersRef.current.set(
+          id,
+          setTimeout(() => {
+            timersRef.current.delete(id);
+            setToasts((prev) => prev.filter((toast) => toast.id !== id));
+          }, duration)
+        );
       }
     },
-    [removeToast]
+    []
   );
 
   const success = useCallback(
@@ -73,11 +92,23 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     [showToast]
   );
 
+  // Object literal mới ở mỗi render khiến `useToast()` trả về identity khác,
+  // làm mọi useEffect phụ thuộc `toast` chạy lại — trước đây nghĩa là mỗi toast
+  // hiện lên lại kéo theo một vòng refetch campaigns + contents + my-tasks.
+  const value = useMemo<ToastContextType>(
+    () => ({ showToast, success, error, warning, info, removeToast }),
+    [showToast, success, error, warning, info, removeToast]
+  );
+
   return (
-    <ToastContext.Provider value={{ showToast, success, error, warning, info, removeToast }}>
+    <ToastContext.Provider value={value}>
       {children}
       {/* Toast Notification Floating Container */}
-      <div className="fixed top-5 right-5 z-[9999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0">
+      <div
+        role="region"
+        aria-label="Thông báo"
+        className="fixed top-5 right-5 z-[9999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0"
+      >
         {toasts.map((toast) => {
           let bgClass = 'bg-white border-slate-200 text-slate-900';
           let icon = <Info className="w-4 h-4 text-blue-500 shrink-0" />;
@@ -104,6 +135,8 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           return (
             <div
               key={toast.id}
+              role={toast.type === 'error' ? 'alert' : 'status'}
+              aria-live={toast.type === 'error' ? 'assertive' : 'polite'}
               className={`pointer-events-auto border rounded-xl p-3.5 shadow-lg flex items-start gap-3 transition-all duration-200 ${bgClass}`}
             >
               {icon}
@@ -118,7 +151,9 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 </p>
               </div>
               <button
+                type="button"
                 onClick={() => removeToast(toast.id)}
+                aria-label={`Đóng thông báo: ${toast.title || toast.message}`}
                 className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 transition-colors shrink-0"
               >
                 <X className="w-3.5 h-3.5" />

@@ -1,19 +1,19 @@
-# Research pack của báo cáo AIA331
+# Research pack — báo cáo AIA331 V9
 
-Đây là bộ hồ sơ nguồn cho bản LaTeX V8. Nó dùng để giữ traceability giữa yêu cầu, quyết định thiết kế, nguồn nghiên cứu, hình vẽ và kế hoạch kiểm tra.
+Đây là bộ hồ sơ đi cùng snapshot báo cáo V9, được giữ để truy vết tài liệu học thuật. Nó không phải baseline sản phẩm hoặc bộ bằng chứng CI hiện tại.
 
-Tình trạng hiện tại là baseline phân tích--thiết kế trước khi code. Các ô implementation/evaluation chưa có kết quả phải giữ trạng thái PLANNED hoặc UNKNOWN, không điền số liệu giả.
+## Nội dung
 
-Các file chính:
+- project-research-plan.md: câu hỏi, phạm vi và kế hoạch nghiên cứu tại thời điểm lập báo cáo.
+- source-inventory.csv: danh mục nguồn được sử dụng.
+- evidence-ledger.csv: claim, nguồn và trạng thái bằng chứng.
+- related-work-matrix.csv: so sánh tài liệu tham khảo.
+- requirements-traceability.csv: ánh xạ yêu cầu tới thiết kế/implementation/test theo snapshot V9.
+- quality-attribute-scenarios.csv: kịch bản thuộc tính chất lượng.
+- evaluation-plan.md: kế hoạch/định nghĩa đánh giá.
+- visual-coverage-map.csv: mục đích và nguồn của hình.
+- reproducibility-manifest.yaml: môi trường và quy trình tái lập đã ghi cho phiên bản báo cáo.
 
-- project-research-plan.md: identity, scope, research questions và risk.
-- source-inventory.csv: nguồn người dùng cung cấp, skill và tài liệu chính thức.
-- evidence-ledger.csv: claim/evidence/status.
-- related-work-matrix.csv: so sánh nguồn tham chiếu.
-- requirements-traceability.csv: requirement tới design/test/evidence.
-- quality-attribute-scenarios.csv: kịch bản NFR có thể đo.
-- evaluation-plan.md: fixture, metric, protocol và negative evidence.
-- visual-coverage-map.csv: câu hỏi mà từng hình trả lời.
-- reproducibility-manifest.yaml: manifest sẽ hoàn thiện sau khi có repository/runtime.
+Các trạng thái trong CSV phản ánh bằng chứng ở thời điểm V9 và cần được kiểm tra lại trước khi dùng cho tuyên bố hiện tại. Không hiểu một tỷ lệ traceability trong snapshot là chứng minh mọi yêu cầu hiện vẫn hoạt động.
 
-Nguồn chỉnh sửa của báo cáo nằm ở thư mục cha: main.tex, chapters/, figures/, design/schema.sql. PDF chỉ là artefact sinh ra.
+Nguồn hiện hành: [docs/README.md](../../docs/README.md), [docs/ROADMAP.md](../../docs/ROADMAP.md), [docs/TESTING.md](../../docs/TESTING.md). PDF là artifact; LaTeX và research pack là nguồn có thể biên tập.

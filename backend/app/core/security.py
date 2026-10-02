@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
+import ipaddress
 import logging
 import re
 import threading
@@ -10,6 +11,7 @@ import jwt
 
 logger = logging.getLogger(__name__)
 from fastapi import Depends, HTTPException, status
+from fastapi import params
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.config import settings
 from app.core.crypto import (
@@ -24,6 +26,28 @@ from app.core.crypto import (
 )
 
 security_bearer = HTTPBearer(auto_error=False)
+
+# Mạng được coi là proxy ngược đáng tin (loopback + docker/k8s private range).
+# Mục đích: chỉ khi request đến từ một trong các mạng này thì mới chấp nhận giá trị
+# X-Forwarded-For / CF-Connecting-IP. Nếu không kiểm tra, bất kỳ client nào cũng
+# tự khai IP giả qua header và né được rate limit đăng nhập.
+TRUSTED_PROXY_NETWORKS = tuple(
+    ipaddress.ip_network(cidr)
+    for cidr in ("127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "::1/128")
+)
+
+
+def is_trusted_proxy(host: str) -> bool:
+    """True nếu `host` nằm trong dải mạng nội bộ được coi là proxy ngược."""
+    if not host:
+        return False
+    try:
+        addr = ipaddress.ip_address(host.strip())
+    except ValueError:
+        return False
+    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped:
+        addr = addr.ipv4_mapped
+    return any(addr in net for net in TRUSTED_PROXY_NETWORKS)
 
 # Định dạng bcrypt hợp lệ: $2<version>$<cost 2 chữ số>$<salt 22 ký tự><digest 31 ký tự>
 _BCRYPT_RE = re.compile(r"^\$2[abxy]\$\d{2}\$[./A-Za-z0-9]{53}$")
@@ -117,19 +141,14 @@ class RoleChecker:
         token = credentials.credentials
         payload = decode_access_token(token)
 
-        # 1. Kiểm tra trường role trong token payload
-        token_role = payload.get("role")
-        if not token_role:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Thao tác trái quyền. Quyền yêu cầu: {', '.join(self.allowed_roles)}, quyền hiện tại: {token_role}",
-            )
-        if token_role not in self.allowed_roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Thao tác trái quyền. Quyền yêu cầu: {', '.join(self.allowed_roles)}, quyền hiện tại: {token_role}",
-            )
-
+        # 1. Vai trò KHÔNG được đọc từ token. JWT là base64 không mã hoá, nên
+        # `payload["role"]` là dữ liệu do client kiểm soát — tin vào nó là tin
+        # dữ liệu không đáng tin. Vai trò thật được nạp từ DB ở bước 5.
+        # Trước đây bước này chặn cả khi token thiếu `role`, buộc phải nhúng role
+        # (và cả email/full_name) vào JWT chỉ để kiểm tra quyền: vừa lộ PII cho
+        # mọi XSS đọc được từ localStorage, vừa cho phép token cũ giữ quyền cũ
+        # sau khi admin đã hạ quyền người dùng.
+        #
         # 2. Bắt buộc có trường "sub" không rỗng trong payload
         sub = payload.get("sub")
         if sub is None or str(sub).strip() == "":
@@ -144,7 +163,14 @@ class RoleChecker:
         # Quản lý Database Session (hỗ trợ cả FastAPI injection và standalone call)
         close_db = False
         active_db = db
-        if active_db is None:
+        # Khi gọi trực tiếp (ngoài vòng đời request của FastAPI, ví dụ trong test
+        # hoặc script kiểm thử), tham số `db` vẫn là giá trị mặc định
+        # `Depends(get_db)` — tức MỘT ĐỐI TƯỢNG Depends chứ không phải Session.
+        # Kiểm tra `is None` như trước đây không bắt được trường hợp này và dẫn
+        # tới AttributeError: 'Depends' object has no attribute 'query'.
+        # Chỉ loại đúng `Depends` (không dùng isinstance(Session)) để vẫn giữ được
+        # session giả/mock trong test, vốn chỉ cần interface `query`.
+        if active_db is None or isinstance(active_db, params.Depends):
             active_db = SessionLocal()
             close_db = True
 
@@ -318,4 +344,70 @@ def reset_login_rate_limit(identifier: str) -> None:
         return
     with _login_attempts_lock:
         _login_attempts.pop(identifier, None)
+
+
+# --- Generic quota limiter (in-memory, per-process) ---------------------------------
+# Dùng cho endpoint AI và đăng ký tài khoản. Trước đây KHÔNG endpoint nào được
+# giới hạn: bất kỳ ai giữ token (hoặc khoá BYOK trong localStorage) đều có thể gọi
+# /ai/draft liên tục và tiêu hết hạn mức của tổ chức.
+# Cùng giới hạn với login: bộ nhớ trong tiến trình, chỉ là lớp phòng thủ bổ sung,
+# không thay thế rate limiting ở reverse proxy / Cloudflare.
+QUOTA_MAX_CALLS = 30
+QUOTA_WINDOW_SECONDS = 60 * 60
+
+_quota_buckets: Dict[str, deque] = defaultdict(deque)
+_quota_lock = threading.Lock()
+
+
+def _prune_quota(now: float) -> None:
+    cutoff = now - QUOTA_WINDOW_SECONDS
+    for key in list(_quota_buckets.keys()):
+        bucket = _quota_buckets.get(key)
+        if not bucket:
+            _quota_buckets.pop(key, None)
+            continue
+        while bucket and bucket[0] <= cutoff:
+            bucket.popleft()
+        if not bucket:
+            _quota_buckets.pop(key, None)
+
+
+def enforce_quota(identifier: str, max_calls: int = QUOTA_MAX_CALLS, window_seconds: int = QUOTA_WINDOW_SECONDS) -> None:
+    """Ném 429 nếu `identifier` đã vượt `max_calls` lần gọi trong cửa sổ thời gian.
+
+    Gọi TRƯỚC khi thực hiện tác vụ tốn tài nguyên (gọi nhà cung cấp AI, tạo workspace).
+    """
+    if not identifier:
+        return
+    now = time.monotonic()
+    retry_after = 0
+    with _quota_lock:
+        cutoff = now - window_seconds
+        bucket = _quota_buckets[identifier]
+        while bucket and bucket[0] <= cutoff:
+            bucket.popleft()
+        if len(bucket) >= max_calls:
+            retry_after = max(1, int(window_seconds - (now - bucket[0])))
+            used = len(bucket)
+    if retry_after:
+        logger.warning("[Security] Quota exceeded for %s (used=%d, retry_after=%ds).", identifier, used, retry_after)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Bạn đã vượt giới hạn số lượt gọi. Vui lòng thử lại sau.",
+            headers={"Retry-After": str(retry_after)},
+        )
+    with _quota_lock:
+        _quota_buckets[identifier].append(now)
+
+
+def reset_all_quotas() -> None:
+    """Xoá toàn bộ bộ đếm quota trong bộ nhớ.
+
+    Bộ đếm sống trong tiến trình và KHÔNG tự hết hạn theo test, nên nếu không có
+    hàm này thì các test gọi API hàng loạt sẽ đụng trần của nhau và fail với 429
+    một cách khó hiểu. Test fixture gọi hàm này giữa các test, tương đương cách
+    DB được rollback cho dữ liệu.
+    """
+    with _quota_lock:
+        _quota_buckets.clear()
 

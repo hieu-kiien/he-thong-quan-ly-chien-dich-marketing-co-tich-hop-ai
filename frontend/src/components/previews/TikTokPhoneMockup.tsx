@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Heart, MessageSquare, Bookmark, Share2, Music, Plus, Check, Sparkles, Image as ImageIcon, Video } from 'lucide-react';
+import { Heart, MessageSquare, Bookmark, Share2, Music, Plus, Check, Image as ImageIcon, Video } from 'lucide-react';
 import { ImageAttachmentPicker } from './ImageAttachmentPicker';
 
 export interface TikTokSceneItem {
@@ -140,8 +140,12 @@ export const TikTokPhoneMockup: React.FC<TikTokPhoneMockupProps> = ({
           {/* TikTok Segmented Progress Bars */}
           <div className="flex items-center gap-1 px-1">
             {allScenes.map((_, i) => (
-              <div
+              // Thanh tiến trình cũng là nút chuyển phân cảnh nên dùng <button> gốc.
+              <button
                 key={i}
+                type="button"
+                aria-pressed={i === activeSceneIndex}
+                aria-label={`Xem phân cảnh ${i + 1}`}
                 onClick={() => setActiveSceneIndex(i)}
                 className={`h-1 flex-1 rounded-full cursor-pointer transition-all duration-300 ${
                   i === activeSceneIndex
@@ -169,7 +173,7 @@ export const TikTokPhoneMockup: React.FC<TikTokPhoneMockupProps> = ({
               <button
                 key={idx}
                 onClick={() => setActiveSceneIndex(idx)}
-                className={`text-[9px] px-2 py-0.5 rounded-full font-bold transition shadow-xs ${
+                className={`text-[9px] px-2 py-0.5 rounded-full font-bold transition shadow-sm ${
                   idx === activeSceneIndex
                     ? 'bg-yellow-400 text-slate-950 scale-105'
                     : 'bg-black/50 text-white/80 border border-white/20 hover:bg-black/70'
@@ -196,7 +200,7 @@ export const TikTokPhoneMockup: React.FC<TikTokPhoneMockupProps> = ({
           {/* Kinetic Voiceover Captions */}
           <div className="px-2 py-1 text-center max-w-[280px]">
             <p className="font-black text-xs sm:text-[13px] text-yellow-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] leading-snug tracking-wide">
-              "{currentScene.voiceover}"
+              &ldquo;{currentScene.voiceover}&rdquo;
             </p>
           </div>
         </div>
@@ -320,7 +324,7 @@ export const TikTokPhoneMockup: React.FC<TikTokPhoneMockupProps> = ({
         <div className="mt-3 flex items-center gap-2">
           <button
             onClick={() => setIsPickerOpen(!isPickerOpen)}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded-xl shadow-xs transition flex items-center gap-1.5"
+            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded-xl shadow-sm transition flex items-center gap-1.5"
           >
             <ImageIcon className="w-3.5 h-3.5 text-indigo-400" />
             {imageUrl ? 'Đổi ảnh nền Video' : 'Gắn ảnh nền Video'}

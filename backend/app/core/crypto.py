@@ -6,6 +6,9 @@ tách biệt JWT Secret khỏi BYOK Encryption Key và hỗ trợ xoay vòng kh�
 
 import base64
 import logging
+import os
+import secrets
+from pathlib import Path
 from typing import Optional, List, Union
 from cryptography.fernet import Fernet, MultiFernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
@@ -19,6 +22,49 @@ logger = logging.getLogger(__name__)
 # Salt cố định cho việc dẫn xuất khóa Fernet vault
 VAULT_SALT = b"marketflow-byok-vault-pbkdf2-salt-v1"
 
+_VAULT_SALT_CACHE: Optional[bytes] = None
+
+
+def _resolve_vault_salt() -> bytes:
+    """Salt PBKDF2 ngẫu nhiên, ổn định theo từng deployment.
+
+    Vì sao không dùng hằng số công khai:
+      - Salt cố định + passphrase yếu = kẻ tấn công chỉ cần một bảng tra dùng
+        chung cho TẤT CẢ bản triển khai, và mọi bản cài có cùng passphrase đều
+        sinh ra cùng một khoá.
+      - Salt ngẫu nhiên theo từng deployment phá vỡ khả năng dùng chung bảng tra.
+    Salt được lưu cạnh CSDL để giữ nguyên khả năng giải mã sau khi restart; salt
+    cũ vẫn được thử như một khoá giải mã dữ liệu trước đây (xem `get_multi_fernet`).
+    """
+    global _VAULT_SALT_CACHE
+    if _VAULT_SALT_CACHE is not None:
+        return _VAULT_SALT_CACHE
+
+    # Ưu tiên biến môi trường (dùng cho hạ tầng sinh salt ra ngoài: Kubernetes
+    # Secret, Cloudflare Secret), sau đó mới tới file cạnh mã nguồn.
+    env_salt = os.environ.get("BYOK_PBKDF2_SALT", "").strip()
+    if env_salt:
+        _VAULT_SALT_CACHE = env_salt.encode("utf-8")
+        return _VAULT_SALT_CACHE
+
+    salt_file = Path(settings.BASE_DIR) / "backend" / ".vault_salt"
+    try:
+        if not salt_file.exists():
+            salt_file.parent.mkdir(parents=True, exist_ok=True)
+            salt_file.write_bytes(secrets.token_bytes(32))
+            try:
+                os.chmod(salt_file, 0o600)
+            except OSError:
+                pass
+        data = salt_file.read_bytes()
+        _VAULT_SALT_CACHE = data if data else VAULT_SALT
+    except OSError:
+        # Read-only filesystem: dùng salt cố định như trước đây để hệ thống vẫn
+        # khởi động được. Kém hơn, nhưng còn hơn là không khởi động.
+        logger.warning("Khong doc/ghi duoc file salt PBKDF2, dung salt co dinh (yeu hon).")
+        _VAULT_SALT_CACHE = VAULT_SALT
+    return _VAULT_SALT_CACHE
+
 
 def get_jwt_secret_key() -> str:
     """Trả về secret key dùng cho JWT HMAC-SHA256 signing & verification.
@@ -30,12 +76,16 @@ def get_jwt_secret_key() -> str:
     return settings.SECRET_KEY
 
 
-def _derive_fernet_key(passphrase: str, salt: bytes = VAULT_SALT) -> bytes:
-    """Dẫn xuất 32-byte URL-safe base64 key từ passphrase thông qua PBKDF2HMAC SHA-256."""
+def _derive_fernet_key(passphrase: str, salt: Optional[bytes] = None) -> bytes:
+    """Dẫn xuất 32-byte URL-safe base64 key từ passphrase thông qua PBKDF2HMAC SHA-256.
+
+    Mặc định dùng salt ngẫu nhiên theo deployment (`_resolve_vault_salt`). Chỉ truyền
+    `salt` tường minh khi cần giải mã dữ liệu tạo bởi salt khác (dữ liệu cũ).
+    """
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=32,
-        salt=salt,
+        salt=salt if salt is not None else _resolve_vault_salt(),
         iterations=100_000,
     )
     return base64.urlsafe_b64encode(kdf.derive(passphrase.encode("utf-8")))
@@ -114,9 +164,17 @@ def get_multi_fernet() -> MultiFernet:
 
     # Tự động hỗ trợ giải mã từ SECRET_KEY cũ nếu BYOK_ENCRYPTION_KEY khác biệt
     legacy_secret_key = _derive_fernet_key(settings.SECRET_KEY)
+
+    # Và từ salt CỐ ĐỊNH của các bản triển khai trước khi sinh salt ngẫu nhiên:
+    # dữ liệu đã mã hoá trước đây chỉ giải mã được bằng salt cũ, nên phải giữ nó
+    # trong keyring để không mất BYOK khi nâng cấp.
+    legacy_salted_key = _derive_fernet_key(settings.SECRET_KEY, salt=VAULT_SALT)
     if legacy_secret_key not in seen_keys:
         fernets.append(Fernet(legacy_secret_key))
         seen_keys.add(legacy_secret_key)
+    if legacy_salted_key not in seen_keys:
+        fernets.append(Fernet(legacy_salted_key))
+        seen_keys.add(legacy_salted_key)
 
     return MultiFernet(fernets)
 

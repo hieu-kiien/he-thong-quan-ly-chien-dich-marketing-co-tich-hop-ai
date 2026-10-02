@@ -78,6 +78,18 @@ jobs:
         run: npm ci
         working-directory: frontend
 
+      # Gate mới: lint + typecheck tách khỏi `npm run build`.
+      # Trước đây Gate 2 chỉ chạy `npm run build`, mà script đó là `tsc && vite
+      # build` với `strict: false` và KHÔNG có ESLint — nên một loạt lỗi
+      # null-safety và lỗi accessibility vẫn merge được với CI xanh.
+      - name: Type-check (strict)
+        run: npm run typecheck
+        working-directory: frontend
+
+      - name: "Lint (ESLint: react-hooks + jsx-a11y)"
+        run: npm run lint
+        working-directory: frontend
+
       - name: Build frontend distribution bundle (npm run build)
         run: npm run build
         working-directory: frontend
@@ -85,6 +97,10 @@ jobs:
       - name: Verify build artifacts
         run: |
           test -f frontend/dist/index.html || (echo "Missing frontend/dist/index.html" && exit 1)
+          # file tĩnh mà index.html tham chiếu phải tồn tại, nếu không mỗi lần tải
+          # trang đều ghi thêm một 404 vào console.
+          test -f frontend/dist/vite.svg || (echo "Missing frontend/dist/vite.svg (index.html tham chiếu tới file này)" && exit 1)
+          test -f frontend/dist/50x.html || (echo "Missing frontend/dist/50x.html (nginx error_page trỏ tới file này)" && exit 1)
           echo "Frontend build successfully verified."
 
   # =========================================================================
@@ -407,7 +423,49 @@ jobs:
         run: npm audit --audit-level=high || echo "::warning::npm audit found advisories"
 
   # =========================================================================
-  # Docker Verification Gate (Requires all 6 gates to pass)
+  # Gate 7: Cloudflare Worker Typecheck & Config Consistency
+  #
+  # Worker nằm ngoài backend + frontend nên trước đây không gate nào typecheck nó.
+  # Lỗi trong đường Cron chỉ lộ ra lúc deploy — và lỗi so khớp cron là loại
+  # im lặng: handler thoát ngay mà không có dấu vết.
+  # =========================================================================
+  cloudflare-worker-verify:
+    name: "Cloudflare Worker Typecheck & Config Consistency"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: cloudflare/package-lock.json
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+        working-directory: cloudflare
+
+      # Worker nằm ngoài backend + frontend nên trước đây KHÔNG có gate nào
+      # typecheck nó — lỗi TS trong đường Cron chỉ lộ ra lúc deploy.
+      - name: Type-check Worker
+        run: npx tsc --noEmit
+        working-directory: cloudflare
+
+      # Kiểm tra wrangler.jsonc parse được, `SCHEDULER_SECRET` có trong
+      # secrets.required, và biểu thức cron mà Worker so khớp có thật sự nằm
+      # trong triggers.crons. `controller.cron` là biểu thức cron chứ không phải
+      # tên tự đặt; nếu lệch thì scheduled() thoát ngay và lịch đăng trên
+      # Cloudflare không bao giờ chạy — lỗi im lặng, chỉ lộ lúc deploy.
+      - name: Verify wrangler config & cron consistency
+        run: npm run check:config
+        working-directory: cloudflare
+
+  # =========================================================================
+  # Docker Verification Gate (Requires all gates above to pass)
   # =========================================================================
   docker-verify:
     name: "Docker Build & Compose Verification"
@@ -419,6 +477,7 @@ jobs:
       - wcag-accessibility-audit
       - performance-load-verify
       - secret-and-dependency-scan
+      - cloudflare-worker-verify
     timeout-minutes: 15
 
     env:

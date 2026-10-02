@@ -171,6 +171,50 @@ def _backfill_tenant_workspace_ids(db_engine=engine, conn=None):
                 conn.close()
 
 
+def _migrate_custom_api_key_provider_constraint(db_engine, conn) -> None:
+    """Dựng lại bảng `custom_api_keys` nếu CHECK constraint provider chưa chứa 'opencode'.
+
+    SQLite không hỗ trợ ALTER CONSTRAINT, nên phải tạo bảng mới -> chép dữ liệu ->
+    đổi tên -> xoá bảng cũ. Thao tác chạy trong một transaction của `conn` (ngoại
+    trừ của hàm này quản lý), nên nếu bước nào lỗi thì bảng cũ vẫn còn nguyên.
+
+    Idempotent: nếu SQL của bảng đã chứa 'opencode' thì thoát ngay.
+    """
+    row = conn.exec_driver_sql(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='custom_api_keys'"
+    ).fetchone()
+    if not row or not row[0]:
+        return
+    table_sql = row[0]
+    if "'opencode'" in table_sql:
+        return
+
+    logger.info("Migrating custom_api_keys provider constraint to include 'opencode'")
+    # Giữ nguyên tên constraint và cấu trúc cột; chỉ nới danh sách provider.
+    new_sql = table_sql.replace(
+        "'gemini', 'openrouter', 'openai')",
+        "'gemini', 'openrouter', 'openai', 'opencode')",
+    )
+    if new_sql == table_sql:
+        # CSDL ghi CHECK theo cách khác -> không đoán, bỏ qua thay vì dựng lại bảng
+        # với DDL sai. Constraint cũ chỉ chặn provider mới, các provider cũ vẫn
+        # hoạt động bình thường.
+        logger.warning(
+            "Khong nhan dang CHECK constraint cua custom_api_keys trong DDL; bo qua migration."
+        )
+        return
+
+    conn.exec_driver_sql("ALTER TABLE custom_api_keys RENAME TO custom_api_keys_legacy")
+    conn.exec_driver_sql(new_sql)
+    conn.exec_driver_sql(
+        "INSERT INTO custom_api_keys "
+        "(id, user_id, workspace_id, provider, encrypted_key, model, is_active, created_at, updated_at) "
+        "SELECT id, user_id, workspace_id, provider, encrypted_key, model, is_active, created_at, updated_at "
+        "FROM custom_api_keys_legacy"
+    )
+    conn.exec_driver_sql("DROP TABLE custom_api_keys_legacy")
+
+
 def ensure_sqlite_schema_compatibility(db_engine=engine):
     """Tự động kiểm tra và bổ sung các cột mới vào CSDL SQLite hiện hữu nếu thiếu (Idempotent Zero Migration Failure)."""
     if not str(db_engine.url).startswith("sqlite"):
@@ -183,7 +227,11 @@ def ensure_sqlite_schema_compatibility(db_engine=engine):
                 if "image_url" not in existing_cols:
                     conn.exec_driver_sql("ALTER TABLE marketing_contents ADD COLUMN image_url VARCHAR(1024)")
                 if "workspace_id" not in existing_cols:
-                    conn.exec_driver_sql("ALTER TABLE marketing_contents ADD COLUMN workspace_id INTEGER DEFAULT 1")
+                    # KHÔNG gán DEFAULT 1: workspace 1 có thể thuộc tenant khác, nên
+                    # gán hàng loạt vào đó là gán dữ liệu của agency này sang agency
+                    # khác. `_backfill_tenant_workspace_ids` sẽ suy ra đúng workspace
+                    # từ campaign cha; bước này chỉ thêm cột, chưa gán giá trị.
+                    conn.exec_driver_sql("ALTER TABLE marketing_contents ADD COLUMN workspace_id INTEGER")
                 if "warnings_json" not in existing_cols:
                     conn.exec_driver_sql("ALTER TABLE marketing_contents ADD COLUMN warnings_json TEXT DEFAULT '[]'")
 
@@ -228,6 +276,33 @@ def ensure_sqlite_schema_compatibility(db_engine=engine):
             table_kpi_check = conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='campaign_kpi_targets'")
             if not table_kpi_check.fetchone():
                 CampaignKPITarget.__table__.create(bind=conn)
+
+            # 5. Bổ sung index cho các cột lọc nóng.
+            # `Base.metadata.create_all` chỉ tạo index cho bảng MỚI; với CSDL SQLite
+            # đã tồn tại, index khai báo trong `__table_args__` sẽ không bao giờ
+            # được tạo. Danh sách dưới đây phải được giữ đồng bộ với entities.py.
+            # Đều idempotent (CREATE INDEX IF NOT EXISTS) nên chạy lại vô hại.
+            for index_sql in (
+                "CREATE INDEX IF NOT EXISTS idx_campaigns_workspace ON campaigns (workspace_id)",
+                "CREATE INDEX IF NOT EXISTS idx_campaigns_product ON campaigns (product_id)",
+                "CREATE INDEX IF NOT EXISTS idx_contents_workspace ON marketing_contents (workspace_id)",
+                "CREATE INDEX IF NOT EXISTS idx_contents_channel ON marketing_contents (channel_id)",
+                "CREATE INDEX IF NOT EXISTS idx_contents_status ON marketing_contents (status)",
+                "CREATE INDEX IF NOT EXISTS idx_metrics_channel ON campaign_metrics (channel_id)",
+                "CREATE INDEX IF NOT EXISTS idx_workspace_members_workspace ON workspace_members (workspace_id)",
+            ):
+                try:
+                    conn.exec_driver_sql(index_sql)
+                except Exception:
+                    # Bảng chưa tồn tại (DB rỗng, sẽ được create_all tạo sau) ->
+                    # bỏ qua, không làm hỏng toàn bộ bước migration.
+                    logger.debug("Index creation skipped: %s", index_sql, exc_info=True)
+
+            # 5b. Nới CHECK constraint `provider` của custom_api_keys.
+            # SQLite không có ALTER CONSTRAINT nên phải dựng lại bảng. CSDL cũ
+            # chặn 'opencode' ở tầng DB, khiến lưu khóa BYOK chết bằng
+            # IntegrityError (HTTP 500) thay vì lỗi validation có thể đọc được.
+            _migrate_custom_api_key_provider_constraint(db_engine=db_engine, conn=conn)
 
             # Backfill tenant: gán workspace_id cho dữ liệu legacy còn NULL để không
             # rơi vào vùng fail-closed của tầng phân quyền (idempotent, bọc try/except).

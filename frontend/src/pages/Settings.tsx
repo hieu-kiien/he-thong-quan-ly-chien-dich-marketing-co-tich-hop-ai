@@ -1,9 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  KeyRound, ShieldCheck, Zap, CheckCircle2, AlertCircle, Eye, EyeOff, 
-  Trash2, ExternalLink, RefreshCw, Loader2, Sparkles, Building2, User, 
-  Check, Power, ShieldAlert, Cpu, ArrowRight
-} from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { KeyRound, ShieldCheck, Zap, CheckCircle2, AlertCircle, Eye, EyeOff, Trash2, ExternalLink, RefreshCw, Loader2, Building2, User, Check, Power } from 'lucide-react';
 import { settingsApi, getApiErrorMessage } from '../services/api';
 import { useToast } from '../components/Toast';
 import { CustomApiKey, AIKeyTestResponse, User as UserType, Workspace } from '../types';
@@ -134,6 +130,44 @@ const PROVIDER_CONFIGS = {
         desc: 'Chuyên sâu giải toán, lập luận logic và phân tích chỉ số Attribution.'
       }
     ]
+  },
+  // Endpoint OpenAI-compatible của opencode zen. Danh sách model đầy đủ lấy
+  // từ GET {AI_BASE_URL}/models — những model dưới đây chỉ là lựa chọn nhanh,
+  // người dùng vẫn gõ được slug bất kỳ (backend chỉ yêu cầu khác rỗng).
+  opencode: {
+    name: 'OpenCode Zen',
+    initials: 'OC',
+    initialsColor: 'text-indigo-700',
+    badge: 'Không cần credits',
+    badgeColor: 'bg-indigo-100 text-indigo-800',
+    desc: 'Endpoint OpenAI-compatible của opencode, dùng đúng model opencode đang cấu hình.',
+    keyLabel: 'OpenCode API Key',
+    keyLink: '',
+    linkText: '',
+    placeholder: 'sk-... (Dán khóa API từ ~/.config/opencode/opencode.json)',
+    models: [
+      {
+        id: 'space-bunny-free',
+        name: 'space-bunny-free',
+        badge: 'Mặc định',
+        badgeColor: 'bg-indigo-100 text-indigo-700',
+        desc: 'Model đang dùng cho backend khi AI_PROVIDER=opencode.'
+      },
+      {
+        id: 'muse-spark-1.3-contributor-free',
+        name: 'muse-spark-1.3',
+        badge: 'Miễn phí',
+        badgeColor: 'bg-emerald-100 text-emerald-800',
+        desc: 'Biến thể cộng tác viên, ưu tiên tốc độ cho nội dung ngắn.'
+      },
+      {
+        id: 'claude-sonnet-5-5',
+        name: 'claude-sonnet-5-5',
+        badge: 'Suy luận sâu',
+        badgeColor: 'bg-purple-100 text-purple-700',
+        desc: 'Phân tích chiến lược dài, thẩm định chất lượng bản nháp.'
+      }
+    ]
   }
 };
 
@@ -147,7 +181,9 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
   const [activeTab, setActiveTab] = useState<'byok' | 'profile' | 'workspace'>('byok');
 
   // BYOK Form States
-  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'openrouter' | 'openai'>('gemini');
+  // Khớp SUPPORTED_AI_PROVIDERS của backend. Thiếu 'opencode' ở đây khiến tab
+// provider đó không thể chọn được dù đã có cấu hình hiển thị.
+  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'openrouter' | 'openai' | 'opencode'>('gemini');
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
@@ -161,27 +197,33 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
+  const [keysError, setKeysError] = useState<string | null>(null);
 
   // Active Keys Table States
   const [keysList, setKeysList] = useState<CustomApiKey[]>([]);
   const [isLoadingKeys, setIsLoadingKeys] = useState(false);
 
-  // Load keys on mount and when workspace changes
-  useEffect(() => {
-    loadKeys();
-  }, [currentWorkspace]);
-
-  const loadKeys = async () => {
+  const loadKeys = useCallback(async () => {
     setIsLoadingKeys(true);
+    setKeysError(null);
     try {
       const keys = await settingsApi.getKeysList(currentWorkspace?.id);
       setKeysList(keys);
     } catch (err) {
-      console.error('Lỗi khi tải danh sách khóa AI:', err);
+      // KHÔNG nuốt lỗi: bảng khóa AI hiển thị "chưa cấu hình khóa nào" khi
+      // tải thất bại, tức người dùng tưởng mình thật sự chưa có khóa.
+      setKeysError(getApiErrorMessage(err));
     } finally {
       setIsLoadingKeys(false);
     }
-  };
+  }, [currentWorkspace?.id]);
+
+  // Nạp khóa khi mount và mỗi khi đổi workspace. Phụ thuộc vào `id` chứ không
+  // phải cả object workspace: đổi object (mỗi lần load lại danh sách) sẽ khiến
+  // effect chạy lại vô ích.
+  useEffect(() => {
+    void loadKeys();
+  }, [loadKeys]);
 
   const handleTestConnection = async () => {
     if (!apiKey.trim()) {
@@ -291,7 +333,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
             <div className="flex items-center gap-2 mb-2">
               <span className="px-2.5 py-1 bg-indigo-500/20 text-indigo-300 text-xs font-semibold rounded-full border border-indigo-400/30 flex items-center gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
-                Mã hóa AES-256 Vault / Fernet Kích hoạt
+                Mã hóa Fernet (AES-128-CBC + HMAC-SHA256)
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
@@ -381,38 +423,50 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
                     Nhà cung cấp AI (AI Provider)
                   </label>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* `lg:` chứ không phải `md:` cho 3 cột. Ở viewport 929px (nội dung thực
+                      ~617px), `md:grid-cols-3` để lại mỗi thẻ ~69px — hẹp hơn
+                      cả tên provider lẫn badge, nên badge tràn ra ngoài thẻ.
+                      Ở `lg:` mỗi thẻ đủ chỗ cho icon + tên + badge. */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                     {(Object.keys(PROVIDER_CONFIGS) as Array<keyof typeof PROVIDER_CONFIGS>).map((pKey) => {
                       const p = PROVIDER_CONFIGS[pKey];
                       const isSelected = selectedProvider === pKey;
                       return (
-                        <div
+                        // Thẻ chọn nhà cung cấp: dùng <button> gốc + aria-pressed để
+                        // hoạt động được bằng chuột lẫn bàn phím.
+                        <button
                           key={pKey}
+                          type="button"
+                          aria-pressed={isSelected}
                           onClick={() => {
                             setSelectedProvider(pKey);
                             setSelectedModel(p.models[0].id);
                           }}
-                          className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                          className={`w-full text-left font-sans p-3.5 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                             isSelected
                               ? 'border-indigo-600 bg-indigo-50/50 shadow-sm'
                               : 'border-slate-200 hover:border-slate-300 bg-white'
                           }`}
                         >
                           <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <div className={`w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center font-bold text-xs shadow-sm ${p.initialsColor}`}>
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              {/* Tên provider và badge đều cần `shrink-0`: badge
+                                  "Đa mô hình" bị vỡ thành "Đa mô / hình" khi thẻ
+                                  provider hẹp (bề rộng thực tế ~144px ở viewport
+                                  929px sau khi trừ sidebar). */}
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className={`w-7 h-7 shrink-0 rounded-lg bg-white border border-slate-200 flex items-center justify-center font-bold text-xs shadow-sm ${p.initialsColor}`}>
                                   {p.initials}
                                 </div>
-                                <span className="font-bold text-sm text-slate-900">{p.name}</span>
+                                <span className="font-bold text-sm text-slate-900 shrink-0">{p.name}</span>
                               </div>
-                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${p.badgeColor}`}>
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap ${p.badgeColor}`}>
                                 {p.badge}
                               </span>
                             </div>
                             <p className="text-xs text-slate-500 leading-snug">{p.desc}</p>
                           </div>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -425,23 +479,26 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     {PROVIDER_CONFIGS[selectedProvider].models.map((m) => (
-                      <div
+                      // Thẻ chọn mô hình AI: dùng <button> gốc + aria-pressed để chọn được bằng bàn phím.
+                      <button
                         key={m.id}
+                        type="button"
+                        aria-pressed={selectedModel === m.id}
                         onClick={() => setSelectedModel(m.id)}
-                        className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+                        className={`w-full text-left font-sans p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
                           selectedModel === m.id
                             ? 'border-indigo-600 bg-indigo-50/50 shadow-sm'
                             : 'border-slate-200 hover:border-slate-300 bg-white'
                         }`}
                       >
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="font-bold text-sm text-slate-900">{m.name}</span>
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${m.badgeColor}`}>
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <span className="font-bold text-sm text-slate-900 min-w-0">{m.name}</span>
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap ${m.badgeColor}`}>
                             {m.badge}
                           </span>
                         </div>
                         <p className="text-xs text-slate-500 leading-snug">{m.desc}</p>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -510,15 +567,20 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
                     <label className="block text-sm font-semibold text-slate-700">
                       {PROVIDER_CONFIGS[selectedProvider].keyLabel}
                     </label>
-                    <a
-                      href={PROVIDER_CONFIGS[selectedProvider].keyLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-indigo-600 hover:text-indigo-700 flex items-center gap-1 font-medium"
-                    >
-                      {PROVIDER_CONFIGS[selectedProvider].linkText}
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
+                    {/* opencode không có trang "lấy API key" công khai — khoá nằm trong
+                        file cấu hình cục bộ. Render link rỗng sẽ tạo <a href="">
+                        bấm được nhưng điều hướng về chính trang hiện tại, nên ẩn. */}
+                    {PROVIDER_CONFIGS[selectedProvider].keyLink && (
+                      <a
+                        href={PROVIDER_CONFIGS[selectedProvider].keyLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-indigo-600 hover:text-indigo-700 flex items-center gap-1 font-medium"
+                      >
+                        {PROVIDER_CONFIGS[selectedProvider].linkText}
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
                   </div>
                   <div className="relative">
                     <input
@@ -642,7 +704,9 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
                 </p>
               </div>
               <button
-                onClick={loadKeys}
+                type="button"
+                onClick={() => void loadKeys()}
+                aria-label="Tải lại danh sách khóa API"
                 className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
                 title="Tải lại danh sách"
               >
@@ -668,10 +732,26 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {keysList.length === 0 ? (
+                  {keysError ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-8 text-center">
+                        <p className="text-xs font-bold text-rose-700">Không tải được danh sách khóa API</p>
+                        <p className="text-[11px] text-rose-600 mt-1">{keysError}</p>
+                        <button
+                          type="button"
+                          onClick={() => void loadKeys()}
+                          className="mt-2 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[11px] font-bold"
+                        >
+                          Thử lại
+                        </button>
+                      </td>
+                    </tr>
+                  ) : keysList.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-6 py-8 text-center text-slate-400 text-xs">
-                        Chưa có khóa tùy biến nào được lưu. Hệ thống hiện đang sử dụng Khóa Hệ thống hoặc Smart Fallback Engine.
+                        {isLoadingKeys
+                          ? 'Đang tải danh sách khóa…'
+                          : 'Chưa có khóa tùy biến nào được lưu. Hệ thống hiện đang sử dụng Khóa Hệ thống hoặc Smart Fallback Engine.'}
                       </td>
                     </tr>
                   ) : (

@@ -6,7 +6,8 @@
     "dev": "wrangler dev",
     "build": "npm --prefix ../frontend run build",
     "deploy": "npm run build && wrangler deploy --secrets-file .env.production",
-    "check": "wrangler types && tsc --noEmit"
+    "check": "wrangler types && tsc --noEmit && node scripts/check-config.cjs",
+    "check:config": "node scripts/check-config.cjs"
   },
   "dependencies": {
     "@cloudflare/containers": "^0.3.7"

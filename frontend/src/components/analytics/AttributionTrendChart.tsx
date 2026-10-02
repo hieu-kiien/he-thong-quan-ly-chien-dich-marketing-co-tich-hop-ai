@@ -1,18 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  TrendingUp, 
-  Coins, 
-  Award, 
-  BarChart3, 
-  Layers, 
-  Calendar,
-  Sparkles,
-  ArrowUpRight,
-  ShieldCheck,
-  CheckCircle2,
-  Loader2,
-  Inbox
-} from 'lucide-react';
+import { TrendingUp, Coins, BarChart3, Layers, Loader2 } from 'lucide-react';
 import { ChannelAttribution } from '../../types';
 import { metricsApi, analyticsApi } from '../../services/api';
 
@@ -138,7 +125,10 @@ export const AttributionTrendChart: React.FC<AttributionTrendChartProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [campaignId, propDailyMetrics]);
+    // `propChannels` là đầu vào đọc bên trong effect (dòng ~78) nên phải nằm
+    // trong deps. Thiếu nó là stale closure: đổi workspace/kênh sẽ không nạp lại
+    // và biểu đồ tiếp tục vẽ số liệu của lần trước.
+  }, [campaignId, propDailyMetrics, propChannels]);
 
   // Filter trend days by selected time range
   const filteredTrendDays = useMemo(() => {
@@ -148,7 +138,13 @@ export const AttributionTrendChart: React.FC<AttributionTrendChartProps> = ({
     return dynamicDailyMetrics;
   }, [dynamicDailyMetrics, timeRange]);
 
-  const rawChannels = dynamicChannels.length > 0 ? dynamicChannels : (propChannels || []);
+  // Dùng useMemo để `rawChannels` giữ được identity ổn định. Nếu để là biểu
+  // thức tạo mảng mới mỗi render, nó làm useMemo phía dưới vô hiệu hoá và ép
+  // tính lại chuỗi normalize + tổng hợp trên mọi lần render.
+  const rawChannels = useMemo(
+    () => (dynamicChannels.length > 0 ? dynamicChannels : (propChannels || [])),
+    [dynamicChannels, propChannels]
+  );
 
   // CHUẨN HOÁ DỮ LIỆU ĐẦU VÀO — sửa lỗi làm sập cả Dashboard.
   //
@@ -271,7 +267,7 @@ export const AttributionTrendChart: React.FC<AttributionTrendChartProps> = ({
   ];
 
   return (
-    <div className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-xs ${className}`}>
+    <div className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm ${className}`}>
       {/* Top Header: Controls & Tabs */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100 dark:border-slate-800">
         <div className="space-y-1">
@@ -293,9 +289,9 @@ export const AttributionTrendChart: React.FC<AttributionTrendChartProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('cost_revenue')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 ${
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
                 activeTab === 'cost_revenue'
-                  ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-xs'
+                  ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
               }`}
             >
@@ -305,9 +301,9 @@ export const AttributionTrendChart: React.FC<AttributionTrendChartProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('channel_attribution')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 ${
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
                 activeTab === 'channel_attribution'
-                  ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-xs'
+                  ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
               }`}
             >
@@ -323,9 +319,9 @@ export const AttributionTrendChart: React.FC<AttributionTrendChartProps> = ({
                 key={r}
                 type="button"
                 onClick={() => setTimeRange(r)}
-                className={`px-2.5 py-1 rounded-lg transition-all focus:outline-hidden focus:ring-2 focus:ring-indigo-500 ${
+                className={`px-2.5 py-1 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
                   timeRange === r 
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-bold' 
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm font-bold' 
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                 }`}
               >
@@ -345,26 +341,29 @@ export const AttributionTrendChart: React.FC<AttributionTrendChartProps> = ({
         /* TAB 1: BIỂU ĐỒ DÒNG TIỀN DOANH THU VS CHI PHÍ */
         <div className="pt-5 space-y-6">
           {/* Quick Stat Summary Banner */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800">
-            <div>
+          {/* Không dùng `sm:grid-cols-4`. Sidebar 256px làm bề rộng nội dung thực
+              thấp hơn viewport: ở viewport 768px nội dung chỉ ~440px, 4 cột
+              để lại ~85px mỗi ô và số tiền ("12.000.000 đ") tràn ngang. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800">
+            <div className="min-w-0">
               <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Tổng Chi Phí (Spend)</span>
               <div className="text-base font-black text-rose-700 dark:text-rose-400 mt-0.5">
                 {totalCost.toLocaleString('vi-VN')} đ
               </div>
             </div>
-            <div>
+            <div className="min-w-0">
               <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Tổng Doanh Thu (Revenue)</span>
               <div className="text-base font-black text-emerald-700 dark:text-emerald-400 mt-0.5">
                 {totalRevenue.toLocaleString('vi-VN')} đ
               </div>
             </div>
-            <div>
+            <div className="min-w-0">
               <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Lợi Nhuận Ròng (Profit)</span>
               <div className="text-base font-black text-indigo-700 dark:text-indigo-400 mt-0.5">
                 {netProfit >= 0 ? `+${netProfit.toLocaleString('vi-VN')}` : `${netProfit.toLocaleString('vi-VN')}`} đ
               </div>
             </div>
-            <div>
+            <div className="min-w-0">
               <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Điểm Hoàn Vốn ROAS</span>
               <div className="text-base font-black text-slate-900 dark:text-white mt-0.5 flex items-center gap-1.5">
                 <span>{overallRoas}x</span>
@@ -507,7 +506,7 @@ export const AttributionTrendChart: React.FC<AttributionTrendChartProps> = ({
                         width={40} 
                         height={chartH} 
                         fill="transparent" 
-                        className="cursor-pointer focus:outline-hidden"
+                        className="cursor-pointer focus:outline-none"
                         tabIndex={0}
                         role="img"
                         aria-label={`Ngày ${d.date}: Doanh thu ${d.revenue.toLocaleString('vi-VN')} đ, Chi phí ${d.cost.toLocaleString('vi-VN')} đ`}
@@ -685,7 +684,7 @@ export const AttributionTrendChart: React.FC<AttributionTrendChartProps> = ({
                   return (
                     <div 
                       key={ch.channel_id} 
-                      className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4.5 space-y-3.5 shadow-xs hover:shadow-md transition-all"
+                      className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4.5 space-y-3.5 shadow-sm hover:shadow-md transition-all"
                     >
                       <div className="flex items-center justify-between">
                         <div>

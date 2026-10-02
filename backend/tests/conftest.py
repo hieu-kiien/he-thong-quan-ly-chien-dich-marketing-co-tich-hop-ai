@@ -90,6 +90,63 @@ def _fast_bcrypt_for_tests():
         bcrypt.gensalt = _BCRYPT_ORIGINAL_GENSALT
 
 
+_NETWORK_GUARD_MARKER = "marketflow_offline_ai_guard"
+
+
+@pytest.fixture(autouse=True)
+def offline_ai_for_tests(request):
+    """Chặn mọi gọi ra provider AI trong test.
+
+    Trước đây test chạy được vì `.env` không có khoá dùng được, nên mọi lời gọi
+    AI rơi thẳng vào Smart Fallback và trả kết quả tức thì. Sau khi cấu hình
+    provider thật (opencode), các test như `test_t2_r2_02_oversized_brief_stress`
+    lại gọi HTTP ra ngoài: /ai/omnichannel mất 83–214 giây, làm cả suite vượt
+    `--timeout` và treo (không phải lỗi logic).
+
+    Fixture này thay `ai_service._call_provider_with_retry` bằng hàm ném lỗi có
+    kiểm soát, để nhánh Smart Fallback được thực thi đúng như khi không có mạng.
+    Test nào cố tình kiểm tra đường gọi provider sẽ fail rõ ràng thay vì chạy
+    chậm và phụ thuộc trạng thái tài khoản bên ngoài.
+    """
+    from app.services.ai.ai_service import AIService
+
+    original = AIService._call_provider_with_retry
+
+    def _blocked(self, *args, **kwargs):
+        raise RuntimeError("Network calls are disabled in the test suite")
+
+    # Gán trên LỚP chứ không trên singleton: một số test tự khởi tạo
+    # `AIService()` mới (vd test_30 trong test_tier5_adversarial_hardening.py)
+    # nên chỉ vá singleton sẽ bị bỏ qua và những test đó vẫn gọi mạng thật.
+    #
+    # Ngoại lệ: test đánh dấu `@pytest.mark.allow_ai_network` — đó là các test
+    # tự mock `httpx.Client.post` để kiểm tra việc định tuyến provider, nên
+    # không hề ra mạng.
+    if request.node.get_closest_marker("allow_ai_network"):
+        yield
+        return
+
+    AIService._call_provider_with_retry = _blocked
+    try:
+        yield
+    finally:
+        AIService._call_provider_with_retry = original
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiters():
+    """Xoá bộ đếm rate-limit/quota trong bộ nhớ trước mỗi test.
+
+    Các bộ đếm này sống trong tiến trình và cố ý KHÔNG được rollback như dữ liệu
+    DB. Nếu không xoá, các test gọi API hàng loạt sẽ dồn vào cùng một bucket và
+    chạm trần, khiến chúng fail bằng 429 trông rất giống lỗi logic/phân quyền.
+    """
+    from app.core.security import reset_all_quotas
+    reset_all_quotas()
+    yield
+    reset_all_quotas()
+
+
 @pytest.fixture(autouse=True)
 def live_db_guard():
     """Autouse fixture verifying that live marketing_campaigns.db is NEVER modified during tests."""

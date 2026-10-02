@@ -14,7 +14,8 @@ import {
 } from 'lucide-react';
 import { AppNotification } from '../types';
 import { useFocusTrap } from '../hooks/useFocusTrap';
-import { notificationApi } from '../services/api';
+import { notificationApi, getApiErrorMessage } from '../services/api';
+import { useToast } from './Toast';
 
 interface NotificationCenterProps {
   pendingReviewsCount?: number;
@@ -24,42 +25,54 @@ interface NotificationCenterProps {
 
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   pendingReviewsCount = 0,
-  activeCampaignsCount = 0,
   onNavigateTab
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread'>('all');
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(false);
+  // Không nuốt lỗi: chuông báo 0 thông báo là không phân biệt được với
+  // "thật sự không có" và "không tải được".
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const toast = useToast();
 
   // Fetch real notifications from backend API
-  const fetchNotifications = useCallback(async () => {
+  const fetchNotifications = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
-      const data = await notificationApi.getAll();
+      setLoadError(null);
+      const data = await notificationApi.getAll(signal);
       setNotifications(data);
-    } catch (e) {
-      console.error('Error fetching notifications:', e);
+    } catch (e: any) {
+      if (e?.code === 'ERR_CANCELED' || signal?.aborted) return;
+      setLoadError(getApiErrorMessage(e));
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchNotifications();
+    const controller = new AbortController();
+    void fetchNotifications(controller.signal);
+    return () => controller.abort();
   }, [fetchNotifications, pendingReviewsCount]);
 
   useEffect(() => {
     if (isOpen) {
-      fetchNotifications();
+      void fetchNotifications();
     }
   }, [isOpen, fetchNotifications]);
 
+  // Đây là DROPDOWN, không phải modal. Dùng focus trap ở đây khoá Tab trong danh
+  // sách thông báo khiến người dùng bàn phím không Tab qua được ra trang, và
+  // khoá scroll/inert cả trang nền. Chỉ giữ phần bắt phím Escape.
   const modalRef = useFocusTrap<HTMLDivElement>({
     isActive: isOpen,
-    onEscape: () => setIsOpen(false)
+    onEscape: () => setIsOpen(false),
+    lockScroll: false,
+    inertSiblings: false
   });
 
   // Close when clicking outside
@@ -82,42 +95,55 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  // Mọi thao tác cập nhật trạng thái đều là optimistic; phải khôi phục lại trạng
+  // thái cũ khi API lỗi, nếu không UI nằm im báo "đã đọc/đã xoá" cho tới lúc tải
+  // lại trang dù thao tác chưa hề thành công.
   const markAllAsRead = useCallback(async () => {
+    const previous = notifications;
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     try {
       await notificationApi.markAllAsRead();
-    } catch (e) {
-      console.error('Error marking all notifications as read:', e);
+    } catch (e: any) {
+      setNotifications(previous);
+      toast.error(getApiErrorMessage(e), 'Không đánh dấu đã đọc được');
     }
-  }, []);
+  }, [notifications, toast]);
 
   const markAsRead = useCallback(async (id: string) => {
+    const previous = notifications;
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
     try {
       await notificationApi.markAsRead(id);
-    } catch (e) {
-      console.error('Error marking notification as read:', e);
+    } catch (e: any) {
+      setNotifications(previous);
+      toast.error(getApiErrorMessage(e), 'Không cập nhật được thông báo');
     }
-  }, []);
+  }, [notifications, toast]);
 
   const removeNotification = useCallback(async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    const previous = notifications;
     setNotifications(prev => prev.filter(n => n.id !== id));
     try {
       await notificationApi.markAsRead(id);
-    } catch (e) {
-      console.error('Error dismissing notification:', e);
+    } catch (e: any) {
+      setNotifications(previous);
+      toast.error(getApiErrorMessage(e), 'Không ẩn được thông báo');
     }
-  }, []);
+  }, [notifications, toast]);
 
   const clearAll = useCallback(async () => {
+    const previous = notifications;
     setNotifications([]);
     try {
+      // Backend không có "xoá hết"; mark-all-read là hành vi gần nhất tương đương.
       await notificationApi.markAllAsRead();
-    } catch (e) {
-      console.error('Error clearing notifications:', e);
+      toast.success(`Đã đánh dấu ${previous.length} thông báo là đã đọc`);
+    } catch (e: any) {
+      setNotifications(previous);
+      toast.error(getApiErrorMessage(e), 'Không xử lý được danh sách thông báo');
     }
-  }, []);
+  }, [notifications, toast]);
 
   const handleActionClick = (notif: AppNotification) => {
     markAsRead(notif.id);
@@ -249,6 +275,19 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                 <Loader2 className="w-6 h-6 animate-spin text-indigo-400 mx-auto" />
                 <p className="text-xs font-medium text-slate-300">Đang tải thông báo...</p>
               </div>
+            ) : loadError ? (
+              <div role="alert" className="p-8 text-center space-y-2">
+                <AlertTriangle className="w-6 h-6 text-rose-400 mx-auto" />
+                <p className="text-xs font-bold text-rose-300">Không tải được thông báo</p>
+                <p className="text-[11px] text-slate-400">{loadError}</p>
+                <button
+                  type="button"
+                  onClick={() => void fetchNotifications()}
+                  className="mt-1 px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[11px] font-bold"
+                >
+                  Thử lại
+                </button>
+              </div>
             ) : filteredNotifications.length === 0 ? (
               <div className="p-8 text-center text-slate-400 space-y-2">
                 <CheckCircle2 className="w-8 h-8 text-emerald-400/80 mx-auto" />
@@ -261,9 +300,21 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               </div>
             ) : (
               filteredNotifications.map((n) => (
+                // Dùng role="button" + tabIndex + onKeyDown (thay vì <button>) vì thẻ thông báo
+                // chứa nút xoá bên trong; <button> lồng nhau sẽ không hợp lệ về HTML.
                 <div
                   key={n.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Mở thông báo: ${n.title}`}
                   onClick={() => handleActionClick(n)}
+                  onKeyDown={(e) => {
+                    if (e.target !== e.currentTarget) return;
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleActionClick(n);
+                    }
+                  }}
                   className={`p-3 rounded-xl transition-all flex items-start gap-3 cursor-pointer group ${
                     n.read 
                       ? 'bg-transparent hover:bg-slate-800/40 text-slate-300' 

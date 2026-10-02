@@ -44,6 +44,8 @@ function AppContent() {
   const [contents, setContents] = useState<MarketingContent[]>([]);
   const [myTasksCount, setMyTasksCount] = useState<number>(0);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  // Truy vấn tìm kiếm từ ô trên Navbar, truyền xuống Campaigns.
+  const [campaignSearch, setCampaignSearch] = useState<string>('');
 
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
@@ -93,8 +95,23 @@ function AppContent() {
   useEffect(() => {
     if (isAuthenticated) {
       loadCampaignsAndContents(currentWorkspace?.id);
+    } else {
+      // Reset toàn bộ dữ liệu của người dùng trước khi thoát. Nếu không, sau khi
+      // đăng nhập bằng tài khoản khác, UI vẫn hiện tab và danh sách contents
+      // của người dùng cũ cho tới lúc refetch hoàn tất.
+      setCampaigns([]);
+      setContents([]);
+      setMyTasksCount(0);
+      setSelectedCampaign(null);
+      setCurrentTab('dashboard');
+      setCampaignSearch('');
     }
-  }, [isAuthenticated, currentWorkspace, loadCampaignsAndContents]);
+  }, [isAuthenticated, currentWorkspace?.id, loadCampaignsAndContents]);
+
+  const handleSearchCampaigns = (query: string) => {
+    setCampaignSearch(query);
+    setCurrentTab('campaigns');
+  };
 
   const handleOpenWorkflow = (campaign: Campaign) => {
     setSelectedCampaign(campaign);
@@ -207,6 +224,7 @@ function AppContent() {
           }}
           onToggleSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
           onNavigateTab={(tab) => setCurrentTab(tab)}
+          onSearchCampaigns={handleSearchCampaigns}
           pendingReviewsCount={contents.filter(c => c.status === 'IN_REVIEW').length}
           activeCampaignsCount={campaigns.filter(c => c.status === 'ACTIVE').length}
         />
@@ -237,6 +255,8 @@ function AppContent() {
                 onNavigateTab={(t) => setCurrentTab(t)}
                 onRefreshData={() => loadCampaignsAndContents(currentWorkspace?.id)}
                 userRole={userRole || undefined}
+                initialSearchTerm={campaignSearch}
+                searchTermSync={campaignSearch}
               />
             )}
 
@@ -266,7 +286,7 @@ function AppContent() {
                         if (found) setSelectedCampaign(found);
                       }}
                       aria-label="Chọn chiến dịch điều phối"
-                      className="text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 font-semibold text-slate-700 shadow-xs outline-hidden"
+                      className="text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 font-semibold text-slate-700 shadow-sm outline-none"
                     >
                       {campaigns.map((c) => (
                         <option key={c.id} value={c.id}>{c.name}</option>

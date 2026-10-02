@@ -1,19 +1,16 @@
 import React from 'react';
-import { 
-  LayoutDashboard, 
-  Megaphone, 
-  GitBranch, 
-  CheckSquare, 
-  Sparkles, 
-  LogOut,
-  Layers,
-  ShieldCheck,
-  X,
-  Settings,
-  Calendar,
-  ListTodo
-} from 'lucide-react';
+import { LayoutDashboard, Megaphone, CheckSquare, Sparkles, LogOut, Layers, ShieldCheck, X, Settings, Calendar, ListTodo } from 'lucide-react';
 import { User } from '../types';
+
+// Nhãn hiển thị cho từng vai trò. Role không có trong bảng sẽ hiện nguyên tên
+// role thay vì rơi về nhãn của vai trò khác — xem chú thích tại chỗ dùng.
+const ROLE_LABELS: Record<string, string> = {
+  AGENCY_MANAGER: 'Agency Manager',
+  MANAGER: 'Quản lý (Manager)',
+  CLIENT_APPROVER: 'Client Approver',
+  ADMIN: 'Quản trị hệ thống (Admin)',
+  MARKETER: 'Marketer',
+};
 
 interface SidebarProps {
   currentTab: string;
@@ -34,6 +31,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClose,
   tasksCount
 }) => {
+  // Chế độ build quyết định nhãn môi trường, không phải hằng số ghi cứng.
+  const isProd = Boolean((import.meta as any).env?.PROD);
   const menuItems = [
     { id: 'dashboard', label: 'Bảng Điều Khiển', icon: LayoutDashboard },
     { id: 'campaigns', label: 'Quản Lý Chiến Dịch', icon: Megaphone, highlight: true },
@@ -58,10 +57,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {/* Mobile Drawer Backdrop */}
+      {/* Lớp nền mobile chỉ là phím tắt chuột; nút đóng (icon X) bên trong sidebar là
+          cách đóng bằng bàn phím, nên backdrop không mang ý nghĩa tương tác. */}
       {isOpen && (
         <div
+          role="none"
           onClick={onClose}
-          className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-40 md:hidden transition-opacity no-print"
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-40 md:hidden transition-opacity no-print"
         />
       )}
 
@@ -101,19 +103,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="text-xs text-slate-400">Vai trò:</span>
             <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
               currentUser?.role === 'MANAGER' || currentUser?.role === 'AGENCY_MANAGER'
-                ? 'bg-emerald-950/80 text-emerald-200 border border-emerald-500/40' 
+                ? 'bg-emerald-950/80 text-emerald-200 border border-emerald-500/40'
                 : currentUser?.role === 'CLIENT_APPROVER'
                 ? 'bg-amber-950/80 text-amber-200 border border-amber-500/40'
                 : 'bg-indigo-950/80 text-indigo-200 border border-indigo-500/40'
             }`}>
               <ShieldCheck className="w-3 h-3" />
-              {currentUser?.role === 'AGENCY_MANAGER'
-                ? 'Agency Manager'
-                : currentUser?.role === 'MANAGER'
-                ? 'Quản lý (Manager)'
-                : currentUser?.role === 'CLIENT_APPROVER'
-                ? 'Client Approver'
-                : 'Marketer'}
+              {/* Bảng nhãn: role không có trong bảng thì hiện CHÍNH role đó, thay
+                  vì rơi về 'Marketer' — fallback sai khiến người dùng ADMIN tưởng
+                  mình là Marketer. */}
+              {ROLE_LABELS[currentUser?.role ?? ''] ?? currentUser?.role ?? '—'}
             </span>
           </div>
         </div>
@@ -146,7 +145,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {item.badge && (
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
                     isActive
-                      ? 'bg-white text-indigo-900 shadow-xs'
+                      ? 'bg-white text-indigo-900 shadow-sm'
                       : 'bg-emerald-950/80 text-emerald-200 border border-emerald-500/40'
                   }`}>
                     {item.badge}
@@ -158,13 +157,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </nav>
 
         {/* Subdomain status */}
+        {/* Nhãn môi trường lấy từ chế độ build, không hardcode "PROD".
+            Trước đây mọi bản chạy — kể cả `npm run dev` trên localhost:5173 —
+            đều hiện badge PROD và tên miền production, tức là một chỉ báo môi
+            trường sai trong 100% phiên chạy thật. */}
         <div className="px-4 py-2 border-t border-slate-800/60 bg-slate-950/30 flex items-center justify-between text-[11px]">
           <div className="flex items-center gap-1.5 text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span className="font-mono text-[10px] text-slate-300">kienhieu.id.vn</span>
+            <span
+              className={`w-2 h-2 rounded-full ${isProd ? 'bg-emerald-400' : 'bg-amber-400'}`}
+              aria-hidden="true"
+            ></span>
+            <span className="font-mono text-[10px] text-slate-300">
+              {isProd ? 'production' : 'development'}
+            </span>
           </div>
-          <span className="text-[9px] uppercase tracking-wider font-bold bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded">
-            PROD
+          <span
+            className={`text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded ${
+              isProd
+                ? 'bg-indigo-500/20 text-indigo-300'
+                : 'bg-amber-500/20 text-amber-300'
+            }`}
+          >
+            {isProd ? 'PROD' : 'DEV'}
           </span>
         </div>
 

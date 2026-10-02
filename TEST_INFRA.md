@@ -1,5 +1,7 @@
 # MarketFlow AI — Opaque-Box E2E Test Suite Infrastructure (TEST_INFRA.md)
 
+> **Historical design note (2026-09-29):** This document describes an earlier testing plan and may name suites, counts, or guarantees that have since changed. Current gate definitions and commands live in [docs/TESTING.md](docs/TESTING.md) and [.github/workflows/ci.yml](.github/workflows/ci.yml). Keep this file as design history; do not use it as the current test contract.
+
 ## 1. Executive Summary & Testing Philosophy
 
 This document defines the complete infrastructure, test hierarchy, execution mechanics, and pass/fail semantics for the **MarketFlow AI Official Release E2E Testing Track**.

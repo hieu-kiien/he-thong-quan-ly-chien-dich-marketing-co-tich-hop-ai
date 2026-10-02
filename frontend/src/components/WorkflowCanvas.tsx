@@ -1,64 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Play, 
-  Sparkles, 
-  ShieldCheck, 
-  Send, 
-  BarChart3, 
-  ArrowRight, 
-  CheckCircle2, 
-  Clock, 
-  XCircle,
-  AlertTriangle,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
-  Calendar,
-  DollarSign,
-  Target,
-  Users,
-  Layers,
-  FileText,
-  Check,
-  Copy,
-  ChevronRight,
-  TrendingUp,
-  Stethoscope,
-  Plus,
-  RefreshCw,
-  ThumbsUp,
-  MessageSquare,
-  Share2,
-  Mail,
-  Video,
-  ExternalLink,
-  HelpCircle,
-  Zap,
-  Info,
-  Eye,
-  CalendarCheck,
-  ShieldAlert,
-  Wand2,
-  X,
-  PieChart,
-  Brain,
-  Award,
-  ListTodo,
-  Edit3,
-  Save,
-  Trash2,
-  Key,
-  Percent,
-  Briefcase
-} from 'lucide-react';
-import { 
-  Campaign, MarketingContent, KPISummary, AISummaryResponse, AIIdeaItem, AIDraftResponse, ContentComplianceCheck,
-  Task, TaskStatus, TaskPriority, TaskType, BudgetAllocation, KPITarget
-} from '../types';
-import { 
-  campaignApi, contentApi, aiApi, scheduleApi, taskApi, budgetApi, kpiApi, evaluateMarketingCompliance, getApiErrorMessage 
-} from '../services/api';
+import { Play, Sparkles, ShieldCheck, BarChart3, ArrowRight, CheckCircle2, XCircle, ZoomIn, ZoomOut, Calendar, Target, Users, Layers, FileText, Check, Copy, Stethoscope, RefreshCw, ThumbsUp, MessageSquare, Share2, Mail, Video, ExternalLink, Eye, CalendarCheck, ShieldAlert, Wand2, X, PieChart, ListTodo } from 'lucide-react';
+import { Campaign, MarketingContent, KPISummary, AIIdeaItem, AIDraftResponse, ContentComplianceCheck, Task, TaskStatus, TaskPriority, TaskType } from '../types';
+import { campaignApi, contentApi, aiApi, scheduleApi, taskApi, budgetApi, evaluateMarketingCompliance, getApiErrorMessage } from '../services/api';
 import { useToast } from './Toast';
+import { copyToClipboardWithFormatting } from '../utils/copyUtils';
 import { 
   OverviewTab, 
   TasksTab, 
@@ -73,7 +18,9 @@ interface WorkflowCanvasProps {
   contents: MarketingContent[];
   campaigns?: Campaign[];
   onSelectCampaign?: (c: Campaign | null) => void;
-  onOpenAI: (campaign: Campaign) => void;
+  /** Mở trợ lý AI Copilot. Canvas đã có tab Copilot riêng nên prop này không bắt
+   *  buộc dùng; giữ optional để không phá call site. */
+  onOpenAI?: (campaign: Campaign) => void;
   onApproveContent?: (id: number) => void;
   onSubmitForReview?: (id: number) => void;
   userRole?: string;
@@ -85,7 +32,6 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   contents,
   campaigns = [],
   onSelectCampaign,
-  onOpenAI,
   onApproveContent,
   onSubmitForReview,
   userRole,
@@ -99,16 +45,12 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 
   // KPI & Doctor states
   const [campaignKpi, setCampaignKpi] = useState<KPISummary | null>(null);
-  const [doctorData, setDoctorData] = useState<AISummaryResponse | null>(null);
-  const [loadingDoctor, setLoadingDoctor] = useState<boolean>(false);
   const [submittingId, setSubmittingId] = useState<number | null>(null);
   const [approvingId, setApprovingId] = useState<number | null>(null);
 
   // Operational Brief & Tasks states
   const [campaignTasks, setCampaignTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState<boolean>(false);
-  const [budgetAllocations, setBudgetAllocations] = useState<BudgetAllocation[]>([]);
-  const [kpiTargets, setKpiTargets] = useState<KPITarget[]>([]);
   const [isEditingBrief, setIsEditingBrief] = useState<boolean>(false);
   const [briefKeyMessage, setBriefKeyMessage] = useState<string>('');
   const [briefPrimaryCta, setBriefPrimaryCta] = useState<string>('');
@@ -171,9 +113,12 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
       .catch(() => setCampaignTasks([]))
       .finally(() => setLoadingTasks(false));
 
+    // Phân bổ ngân sách được nạp để đổ vào `channelAllocations` (dùng bởi
+    // OverviewTab cho phần sửa ngân sách theo kênh). Trước đây còn giữ thêm
+    // state `budgetAllocations` riêng nhưng không component nào đọc tới nó —
+    // dữ liệu bị tải rồi vứt, tức là 1 request thừa mỗi lần đổi chiến dịch.
     budgetApi.getBudgetAllocations(campId)
       .then(res => {
-        setBudgetAllocations(res);
         if (res.length > 0) {
           setChannelAllocations(prev => prev.map(ch => {
             const found = res.find(a => a.channel_id === ch.channel_id);
@@ -181,11 +126,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
           }));
         }
       })
-      .catch(() => setBudgetAllocations([]));
-
-    kpiApi.getKPITargets(campId)
-      .then(res => setKpiTargets(res))
-      .catch(() => setKpiTargets([]));
+      .catch(() => undefined);
   };
 
   useEffect(() => {
@@ -193,7 +134,6 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
       campaignApi.getKpi(campaign.id)
         .then(res => setCampaignKpi(res))
         .catch(() => setCampaignKpi(null));
-      setDoctorData(null);
 
       setBriefKeyMessage(campaign.key_message || '');
       setBriefPrimaryCta(campaign.primary_cta || '');
@@ -202,6 +142,11 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 
       loadCampaignExtraData(campaign.id);
     }
+    // Chỉ nạp lại khi ĐỔI chiến dịch. Đưa 4 trường brief vào deps sẽ khiến effect
+    // chạy lại mỗi lần người dùng gõ trong ô brief (vì App truyền campaign object
+    // mới sau mỗi lần refetch), xoá mất nội dung đang soạn — đúng lỗi "gõ mất
+    // chữ" mà danh sách deps rộng gây ra.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaign?.id]);
 
   const handleSaveBrief = async () => {
@@ -230,8 +175,18 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
       const dataToSave = channelAllocations
         .filter(c => c.planned_amount > 0)
         .map(c => ({ channel_id: c.channel_id, planned_amount: c.planned_amount }));
+      // Đồng bộ lại state cục bộ từ phản hồi của server: trước đây dùng phản hồi
+      // để cập nhật `budgetAllocations` (một state không ai đọc) nên biểu mẫu vẫn
+      // giữ số người dùng gõ dù server đã trả về giá trị chuẩn hoá khác.
       const saved = await budgetApi.updateBudgetAllocations(campaign.id, dataToSave);
-      setBudgetAllocations(saved);
+      if (saved.length > 0) {
+        setChannelAllocations(prev =>
+          prev.map(ch => {
+            const found = saved.find(a => a.channel_id === ch.channel_id);
+            return found ? { ...ch, planned_amount: Number(found.planned_amount) } : ch;
+          })
+        );
+      }
       setIsEditingBudget(false);
       toast.success('Đã cập nhật phân bổ ngân sách các kênh!');
     } catch (e: any) {
@@ -285,7 +240,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 
   if (!campaign) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-16 text-center text-slate-500 shadow-xs">
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-16 text-center text-slate-500 shadow-sm">
         <Layers className="w-12 h-12 text-slate-300 mx-auto mb-3" />
         <h3 className="text-base font-bold text-slate-800">Chưa chọn chiến dịch tiếp thị</h3>
         <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
@@ -371,20 +326,6 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
       toast.error(getApiErrorMessage(e), 'Lỗi khi lập lịch xuất bản');
     } finally {
       setSchedulingAction(false);
-    }
-  };
-
-  // AI Performance Doctor
-  const handleRunDoctor = async () => {
-    try {
-      setLoadingDoctor(true);
-      const res = await aiApi.generateSummary(campaign.id);
-      setDoctorData(res);
-      toast.success('Bác sĩ AI đã hoàn tất chẩn đoán chiến dịch!');
-    } catch (e: any) {
-      toast.error(getApiErrorMessage(e), 'Lỗi chẩn đoán chiến dịch');
-    } finally {
-      setLoadingDoctor(false);
     }
   };
 
@@ -500,10 +441,16 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 
   // Copy text helper
   const handleCopyText = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedDraft(true);
-    setTimeout(() => setCopiedDraft(false), 2000);
-    toast.info('Đã sao chép nội dung vào Clipboard!');
+    // Không báo "Đã sao chép" khi clipboard thực tế bị từ chối (HTTP, quyền bị chặn).
+    void copyToClipboardWithFormatting(text).then((ok) => {
+      if (!ok) {
+        toast.error('Trình duyệt từ chối ghi vào clipboard');
+        return;
+      }
+      setCopiedDraft(true);
+      setTimeout(() => setCopiedDraft(false), 2000);
+      toast.info('Đã sao chép nội dung vào Clipboard!');
+    });
   };
 
   // Handle Marketer asking AI to fix rejected draft
@@ -536,7 +483,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   return (
     <div className="space-y-6">
       {/* 1. CAMPAIGN HEADER & OPERATIONAL CONTEXT BANNER */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2.5">
@@ -891,7 +838,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
       {activeTab === 'copilot' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Column: Form & Configuration */}
-          <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-5 space-y-5 shadow-xs">
+          <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-5 space-y-5 shadow-sm">
             <div>
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-violet-600" />
@@ -1013,7 +960,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                 value={tone}
                 onChange={(e) => setTone(e.target.value)}
                 placeholder="VD: Hào hứng, uy tín, trẻ trung, dí dỏm..."
-                className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:border-indigo-500 font-medium text-slate-800"
+                className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 font-medium text-slate-800"
               />
             </div>
 
@@ -1036,10 +983,14 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                 <label className="text-xs font-bold text-slate-700">Chọn 1 góc tiếp cận tâm đắc nhất:</label>
                 <div className="space-y-2">
                   {ideas.map((item, idx) => (
-                    <div
+                    // Dùng <button> gốc vì đây là lựa chọn (selectable option) trong danh sách,
+                    // cần hoạt động được bằng chuột lẫn bàn phím.
+                    <button
                       key={item.id || idx}
+                      type="button"
+                      aria-pressed={selectedIdea === item.headline}
                       onClick={() => setSelectedIdea(item.headline)}
-                      className={`p-2.5 rounded-lg border cursor-pointer text-xs transition-all ${
+                      className={`w-full text-left p-2.5 rounded-lg border cursor-pointer text-xs transition-all ${
                         selectedIdea === item.headline
                           ? 'border-indigo-600 bg-indigo-50/60 ring-2 ring-indigo-600/20 font-semibold text-slate-900'
                           : 'border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -1050,7 +1001,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                         <span className="text-[10px] text-slate-400 uppercase">{item.target_emotion}</span>
                       </div>
                       <p className="line-clamp-2">{item.headline}</p>
-                    </div>
+                    </button>
                   ))}
                 </div>
 
@@ -1069,7 +1020,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 
           {/* Right Column: Live Channel Preview Mockup & Compliance Guardrail */}
           <div className="lg:col-span-7 space-y-4">
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
@@ -1135,7 +1086,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                       {complianceResult.flagged_items.map((item, i) => (
                         <div key={i} className="bg-white/80 p-2 rounded border text-[11px] space-y-0.5">
                           <div className="flex items-center justify-between">
-                            <span className="font-bold text-rose-700">"{item.phrase}"</span>
+                            <span className="font-bold text-rose-700">&ldquo;{item.phrase}&rdquo;</span>
                             <span className="text-[9px] uppercase font-bold text-slate-400">Rủi ro: {item.risk_level}</span>
                           </div>
                           <div className="text-slate-600">{item.reason}</div>
@@ -1145,7 +1096,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 
                       <button
                         onClick={handleAutoFixCompliance}
-                        className="mt-2 text-[11px] font-bold text-emerald-800 bg-white hover:bg-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-300 transition-colors flex items-center gap-1.5 shadow-xs"
+                        className="mt-2 text-[11px] font-bold text-emerald-800 bg-white hover:bg-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-300 transition-colors flex items-center gap-1.5 shadow-sm"
                       >
                         <Wand2 className="w-3.5 h-3.5 text-emerald-600" />
                         <span>Tự động sửa các từ rủi ro bằng ngôn từ an toàn</span>
@@ -1164,7 +1115,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                     </div>
                     <p className="text-xs font-semibold text-slate-600">Khung xem trước bài viết tự động</p>
                     <p className="text-[11px] max-w-sm mx-auto">
-                      Hãy chọn kênh và bấm "Viết nội dung hoàn chỉnh". Bản nháp định dạng đúng chuẩn của kênh sẽ xuất hiện ngay tại đây.
+                      Hãy chọn kênh và bấm &ldquo;Viết nội dung hoàn chỉnh&rdquo;. Bản nháp định dạng đúng chuẩn của kênh sẽ xuất hiện ngay tại đây.
                     </p>
                   </div>
                 ) : channel === 'facebook' ? (
@@ -1204,7 +1155,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                       <div className="text-[11px] text-slate-500 truncate max-w-[200px]">
                         kienhieu.id.vn
                       </div>
-                      <span className="px-3 py-1 bg-indigo-600 text-white font-bold text-xs rounded-md shadow-xs">
+                      <span className="px-3 py-1 bg-indigo-600 text-white font-bold text-xs rounded-md shadow-sm">
                         {generatedDraft.cta || 'ĐĂNG KÝ NGAY'}
                       </span>
                     </div>
@@ -1349,9 +1300,21 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
           >
             <div className="flex items-center gap-6 relative max-w-6xl">
 
+              {/* Các node bên dưới dùng role="button" + tabIndex + onKeyDown thay vì <button> vì
+                  Node 2/3 chứa <button> con; <button> lồng nhau sẽ không hợp lệ về HTML. */}
               {/* Node 1: Trigger / Brief */}
               <div 
+                role="button"
+                tabIndex={0}
+                aria-pressed={activeNode === 'trigger'}
+                aria-label="Node 1: Khởi động (Trigger)"
                 onClick={() => setActiveNode('trigger')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setActiveNode('trigger');
+                  }
+                }}
                 className={`w-60 bg-slate-800/90 backdrop-blur-md rounded-xl p-4 border transition-all cursor-pointer shadow-lg ${
                   activeNode === 'trigger' ? 'border-indigo-500 ring-2 ring-indigo-500/30' : 'border-slate-700 hover:border-slate-600'
                 }`}
@@ -1376,7 +1339,18 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 
               {/* Node 2: AI Content Copilot */}
               <div 
+                role="button"
+                tabIndex={0}
+                aria-pressed={activeNode === 'ai_gen'}
+                aria-label="Node 2: AI Content Copilot"
                 onClick={() => setActiveNode('ai_gen')}
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setActiveNode('ai_gen');
+                  }
+                }}
                 className={`w-60 bg-slate-800/90 backdrop-blur-md rounded-xl p-4 border transition-all cursor-pointer shadow-lg relative ${
                   activeNode === 'ai_gen' ? 'border-violet-500 ring-2 ring-violet-500/30' : 'border-slate-700 hover:border-slate-600'
                 }`}
@@ -1407,7 +1381,18 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 
               {/* Node 3: Manager Approval Gate (Human-in-the-loop) */}
               <div 
+                role="button"
+                tabIndex={0}
+                aria-pressed={activeNode === 'approval'}
+                aria-label="Node 3: Chốt chặn duyệt (HITL)"
                 onClick={() => setActiveNode('approval')}
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setActiveNode('approval');
+                  }
+                }}
                 className={`w-60 bg-slate-800/90 backdrop-blur-md rounded-xl p-4 border transition-all cursor-pointer shadow-lg relative ${
                   activeNode === 'approval' ? 'border-amber-500 ring-2 ring-amber-500/30' : 'border-slate-700 hover:border-slate-600'
                 }`}
@@ -1442,7 +1427,17 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 
               {/* Node 4: Dispatch & Analytics */}
               <div 
+                role="button"
+                tabIndex={0}
+                aria-pressed={activeNode === 'dispatch'}
+                aria-label="Node 4: Đo lường & Bác sĩ AI"
                 onClick={() => setActiveNode('dispatch')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setActiveNode('dispatch');
+                  }
+                }}
                 className={`w-60 bg-slate-800/90 backdrop-blur-md rounded-xl p-4 border transition-all cursor-pointer shadow-lg ${
                   activeNode === 'dispatch' ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-slate-700 hover:border-slate-600'
                 }`}
@@ -1499,8 +1494,8 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 
       {/* 9. MODAL: LẬP LỊCH XUẤT BẢN (SCHEDULE MODAL) */}
       {scheduleModalContent && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <CalendarCheck className="w-5 h-5 text-indigo-600" />
@@ -1576,8 +1571,8 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 
       {/* 10. MODAL: TỪ CHỐI BÀI VIẾT KÈM LÝ DO (REJECT REASON MODAL) */}
       {rejectModalContent && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2 text-rose-600">
                 <XCircle className="w-5 h-5" />
@@ -1608,7 +1603,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
                 placeholder="Nhập yêu cầu hiệu chỉnh (VD: Giọng điệu quá suồng sã, cần đổi CTA - tối thiểu 3 ký tự)..."
-                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-800 focus:outline-hidden focus:border-rose-500"
+                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-800 focus:outline-none focus:border-rose-500"
               />
             </div>
 

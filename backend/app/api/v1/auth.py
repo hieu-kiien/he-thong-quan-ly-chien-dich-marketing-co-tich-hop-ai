@@ -3,6 +3,7 @@ import uuid
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import (
@@ -13,6 +14,7 @@ from app.core.security import (
     check_login_rate_limit,
     record_login_failure,
     reset_login_rate_limit,
+    enforce_quota,
 )
 from app.models.entities import User, Workspace, WorkspaceMember, BrandKit
 from app.schemas.schemas import LoginRequest, TokenResponse, UserResponse, UserRegister
@@ -20,6 +22,24 @@ from app.schemas.schemas import LoginRequest, TokenResponse, UserResponse, UserR
 router = APIRouter(prefix="/auth", tags=["Xác thực & Phân quyền"])
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_client_ip(request: Request) -> str:
+    """Xác định IP thật của client, chỉ dùng X-Forwarded-For khi proxy đáng tin."""
+    from app.core.security import is_trusted_proxy  # import cục bộ tránh vòng lặp
+
+    peer = request.client.host if request.client else "unknown"
+    if not is_trusted_proxy(peer):
+        return peer
+
+    forwarded = request.headers.get("x-forwarded-for")
+    if not forwarded:
+        # Cloudflare dùng CF-Connecting-IP cho IP thật của client.
+        return request.headers.get("cf-connecting-ip") or peer
+
+    # Chuỗi XFF là "client, proxy1, proxy2, ...". Phần tử đầu là client thật.
+    return forwarded.split(",")[0].strip() or peer
+
 
 def generate_workspace_slug(name: str, user_id: int) -> str:
     cleaned = re.sub(r'[^a-zA-Z0-9]+', '-', name.lower()).strip('-')
@@ -29,7 +49,11 @@ def generate_workspace_slug(name: str, user_id: int) -> str:
     return f"{cleaned}-{user_id}-{short_uid}"
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register(req: UserRegister, db: Session = Depends(get_db)):
+def register(req: UserRegister, request: Request, db: Session = Depends(get_db)):
+    # Hạn mức đăng ký: trước đây endpoint này không bị giới hạn, nên có thể tạo vô
+    # hạn tài khoản + workspace + brand kit, vừa tốn tài nguyên vừa loãng dữ liệu.
+    enforce_quota(f"auth:register:ip={_resolve_client_ip(request)}", max_calls=10, window_seconds=60 * 60)
+
     # 1. Kiểm tra email duy nhất
     existing_user = db.query(User).filter(User.email == req.email).first()
     if existing_user:
@@ -39,6 +63,7 @@ def register(req: UserRegister, db: Session = Depends(get_db)):
         )
 
     # 2. Tạo User mới (Chặn leo thang đặc quyền Privilege Escalation)
+    # Không được nhận vai trò đặc quyền từ client: tự đăng ký luôn là MARKETER.
     requested_role = (req.role or "MARKETER").strip().upper()
     if requested_role in ("AGENCY_MANAGER", "CLIENT_APPROVER", "ADMIN", "MANAGER"):
         raise HTTPException(
@@ -54,7 +79,16 @@ def register(req: UserRegister, db: Session = Depends(get_db)):
         status="ACTIVE"
     )
     db.add(user)
-    db.commit()
+    try:
+        # Phải bắt IntegrityError: hai request đăng ký song song cùng email đều
+        # qua bước SELECT ở trên, rồi cả hai INSERT -> thẳng 500 thay vì 400.
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email này đã được sử dụng trong hệ thống"
+        )
     db.refresh(user)
 
     # 3. Tự động tạo Personal Workspace ban đầu cho người dùng
@@ -72,11 +106,11 @@ def register(req: UserRegister, db: Session = Depends(get_db)):
     db.refresh(ws)
 
     # 4. Gán người dùng vào Workspace
-    member_role = "AGENCY_MANAGER" if role in ("MANAGER", "AGENCY_MANAGER") else role
     ws_member = WorkspaceMember(
         workspace_id=ws.id,
         user_id=user.id,
-        role=member_role
+        # Người tự đăng ký luôn là MARKETER, nên vai trò trong workspace cũng vậy.
+        role=role
     )
     db.add(ws_member)
 
@@ -97,7 +131,13 @@ def register(req: UserRegister, db: Session = Depends(get_db)):
 def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     # Brute-force protection (H1): khoá theo (email, client IP) để vừa chặn tấn
     # công dò tài khoản vừa tránh kẻ xấu khoá chính một email từ IP khác.
-    client_ip = request.client.host if request.client else "unknown"
+    #
+    # PHẢI đọc IP từ X-Forwarded-For chứ không dùng `request.client.host`.
+    # Khi chạy sau nginx/Cloudflare, `request.client.host` là địa chỉ của proxy,
+    # nên MỌI người dùng cùng nằm trong một bucket: 5 lần đoán sai từ bất kỳ ai
+    # cũng khoá đúng email đó cho toàn bộ hệ thống (DoS đăng nhập theo email),
+    # và rate limit thực tế yếu hơn hình thức trên giấy.
+    client_ip = _resolve_client_ip(request)
     identifier = f"{req.email}|{client_ip}"
 
     # PHẢI kiểm tra TRƯỚC khi chạm vào CSDL: nếu không, kẻ dò mật khẩu vẫn tiêu tốn
@@ -138,12 +178,12 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
             detail="Tài khoản đã bị vô hiệu hóa"
         )
 
-    access_token = create_access_token(data={
-        "sub": str(user.id),
-        "email": user.email,
-        "role": user.role,
-        "full_name": user.full_name
-    })
+    # Token chỉ chứa `sub` (id). KHÔNG nhúng email/role/full_name: JWT là base64
+    # (không mã hoá), nên mọi PII đó đều đọc được bằng mắt thường từ localStorage,
+    # và bất kỳ XSS nào cũng đọc được ngay. Vai trò được đọc lại từ DB ở
+    # `get_current_user` (xem app/core/security.py), nên bỏ khỏi token không ảnh
+    # hưởng phân quyền — thay vào đó loại bỏ nguy cơ token "cũ" mang vai trò cũ.
+    access_token = create_access_token(data={"sub": str(user.id)})
 
     return TokenResponse(
         access_token=access_token,

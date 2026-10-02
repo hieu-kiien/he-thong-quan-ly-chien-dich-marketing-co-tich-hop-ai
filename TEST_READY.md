@@ -1,11 +1,13 @@
 # MarketFlow AI — Comprehensive Test Suite Readiness & Verification Report (TEST_READY.md)
 
-> **Document Status**: READY, OPERATIONAL & HARDENED (Milestone M6 / Release V9)  
-> **Testing Track**: Full Enterprise Test Matrix (Backend Unit, Integration, Security, Adversarial, Opaque-Box E2E, Visual/UX Probes & CI/CD Gating)  
-> **Author**: Quality Assurance, Visual UX & Test Engineering Squad (Worker M6)  
-> **Date**: 2026-09-27  
-> **Target System**: MarketFlow AI — Enterprise Agency Omnichannel MarTech SaaS (Release V9)  
+> **Document Status**: ARCHIVED SNAPSHOT — NOT CURRENT READINESS EVIDENCE (Milestone M6 / Release V9)
+> **Testing Track**: Full Enterprise Test Matrix (Backend Unit, Integration, Security, Adversarial, Opaque-Box E2E, Visual/UX Probes & CI/CD Gating)
+> **Author**: Quality Assurance, Visual UX & Test Engineering Squad (Worker M6)
+> **Date**: 2026-09-27
+> **Target System**: MarketFlow AI — Enterprise Agency Omnichannel MarTech SaaS (Release V9)
 > **Standards Compliance**: ISO/IEC/IEEE 29119 Software Testing Standard, WCAG 2.2 AA & Adversarial Visual/UX Verification Protocol
+
+> **Historical notice (2026-09-29):** This report contains test counts and pass claims from an earlier snapshot. Use [docs/TESTING.md](docs/TESTING.md) and the linked GitHub Actions run for current commands/results. The detailed observations below are retained as historical evidence, not as a current readiness or security certification.
 
 ---
 
@@ -64,7 +66,7 @@ frontend/tests/adversarial-interaction-probes.spec.ts (12 passed in 32.4s)
 │   ├── Cold-Start Probe: Server awakening latency (>3.5s) displays friendly indicator without blank screen or crash (4.8s) -> PASSED
 │   └── Latency Resilience Probe: Delayed API response exercises server awakening indicator & recovers gracefully (5.1s) -> PASSED
 └── Probe 4: Multi-Role Concurrency & HITL State Machine Integrity (1 test)
-    └── Full Multi-Role Flow: Marketer creates/submits -> Manager approves -> Marketer edits approved content -> 
+    └── Full Multi-Role Flow: Marketer creates/submits -> Manager approves -> Marketer edits approved content ->
         Brand Safety Confirmation Dialog -> Demotes to AI_DRAFT & version_no=2 (3.4s) -> PASSED
 ```
 

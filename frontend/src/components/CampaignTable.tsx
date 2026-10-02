@@ -1,23 +1,18 @@
 import React, { useState } from 'react';
-import { 
-  Megaphone, 
-  Calendar, 
-  Sparkles, 
-  GitBranch, 
-  Trash2, 
-  Filter, 
-  Plus, 
-  Search,
-  ArrowUpRight
-} from 'lucide-react';
+import { Calendar, Sparkles, GitBranch, Trash2, Filter, Search, ArrowUpRight } from 'lucide-react';
 import { Campaign } from '../types';
+import { formatNumber } from '../utils/format';
 
 interface CampaignTableProps {
   campaigns: Campaign[];
   onSelectCampaign: (campaign: Campaign) => void;
   onOpenWorkflow: (campaign: Campaign) => void;
   onOpenAIForCampaign: (campaign: Campaign) => void;
-  onDeleteCampaign?: (id: number) => void;
+  /** Mở bước xác nhận xóa (không xóa thẳng) — việc xóa cần hộp thoại xác nhận
+   *  thay vì `window.confirm` chặn cả trang. */
+  onRequestDeleteCampaign?: (id: number) => void;
+  /** Phần trăm ngân sách đã dùng, tính từ CampaignMetric thật. */
+  spendPercentByCampaign?: Record<number, number>;
   userRole?: string;
 }
 
@@ -26,16 +21,21 @@ export const CampaignTable: React.FC<CampaignTableProps> = ({
   onSelectCampaign,
   onOpenWorkflow,
   onOpenAIForCampaign,
-  onDeleteCampaign,
+  onRequestDeleteCampaign,
+  spendPercentByCampaign,
   userRole
 }) => {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   const filteredCampaigns = campaigns.filter((c) => {
+    const needle = searchTerm.trim().toLowerCase();
     const matchesStatus = statusFilter === 'ALL' || c.status === statusFilter;
-    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          c.objective.toLowerCase().includes(searchTerm.toLowerCase());
+    // Dữ liệu partial/legacy có thể thiếu objective — `.toLowerCase()` trực tiếp
+    // trên undefined làm hỏng cả bảng.
+    const matchesSearch = needle === '' ||
+      (c.name ?? '').toLowerCase().includes(needle) ||
+      (c.objective ?? '').toLowerCase().includes(needle);
     return matchesStatus && matchesSearch;
   });
 
@@ -79,7 +79,7 @@ export const CampaignTable: React.FC<CampaignTableProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
+    <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
       {/* Table Header Controls */}
       <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
@@ -91,7 +91,7 @@ export const CampaignTable: React.FC<CampaignTableProps> = ({
               onChange={(e) => setSearchTerm(e.target.value)}
               aria-label="Lọc chiến dịch theo tên"
               placeholder="Lọc chiến dịch theo tên..."
-              className="text-xs pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:border-indigo-500 w-56"
+              className="text-xs pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 w-56"
             />
           </div>
           <div className="flex items-center gap-1">
@@ -100,7 +100,7 @@ export const CampaignTable: React.FC<CampaignTableProps> = ({
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               aria-label="Lọc chiến dịch theo trạng thái"
-              className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-hidden"
+              className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none"
             >
               <option value="ALL">Tất cả trạng thái</option>
               <option value="ACTIVE">Đang chạy</option>
@@ -143,10 +143,14 @@ export const CampaignTable: React.FC<CampaignTableProps> = ({
               filteredCampaigns.map((c) => (
                 <tr key={c.id} className="hover:bg-slate-50/60 transition-colors group">
                   <td className="py-3.5 px-4">
-                    <div className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors cursor-pointer flex items-center gap-1.5" onClick={() => onSelectCampaign(c)}>
+                    <button
+                      type="button"
+                      onClick={() => onSelectCampaign(c)}
+                      className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors flex items-center gap-1.5 text-left"
+                    >
                       {c.name}
                       <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
+                    </button>
                     <p className="text-xs text-slate-500 truncate mt-0.5">{c.objective}</p>
                   </td>
                   <td className="py-3.5 px-4 whitespace-nowrap">
@@ -157,11 +161,35 @@ export const CampaignTable: React.FC<CampaignTableProps> = ({
                   </td>
                   <td className="py-3.5 px-4 whitespace-nowrap">
                     <div className="font-semibold text-slate-900 text-xs">
-                      {Number(c.budget).toLocaleString('vi-VN')} đ
+                      {formatNumber(c.budget)} đ
                     </div>
-                    <div className="w-24 bg-slate-100 h-1.5 rounded-full mt-1.5 overflow-hidden">
-                      <div className="bg-indigo-500 h-full rounded-full w-2/3"></div>
-                    </div>
+                    {/* Thanh nhịp chi tiêu: trước đây đặt cứng w-2/3 (66%) cho mọi
+                        dòng bất kể đã chi bao nhiêu. */}
+                    {(() => {
+                      const pct = spendPercentByCampaign?.[c.id];
+                      if (pct === undefined) {
+                        return (
+                          <div className="text-[10px] text-slate-400 mt-1 italic">
+                            chưa ghi nhận chi phí
+                          </div>
+                        );
+                      }
+                      return (
+                        <>
+                          <div
+                            className="w-24 bg-slate-100 h-1.5 rounded-full mt-1.5 overflow-hidden"
+                            role="img"
+                            aria-label={`Đã dùng ${pct.toFixed(1)}% ngân sách`}
+                          >
+                            <div
+                              className={`h-full rounded-full ${pct >= 90 ? 'bg-rose-500' : pct >= 70 ? 'bg-amber-500' : 'bg-indigo-500'}`}
+                              style={{ width: `${Math.min(pct, 100)}%` }}
+                            ></div>
+                          </div>
+                          <div className="text-[10px] text-slate-500 mt-0.5">{pct.toFixed(1)}%</div>
+                        </>
+                      );
+                    })()}
                   </td>
                   <td className="py-3.5 px-4 whitespace-nowrap">
                     {getStatusBadge(c.status)}
@@ -184,10 +212,13 @@ export const CampaignTable: React.FC<CampaignTableProps> = ({
                         <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
                         <span>AI Viết</span>
                       </button>
-                      {(userRole === 'MANAGER' || userRole === 'AGENCY_MANAGER' || userRole === 'ADMIN') && onDeleteCampaign && (
+                                            {/* Backend DELETE /campaigns/{id} chỉ cho MANAGER/AGENCY_MANAGER;
+                          đưa ADMIN vào đây khiến nút hiện ra rồi nhận 403. */}
+                      {(userRole === 'MANAGER' || userRole === 'AGENCY_MANAGER') && onRequestDeleteCampaign && (
                         <button
-                          onClick={() => onDeleteCampaign(c.id)}
-                          aria-label="Xóa chiến dịch"
+                          type="button"
+                          onClick={() => onRequestDeleteCampaign(c.id)}
+                          aria-label={`Xóa chiến dịch ${c.name}`}
                           title="Xóa chiến dịch"
                           className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
                         >

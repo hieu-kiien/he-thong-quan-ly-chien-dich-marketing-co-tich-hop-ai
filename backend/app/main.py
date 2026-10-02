@@ -1,3 +1,4 @@
+import re
 import sys
 import time
 import logging
@@ -58,9 +59,15 @@ class TimingMiddleware(BaseHTTPMiddleware):
 app.add_middleware(TimingMiddleware)
 
 # CORS Middleware hỗ trợ kết nối từ Frontend React
+#
+# `allow_origin_regex` là BẮT BUỘC: CORSMiddleware của Starlette so khớp
+# `allow_origins` theo chuỗi chính xác, nên một mục dạng "https://*.kienhieu.id.vn"
+# trong danh sách sẽ không bao giờ khớp. Regex mới là thứ thực sự cho phép subdomain.
+# Lưu ý: chỉ dùng `allow_origin_regex` (không dùng "*") vì cần `allow_credentials=True`.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origin_regex="|".join(settings.ALLOWED_ORIGIN_REGEXES) if settings.ALLOWED_ORIGIN_REGEXES else None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -71,7 +78,11 @@ from fastapi.exception_handlers import request_validation_exception_handler
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    if "/reject" in str(request.url.path):
+    # So khớp theo đường dẫn, KHÔNG dùng `"/reject" in path`: bất kỳ đường dẫn nào
+    # chứa chuỗi "reject" (ví dụ /campaigns/1/contents/2/rejected-archive) cũng nhận
+    # cùng thông báo sai, và tra cứu chuỗi con trên URL là cách so khớp mong manh.
+    path = str(request.url.path)
+    if re.search(r"/contents/[^/]+/reject$", path):
         return JSONResponse(
             status_code=400,
             content={"detail": "Vui lòng cung cấp lý do từ chối cụ thể (tối thiểu 3 ký tự)"}
@@ -116,6 +127,21 @@ def on_startup():
     except Exception as e:
         logger.error(f"Error during database startup seed: {e}", exc_info=True)
 
+    # Scheduler nền.
+    #
+    # Vì sao cần công tắc tắt: trên Cloudflare, container được evict sau
+    # `sleepAfter` (10m) và dữ liệu chỉ được đẩy lên R2 qua `persistSnapshot()`
+    # sau MỖI HTTP write. Nếu scheduler chạy trong container, nó ghi
+    # APPROVED -> PUBLISHED thẳng vào SQLite mà không đi qua HTTP, nên thay đổi đó
+    # KHÔNG được snapshot. Khi container bị evict, bài đã "đăng" biến mất âm
+    # thầm — mà không có lỗi nào được ghi ra. Đặt SCHEDULER_ENABLED=false để
+    # tắt scheduler trong container và để lớp Durable Object điều phối thay.
+    if not settings.SCHEDULER_ENABLED:
+        logger.info(
+            "SCHEDULER_ENABLED=false: bo qua scheduler nen trong tien trinh. "
+            "Voi Cloudflare, lich dang nen duoc Durable Object xu ly de dam bao duoc snapshot."
+        )
+        return
     try:
         start_scheduler_task(app)
         logger.info("Background scheduler task initiated on startup.")

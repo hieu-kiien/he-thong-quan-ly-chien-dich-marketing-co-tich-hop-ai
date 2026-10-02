@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle2, Lock, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, CheckCircle2, Lock, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { ComplianceCheckResponse, ComplianceViolation } from '../types';
 
 interface ComplianceAlertBadgeProps {
@@ -69,8 +69,24 @@ export const ComplianceAlertBadge: React.FC<ComplianceAlertBadgeProps> = ({
 
   return (
     <div className={`rounded-xl border transition-all ${config.bg} ${className}`}>
-      {/* Header Bar */}
-      <div className="p-4 flex items-center justify-between gap-3 cursor-pointer select-none" onClick={() => setIsExpanded(!isExpanded)}>
+      {/* Header Bar - giữ <div> vì bên trong còn chứa các <button> con (auto-fix, chevron);
+          dùng role="button" + tabIndex + onKeyDown để header vẫn điều khiển được bằng bàn phím
+          mà không tạo HTML <button> lồng nhau không hợp lệ. */}
+      <div 
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        className="p-4 flex items-center justify-between gap-3 cursor-pointer select-none"
+        onClick={() => setIsExpanded(!isExpanded)}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsExpanded(!isExpanded);
+          }
+        }}
+      >
         <div className="flex items-center gap-3">
           {config.icon}
           <div>
@@ -140,7 +156,7 @@ export const ComplianceAlertBadge: React.FC<ComplianceAlertBadgeProps> = ({
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                          "{v.word}"
+                          &ldquo;{v.word}&rdquo;
                         </span>
                         <span className={`px-2 py-0.5 rounded font-semibold text-[10px] ${
                           v.category === 'BRAND_BANNED' 

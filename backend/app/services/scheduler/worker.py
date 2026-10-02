@@ -117,14 +117,27 @@ def process_due_schedules(db: Optional[Session] = None) -> List[int]:
 
     processed_ids: List[int] = []
     try:
-        due_schedules = (
+        # Chỉ xét các lịch PLANNED SỚP NHẤT theo `scheduled_at` tăng dần, tối đa
+        # 200 lịch. `ORDER BY scheduled_at` dùng được idx_schedules_time_status, và
+        # việc cắt ngắn ở đây là ĐÚNG: nếu 200 lịch sớm nhất đều còn ở tương lai
+        # thì không lịch nào đến hạn.
+        #
+        # KHÔNG lọc đến hạn ngay trong SQL: `scheduled_at` là chuỗi theo MÚI GIỜ CỦA
+        # LỊCH (mặc định Asia/Ho_Chi_Minh), nên so sánh nó với giờ UTC trong SQL là
+        # sai lệch 7 tiếng và bỏ sót/sai các lịch đã đến hạn. Việc quyết định "đã
+        # đến hạn" phải do `parse_scheduled_datetime` đảm nhiệm (nó nhận thêm
+        # `timezone` của từng lịch). Trước đây vòng lặp quét TOÀN BỘ lịch PLANNED
+        # mỗi 20 giây; giờ chỉ quét tối đa 200 lịch cũ nhất.
+        candidate_schedules = (
             db.query(MarketingSchedule)
             .filter(MarketingSchedule.status == "PLANNED")
+            .order_by(MarketingSchedule.scheduled_at.asc())
+            .limit(200)
             .all()
         )
         now_utc = datetime.now(timezone.utc)
 
-        for schedule in due_schedules:
+        for schedule in candidate_schedules:
             try:
                 scheduled_dt = parse_scheduled_datetime(schedule.scheduled_at, schedule.timezone)
                 if scheduled_dt.astimezone(timezone.utc) <= now_utc:
@@ -147,7 +160,15 @@ def process_due_schedules(db: Optional[Session] = None) -> List[int]:
                             f"Schedule {schedule.id} already claimed by another worker/replica; skipping."
                         )
                         continue
-                    # Chi sau khi da nam duoc lease, moi chuyen noi dung APPROVED sang PUBLISHED.
+                    # Chỉ sau khi đã nắm được lease, mới chuyển nội dung APPROVED sang PUBLISHED.
+                    #
+                    # Về phân quyền: bản ghi MarketingSchedule CHÍNH LÀ giấy phép do
+                    # người dùng đã tạo qua `POST /contents/{id}/schedule`, mà endpoint
+                    # đó bắt buộc nội dung ở trạng thái APPROVED (tức đã qua quy trình
+                    # duyệt và quy tắc "không tự duyệt nội dung của mình"). Vì vậy
+                    # worker không cần — và không được — chạy lại RoleChecker của
+                    # /publish: không có mốc "ai đã duyệt" nào để kiểm tra tại thời
+                    # điểm chạy nền, và cố kiểm tra sẽ chỉ tạo ra hai nguồn sự thật.
                     content = (
                         db.query(MarketingContent)
                         .filter(MarketingContent.id == schedule.content_id)

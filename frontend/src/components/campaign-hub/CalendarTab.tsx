@@ -30,7 +30,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
         {onNavigateToDoctor && (
           <button
             onClick={onNavigateToDoctor}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs shadow-xs transition-colors flex items-center gap-1.5 shrink-0"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs shadow-sm transition-colors flex items-center gap-1.5 shrink-0"
           >
             <Stethoscope className="w-4 h-4" />
             <span>Chuyển sang Bác sĩ AI Vận hành</span>

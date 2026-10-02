@@ -91,9 +91,73 @@ def check_campaign_access(campaign: Campaign, user: User, db: Session):
         detail="Not authorized to access this resource"
     )
 
+def resolve_effective_workspace_id(
+    db: Session,
+    current_user: User,
+    workspace_id: Optional[int] = None,
+    header_workspace_id: Optional[str] = None,
+) -> Optional[int]:
+    """Chốt workspace hiện hành của request, theo thứ tự ưu tiên:
+
+    1. Query param `workspace_id` (gọi API trực tiếp, rõ ý định nhất).
+    2. Header `X-Workspace-Id` — đây là header mà frontend gửi tự động từ
+       workspace người dùng đang chọn trên `WorkspaceSwitcher` (xem
+       interceptor trong frontend/src/services/api.ts).
+    3. `None` = không lọc theo workspace cụ thể (endpoint tự áp tenant scope
+       rộng hơn, ví dụ dashboard tổng hợp).
+
+    Vì sao cần hàm dùng chung: trước đây header chỉ được `POST /campaigns` đọc.
+    Các endpoint LIST (`GET /campaigns`, `GET /contents`, ...) bỏ qua nó, nên khi
+    người dùng đổi workspace trên UI, màn hình vẫn hiện dữ liệu của workspace đầu
+    tiên — bộ chuyển workspace trông như hoạt động nhưng không có tác dụng gì.
+    """
+    if workspace_id is not None:
+        return workspace_id
+    if header_workspace_id:
+        try:
+            return int(header_workspace_id)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Header X-Workspace-Id không phải là số nguyên hợp lệ",
+            )
+    return None
+
+
+def get_workspace_filter(
+    workspace_id: Optional[int] = Query(None, alias="workspace_id"),
+    x_workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Optional[int]:
+    """Dependency trả về workspace hiện hành, hoặc None nếu không yêu cầu lọc.
+
+    Dùng cho endpoint list. Giá trị trả về đã được kiểm tra quyền: người dùng
+    chỉ được chỉ định workspace mà mình là owner hoặc thành viên (ADMIN thì tự do).
+    Endpoint vẫn tự áp `_apply_tenant_scope` phía sau, nên thiếu hoặc sai header
+    cũng không thể vượt qua ranh giới tenant.
+    """
+    target = resolve_effective_workspace_id(db, current_user, workspace_id, x_workspace_id)
+    if target is None:
+        return None
+    if current_user.role != "ADMIN":
+        ws = db.query(Workspace).filter(Workspace.id == target).first()
+        is_ws_owner = ws is not None and ws.owner_id == current_user.id
+        is_ws_member = db.query(WorkspaceMember).filter(
+            WorkspaceMember.workspace_id == target,
+            WorkspaceMember.user_id == current_user.id
+        ).first() is not None
+        if not (is_ws_owner or is_ws_member):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access data in this workspace",
+            )
+    return target
+
+
 @router.get("", response_model=List[CampaignResponse])
 def get_campaigns(
-    workspace_id: Optional[int] = Query(None, alias="workspace_id"),
+    workspace_id: Optional[int] = Depends(get_workspace_filter),
     status_filter: Optional[str] = Query(None, alias="status"),
     channel_id: Optional[int] = Query(None, alias="channel_id"),
     start_date: Optional[str] = Query(None, alias="start_date"),
@@ -117,19 +181,9 @@ def get_campaigns(
             (Campaign.id.in_(member_campaign_ids))
         )
 
+    # `workspace_id` tới đây đã được phân giải + kiểm tra quyền trong dependency
+    # `get_workspace_filter` (đọc cả query param lẫn header X-Workspace-Id).
     if workspace_id is not None:
-        if current_user.role != "ADMIN":
-            ws = db.query(Workspace).filter(Workspace.id == workspace_id).first()
-            is_ws_owner = ws is not None and ws.owner_id == current_user.id
-            is_ws_member = db.query(WorkspaceMember).filter(
-                WorkspaceMember.workspace_id == workspace_id,
-                WorkspaceMember.user_id == current_user.id
-            ).first() is not None
-            if not (is_ws_owner or is_ws_member):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Not authorized to access campaigns in this workspace"
-                )
         query = query.filter(Campaign.workspace_id == workspace_id)
     if status_filter:
         query = query.filter(Campaign.status == status_filter)
@@ -273,6 +327,19 @@ def update_campaign(
                 detail=f"Không được cập nhật trường '{field}'.",
             )
         setattr(campaign, field, value)
+
+    # Sửa `status` hoặc `budget` là hành động quản trị, không phải thao tác
+    # nội dung. Trước đây endpoint này chỉ kiểm tra "có quyền đọc campaign" nên
+    # CLIENT_APPROVER (và cả marketer không sở hữu) cũng đổi được trạng thái và
+    # ngân sách — chính là đường để tăng ngân sách 20% bằng một cú bấm.
+    if ("status" in update_data or "budget" in update_data):
+        privileged = current_user.role in ("ADMIN", "MANAGER", "AGENCY_MANAGER")
+        is_owner = campaign.owner_id == current_user.id
+        if not (privileged or is_owner):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Chỉ chủ sở hữu hoặc quản lý mới được thay đổi trạng thái/ngân sách chiến dịch",
+            )
 
     # Validate lại ngày nếu có cập nhật
     if campaign.end_date < campaign.start_date:

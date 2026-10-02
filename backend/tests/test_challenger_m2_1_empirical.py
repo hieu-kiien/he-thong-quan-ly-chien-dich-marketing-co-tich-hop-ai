@@ -62,7 +62,9 @@ class TestChallenger1OmnichannelEmpirical:
 
         # Kiểm chứng task_type & model
         assert data.get("task_type") == "OMNICHANNEL"
-        assert "gemini" in data.get("model_used", "").lower() or "flash" in data.get("model_used", "").lower()
+        # Kh?ng hardcode t*n model: AI_PROVIDER l? c?u h?nh nên t*n model tùy provider.
+        # Test tr?c ??i "gemini" -> ch? ??i provider kh?c l? to?n b? suite ??
+        assert str(data.get("model_used", "")).strip(), "model_used ph?i ???c b?o c?o"
 
         # 1. Kênh Facebook
         fb = data.get("facebook")
@@ -201,7 +203,9 @@ class TestChallenger1OmnichannelEmpirical:
         assert "đa cấp" not in full_text
 
         # 4. Kiểm chứng AILog được lưu trong DB với task_type='OMNICHANNEL'
-        assert "gemini" in data.get("model_used", "").lower() or "flash" in data.get("model_used", "").lower()
+        # Kh?ng hardcode t*n model: AI_PROVIDER l? c?u h?nh nên t*n model tùy provider.
+        # Test tr?c ??i "gemini" -> ch? ??i provider kh?c l? to?n b? suite ??
+        assert str(data.get("model_used", "")).strip(), "model_used ph?i ???c b?o c?o"
         log = db_session.query(AILog).filter(
             AILog.campaign_id == camp.id,
             AILog.task_type == "OMNICHANNEL"

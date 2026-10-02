@@ -6,11 +6,13 @@
 # BÁO CÁO NGHIỆM THU KỸ THUẬT NỘI BỘ CHUẨN DOANH NGHIỆP & CHỨNG NHẬN CHẤT LƯỢNG HỆ THỐNG
 ## (ENTERPRISE INTERNAL TECHNICAL ACCEPTANCE & QUALITY CERTIFICATION REPORT)
 
-**Dự án**: Hệ thống Quản lý Chiến dịch Marketing có Tích hợp AI (MarketFlow AI) — Vòng 3  
-**Mã hồ sơ nghiệm thu**: `MF-ENT-ACCEPTANCE-2026-09-23-V3`  
-**Cơ quan thực hiện**: Hội đồng Nghiệm thu Kỹ thuật Chuẩn Doanh nghiệp (Enterprise Final Acceptance Team - Team 5) phối hợp cùng Ban Giám sát Độc lập (Supervisory Oversight Team - Team 4)  
-**Thời điểm lập biên bản**: 2026-09-23T22:30:00+07:00 (15:30:00 UTC)  
-**Trạng thái phê duyệt**: PHÊ DUYỆT CHUYỂN GIAO CÓ ĐIỀU KIỆN (CONDITIONAL ENTERPRISE RELEASE GATE APPROVAL)  
+> **Hồ sơ lịch sử:** Biên bản này ghi nhận đánh giá tại thời điểm lập và giữ lại làm dấu vết. Các kết luận, đề xuất hạ tầng và số liệu không đại diện trạng thái hiện tại. Dùng [lộ trình hiện hành](docs/ROADMAP.md), [kiến trúc](docs/ARCHITECTURE.md) và [bằng chứng CI](docs/TESTING.md) để lập kế hoạch hoặc đưa ra tuyên bố hiện nay.
+
+**Dự án**: Hệ thống Quản lý Chiến dịch Marketing có Tích hợp AI (MarketFlow AI) — Vòng 3
+**Mã hồ sơ nghiệm thu**: `MF-ENT-ACCEPTANCE-2026-09-23-V3`
+**Cơ quan thực hiện**: Hội đồng Nghiệm thu Kỹ thuật Chuẩn Doanh nghiệp (Enterprise Final Acceptance Team - Team 5) phối hợp cùng Ban Giám sát Độc lập (Supervisory Oversight Team - Team 4)
+**Thời điểm lập biên bản**: 2026-09-23T22:30:00+07:00 (15:30:00 UTC)
+**Trạng thái phê duyệt**: PHÊ DUYỆT CHUYỂN GIAO CÓ ĐIỀU KIỆN (CONDITIONAL ENTERPRISE RELEASE GATE APPROVAL)
 
 ---
 

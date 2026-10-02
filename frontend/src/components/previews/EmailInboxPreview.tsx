@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Star, Archive, Trash2, Eye, ShieldCheck, ArrowLeft, Printer, Image as ImageIcon, CheckCircle2 } from 'lucide-react';
+import { Mail, Star, Archive, Trash2, Eye, ShieldCheck, ArrowLeft, Image as ImageIcon } from 'lucide-react';
 import { ImageAttachmentPicker } from './ImageAttachmentPicker';
 
 export interface EmailInboxPreviewProps {
@@ -67,7 +67,7 @@ export const EmailInboxPreview: React.FC<EmailInboxPreviewProps> = ({
             onClick={() => setViewMode('INBOX_ROW')}
             className={`px-2.5 py-1 rounded-md font-medium text-[11px] transition ${
               viewMode === 'INBOX_ROW'
-                ? 'bg-white text-indigo-700 shadow-xs'
+                ? 'bg-white text-indigo-700 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -77,7 +77,7 @@ export const EmailInboxPreview: React.FC<EmailInboxPreviewProps> = ({
             onClick={() => setViewMode('FULL_READER')}
             className={`px-2.5 py-1 rounded-md font-medium text-[11px] transition ${
               viewMode === 'FULL_READER'
-                ? 'bg-white text-indigo-700 shadow-xs'
+                ? 'bg-white text-indigo-700 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -97,10 +97,17 @@ export const EmailInboxPreview: React.FC<EmailInboxPreviewProps> = ({
             {effectiveSubjectOptions.map((subj, idx) => (
               <button
                 key={idx}
+                type="button"
                 onClick={() => setSelectedSubjectIdx(idx)}
+                // Hiện chữ ký A/B là "Tiêu đề A/B/C" và mọi biến thể đều hiện
+                // giống nhau — người dùng không biết mình đang chọn dòng chữ nào.
+                // `title` hiện nội dung thật của từng biến thể.
+                title={subj}
+                aria-label={`Xem trước tiêu đề biến thể ${String.fromCharCode(65 + idx)}: ${subj}`}
+                aria-pressed={selectedSubjectIdx === idx}
                 className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${
                   selectedSubjectIdx === idx
-                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    ? 'bg-indigo-600 text-white shadow'
                     : 'bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100'
                 }`}
               >
@@ -114,12 +121,23 @@ export const EmailInboxPreview: React.FC<EmailInboxPreviewProps> = ({
       {/* CHẾ ĐỘ 1: INBOX ROW PREVIEW */}
       {viewMode === 'INBOX_ROW' && (
         <div className="p-3 bg-white hover:bg-slate-50 transition cursor-pointer group">
+          {/* Dòng inbox dùng role="button" + tabIndex + onKeyDown vì chứa checkbox và nút sao bên trong. */}
           <div
+            role="button"
+            tabIndex={0}
+            aria-label="Mở email"
             onClick={() => setViewMode('FULL_READER')}
+            onKeyDown={(e) => {
+              if (e.target !== e.currentTarget) return;
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setViewMode('FULL_READER');
+              }
+            }}
             className="flex items-center gap-3"
           >
             {/* Unread blue dot */}
-            <div className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0 shadow-xs"></div>
+            <div className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0 shadow-sm"></div>
 
             {/* Checkbox & Star */}
             <div className="flex items-center gap-2 text-slate-400">
@@ -228,6 +246,8 @@ export const EmailInboxPreview: React.FC<EmailInboxPreviewProps> = ({
 
           {/* Newsletter Header Banner (Ảnh thực tế) */}
           <div className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+            {/* Vùng chọn ảnh banner dùng <button> gốc thay cho div onClick: đây là
+                nút bấm thật (không chứa phần tử tương tác con). */}
             {imageUrl ? (
               <div className="relative aspect-[21/9] w-full overflow-hidden bg-slate-900">
                 <img
@@ -238,7 +258,7 @@ export const EmailInboxPreview: React.FC<EmailInboxPreviewProps> = ({
                 {onImageChange && (
                   <button
                     onClick={() => setIsPickerOpen(!isPickerOpen)}
-                    className="absolute top-2 right-2 px-2.5 py-1 bg-black/70 hover:bg-black text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition shadow backdrop-blur-xs flex items-center gap-1.5"
+                    className="absolute top-2 right-2 px-2.5 py-1 bg-black/70 hover:bg-black text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition shadow backdrop-blur-sm flex items-center gap-1.5"
                   >
                     <ImageIcon className="w-3.5 h-3.5" />
                     Đổi ảnh Banner
@@ -246,14 +266,15 @@ export const EmailInboxPreview: React.FC<EmailInboxPreviewProps> = ({
                 )}
               </div>
             ) : (
-              <div
+              <button
+                type="button"
                 onClick={() => onImageChange && setIsPickerOpen(true)}
-                className="py-6 px-4 text-center bg-slate-50 border-dashed border-2 border-slate-200 hover:bg-slate-100 transition cursor-pointer"
+                className="w-full font-sans py-6 px-4 text-center bg-slate-50 border-dashed border-2 border-slate-200 hover:bg-slate-100 transition cursor-pointer"
               >
                 <ImageIcon className="w-6 h-6 text-slate-400 mx-auto mb-1" />
                 <p className="text-xs font-semibold text-slate-700">Chưa gắn ảnh banner tiêu đề email</p>
                 <p className="text-[10px] text-slate-500">Bấm để chọn banner chất lượng cao</p>
-              </div>
+              </button>
             )}
           </div>
 

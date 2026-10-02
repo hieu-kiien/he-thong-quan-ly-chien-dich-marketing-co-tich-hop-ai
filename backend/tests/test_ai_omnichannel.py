@@ -51,7 +51,11 @@ class TestAIOmnichannelEngine:
         assert "tiktok" in data and data["tiktok"] is not None
         assert "email" in data and data["email"] is not None
         assert data.get("task_type") == "OMNICHANNEL"
-        assert "gemini" in data.get("model_used", "").lower() or "flash" in data.get("model_used", "").lower()
+        # Không hardcode tên model: AI_PROVIDER là biến cấu hình (gemini /
+        # openrouter / openai / opencode) nên tên model có thể là bất kỳ slug nào.
+        # Test trước đòi "gemini" trong model_used, nên chỉ đổi AI_PROVIDER sang
+        # provider khác là toàn bộ suite đỏ dù ứng dụng chạy đúng.
+        assert str(data.get("model_used", "")).strip(), "model_used phải được báo cáo"
 
     def test_02_facebook_creative_dual_fields_compatibility(self, client: TestClient, manager_headers):
         """Kiểm tra hợp đồng dữ liệu kênh Facebook: Đầy đủ title/headline, body/primary_text, cta, hashtags."""

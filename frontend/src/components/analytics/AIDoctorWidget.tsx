@@ -1,20 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Stethoscope, 
-  Sparkles, 
-  AlertTriangle, 
-  CheckCircle2, 
-  Zap, 
-  TrendingUp, 
-  RefreshCw, 
-  ArrowUpRight, 
-  PauseCircle, 
-  Wand2, 
-  Check, 
-  ShieldCheck,
-  AlertCircle,
-  Info
-} from 'lucide-react';
+import { Stethoscope, Sparkles, AlertTriangle, Zap, TrendingUp, RefreshCw, ArrowUpRight, PauseCircle, Wand2, Check, AlertCircle, Info } from 'lucide-react';
 import { AIDoctorReport, AIDoctorRecommendation } from '../../types';
 import { campaignApi } from '../../services/api';
 import { useToast } from '../Toast';
@@ -138,11 +123,15 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
   const strokeDashoffset = circumference - (score / 100) * circumference;
 
   return (
-    <div className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-xs space-y-6 ${className}`}>
+    <div className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm space-y-6 ${className}`}>
       
       {/* 1. Header & Re-diagnose Trigger */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-slate-100 dark:border-slate-800">
-        <div className="flex items-center gap-3">
+      {/* Widget này xuất hiện ở hai nơi với bề rộng rất khác nhau: cột ~305px của
+          Dashboard và toàn bộ bề rộng trong PerformanceTab. Breakpoint theo
+          viewport không phân biệt được hai trường hợp đó — nên `compact`
+          quyết định bố cục thay vì `sm:`/`lg:`. */}
+      <div className={`flex ${compact ? 'flex-col' : 'flex-col lg:flex-row'} items-center justify-between gap-3 pb-5 border-b border-slate-100 dark:border-slate-800`}>
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/20 shrink-0">
             <Stethoscope className="w-5 h-5" />
           </div>
@@ -162,7 +151,7 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
                 <span 
                   role="status"
                   aria-label="Chế độ dữ liệu mẫu"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-700 text-[11px] font-bold shadow-2xs"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-700 text-[11px] font-bold shadow"
                   title="Dữ liệu mẫu: Hệ thống đang chạy chế độ mô phỏng do chiến dịch chưa tích lũy đủ số liệu thực tế"
                 >
                   <AlertCircle className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0" aria-hidden="true" />
@@ -181,7 +170,7 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
             type="button"
             onClick={() => loadDiagnosis(campaignId)}
             disabled={loading}
-            className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shrink-0 self-start sm:self-auto focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+            className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shrink-0 self-start sm:self-auto focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-indigo-600' : ''}`} />
             <span>{loading ? 'Đang khám số liệu...' : 'Khám & Chẩn đoán lại'}</span>
@@ -193,7 +182,7 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
       {isDemoMode && (
         <div 
           role="status"
-          className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5 shadow-2xs"
+          className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5 shadow"
         >
           <Info className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
           <div className="leading-relaxed">
@@ -207,10 +196,10 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
       )}
 
       {/* 2. Health Score Meter & Diagnostic Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center bg-gradient-to-r from-slate-50 via-indigo-50/30 to-emerald-50/30 dark:from-slate-800/40 dark:to-slate-800/20 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800">
+      <div className={`grid grid-cols-1 ${compact ? '' : 'lg:grid-cols-12'} gap-5 items-center bg-gradient-to-r from-slate-50 via-indigo-50/30 to-emerald-50/30 dark:from-slate-800/40 dark:to-slate-800/20 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800`}>
         
         {/* Circular Gauge Meter */}
-        <div className="md:col-span-4 flex items-center gap-4 justify-center md:justify-start">
+        <div className={`${compact ? '' : 'lg:col-span-4'} flex items-center gap-4 justify-center ${compact ? '' : 'lg:justify-start'} min-w-0`}>
           <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
             <svg 
               className="w-full h-full transform -rotate-90" 
@@ -242,7 +231,10 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
               <span className="text-2xl font-black text-slate-900 dark:text-white leading-none">
                 {score}
               </span>
-              <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase mt-0.5">/ 100đ</span>
+              {/* KHÔNG dùng `uppercase` ở đây: nó biến chữ "đ" trong "điểm"
+                  thành "Đ", nên vòng tròn hiển thị "/ 100Đ" và trông như lỗi
+                  chính tả. Chữ thường vẫn đọc rõ ở cỡ 10px đã in đậm. */}
+              <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 mt-0.5">/ 100đ</span>
             </div>
           </div>
 
@@ -257,7 +249,7 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
         </div>
 
         {/* Diagnostic Narrative */}
-        <div className="md:col-span-8 space-y-1.5 md:border-l md:border-slate-200 dark:md:border-slate-800 md:pl-5">
+        <div className={`${compact ? '' : 'lg:col-span-8'} space-y-1.5 min-w-0 ${compact ? '' : 'lg:border-l lg:border-slate-200 dark:lg:border-slate-800 lg:pl-5'}`}>
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-indigo-700 dark:text-indigo-400" />
             <span>Tóm tắt Chẩn đoán Cấp Quản lý</span>
@@ -318,12 +310,13 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Xem `compact`: ở Dashboard mỗi thẻ chỉ còn ~89px nên badge "SCALE" +
+            tên kênh bị tràn; ở PerformanceTab thì 3 cột vẫn vừa. */}
+        <div className={`grid grid-cols-1 ${compact ? '' : 'lg:grid-cols-3'} gap-4`}>
           {recommendations.map((rec, idx) => {
             const isApplied = appliedActions[idx];
             const isScale = rec.action === 'SCALE';
             const isOptimize = rec.action === 'OPTIMIZE';
-            const isPause = rec.action === 'PAUSE' || rec.action === 'REDUCE';
 
             const cardBorder = isScale
               ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/20'
@@ -340,10 +333,12 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
             return (
               <div 
                 key={idx}
-                className={`rounded-xl border p-4.5 space-y-3 flex flex-col justify-between transition-all hover:shadow-md ${cardBorder}`}
+                className={`rounded-xl border p-4.5 space-y-3 flex flex-col justify-between transition-all hover:shadow-md min-w-0 ${cardBorder}`}
               >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
+                <div className="space-y-2 min-w-0">
+                  {/* `flex-wrap`: badge hành động + tên kênh không đứng cạnh
+                      nhau được trong thẻ hẹp. */}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${actionBadge}`}>
                       {rec.action}
                     </span>
@@ -375,7 +370,7 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
                     type="button"
                     onClick={() => handleApplyAction(idx, rec)}
                     disabled={isApplied}
-                    className={`w-full py-2 px-3 rounded-lg text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95 focus:outline-hidden focus:ring-2 focus:ring-offset-2 ${
+                    className={`w-full py-2 px-3 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                       isApplied
                         ? 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400 cursor-default'
                         : isScale

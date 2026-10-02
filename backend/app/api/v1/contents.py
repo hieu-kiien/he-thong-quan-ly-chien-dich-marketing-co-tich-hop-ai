@@ -13,7 +13,7 @@ from app.schemas.schemas import (
 )
 from app.services.compliance.compliance_service import ComplianceScanner
 from app.api.v1.notifications import create_notification
-from app.api.v1.campaigns import _apply_tenant_scope
+from app.api.v1.campaigns import _apply_tenant_scope, get_workspace_filter
 
 router = APIRouter(prefix="/contents", tags=["Quản lý Nội dung Marketing"])
 
@@ -140,7 +140,7 @@ def check_campaign_access_for_content(campaign_id: int, user: User, db: Session)
 
 @router.get("", response_model=List[ContentResponse])
 def get_contents(
-    workspace_id: Optional[int] = Query(None),
+    workspace_id: Optional[int] = Depends(get_workspace_filter),
     campaign_id: Optional[int] = Query(None),
     status_filter: Optional[str] = Query(None, alias="status"),
     channel_id: Optional[int] = Query(None),
@@ -156,8 +156,18 @@ def get_contents(
     if current_user.role != "ADMIN":
         query = _apply_tenant_scope(query, MarketingContent, current_user, db, MarketingContent.created_by)
 
-    # Record-level filtering cho Marketer
-    if current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER"):
+    # Record-level filtering cho Marketer.
+    #
+    # CLIENT_APPROVER được liệt kê cùng nhóm quản lý: đó chính là mục đích của
+    # vai trò này — họ không phải thành viên của từng chiến dịch (thường không
+    # có CampaignMember nào), nên nếu lọc theo `CampaignMember` thì hàng đợi
+    # phê duyệt của họ LUÔN RỖNG trong khi `POST /approve` lại cho phép họ duyệt
+    # (xem giải thích ở approve_content). Đây là trạng thái không nhất quán:
+    # không thấy bài nhưng vẫn duyệt được nếu đoán đúng id. Biên an toàn vẫn được
+    # giữ bởi `_apply_tenant_scope` + `get_workspace_filter` phía trên — approver
+    # chỉ thấy nội dung trong workspace họ thực sự là owner/member, và vẫn bị chặn
+    # tự duyệt bài của chính mình ở approve_content.
+    if current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER", "CLIENT_APPROVER"):
         if campaign_id is not None:
             # Nếu truyền campaign_id, kiểm tra quyền truy cập chiến dịch đó
             check_campaign_access_for_content(campaign_id, current_user, db)
@@ -175,19 +185,9 @@ def get_contents(
         if campaign_id:
             query = query.filter(MarketingContent.campaign_id == campaign_id)
 
+    # `workspace_id` đã được phân giải + kiểm tra quyền trong dependency
+    # `get_workspace_filter` (đọc cả query param lẫn header X-Workspace-Id).
     if workspace_id is not None:
-        if current_user.role != "ADMIN":
-            ws = db.query(Workspace).filter(Workspace.id == workspace_id).first()
-            is_ws_owner = ws is not None and ws.owner_id == current_user.id
-            is_ws_member = db.query(WorkspaceMember).filter(
-                WorkspaceMember.workspace_id == workspace_id,
-                WorkspaceMember.user_id == current_user.id
-            ).first() is not None
-            if not (is_ws_owner or is_ws_member):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Not authorized to access resources in this workspace"
-                )
         query = query.filter(MarketingContent.workspace_id == workspace_id)
     if status_filter:
         query = query.filter(MarketingContent.status == status_filter)
@@ -478,6 +478,12 @@ def approve_content(
         )
 
     # Enforce workspace boundary
+    # Biên bảo mật đúng cho hai thao tác này là BIÊN WORKSPACE, không phải biên
+    # chiến dịch: CLIENT_APPROVER cố tình là vai trò duyệt nội dung của cả
+    # workspace, và họ chỉ được duyệt khi đã là owner/member của workspace đó
+    # (check_workspace_boundary). Thêm check_content_access ở đây sẽ chặn cả
+    # người duyệt hợp lệ vì họ không nhất thiết là thành viên của từng chiến dịch.
+    # `publish` vẫn an toàn hơn: RoleChecker ở trên chỉ cho MANAGER/AGENCY_MANAGER.
     check_workspace_boundary(content, current_user, db)
 
     if content.status != "IN_REVIEW":
@@ -607,7 +613,8 @@ def publish_content(
     if not current_user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Người dùng không tồn tại")
 
-    # Enforce workspace boundary
+    # Enforce workspace boundary (xem giải thích ở approve_content: biên đúng là
+    # biên workspace; RoleChecker phía trên đã giới hạn còn MANAGER/AGENCY_MANAGER)
     check_workspace_boundary(content, current_user, db)
 
     if content.status != "APPROVED":

@@ -15,6 +15,21 @@ import logging
 
 logger = logging.getLogger("marketflow.ai_service")
 
+# Model mặc định theo provider. Dùng cho khoá BYOK không khai báo model và cho
+# nhánh fallback. Trước đây nhánh lặp `if/else` viết tay ở nhiều chỗ và quên
+# provider `opencode`, nên khoá opencode không khai báo model sẽ nhận slug của
+# provider khác rồi fail 404.
+_DEFAULT_MODELS_BY_PROVIDER: Dict[str, str] = {
+    "gemini": "gemini-2.5-flash",
+    "openrouter": "meta-llama/llama-3.3-70b-instruct",
+    "openai": "gpt-4o",
+    "opencode": "space-bunny-free",
+}
+
+
+def _default_model_for(provider: Optional[str]) -> str:
+    return _DEFAULT_MODELS_BY_PROVIDER.get((provider or "").lower().strip(), "gemini-2.5-flash")
+
 
 def _sanitize_ai_error(err_msg: Optional[str], active_key: Optional[str] = None) -> str:
     """Làm sạch các token nhạy cảm, API keys, query parameter ?key=... khỏi log và thông báo lỗi."""
@@ -181,7 +196,7 @@ class AIService:
                     try:
                         plain = decrypt_api_key(ws_key.encrypted_key)
                         if plain and plain.strip():
-                            default_m = "gpt-4o" if provider == "openai" else ("meta-llama/llama-3.3-70b-instruct" if provider == "openrouter" else "gemini-2.5-flash")
+                            default_m = _default_model_for(provider)
                             return {
                                 "api_key": plain.strip(),
                                 "model": ws_key.model or default_m,
@@ -215,7 +230,7 @@ class AIService:
                     try:
                         plain = decrypt_api_key(user_key.encrypted_key)
                         if plain and plain.strip():
-                            default_m = "gpt-4o" if provider == "openai" else ("meta-llama/llama-3.3-70b-instruct" if provider == "openrouter" else "gemini-2.5-flash")
+                            default_m = _default_model_for(provider)
                             return {
                                 "api_key": plain.strip(),
                                 "model": user_key.model or default_m,
@@ -230,16 +245,22 @@ class AIService:
 
         # Tier 3: System Default Key
         env_key = None
-        system_model = settings.AI_MODEL or "gemini-2.5-flash"
+        # Ưu tiên biến chuyên dụng theo provider, rồi mới tới AI_API_KEY chung — nếu
+        # không thì provider "openrouter"/"openai" sẽ rơi xuống Tier 4 và im lặng
+        # sinh nội dung template dù .env đã có khoá.
+        system_model = settings.AI_MODEL or _default_model_for(provider)
         if provider == "gemini":
             env_key = os.environ.get("GEMINI_API_KEY") or getattr(settings, "GEMINI_API_KEY", None) or settings.AI_API_KEY
-            system_model = settings.AI_MODEL or "gemini-2.5-flash"
         elif provider == "openrouter":
-            env_key = os.environ.get("OPENROUTER_API_KEY") or getattr(settings, "OPENROUTER_API_KEY", None)
-            system_model = "meta-llama/llama-3.3-70b-instruct"
+            env_key = os.environ.get("OPENROUTER_API_KEY") or getattr(settings, "OPENROUTER_API_KEY", None) or settings.AI_API_KEY
         elif provider == "openai":
-            env_key = os.environ.get("OPENAI_API_KEY") or getattr(settings, "OPENAI_API_KEY", None)
-            system_model = "gpt-4o"
+            env_key = os.environ.get("OPENAI_API_KEY") or getattr(settings, "OPENAI_API_KEY", None) or settings.AI_API_KEY
+        elif provider == "opencode":
+            env_key = (
+                os.environ.get("OPENCODE_API_KEY")
+                or getattr(settings, "OPENCODE_API_KEY", None)
+                or settings.AI_API_KEY
+            )
 
         if env_key and env_key.strip():
             return {
@@ -251,7 +272,7 @@ class AIService:
             }
 
         # Tier 4: Fallback
-        default_fallback_model = "gpt-4o" if provider == "openai" else ("meta-llama/llama-3.3-70b-instruct" if provider == "openrouter" else (settings.AI_MODEL or "gemini-2.5-flash"))
+        default_fallback_model = settings.AI_MODEL or _default_model_for(provider)
         return {
             "api_key": None,
             "model": default_fallback_model,
@@ -290,14 +311,20 @@ class AIService:
             "Authorization": f"Bearer {key_to_use}" if key_to_use else "",
         }
 
-        if eff_provider == "openrouter":
+        if eff_provider == "opencode":
+            # Endpoint OpenAI-compatible của opencode zen. KHÔNG ghim base_url cứng:
+            # lấy từ AI_BASE_URL để có thể trỏ sang endpoint opencode khác.
+            base_url = self.base_url
+            headers["HTTP-Referer"] = "http://localhost:5173"
+            headers["X-Title"] = "MarketFlow AI"
+        elif eff_provider == "openrouter":
             base_url = "https://openrouter.ai/api/v1"
             headers["HTTP-Referer"] = "https://marketflow.ai"
             headers["X-Title"] = "MarketFlow AI"
         elif eff_provider == "openai":
             base_url = "https://api.openai.com/v1"
         elif eff_provider == "gemini":
-            base_url = "https://generativelanguage.googleapis.com/v1beta/openai" if "opencode.ai" in self.base_url else self.base_url
+            base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
             headers["HTTP-Referer"] = "http://localhost:5173"
             headers["X-Title"] = "MarketFlow AI"
         else:
@@ -586,7 +613,16 @@ class AIService:
                 except Exception:
                     pass
 
-            req_provider = context.get("provider") or "gemini"
+            # Mặc định lấy provider từ cấu hình, không phải "gemini". Trước đây hardcode
+            # "gemini" nên khi .env đặt AI_PROVIDER=opencode (hay openrouter),
+            # `resolve_api_key` vẫn tra nhánh gemini: với opencode điều đó
+            # thành env_key=None -> rơi thẳng Tier 4 -> Smart Fallback, và API
+            # trả về thông báo "Please pass a valid API key" dù .env có khoá.
+            req_provider = (
+                context.get("provider")
+                or settings.AI_PROVIDER
+                or "gemini"
+            )
             resolved = self.resolve_api_key(db=db, workspace_id=target_ws_id, user_id=user_id, provider=req_provider)
             active_key = resolved.get("api_key")
             active_model = resolved.get("model") or self.model

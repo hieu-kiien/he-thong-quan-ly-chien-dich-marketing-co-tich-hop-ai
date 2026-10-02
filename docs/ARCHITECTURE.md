@@ -1,8 +1,9 @@
 # MarketFlow AI — System Architecture & Technical Specifications
 
-**Dự án**: Hệ thống quản lý chiến dịch marketing có tích hợp AI (MarketFlow AI)  
-**Phiên bản**: v9.5 (B2B SaaS Marketing Operations Platform)  
-**Mục tiêu thiết kế**: Tính sẵn sàng cao (High Availability), Xác định không phụ thuộc (Deterministic Core), Chống ảo giác (Zero Hallucination), Phân quyền đa người thuê an toàn (Multi-Tenant RBAC).
+**Dự án**: Hệ thống quản lý chiến dịch marketing có tích hợp AI (MarketFlow AI)
+**Baseline mô tả**: main tại b99ac876a06993edfb5a88d866c22080434e7372 (2026-09-29)
+**Phạm vi**: Tóm tắt kiến trúc được thể hiện trong code hiện tại; đây không phải tuyên bố HA, production-ready hoặc bảo đảm AI không thể tạo nội dung sai.
+**Nguồn chuẩn**: backend/frontend, database configuration, deployment configuration và [bằng chứng CI](TESTING.md).
 
 ---
 
@@ -18,7 +19,7 @@ graph TD
     Operations["Khối Vận Hành Nghiệp Vụ (Command Center, Tasks, Budgets, KPIs)"]
     AIDoctor["Động Cơ Bác Sĩ AI (Deterministic Diagnostic Engine)"]
     AIEngine["Động Cơ AI Generative (Prompt Engine v1-v3 + Smart Fallback)"]
-    DB[(SQLite WAL / PostgreSQL-Compatible Relational DB)]
+    DB[(SQLite in local / CI / Cloudflare deployment)]
     ExternalAI["Nhà Cung Cấp AI Ngoại Vi (Google Gemini / OpenRouter / OpenAI)"]
 
     Client -->|HTTPS RESTful API| API
@@ -33,15 +34,15 @@ graph TD
 ```
 
 ### Nguyên tắc Thiết kế Cốt lõi:
-1. **Deterministic Core (Lõi Xác Định)**: Tất cả các quyết định liên quan đến tiền bạc, sức khỏe chiến dịch, phân công công việc, hạn chót và quyền truy cập dữ liệu được giải quyết 100% bằng giải thuật xác định trong FastAPI và CSDL quan hệ. LLM không bao giờ can thiệp vào các logic nghiệp vụ sống còn này.
-2. **Fail-Closed Security**: Mọi truy vấn nếu thiếu định danh Workspace, người dùng bị đình chỉ (`status != 'ACTIVE'`) hoặc không thuộc danh sách thành viên được phân quyền đều bị chặn ngay lập tức tại tầng middleware (HTTP 403 Forbidden).
-3. **Graceful Degradation (Chống Sụp Đổ Cục Bộ)**: Nếu kết nối tới nhà cung cấp AI ngoại vi bị đứt gãy, hết hạn quota (HTTP 429) hoặc quá thời gian chờ (15 giây), hệ thống tự động bẫy lỗi và kích hoạt Động cơ Dự phòng Cục bộ (Local Fallback Engine) mà không làm gián đoạn trải nghiệm người dùng.
+1. **Deterministic business rules**: Các phép tính KPI/health và một số quyết định trạng thái được thực hiện bằng code/backend; AI không phải nguồn dữ liệu gốc cho metrics. Chi tiết từng phép tính cần đối chiếu implementation và test liên quan.
+2. **Workspace and role checks**: Các endpoint kiểm tra vai trò và ranh giới workspace theo tài nguyên/thao tác. Tuyên bố bảo mật chỉ áp dụng tới những đường đi đã được kiểm tra; xem test matrix thay vì suy ra rằng mọi endpoint đều đã được chứng minh an toàn.
+3. **AI fallback**: Tác vụ AI có cơ chế xử lý lỗi/fallback trong những nhánh được kiểm thử. Điều đó không bảo đảm mọi trải nghiệm không gián đoạn hoặc mọi nội dung sinh ra chính xác.
 
 ---
 
 ## 2. Mô Hình Dữ Liệu Quan Hệ (Entity-Relationship Model - ERD)
 
-CSDL được thiết kế theo chuẩn hóa 3NF, bảo đảm toàn vẹn dữ liệu với khoá ngoại và các ràng buộc toàn vẹn mức database (`CheckConstraint`):
+Model quan hệ và constraint được định nghĩa trong SQLAlchemy. Local/CI và Cloudflare deployment hiện dùng SQLite. Việc cấu hình URL cho một database engine khác không tự chứng minh migration, concurrency hay hành vi production đã được xác nhận.
 
 ```mermaid
 erDiagram
@@ -72,13 +73,15 @@ erDiagram
 | `campaign_budget_allocations` | Kế hoạch ngân sách theo từng kênh | `campaign_id -> campaigns.id (CASCADE)`<br>`channel_id -> marketing_channels.id (RESTRICT)` |
 | `campaign_kpi_targets` | Mục tiêu định lượng cam kết của chiến dịch | `kpi_name`, `target_value`, `unit` |
 | `campaign_metrics` | Số liệu đo lường thực nghiệm hàng ngày | `views`, `clicks`, `conversions`, `cost`, `revenue` |
-| `ai_logs` | Sổ cái kiểm toán minh bạch cho mọi cuộc gọi AI | `input_hash` (SHA-256), `provider`, `model`, `output_json`, `latency_ms` |
+| `ai_logs` | Lưu log ở các đường AI hiện đang ghi nhận | `input_hash`, `provider`, `model`, `output_json`, `latency_ms`; không mặc định rằng mọi lời gọi AI đều có log. |
 
 ---
 
 ## 3. Kiến Trúc Phân Quyền Đa Người Thuê (Multi-Tenant RBAC)
 
 Hệ thống kết hợp **Tenant Workspace Boundary** và **Phân quyền cấp bản ghi (Record-Level Access Control)**:
+
+Sơ đồ sau mô tả các kiểu kiểm tra có trong một số đường API. Quyền thực tế phụ thuộc endpoint và thao tác; cần xác nhận ở router/service cùng test tương ứng trước khi khẳng định một vai trò có quyền trên toàn hệ thống.
 
 ```mermaid
 flowchart TD
@@ -87,7 +90,7 @@ flowchart TD
     TokenVal -- Hợp Lệ --> TenantCheck{Kiểm Tra Ranh Giới Workspace}
     TenantCheck -- Không Thuộc Workspace --> Err403[HTTP 403 Forbidden: Sai Tenant]
     TenantCheck -- Cùng Workspace --> RecordRBAC{Phân Quyền Cấp Bản Ghi}
-    
+
     subgraph Record-Level Rules
         RecordRBAC -- Là Manager / Admin --> AllowAll[Cho phép Đọc, Tạo, Sửa, Duyệt, Xóa]
         RecordRBAC -- Là Assignee của Task --> AllowTaskStatus[Chỉ cho phép Đổi Trạng Thái & Độ Ưu Tiên]
@@ -98,40 +101,36 @@ flowchart TD
 
 ---
 
-## 4. Thuật Toán Tính Điểm Sức Khỏe Chiến Dịch (Deterministic Health Scoring)
+## 4. Điểm sức khỏe chiến dịch
 
-Điểm sức khỏe chiến dịch ($H \in [0, 100]$) được tính toán theo công thức toán học xác định nhằm loại bỏ hoàn toàn nhận định cảm tính của AI:
+Ở baseline này có **hai phép tính riêng**, phục vụ hai luồng khác nhau. Không nên trình bày chúng như một công thức hay một nhãn trạng thái thống nhất.
 
-$$H = \max\left(0, \min\left(100, 100 - D_{\text{overdue}} - D_{\text{budget}} + B_{\text{progress}}\right)\right)$$
+| Luồng | Cách tính ở mức khái quát | Trạng thái | Nguồn chuẩn |
+|---|---|---|---|
+| Command Center | Bắt đầu từ 100; trừ điểm theo task quá hạn, mức dùng ngân sách/rủi ro KPI và tiến độ task thấp; giới hạn điểm trong 0–100. | `ON_TRACK`, `AT_RISK`, `CRITICAL` | `get_command_center` trong `backend/app/api/v1/metrics.py`. |
+| AI Doctor | Tính ROAS, CTR, CVR, CPC từ metrics; chấm từng chỉ số theo ngưỡng rồi cộng trọng số ROAS 40%, CTR 20%, CVR 25%, CPC 15%. Trường hợp dữ liệu thưa có nhánh xử lý riêng, hiện trả điểm 50. | `HEALTHY`, `NEEDS_ATTENTION`, `CRITICAL` | `diagnose_campaign` trong `backend/app/services/ai/ai_doctor.py`. |
 
-Trong đó:
-- $D_{\text{overdue}} = \min(40, N_{\text{overdue}} \times 10)$: Trừ 10 điểm cho mỗi tác vụ quá hạn chưa hoàn thành (tối đa trừ 40 điểm).
-- $D_{\text{budget}} = 25$ nếu tổng ngân sách kênh đã phân bổ vượt trần ngân sách chiến dịch ($\sum P_i > B_{\text{campaign}}$); ngược lại bằng $0$.
-- $B_{\text{progress}} = \text{round}\left(\frac{N_{\text{done}}}{N_{\text{total}}} \times 20\right)$: Cộng tối đa 20 điểm dựa trên tỷ lệ hoàn thành tác vụ.
-
-### Phân loại Trạng thái Trực quan:
-- **HEALTHY** ($H \ge 75$): Chiến dịch vận hành ổn định, đúng tiến độ và ngân sách.
-- **NEEDS_ATTENTION** ($50 \le H < 75$): Có nguy cơ chậm tiến độ hoặc thâm hụt ngân sách cục bộ.
-- **CRITICAL** ($H < 50$): Báo động đỏ; nhiều tác vụ khẩn cấp bị đình trệ, cần quản lý can thiệp ngay lập tức.
+Ngưỡng và điểm cụ thể là quy tắc hiện hành trong implementation, có thể thay đổi. Hai luồng có đầu vào, mục đích, ngưỡng và tên trạng thái khác nhau; cần thống nhất semantics hoặc ghi rõ ngữ cảnh trước khi dùng để so sánh campaign hay đưa ra khuyến nghị chung. Đây là điểm cần xử lý trong [roadmap](ROADMAP.md).
 
 ---
 
-## 5. Động Cơ Khử Ảo Giác & Đánh Giá AI (Anti-Hallucination Pipeline)
+## 5. AI: hành vi hiện có và giới hạn
 
-Hệ thống thiết lập rào chắn kiểm soát AI 3 tầng:
-
-1. **Context Whitelisting**: Chỉ trích xuất và đưa vào prompt ngữ cảnh những trường dữ liệu xác thực (Tên sản phẩm, USP, thông số Brand Kit, số liệu metrics). Lọc sạch các khóa bảo mật và thông tin nhạy cảm qua hàm `_sanitize_ai_error`.
-2. **Sparse Data Safeguard**: Khi chiến dịch chưa có số liệu đo lường (0 views, 0 cost), hệ thống kích hoạt cờ `is_sparse_data: True`. Tuyệt đối không sinh số liệu giả lập, cảnh báo minh bạch cho người dùng.
-3. **Pydantic Contract Validation**: Toàn bộ đầu ra JSON của LLM phải vượt qua kiểm định schema chặt chẽ trước khi được chuyển tiếp tới người dùng hoặc lưu vào CSDL.
+- AI Doctor đọc metrics đã lưu để tính các chỉ số và áp dụng các quy tắc chẩn đoán theo implementation. Khi không có metrics hoặc dữ liệu đo lường bằng 0 theo điều kiện trong code, một số nhánh trả `is_sparse_data`; điều đó không chứng minh mọi đầu ra đều an toàn hoặc grounded.
+- Các đường sinh nội dung có kiểm tra cấu trúc/validation theo hợp đồng dữ liệu tương ứng. Phạm vi kiểm tra cần xác định theo từng endpoint; không khẳng định toàn bộ đầu ra của mọi model đều qua cùng một schema.
+- Một số đường AI có fallback và ghi log, nhưng không đồng nghĩa mọi provider failure đều được xử lý giống nhau hoặc mọi lời gọi đều được lưu audit log.
+- [Báo cáo benchmark](AI_EVALUATION_REPORT.md) giới hạn kết luận theo bộ case, commit và môi trường đã ghi. Không dùng các cụm “zero hallucination”, “không thể sinh số liệu sai” hoặc “sẵn sàng production” như kết luận tổng quát.
 
 ---
 
-## 6. Tiêu Chuẩn Thực Nghiệm & Đo Lường (Empirical Validation)
+## 6. Kiểm thử và đo lường
 
-Các chỉ số kỹ thuật đo lường thực tế trên môi trường kiểm thử:
-- **Tỷ lệ tuân thủ Schema AI**: $100.00\%$ ($\ge 95\%$ target).
-- **Tỷ lệ ảo giác (Hallucination Rate)**: $0.00\%$ ($= 0\%$ target).
-- **Khả năng chịu lỗi mất kết nối (Failover Resilience)**: $100.00\%$ ($\ge 99\%$ target).
-- **Độ trễ API non-AI p95**: $6.84\text{ ms}$ (SLA $\le 800\text{ ms}$; đo tại HEAD bằng `scripts/measure_api_latency.py`, 50 lần lặp mỗi endpoint).
-- **Độ trễ chẩn đoán Bác sĩ AI p95**: $3.36\text{ ms}$ (SLA $\le 50\text{ ms}$).
-- **Tổng số ca kiểm thử tự động**: **1.263 backend tests** (1.262 pass + 1 skip hợp lệ vì runner CI không có file live DB bị `.gitignore`), độ phủ câu lệnh **86.20%** so với ngưỡng CI `--cov-fail-under=80`.
+Số liệu benchmark thay đổi theo commit, runner và workload nên không lưu bản sao trong kiến trúc. Xem [TESTING.md](TESTING.md), [AI_EVALUATION_REPORT.md](AI_EVALUATION_REPORT.md) và link CI có ghi SHA/điều kiện. Kết quả trên môi trường CI/SQLite không đại diện latency provider LLM hoặc tải production.
+
+## 7. Trạng thái năng lực và giới hạn hiện tại
+
+- Scheduler xử lý lịch trong database và đổi trạng thái content sang PUBLISHED; API publish cũng cập nhật trạng thái nội bộ. Trong baseline mô tả ở đây chưa có connector gửi email/xã hội thật gắn với các đường đi này.
+- PUBLISHED vì vậy không đồng nghĩa với provider đã nhận/gửi thành công. UI, báo cáo và tài liệu phải thể hiện rõ khác biệt này.
+- Cloudflare worker dùng một Durable Object/SQLite container, tuần tự hóa các thao tác ghi và tải snapshot database lên R2 sau mỗi write. Mã worker ghi nhận độ trễ/chi phí O(kích thước DB) và queue toàn cục là nợ kỹ thuật; xem [cloudflare/README.md](../cloudflare/README.md).
+- Cần đánh giá restore, concurrency và database production trước khi đưa dữ liệu agency thật vào môi trường triển khai này.
+- Việc dùng AI draft hoặc AI Doctor không chứng minh hiệu quả campaign. Kết quả hữu ích và usability cần đo qua người dùng/pilot.

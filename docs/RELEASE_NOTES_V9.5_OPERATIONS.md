@@ -1,10 +1,12 @@
 # MarketFlow AI — Release Notes v9.5 (Marketing Operations Platform Revamp)
 
-**Mã phiên bản**: `v9.5-operations`  
-**Ngày phát hành**: 29/09/2026  
-**Nhánh Git**: `main` (Commit: `685a5dc`) & `refactor/marketflow-operations`  
-**Kho mã nguồn**: [hieu-kiien/he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai](https://github.com/hieu-kiien/he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai)  
-**Môi trường trực tiếp (Live)**: https://marketing.kienhieu.id.vn  
+**Mã phiên bản**: `v9.5-operations`
+**Ngày phát hành**: 29/09/2026
+**Nhánh Git**: `main` (Commit: `685a5dc`) & `refactor/marketflow-operations`
+**Kho mã nguồn**: [hieu-kiien/he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai](https://github.com/hieu-kiien/he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai)
+**Môi trường trực tiếp (Live)**: https://marketing.kienhieu.id.vn
+
+> **Snapshot lịch sử:** Tài liệu này mô tả v9.5 tại commit `685a5dc`, không phải trạng thái phát hành hiện tại. Số liệu và tuyên bố bên dưới được giữ làm lịch sử; trạng thái hiện tại nằm ở [mục lục](README.md), [testing](TESTING.md) và [roadmap](ROADMAP.md).
 
 ---
 
@@ -86,12 +88,13 @@ Bản phát hành **v9.5** đánh dấu bước chuyển dịch mang tính chi�
 
 ## IV. BỘ TÀI LIỆU HỌC THUẬT PHỤC VỤ BẢO VỆ ĐỒ ÁN
 
-Toàn bộ tài liệu chuyên sâu được lưu trữ tại thư mục `docs/`:
-1. [docs/UNIVERSITY_DEFENSE_RUBRIC_ALIGNMENT.md](file:///c:/Users/hieuk/Desktop/Ứng%20Dụng%20AI/docs/UNIVERSITY_DEFENSE_RUBRIC_ALIGNMENT.md): Bảng đối sánh chi tiết 4 đợt đánh giá (BTTX1, BTTX2, BTTX3, Khóa luận) và kịch bản trả lời 5 câu hỏi hóc búa của Hội đồng.
-2. [docs/ARCHITECTURE.md](file:///c:/Users/hieuk/Desktop/Ứng%20Dụng%20AI/docs/ARCHITECTURE.md): Đặc tả kiến trúc phần mềm, mô hình ERD chuẩn hóa, cơ chế RBAC và công thức tính điểm sức khỏe.
-3. [docs/AI_EVALUATION_REPORT.md](file:///c:/Users/hieuk/Desktop/Ứng%20Dụng%20AI/docs/AI_EVALUATION_REPORT.md): Báo cáo thực nghiệm đo lường AI tự động sinh từ script benchmark.
-4. [scripts/evaluate_ai_grounding.py](file:///c:/Users/hieuk/Desktop/Ứng%20Dụng%20AI/scripts/evaluate_ai_grounding.py): Kịch bản kiểm định AI tự động.
-5. [scripts/measure_api_latency.py](file:///c:/Users/hieuk/Desktop/Ứng%20Dụng%20AI/scripts/measure_api_latency.py): Kịch bản đo lường độ trễ API.
+Tại thời điểm viết release notes, tài liệu tham khảo gồm:
+1. [Bản nháp đối chiếu đồ án](UNIVERSITY_DEFENSE_RUBRIC_ALIGNMENT.md).
+2. [Tài liệu kiến trúc](ARCHITECTURE.md).
+3. [Báo cáo benchmark AI](AI_EVALUATION_REPORT.md), được sinh từ [script benchmark](../scripts/evaluate_ai_grounding.py).
+4. [Script đo độ trễ API](../scripts/measure_api_latency.py).
+
+Các đường dẫn ở đây được giữ tương đối để hoạt động trong checkout khác; nội dung của release notes vẫn là snapshot lịch sử tại commit ghi ở đầu tài liệu.
 
 ---
 

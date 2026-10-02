@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Sparkles, ArrowRight, UserPlus, Mail, Lock, User as UserIcon, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
+import { Sparkles, UserPlus, Mail, Lock, User as UserIcon, AlertCircle, Loader2 } from 'lucide-react';
 import { getApiErrorMessage } from '../services/api';
 
 interface RegisterPageProps {
@@ -103,7 +103,10 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateToLogin })
                 <Mail className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
                   id="register-email"
+                  name="email"
                   type="email"
+                  autoComplete="email"
+                  inputMode="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@agency.com"
@@ -121,7 +124,9 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateToLogin })
                 <Lock className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
                   id="register-password"
+                  name="password"
                   type="password"
+                  autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"

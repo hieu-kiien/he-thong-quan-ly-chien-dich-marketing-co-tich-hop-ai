@@ -197,8 +197,14 @@ def test_resolve_api_key_multi_provider_hierarchy(db_session: Session, monkeypat
     assert res_gemini["provider"] == "gemini"
 
 
+@pytest.mark.allow_ai_network
 def test_ai_service_routes_to_correct_provider_headers(monkeypatch):
-    """Test _call_provider_with_retry properly prepares URLs and headers for OpenRouter, OpenAI, and Gemini."""
+    """Test _call_provider_with_retry properly prepares URLs and headers for OpenRouter, OpenAI, and Gemini.
+
+    Đánh dấu `allow_ai_network` vì test gọi chính `_call_provider_with_retry`
+    để kiểm tra URL/header định tuyến; `httpx.Client.post` bị monkeypatch nên
+    không có lời gọi mạng thật nào.
+    """
     import httpx
     ai_service = AIService()
 

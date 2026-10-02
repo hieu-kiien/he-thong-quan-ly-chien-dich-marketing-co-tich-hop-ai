@@ -1,15 +1,6 @@
 import axios from 'axios';
-import { 
-  Campaign, MarketingContent, KPISummary, AIIdeaResponse, AIDraftResponse, 
-  AISummaryResponse, OmnichannelRequest, OmnichannelResponse, User, Product, 
-  MarketingSchedule, ContentComplianceCheck, Workspace, BrandKit, 
-  ComplianceCheckRequest, ComplianceCheckResponse, ComplianceViolation, 
-  ContentReview, ChannelAttribution, AIDoctorReport,
-  CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse,
-  AppNotification,
-  Task, TaskCreate, TaskUpdate, BudgetAllocation, KPITarget,
-  CommandCenterResponse, CommandCenterAttentionItem, CommandCenterMyWorkItem, CommandCenterCampaignHealth
-} from '../types';
+import { Campaign, MarketingContent, KPISummary, AIIdeaResponse, AIDraftResponse, AISummaryResponse, OmnichannelRequest, OmnichannelResponse, User, Product, MarketingSchedule, ContentComplianceCheck, Workspace, BrandKit, ComplianceCheckRequest, ComplianceCheckResponse, ComplianceViolation, ChannelAttribution, AIDoctorReport, CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse, AppNotification, Task, TaskCreate, TaskUpdate, BudgetAllocation, KPITarget, CommandCenterResponse } from '../types';
+import { MarketingChannel, getChannelRegistry } from '../utils/channels';
 
 import { 
   MOCK_PRODUCTS, 
@@ -29,11 +20,31 @@ const API_BASE_URL = ((import.meta as any).env?.VITE_API_URL ||
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 60000, // 60s phù hợp với chu kỳ khởi động lại (cold start ~50s) của Render Free Tier
+  // 60s chỉ đủ cho cold start của Render Free Tier. Các endpoint AI thật cần
+  // lâu hơn nhiều: /ai/omnichannel sinh đồng thời 3 kênh (Facebook + TikTok 4
+  // cảnh + Email A/B) nên đo thực tế là 83–174 giây. Với timeout 60s, axios
+  // huỷ request giữa chừng và trình duyệt báo ERR_ABORTED — người dùng thấy
+  // "Lỗi khi gọi AI" dù backend vẫn chạy và có thể đã trả kết quả.
+  // Timeout riêng cho nhóm AI được đặt ở `AI_LONG_TIMEOUT` bên dưới.
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+/**
+ * Timeout cho các lời gọi sinh nội dung AI.
+ * Backend đặt AI_TIMEOUT_SECONDS=420 và có retry, nên phía client phải chờ
+ * lâu hơn để không cắt ngang. Đo thực tế /ai/omnichannel với model opencode:
+ * 83–214 giây cho một lần gọi thành công (3 kênh, TikTok 4 cảnh, Email A/B).
+ * Client đặt trần 600s — rộng hơn server để server kịp trả lỗi có kiểm soát,
+ * không phải bị client cắt ngang.
+ */
+const AI_LONG_TIMEOUT = 600000;
+
+/** Danh sách path AI cần timeout dài (khớp prefix router backend `/api/v1/ai`). */
+const isAiPath = (url?: string): boolean =>
+  !!url && (url.includes('/ai/omnichannel') || url.includes('/ai/generate') || url.includes('/ai/draft') || url.includes('/ai/ideas') || url.includes('/ai/summary') || url.includes('/ai/summarize') || url.includes('/ai-doctor'));
 
 // Helper kiểm tra chế độ Demo Offline (chỉ kích hoạt khi có cờ VITE_ENABLE_OFFLINE_DEMO=true tường minh)
 //
@@ -110,11 +121,24 @@ const broadcastAwakening = (status: ServerAwakeningStatus) => {
   }
 };
 
-// Gắn Bearer token tự động & theo dõi cold start Render
+// Gắn Bearer token tự động, workspace hiện hành & theo dõi cold start Render
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  // Workspace đang chọn trên UI phải là tiêu chí lọc duy nhất phía server.
+  // Thiếu header này thì backend rơi về "WorkspaceMember đầu tiên", tức là
+  // người dùng chọn workspace B vẫn nhìn thấy dữ liệu của workspace A.
+  const workspaceId = localStorage.getItem('active_workspace_id');
+  if (workspaceId) {
+    config.headers['X-Workspace-Id'] = workspaceId;
+  }
+
+  // Timeout riêng cho lời gọi AI (xem giải thích cạnh AI_LONG_TIMEOUT).
+  if (isAiPath(config.url)) {
+    config.timeout = AI_LONG_TIMEOUT;
   }
 
   activeRequestsCount++;
@@ -180,6 +204,16 @@ apiClient.interceptors.response.use(
     cleanupAwakeningTracking();
     if (!error?.response) {
       backendReachable = false;
+      return Promise.reject(error);
+    }
+    // Phiên hết hạn / bị thu hồi: dọn token để AuthContext mount lại và hiện
+    // màn hình đăng nhập. Trước đây 401 chỉ nổi lên thành một toast rời rạc,
+    // người dùng phải tự đoán rồi đăng nhập lại.
+    const status = error.response.status;
+    if (status === 401) {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('current_user');
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
     }
     return Promise.reject(error);
   }
@@ -516,6 +550,20 @@ export const campaignApi = {
       console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.delete');
       const list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
       setStoredList('mf_campaigns', list.filter(c => c.id !== id));
+    }
+  }
+};
+
+export const channelApi = {
+  getAll: async (): Promise<MarketingChannel[]> => {
+    try {
+      const res = await apiClient.get('/channels');
+      return res.data || [];
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] No channel mock available; using the seed-order fallback registry');
+      return getChannelRegistry();
     }
   }
 };
@@ -913,15 +961,26 @@ export const analyticsApi = {
       if (data?.kpi && data.kpi.roas === undefined) {
         data.kpi.roas = data.kpi.total_cost > 0 ? Number((data.kpi.total_revenue / data.kpi.total_cost).toFixed(2)) : 0.0;
       }
+      // KHÔNG gắn `|| MOCK_*` vào đường online. Trước đây response backend không
+      // có `channel_attributions`, nên Dashboard âm thầm vẽ mảng số liệu bịa đặt và
+      // người dùng không có cách nào biết đó không phải số đo thật. Giờ thiếu dữ
+      // liệu thì hiển thị trạng thái rỗng trung thực.
       return {
         ...data,
-        channel_attributions: data.channel_attributions || MOCK_CHANNEL_ATTRIBUTIONS
+        channel_attributions: data.channel_attributions ?? [],
+        // Chi phí theo chiến dịch để bảng tính nhịp chi tiêu; mặc định rỗng nghĩa
+        // là chưa có chỉ số nào để hiển thị (không phải 0 đã chi).
+        campaign_spend: data.campaign_spend ?? {},
+        kpi: {
+          ...data.kpi,
+          channel_metrics: data.kpi?.channel_metrics ?? []
+        }
       };
     } catch (e: any) {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: analyticsApi.getDashboard');
-      return { 
+      return {
         kpi: MOCK_DASHBOARD_KPI,
         channel_attributions: MOCK_CHANNEL_ATTRIBUTIONS
       };
@@ -950,7 +1009,7 @@ export const metricsApi = {
   getDashboardOverview: async () => {
     return analyticsApi.getDashboard();
   },
-  getAllCampaignsMetrics: async (): Promise<any[]> => {
+  getAllCampaignsMetrics: async (signal?: AbortSignal): Promise<any[]> => {
     try {
       const campaigns = await campaignApi.getAll();
       if (!campaigns || campaigns.length === 0) return [];
@@ -958,7 +1017,7 @@ export const metricsApi = {
       // của từng chiến dịch thành "không có số liệu", đúng cái che lỗi cần loại bỏ.
       // Lỗi giờ nổi lên Promise.all rồi được xử lý bằng cùng khuôn mẫu chuẩn của file này.
       const metricPromises = campaigns.map(c =>
-        apiClient.get(`/campaigns/${c.id}/metrics`).then(r => r.data || [])
+        apiClient.get(`/campaigns/${c.id}/metrics`, { signal }).then(r => r.data || [])
       );
       const results = await Promise.all(metricPromises);
       return results.flat();
@@ -974,9 +1033,9 @@ export const metricsApi = {
 };
 
 export const scheduleApi = {
-  getAll: async (): Promise<MarketingSchedule[]> => {
+  getAll: async (signal?: AbortSignal): Promise<MarketingSchedule[]> => {
     try {
-      const res = await apiClient.get('/schedules');
+      const res = await apiClient.get('/schedules', { signal });
       return res.data;
     } catch (e: any) {
       if (e?.response) throw e;
@@ -1108,12 +1167,14 @@ export const evaluateMarketingCompliance = (title: string, body: string, cta?: s
 export const settingsApi = {
   testConnection: async (data: AIKeyTestRequest): Promise<AIKeyTestResponse> => {
     try {
-      const res = await apiClient.post('/settings/test-ai-connection', data);
+const res = await apiClient.post('/settings/test-ai-connection', data);
       return res.data;
     } catch (e: any) {
-      if (e?.response?.data) {
-        return e.response.data;
-      }
+      // KHÔNG trả `e.response.data` cho mọi lỗi HTTP: envelope lỗi của FastAPI là
+      // `{detail: ...}`, không có field `success`, nên Settings nhận undefined cho
+      // cả nhánh thành công lẫn thất bại và không hiển thị gì cả. Đây là lỗi
+      // truyền dữ liệu chứ không phải kết quả kiểm tra — phải ném ra cho caller.
+      if (e?.response?.status === 401 || e?.response?.status === 403) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Không thể kiểm tra kết nối AI khi backend offline.');
       throw new Error('Không thể kiểm tra kết nối AI: máy chủ backend không phản hồi. Vui lòng thử lại.');
@@ -1269,9 +1330,9 @@ function formatNotificationRelativeTime(dateStr?: string): string {
 }
 
 export const notificationApi = {
-  getAll: async (params?: { workspace_id?: number; unread_only?: boolean; limit?: number }): Promise<AppNotification[]> => {
+  getAll: async (signal?: AbortSignal, params?: { workspace_id?: number; unread_only?: boolean; limit?: number }): Promise<AppNotification[]> => {
     try {
-      const res = await apiClient.get('/notifications', { params });
+      const res = await apiClient.get('/notifications', { params, signal });
       return (res.data || []).map((item: any) => ({
         id: String(item.id),
         title: item.title,

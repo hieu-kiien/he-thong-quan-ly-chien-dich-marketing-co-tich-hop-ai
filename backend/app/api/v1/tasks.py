@@ -6,7 +6,7 @@ from sqlalchemy import or_, and_, false
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.entities import Task, Campaign, User, Workspace, WorkspaceMember, CampaignMember
+from app.models.entities import Task, Campaign, User, Workspace, WorkspaceMember, CampaignMember, utc_now
 from app.schemas.schemas import TaskCreate, TaskUpdate, TaskResponse, TaskBase
 from app.api.v1.campaigns import _accessible_workspace_ids
 
@@ -192,8 +192,12 @@ def create_campaign_task(
         status=task_in.status,
         priority=task_in.priority,
         due_date=task_in.due_date,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        # Dùng `utc_now()` (tz-aware) như mọi model khác. `datetime.utcnow()` trả
+        # về datetime NAIVE, nên so sánh Task với datetime tz-aware ở tầng Python
+        # sẽ ném TypeError: can't compare offset-naive and offset-aware datetimes.
+        # Cột DateTime của SQLite cũng không lưu được tzinfo.
+        created_at=utc_now(),
+        updated_at=utc_now()
     )
 
     db.add(new_task)
@@ -304,7 +308,7 @@ def update_task(
     for key, value in update_data.items():
         setattr(task, key, value)
 
-    task.updated_at = datetime.utcnow()
+    task.updated_at = utc_now()
     db.commit()
     db.refresh(task)
     return task

@@ -1,8 +1,11 @@
+import hmac
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Header
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
+from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, security_bearer
 from app.models.entities import MarketingSchedule, MarketingContent, User, Workspace, WorkspaceMember, Campaign, CampaignMember
 from app.schemas.schemas import ScheduleCreate, ScheduleUpdate, ScheduleResponse
 from app.api.v1.contents import check_content_access
@@ -172,10 +175,39 @@ def update_schedule(
 
 @router.post("/schedules/trigger-worker")
 def trigger_scheduler_worker(
-    current_user: User = Depends(get_current_user),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer),
+    x_scheduler_secret: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
-    """Kích hoạt thủ công tiến trình Scheduler Worker kiểm tra và thực thi các lịch đến hạn."""
+    """Kích hoạt thủ công tiến trình Scheduler Worker kiểm tra và thực thi các lịch đến hạn.
+
+    Đây là endpoint nội bộ. Ngoài việc cho phép quản lý bấm tay qua UI, nó phục vụ
+    Durable Object trên Cloudflare: scheduler trong container bị tắt (vì ghi
+    thẳng vào SQLite mà không qua HTTP sẽ không được snapshot lên R2), nên cron
+    của Worker gọi endpoint này rồi mới snapshot.
+
+    Hai đường xác thực được chấp nhận:
+    1. Bearer token của người dùng đã đăng nhập (quản lý bấm tay từ UI).
+    2. Header `X-Scheduler-Secret` khớp `SCHEDULER_SECRET` (dùng bởi Worker, vốn
+       không mang token của người dùng).
+
+    Nếu `SCHEDULER_SECRET` chưa được cấu hình thì đường (2) không hoạt động —
+    lớp bảo vệ không bị nới lỏng chỉ vì thêm một caller.
+    """
+    expected_secret = str(getattr(settings, "SCHEDULER_SECRET", "") or "").strip()
+    provided_secret = (x_scheduler_secret or "").strip()
+    if expected_secret and provided_secret and hmac.compare_digest(provided_secret, expected_secret):
+        pass  # đã xác thực bằng scheduler secret
+    elif credentials:
+        # Chuẩn hoá về cùng một kiểm tra với mọi endpoint khác.
+        get_current_user(credentials, db)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Yêu cầu Bearer token hoặc X-Scheduler-Secret hợp lệ",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     processed_ids = process_due_schedules(db)
     return {
         "message": "Scheduler worker executed successfully",

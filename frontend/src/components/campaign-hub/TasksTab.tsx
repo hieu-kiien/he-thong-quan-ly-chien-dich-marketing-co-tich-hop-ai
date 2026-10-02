@@ -46,23 +46,23 @@ export const TasksTab: React.FC<TasksTabProps> = ({
     <div className="space-y-6">
       {/* Quick Metrics Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
+        <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow">
           <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Tổng Tác Vụ</span>
           <span className="text-xl font-extrabold text-slate-900 mt-1 block">{campaignTasks.length}</span>
         </div>
-        <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
+        <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow">
           <span className="text-[11px] font-bold text-rose-600 uppercase tracking-wider block">Quá Hạn</span>
           <span className="text-xl font-extrabold text-rose-600 mt-1 block">
             {campaignTasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'DONE').length}
           </span>
         </div>
-        <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
+        <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow">
           <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider block">Đang Làm</span>
           <span className="text-xl font-extrabold text-blue-600 mt-1 block">
             {campaignTasks.filter(t => t.status === 'IN_PROGRESS').length}
           </span>
         </div>
-        <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
+        <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow">
           <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider block">Đã Xong</span>
           <span className="text-xl font-extrabold text-emerald-600 mt-1 block">
             {campaignTasks.filter(t => t.status === 'DONE').length}
@@ -71,7 +71,7 @@ export const TasksTab: React.FC<TasksTabProps> = ({
       </div>
 
       {/* Quick Create Task Form */}
-      <form onSubmit={handleCreateCampaignTask} className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
+      <form onSubmit={handleCreateCampaignTask} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
             <Plus className="w-4 h-4 text-indigo-600" />
@@ -130,7 +130,7 @@ export const TasksTab: React.FC<TasksTabProps> = ({
             <button
               type="submit"
               disabled={isCreatingTask || !newTaskTitle.trim()}
-              className="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-colors shrink-0 disabled:opacity-50"
+              className="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm transition-colors shrink-0 disabled:opacity-50"
             >
               {isCreatingTask ? '...' : '+ Thêm'}
             </button>
@@ -139,7 +139,7 @@ export const TasksTab: React.FC<TasksTabProps> = ({
       </form>
 
       {/* Task List / Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
           <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
             Danh Sách Tác Vụ ({campaignTasks.length})

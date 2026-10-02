@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, enforce_quota
 from app.models.entities import Campaign, MarketingChannel, Product, CampaignMetric, AILog, User, CampaignMember, BrandKit, Workspace, WorkspaceMember
 from app.schemas.schemas import (
     AIIdeaRequest, AIIdeaResponse,
@@ -73,6 +73,9 @@ def generate_ideas(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    # Hạn mức: trước đây endpoint AI hoàn toàn không bị giới hạn, nên bất kỳ ai
+    # giữ token (hoặc khoá BYOK) cũng có thể tiêu hết hạn mức của tổ chức.
+    enforce_quota(f"ai:ideas:user={current_user.id}")
     user_id = current_user.id
     cid = req.campaign_id
 
@@ -142,6 +145,7 @@ def generate_draft(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    enforce_quota(f"ai:draft:user={current_user.id}")
     user_id = current_user.id
     cid = req.campaign_id
 
@@ -206,6 +210,7 @@ def generate_summary(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    enforce_quota(f"ai:summary:user={current_user.id}")
     user_id = current_user.id
     campaign = check_campaign_access_for_ai(req.campaign_id, current_user, db)
 
@@ -276,6 +281,8 @@ def generate_omnichannel(
     Sinh trọn bộ tài sản tiếp thị Facebook, TikTok và Email từ 1 brief duy nhất,
     kế thừa Brand Kit (USP, Tone, Banned Keywords) của Workspace.
     """
+    # Endpoint này tốn nhiều lượt gọi nhất (sinh 3 kênh cùng lúc) nên cần hạn mức riêng.
+    enforce_quota(f"ai:omnichannel:user={current_user.id}")
     user_id = current_user.id
     cid = req.campaign_id
 
@@ -356,7 +363,14 @@ def generate_omnichannel(
         if "email" not in requested_channels:
             res["email"] = None
         res["campaign_id"] = cid
-        res["model_used"] = "gemini-2.5-flash"
+        # KHÔNG ghi đè model_used/model_provider/is_fallback. Trước đây dòng này
+        # hardcode "gemini-2.5-flash", nên kể cả khi `ai_service` đã trả về
+        # `is_fallback=True` + `model_provider="template-fallback-engine"` thì API
+        # vẫn báo `model_used: "gemini-2.5-flash"` — client hiển thị nội dung
+        # template dự phòng với nhãn của Gemini. Chỉ đặt mặc định khi service
+        # không cung cấp (đường lỗi/validate).
+        res.setdefault("model_used", ai_service.model)
+        res.setdefault("is_fallback", False)
         res["prompt_version"] = req.prompt_version
         res["task_type"] = "OMNICHANNEL"
         return res
@@ -376,7 +390,9 @@ def generate_omnichannel(
     except ValidationError:
         if ai_service.fallback_enabled:
             fallback = ai_service._generate_fallback("omnichannel_generation", context)
-            fallback["model_used"] = "gemini-2.5-flash"
+            # Nội dung do template sinh ra, không phải mô hình ngôn ngữ: ghi
+            # `model_used` là tên engine dự phòng để client không gán nhãn AI.
+            fallback["model_used"] = "template-fallback-engine"
             fallback["prompt_version"] = req.prompt_version
             fallback["task_type"] = "OMNICHANNEL"
             fallback.setdefault("warnings", []).append("Phản hồi AI sai cấu trúc schema, đã kích hoạt Smart Fallback.")
@@ -389,7 +405,7 @@ def generate_omnichannel(
     except Exception as e:
         if ai_service.fallback_enabled:
             fallback = ai_service._generate_fallback("omnichannel_generation", context)
-            fallback["model_used"] = "gemini-2.5-flash"
+            fallback["model_used"] = "template-fallback-engine"
             fallback["prompt_version"] = req.prompt_version
             fallback["task_type"] = "OMNICHANNEL"
             fallback.setdefault("warnings", []).append(f"Dịch vụ AI gặp sự cố ({str(e)}), đã kích hoạt Smart Fallback.")

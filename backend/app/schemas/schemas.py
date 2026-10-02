@@ -856,7 +856,10 @@ EmailContentResponse = EmailCreative
 # ==============================================================================
 
 class AIKeyTestRequest(BaseModel):
-    provider: str = Field("gemini", pattern="^(gemini|openrouter|openai)$", description="Nhà cung cấp AI ('gemini', 'openrouter', 'openai')")
+    # Pattern phải khớp SUPPORTED_AI_PROVIDERS trong app/core/config.py. Thiếu
+    # "opencode" ở đây khiến mọi thao tác kiểm tra/lưu khóa BYOK cho provider đó
+    # bị 422 từ validator, dù backend đã hỗ trợ đầy đủ.
+    provider: str = Field("gemini", pattern="^(gemini|openrouter|openai|opencode)$", description="Nhà cung cấp AI ('gemini', 'openrouter', 'openai', 'opencode')")
     api_key: str = Field(..., description="API Key cần kiểm tra")
     model: Optional[str] = Field("gemini-2.5-flash", description="Model AI cần kiểm tra")
 
@@ -872,9 +875,9 @@ class AIKeyTestRequest(BaseModel):
     def validate_provider(cls, v: Any) -> str:
         # Chạy TRƯỚC ràng buộc `pattern` của field để trả thông báo lỗi thân thiện,
         # đồng thời chuẩn hoá alias ("google" -> "gemini", "gpt" -> "openai") về đúng
-        # 3 provider trong whitelist. `pattern` vẫn là lớp phòng thủ thứ hai.
+        # các provider trong whitelist. `pattern` vẫn là lớp phòng thủ thứ hai.
         if not isinstance(v, str):
-            raise ValueError(f"Nhà cung cấp '{v}' không được hỗ trợ. Chỉ hỗ trợ 'gemini', 'openrouter', 'openai'.")
+            raise ValueError(f"Nhà cung cấp '{v}' không được hỗ trợ. Chỉ hỗ trợ 'gemini', 'openrouter', 'openai', 'opencode'.")
         lower_p = v.lower().strip()
         if lower_p in ["google", "gemini"]:
             return "gemini"
@@ -882,7 +885,9 @@ class AIKeyTestRequest(BaseModel):
             return "openrouter"
         if lower_p in ["openai", "gpt"]:
             return "openai"
-        raise ValueError(f"Nhà cung cấp '{v}' không được hỗ trợ. Chỉ hỗ trợ 'gemini', 'openrouter', 'openai'.")
+        if lower_p in ["opencode", "oc", "zen"]:
+            return "opencode"
+        raise ValueError(f"Nhà cung cấp '{v}' không được hỗ trợ. Chỉ hỗ trợ 'gemini', 'openrouter', 'openai', 'opencode'.")
 
     @field_validator("model")
     @classmethod
@@ -893,6 +898,8 @@ class AIKeyTestRequest(BaseModel):
                 return "gpt-4o"
             elif provider == "openrouter":
                 return "meta-llama/llama-3.3-70b-instruct"
+            elif provider == "opencode":
+                return "space-bunny-free"
             return "gemini-2.5-flash"
         clean_m = v.strip()
         lower_m = clean_m.lower()
@@ -910,6 +917,13 @@ class AIKeyTestRequest(BaseModel):
             if "/" not in clean_m or len(clean_m) < 3:
                 raise ValueError(f"Mô hình '{v}' không hợp lệ cho OpenRouter (cần định dạng tác giả/tên-mô-hình, ví dụ 'meta-llama/llama-3.3-70b-instruct').")
             return clean_m
+        elif provider == "opencode":
+            # Slug model của opencode zen tự do ("space-bunny-free",
+            # "muse-spark-1.3", ...) nên không áp mẫu của provider nào khác.
+            # Danh sách hợp lệ lấy từ GET {AI_BASE_URL}/models.
+            if len(clean_m) < 2:
+                raise ValueError(f"Mô hình '{v}' không hợp lệ cho OpenCode.")
+            return clean_m
         return clean_m
 
     @model_validator(mode="after")
@@ -926,6 +940,9 @@ class AIKeyTestRequest(BaseModel):
         elif prov == "openrouter":
             if "/" not in self.model or len(self.model) < 3:
                 raise ValueError(f"Mô hình '{self.model}' không hợp lệ cho OpenRouter.")
+        elif prov == "opencode":
+            if len(self.model) < 2:
+                raise ValueError(f"Mô hình '{self.model}' không hợp lệ cho OpenCode.")
         return self
 
 
@@ -939,7 +956,8 @@ class AIKeyTestResponse(BaseModel):
 
 
 class AIKeyCreate(BaseModel):
-    provider: str = Field("gemini", pattern="^(gemini|openrouter|openai)$", description="Nhà cung cấp AI ('gemini', 'openrouter', 'openai')")
+    # Xem ghi chú ở AIKeyTestRequest: pattern phải khớp config.
+    provider: str = Field("gemini", pattern="^(gemini|openrouter|openai|opencode)$", description="Nhà cung cấp AI ('gemini', 'openrouter', 'openai', 'opencode')")
     api_key: str = Field(..., description="API Key cần lưu trữ an toàn")
     model: Optional[str] = Field("gemini-2.5-flash", description="Model AI lựa chọn")
     workspace_id: Optional[int] = Field(None, description="ID Workspace nếu lưu khóa cho Workspace")
@@ -957,9 +975,9 @@ class AIKeyCreate(BaseModel):
     def validate_provider(cls, v: Any) -> str:
         # Chạy TRƯỚC ràng buộc `pattern` của field để trả thông báo lỗi thân thiện,
         # đồng thời chuẩn hoá alias ("google" -> "gemini", "gpt" -> "openai") về đúng
-        # 3 provider trong whitelist. `pattern` vẫn là lớp phòng thủ thứ hai.
+        # các provider trong whitelist. `pattern` vẫn là lớp phòng thủ thứ hai.
         if not isinstance(v, str):
-            raise ValueError(f"Nhà cung cấp '{v}' không được hỗ trợ. Chỉ hỗ trợ 'gemini', 'openrouter', 'openai'.")
+            raise ValueError(f"Nhà cung cấp '{v}' không được hỗ trợ. Chỉ hỗ trợ 'gemini', 'openrouter', 'openai', 'opencode'.")
         lower_p = v.lower().strip()
         if lower_p in ["google", "gemini"]:
             return "gemini"
@@ -967,7 +985,9 @@ class AIKeyCreate(BaseModel):
             return "openrouter"
         if lower_p in ["openai", "gpt"]:
             return "openai"
-        raise ValueError(f"Nhà cung cấp '{v}' không được hỗ trợ. Chỉ hỗ trợ 'gemini', 'openrouter', 'openai'.")
+        if lower_p in ["opencode", "oc", "zen"]:
+            return "opencode"
+        raise ValueError(f"Nhà cung cấp '{v}' không được hỗ trợ. Chỉ hỗ trợ 'gemini', 'openrouter', 'openai', 'opencode'.")
 
     @field_validator("model")
     @classmethod
@@ -978,6 +998,8 @@ class AIKeyCreate(BaseModel):
                 return "gpt-4o"
             elif provider == "openrouter":
                 return "meta-llama/llama-3.3-70b-instruct"
+            elif provider == "opencode":
+                return "space-bunny-free"
             return "gemini-2.5-flash"
         clean_m = v.strip()
         lower_m = clean_m.lower()
@@ -994,6 +1016,11 @@ class AIKeyCreate(BaseModel):
         elif provider == "openrouter":
             if "/" not in clean_m or len(clean_m) < 3:
                 raise ValueError(f"Mô hình '{v}' không hợp lệ cho OpenRouter (cần định dạng tác giả/tên-mô-hình, ví dụ 'meta-llama/llama-3.3-70b-instruct').")
+            return clean_m
+        elif provider == "opencode":
+            # Slug tự do, xem ghi chú ở AIKeyTestRequest.validate_model.
+            if len(clean_m) < 2:
+                raise ValueError(f"Mô hình '{v}' không hợp lệ cho OpenCode.")
             return clean_m
         return clean_m
 

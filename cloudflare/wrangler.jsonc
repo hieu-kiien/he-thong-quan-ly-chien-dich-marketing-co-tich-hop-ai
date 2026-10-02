@@ -12,7 +12,10 @@
       "AI_API_KEY",
       "MARKETFLOW_MANAGER_PASSWORD",
       "MARKETFLOW_MARKETER_PASSWORD",
-      "MARKETFLOW_APPROVER_PASSWORD"
+      "MARKETFLOW_APPROVER_PASSWORD",
+      // Cron 5 phút/lần gọi POST /api/v1/schedules/trigger-worker. Thiếu
+      // secret này thì scheduler bỏ qua mọi lần chạy (có log cảnh báo).
+      "SCHEDULER_SECRET"
     ]
   },
   "assets": {
@@ -48,6 +51,13 @@
       "bucket_name": "marketflow-production-data"
     }
   ],
+  // Cron Trigger đẩy việc xử lý lịch đăng xuống Durable Object.
+  // Bắt buộc vì scheduler trong container đã bị tắt (SCHEDULER_ENABLED=false) để
+  // các thay đổi do scheduler ghi vào SQLite luôn được snapshot lên R2. Thiếu
+  // trigger này thì lịch đăng sẽ không bao giờ chạy trên Cloudflare.
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
   "routes": [
     {
       "pattern": "marketing.kienhieu.id.vn/*",

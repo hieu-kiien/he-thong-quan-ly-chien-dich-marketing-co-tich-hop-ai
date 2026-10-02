@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Eye, FileText, Copy, Check, Image as ImageIcon, Sparkles } from 'lucide-react';
+import { Eye, FileText, Copy, Check, Image as ImageIcon } from 'lucide-react';
 import { MarketingContent } from '../../types';
 import { FacebookPreviewCard } from './FacebookPreviewCard';
 import { TikTokPhoneMockup, TikTokSceneItem } from './TikTokPhoneMockup';
 import { EmailInboxPreview } from './EmailInboxPreview';
 import { ImageAttachmentPicker } from './ImageAttachmentPicker';
 import { copyToClipboardWithFormatting, formatFacebookCopy, formatTikTokCopy, formatEmailCopy } from '../../utils/copyUtils';
+import { channelCodeById } from '../../utils/channels';
 
 export type TikTokScene = TikTokSceneItem;
 
@@ -105,7 +106,7 @@ export function parseTikTokScenesFromBody(body?: string | null): TikTokSceneItem
   }
 
   // 3. Fallback: Body là văn bản thông thường (chia 3-4 cảnh: Hook, Thân bài/Giá trị, CTA)
-  let cleanText = rawText
+  const cleanText = rawText
     .replace(/^HOOK\s*\([^)]*\)\s*[:：]?/im, '')
     .replace(/(?:ÂM NHẠC ĐỀ XUẤT|MUSIC|HASHTAGS?)[:\s][\s\S]*$/im, '')
     .trim();
@@ -318,16 +319,30 @@ export const SocialPreviewContainer: React.FC<SocialPreviewContainerProps> = ({
   const [copied, setCopied] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
 
-  // Nhận diện loại kênh từ channel_id hoặc channel.code
-  const channelCode = (content.channel?.code || '').toUpperCase();
-  const isFacebook = content.channel_id === 1 || channelCode.includes('FACEBOOK') || channelCode.includes('FB');
-  const isTikTok = content.channel_id === 4 || content.channel_id === 5 || channelCode.includes('TIKTOK');
-  const isEmail = content.channel_id === 2 || channelCode.includes('EMAIL') || channelCode.includes('MAIL');
+  // Nhận diện loại kênh theo `code` (đã đăng ký trong channels.ts) thay vì đoán
+  // theo `channel_id`. Trước đây `channel_id === 4` được coi là TikTok, nhưng 4
+  // là Google Search Ads — nội dung Google bị render bằng khung TikTok.
+  const channelCode = (content.channel?.code || channelCodeById(content.channel_id)).toUpperCase();
+  const isFacebook = channelCode.includes('FACEBOOK') || channelCode.includes('FB');
+  const isTikTok = channelCode.includes('TIKTOK');
+  const isEmail = channelCode.includes('EMAIL') || channelCode.includes('MAIL');
+  const isBlog = channelCode.includes('BLOG') || channelCode.includes('SEO');
+  const isGoogleAds = channelCode.includes('GOOGLE');
 
   // Phân tích kịch bản TikTok thực tế từ content.body (R4 Remediation)
   const parsedTikTokScenes = isTikTok ? parseTikTokScenesFromBody(content.body) : [];
 
-  const channelLabel = isFacebook ? 'Facebook Feed & Ads' : isTikTok ? 'TikTok Video Script (9:16)' : isEmail ? 'Email Newsletter' : (content.channel?.name || 'Mạng xã hội');
+  const channelLabel = isFacebook
+    ? 'Facebook Feed & Ads'
+    : isTikTok
+      ? 'TikTok Video Script (9:16)'
+      : isEmail
+        ? 'Email Newsletter'
+        : isBlog
+          ? 'Blog SEO'
+          : isGoogleAds
+            ? 'Google Search Ads'
+            : (content.channel?.name || 'Kênh khác');
 
   const handleCopyFormatted = async () => {
     let copyText = '';
@@ -368,7 +383,7 @@ export const SocialPreviewContainer: React.FC<SocialPreviewContainerProps> = ({
   };
 
   return (
-    <div className="bg-slate-50/60 rounded-2xl border border-slate-200 overflow-hidden shadow-xs social-preview-container">
+    <div className="bg-slate-50/60 rounded-2xl border border-slate-200 overflow-hidden shadow-sm social-preview-container">
       {/* Top Toolbar */}
       <div className="bg-white px-4 py-2.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-2">
@@ -405,7 +420,7 @@ export const SocialPreviewContainer: React.FC<SocialPreviewContainerProps> = ({
           {onImageChange && (
             <button
               onClick={() => setIsPickerOpen(!isPickerOpen)}
-              className="px-2.5 py-1 text-slate-700 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 rounded-lg text-xs font-medium transition flex items-center gap-1 shadow-2xs"
+              className="px-2.5 py-1 text-slate-700 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 rounded-lg text-xs font-medium transition flex items-center gap-1 shadow"
             >
               <ImageIcon className="w-3.5 h-3.5 text-indigo-600" />
               <span>{content.image_url ? 'Đổi ảnh' : 'Gắn ảnh'}</span>
@@ -415,7 +430,7 @@ export const SocialPreviewContainer: React.FC<SocialPreviewContainerProps> = ({
           {/* 1-Click Copy */}
           <button
             onClick={handleCopyFormatted}
-            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1 shadow-2xs border ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1 shadow border ${
               copied
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
                 : 'bg-white text-slate-700 hover:text-indigo-600 hover:bg-indigo-50 border-slate-200'
@@ -440,7 +455,7 @@ export const SocialPreviewContainer: React.FC<SocialPreviewContainerProps> = ({
               onClick={() => setViewMode('RAW')}
               className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition flex items-center gap-1 ${
                 viewMode === 'RAW'
-                  ? 'bg-white text-slate-900 shadow-2xs'
+                  ? 'bg-white text-slate-900 shadow'
                   : 'text-slate-700 hover:text-slate-900'
               }`}
             >
@@ -451,7 +466,7 @@ export const SocialPreviewContainer: React.FC<SocialPreviewContainerProps> = ({
               onClick={() => setViewMode('PREVIEW')}
               className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition flex items-center gap-1 ${
                 viewMode === 'PREVIEW'
-                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  ? 'bg-indigo-600 text-white shadow'
                   : 'text-slate-700 hover:text-slate-900'
               }`}
             >

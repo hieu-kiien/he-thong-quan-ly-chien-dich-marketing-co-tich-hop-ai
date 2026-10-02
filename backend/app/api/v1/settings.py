@@ -54,7 +54,12 @@ def test_ai_connection(
     start_time = time.time()
     clean_key = req.api_key.strip()
     provider = (req.provider or "gemini").lower().strip()
-    provider_title = "Google Gemini" if provider == "gemini" else ("OpenRouter" if provider == "openrouter" else "OpenAI")
+    provider_title = {
+        "gemini": "Google Gemini",
+        "openrouter": "OpenRouter",
+        "openai": "OpenAI",
+        "opencode": "OpenCode",
+    }.get(provider, provider)
 
     # Backdoor guard (M2): token kiểm thử giả chỉ được chạy ngoài production.
     # Nếu bật ở production, bất kỳ ai cũng dán "mock-anything" vào đây và nhận
@@ -109,6 +114,15 @@ def test_ai_connection(
         elif provider == "openai":
             url = "https://api.openai.com/v1/models"
             headers = {"Authorization": f"Bearer {clean_key}"}
+        elif provider == "opencode":
+            # opencode zen là endpoint OpenAI-compatible: danh sách model ở
+            # {base}/models. Base lấy từ cấu hình để hỗ trợ endpoint tùy biến.
+            url = f"{settings.AI_BASE_URL.rstrip('/')}/models"
+            headers = {
+                "Authorization": f"Bearer {clean_key}",
+                "HTTP-Referer": "http://localhost:5173",
+                "X-Title": "MarketFlow AI",
+            }
         else:
             raise ValueError(f"Nhà cung cấp {provider} không được hỗ trợ")
 

@@ -2,11 +2,11 @@
 """
 scripts/evaluate_ai_grounding.py
 ================================
-Sprint 4 Benchmark: AI Grounding, Schema Adherence, and Anti-Hallucination Evaluation.
+Sprint 4 Benchmark: bounded AI grounding checks and schema adherence evaluation.
 
 Evaluation Criteria:
 1. Schema Adherence Rate (Target >= 95%, MarketFlow achieves 100% across all task types).
-2. Anti-Hallucination & Evidence Grounding (Target 0% hallucinated numbers or banned temporal claims).
+2. Grounding checks for the fixed cases in this script (target: no flagged violations in that suite).
 3. Provider Failover Resilience (100% graceful fallback to deterministic heuristics upon provider error/timeout).
 4. Deterministic Latency & SLA (p95 <= 50ms for local deterministic calculations, < 800ms API SLA).
 """
@@ -228,7 +228,7 @@ def evaluate_schema_adherence():
 
 
 def evaluate_anti_hallucination_and_grounding(db):
-    print("\n--- 2. Evaluating Anti-Hallucination & Metric Grounding ---")
+    print("\n--- 2. Evaluating Fixed-Case Metric Grounding ---")
     hallucination_count = 0
     total_samples = 0
 
@@ -298,7 +298,7 @@ def evaluate_anti_hallucination_and_grounding(db):
                     hallucination_count += 1
                     print(f"Recommendation did not cite factual ROAS: {r.reason}")
 
-    # 2. Sparse Data / Empty Metrics Anti-Hallucination Test
+    # 2. Sparse data / empty metrics checks for the fixed suite
     for i in range(20):
         total_samples += 1
         camp = Campaign(
@@ -427,9 +427,10 @@ def generate_evaluation_report(schema_rate, hall_rate, failover_rate, lat_stats)
 
     report_content = f"""# Báo Cáo Đánh Giá & Đo Lường Hệ Thống AI (AI Grounding & Evaluation Benchmark)
 
-**Hệ thống**: MarketFlow AI — Hệ thống quản lý chiến dịch marketing có tích hợp AI  
-**Thời gian đánh giá**: {time.strftime('%Y-%m-%d %H:%M:%S')}  
-**Môi trường thực nghiệm**: Local Testbed, SQLite Isolated Database  
+**Hệ thống**: MarketFlow AI — Hệ thống quản lý chiến dịch marketing có tích hợp AI
+**Thời gian đánh giá**: {time.strftime('%Y-%m-%d %H:%M:%S')}
+**Môi trường thực nghiệm**: GitHub Actions/local test runner với SQLite database cô lập
+> **Giới hạn:** benchmark tự động trên tập case cố định; không đo hiệu quả người dùng hoặc chất lượng mọi lần gọi model.
 
 ---
 
@@ -437,10 +438,10 @@ def generate_evaluation_report(schema_rate, hall_rate, failover_rate, lat_stats)
 
 | Chỉ số Đo Lường | Mục Tiêu Chuẩn (SLA / Target) | Kết Quả Đạt Được | Trạng Thái |
 | :--- | :--- | :--- | :--- |
-| **Tỷ lệ Tuân Thủ Schema (Schema Adherence)** | $\\ge 95.0\\%$ | **{schema_rate:.2f}%** | ✅ ĐẠT (VƯỢT CHỈ TIÊU) |
-| **Tỷ lệ Ảo Giác Dữ Liệu (Hallucination Rate)** | $= 0.0\\%$ | **{hall_rate:.2f}%** | ✅ ĐẠT (ZERO HALLUCINATION) |
-| **Khả Năng Chống Chịu Khi Mất Kết Nối (Failover)** | $\\ge 99.0\\%$ | **{failover_rate:.2f}%** | ✅ ĐẠT (SMART FALLBACK) |
-| **Độ Trễ Chẩn Đoán Xác Định (p95 Latency)** | $\\le 50.0\\text{{ ms}}$ | **{p95:.2f} ms** | ✅ ĐẠT (HIGH PERFORMANCE) |
+| **Schema adherence (60 mẫu cố định)** | ≥ 95% | **{schema_rate:.2f}%** | Kết quả trên bộ mẫu này |
+| **Vi phạm grounding (40 case cố định)** | Không suy rộng thành tỷ lệ production | **{hall_rate:.2f}%** | Chỉ áp dụng các case đã chạy |
+| **Failover (tình huống trong script)** | ≥ 99% trong bộ tình huống này | **{failover_rate:.2f}%** | Kết quả test có phạm vi giới hạn |
+| **AI Doctor xác định, p95** | 50 lượt trên SQLite cô lập | **{p95:.2f} ms** | Không phải latency LLM/mạng hoặc tải production |
 
 ---
 
@@ -452,16 +453,16 @@ def generate_evaluation_report(schema_rate, hall_rate, failover_rate, lat_stats)
   - Soạn thảo bài viết quảng cáo (`AIDraftResponse` - title, body, cta).
   - Tóm tắt hiệu suất chiến dịch (`AISummaryResponse` - executive_summary, strengths, weaknesses, recommendations).
   - Động cơ sáng tạo đa kênh (`OmnichannelResponse` - Facebook, TikTok phân cảnh, Email chuỗi).
-- **Kết quả**: 100% các mẫu sinh ra đều khớp hoàn toàn với định dạng JSON và schema ràng buộc kiểu dữ liệu, loại bỏ triệt để rủi ro crash ứng dụng giao diện.
+- Kết quả: {schema_rate:.2f}% mẫu trong tập này đúng schema. Kết quả không loại bỏ mọi lỗi giao diện hoặc mọi lỗi nội dung.
 
-### 2.2 Rào Chắn Chống Ảo Giác (Anti-Hallucination & Evidence Grounding)
+### 2.2 Kiểm Tra Grounding Trên Tập Case Cố Định
 - **Kịch bản 1: Chiến dịch có số liệu đo lường phong phú (Rich Metrics)**:
-  - Động cơ chẩn đoán Bác sĩ AI trích xuất 100% số liệu thực từ bảng `campaign_metrics`.
-  - Mọi nhận định về ROAS, CTR, CPC, Doanh thu trong khuyến nghị đều trích dẫn chính xác con số từ cơ sở dữ liệu.
+  - Các assertion trong suite kiểm tra đầu ra của một số tình huống rich-metrics đã mã hóa.
+  - Suite không chứng minh mọi nhận định ở mọi đầu vào/provider luôn được grounding chính xác; đánh giá đầu ra ngoài các case cần kiểm tra riêng.
 - **Kịch bản 2: Chiến dịch rỗng / Dữ liệu thưa thớt (Sparse Data / 0 Metrics)**:
-  - Hệ thống tự động kích hoạt cờ `is_sparse_data: True`.
+  - Các tình huống sparse-data trong suite kiểm tra phản hồi/cờ dữ liệu thưa theo implementation hiện tại.
   - Cảnh báo rõ ràng cho Marketer: *"Dữ liệu đo lường thực nghiệm chưa đủ... Chưa thể xác định điểm nghẽn hiệu suất định lượng"*.
-  - Tuyệt đối không tự ý phóng đại số liệu, không sinh từ khóa thời gian vô căn cứ ("khung giờ vàng", "cuối tuần", "giờ cao điểm").
+  - Trong các case grounding đã mã hóa, script không ghi nhận vi phạm; không suy ra mọi model/provider không thể hallucinate ngoài tập test.
 
 ### 2.3 Khả Năng Dự Phòng Tự Động (Smart Fallback & Resilience)
 - Khi nhà cung cấp AI gặp sự cố (hết hạn quota, lỗi mạng ngoại vi, HTTP 429/500 hoặc timeout), hệ thống tự động kích hoạt Động cơ Dự phòng Cục bộ (Local Fallback Engine).
@@ -473,15 +474,17 @@ def generate_evaluation_report(schema_rate, hall_rate, failover_rate, lat_stats)
 - **p50 (Median)**: {p50:.2f} ms.
 - **p95**: {p95:.2f} ms.
 - **Thời gian phản hồi tối đa**: {max_lat:.2f} ms.
-- Toàn bộ thuật toán phân rã đóng góp doanh thu đa kênh và chẩn đoán sức khỏe vận hành hoàn toàn trong bộ nhớ máy chủ với tốc độ tức thì.
+- Đây là thời gian của đường chẩn đoán xác định trong runner cô lập; không đo round-trip API, thời gian sinh của LLM hay hiệu năng nhiều tenant.
 
 ---
 
-## 3. Kết Luận Bảo Vệ Đồ Án
-Kết quả thực nghiệm chứng minh hệ thống **MarketFlow AI** không chỉ là một giao diện gọi API đóng gói sẵn, mà sở hữu:
-1. Kiến trúc phân tầng rõ ràng giữa AI suy luận (Generative LLM) và Động cơ Chẩn đoán Xác định (Deterministic Diagnostic Engine).
-2. Rào chắn phòng vệ chống ảo giác hai lớp (Schema Validation + Ground Truth Verification).
-3. Đạt 100% các tiêu chí khắt khe trong rubric đánh giá đồ án tốt nghiệp đại học về tính ổn định, độ tin cậy và khả năng ứng dụng thực tiễn trong doanh nghiệp.
+## 3. Kết luận và giới hạn
+
+Benchmark này cung cấp bằng chứng kỹ thuật trong một môi trường và tập tình huống đã mô tả. Kết quả không phải đánh giá độc lập về tính hữu ích với marketer, không chứng minh năng suất kinh doanh và không chứng nhận production readiness.
+
+1. Schema validation, grounding và failover được đo bằng các case được mã hóa trong script.
+2. Latency p95 là đường chẩn đoán xác định trong test runner/SQLite cô lập; không phải latency của Gemini/OpenAI qua mạng.
+3. Kết quả 0 vi phạm chỉ có nghĩa không có vi phạm quan sát được trong các case grounding đã chạy. Cần đánh giá con người và pilot riêng trước khi đưa ra tuyên bố rộng hơn.
 """
 
     with open(report_file, "w", encoding="utf-8") as f:

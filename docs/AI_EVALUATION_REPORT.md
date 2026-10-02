@@ -1,57 +1,45 @@
-# Báo Cáo Đánh Giá & Đo Lường Hệ Thống AI (AI Grounding & Evaluation Benchmark)
+# Báo cáo benchmark AI (được sinh tự động)
 
-**Hệ thống**: MarketFlow AI — Hệ thống quản lý chiến dịch marketing có tích hợp AI  
-**Thời gian đánh giá**: 2026-09-29 12:37:52  
-**Môi trường thực nghiệm**: GitHub Actions runner (Gate 5 - Performance & API Latency), SQLite Isolated Database  
+> Báo cáo này được sinh bởi [scripts/evaluate_ai_grounding.py](../scripts/evaluate_ai_grounding.py) trong Gate 5 của [workflow CI](../.github/workflows/ci.yml). Khi thay đổi nội dung, cập nhật generator và artifact cùng nhau.
 
----
+**Hệ thống:** MarketFlow AI
+**Thời điểm chạy:** 2026-09-29 12:37:52
+**Môi trường:** GitHub Actions, SQLite cô lập
+**Phạm vi kết luận:** benchmark kỹ thuật tự động trên các case được ghi dưới đây. Không đo giá trị kinh doanh, usability, conversion thực tế hoặc chất lượng mọi lần gọi model.
 
-## 1. Tóm Tắt Kết Quả Đo Lường (Executive Summary)
+## 1. Tóm tắt kết quả
 
-| Chỉ số Đo Lường | Mục Tiêu Chuẩn (SLA / Target) | Kết Quả Đạt Được | Trạng Thái |
-| :--- | :--- | :--- | :--- |
-| **Tỷ lệ Tuân Thủ Schema (Schema Adherence)** | $\ge 95.0\%$ | **100.00%** | ✅ ĐẠT (VƯỢT CHỈ TIÊU) |
-| **Tỷ lệ Ảo Giác Dữ Liệu (Hallucination Rate)** | $= 0.0\%$ | **0.00%** | ✅ ĐẠT (ZERO HALLUCINATION) |
-| **Khả Năng Chống Chịu Khi Mất Kết Nối (Failover)** | $\ge 99.0\%$ | **100.00%** | ✅ ĐẠT (SMART FALLBACK) |
-| **Độ Trễ Chẩn Đoán Xác Định (p95 Latency)** | $\le 50.0\text{ ms}$ | **3.36 ms** | ✅ ĐẠT (HIGH PERFORMANCE) |
+| Chỉ số | Tập đo | Kết quả | Cách diễn giải |
+|---|---:|---:|---|
+| Tuân thủ schema | 60 mẫu cố định trên 4 tác vụ | 100.00% | Các mẫu trong suite đạt schema. |
+| Vi phạm grounding | 40 case cố định | 0.00% (0/40) | Không quan sát vi phạm trong các case này; không phải tỷ lệ tổng quát ngoài suite. |
+| Failover | Các tình huống được định nghĩa trong script | 100.00% | Kết quả có phạm vi của các nhánh failover đã kiểm tra. |
+| Latency AI Doctor xác định | 50 lượt trên SQLite cô lập | p95 = 3.36 ms | Không phải latency LLM/provider qua mạng hoặc tải production. |
 
----
+## 2. Phương pháp và giới hạn
 
-## 2. Chi Tiết Phương Pháp Thực Nghiệm
+### 2.1 Schema
 
-### 2.1 Kiểm Định Schema Cấu Trúc (Pydantic Schema Adherence)
-- **Tập mẫu thử nghiệm**: 60 mẫu thử nghiệm phân bổ đều trên 4 tác vụ:
-  - Sinh ý tưởng tiếp thị (`AIIdeaResponse` - 5 ý tưởng, angle, headline, emotion).
-  - Soạn thảo bài viết quảng cáo (`AIDraftResponse` - title, body, cta).
-  - Tóm tắt hiệu suất chiến dịch (`AISummaryResponse` - executive_summary, strengths, weaknesses, recommendations).
-  - Động cơ sáng tạo đa kênh (`OmnichannelResponse` - Facebook, TikTok phân cảnh, Email chuỗi).
-- **Kết quả**: 100% các mẫu sinh ra đều khớp hoàn toàn với định dạng JSON và schema ràng buộc kiểu dữ liệu, loại bỏ triệt để rủi ro crash ứng dụng giao diện.
+Script kiểm tra mẫu cho các hợp đồng dữ liệu idea, draft, summary và nội dung đa kênh. Tỷ lệ 100% là tỷ lệ mẫu trong bộ kiểm tra hợp lệ với schema. Nó không chứng minh nội dung hữu ích, đúng sự thật, phù hợp thương hiệu hoặc không có lỗi ở mọi đầu vào khác.
 
-### 2.2 Rào Chắn Chống Ảo Giác (Anti-Hallucination & Evidence Grounding)
-- **Kịch bản 1: Chiến dịch có số liệu đo lường phong phú (Rich Metrics)**:
-  - Động cơ chẩn đoán Bác sĩ AI trích xuất 100% số liệu thực từ bảng `campaign_metrics`.
-  - Mọi nhận định về ROAS, CTR, CPC, Doanh thu trong khuyến nghị đều trích dẫn chính xác con số từ cơ sở dữ liệu.
-- **Kịch bản 2: Chiến dịch rỗng / Dữ liệu thưa thớt (Sparse Data / 0 Metrics)**:
-  - Hệ thống tự động kích hoạt cờ `is_sparse_data: True`.
-  - Cảnh báo rõ ràng cho Marketer: *"Dữ liệu đo lường thực nghiệm chưa đủ... Chưa thể xác định điểm nghẽn hiệu suất định lượng"*.
-  - Tuyệt đối không tự ý phóng đại số liệu, không sinh từ khóa thời gian vô căn cứ ("khung giờ vàng", "cuối tuần", "giờ cao điểm").
+### 2.2 Grounding và dữ liệu thưa
 
-### 2.3 Khả Năng Dự Phòng Tự Động (Smart Fallback & Resilience)
-- Khi nhà cung cấp AI gặp sự cố (hết hạn quota, lỗi mạng ngoại vi, HTTP 429/500 hoặc timeout), hệ thống tự động kích hoạt Động cơ Dự phòng Cục bộ (Local Fallback Engine).
-- Tách biệt minh bạch giữa AI thật và dữ liệu dự phòng thông qua thuộc tính `is_fallback: True` và `model_provider: template-fallback-engine`.
+Các case được mã hóa kiểm tra hành vi chẩn đoán khi có metrics và khi thiếu metrics. Trong suite hiện tại, 0/40 case bị đánh dấu vi phạm. Suite không chứng minh mọi nhận định ở mọi đầu vào/provider luôn được grounding chính xác; đầu ra ngoài các case, model/provider mới và dữ liệu vận hành vẫn cần người kiểm tra.
 
-### 2.4 Hiệu Năng Phản Hồi (Latency Benchmark)
-- **Số lượt đo**: 50 iterations liên tục.
-- **Độ trễ trung bình**: 3.20 ms.
-- **p50 (Median)**: 3.14 ms.
-- **p95**: 3.36 ms.
-- **Thời gian phản hồi tối đa**: 4.98 ms.
-- Toàn bộ thuật toán phân rã đóng góp doanh thu đa kênh và chẩn đoán sức khỏe vận hành hoàn toàn trong bộ nhớ máy chủ với tốc độ tức thì.
+### 2.3 Failover
 
----
+Tỷ lệ failover được tính từ các trường hợp provider/fallback do script mô phỏng. Mẫu số nhỏ và không đại diện mọi timeout, quota, lỗi mạng hoặc lỗi dịch vụ có thể xảy ra.
 
-## 3. Kết Luận Bảo Vệ Đồ Án
-Kết quả thực nghiệm chứng minh hệ thống **MarketFlow AI** không chỉ là một giao diện gọi API đóng gói sẵn, mà sở hữu:
-1. Kiến trúc phân tầng rõ ràng giữa AI suy luận (Generative LLM) và Động cơ Chẩn đoán Xác định (Deterministic Diagnostic Engine).
-2. Rào chắn phòng vệ chống ảo giác hai lớp (Schema Validation + Ground Truth Verification).
-3. Đạt 100% các tiêu chí khắt khe trong rubric đánh giá đồ án tốt nghiệp đại học về tính ổn định, độ tin cậy và khả năng ứng dụng thực tiễn trong doanh nghiệp.
+### 2.4 Latency
+
+Độ trễ 3.36 ms là p95 của đường chẩn đoán xác định chạy trong process trên database SQLite cô lập trong 50 lượt. Đây không phải end-to-end response time, thời gian gọi Gemini/OpenAI, throughput nhiều tenant hoặc SLA production.
+
+## 3. Kết luận
+
+Benchmark này hỗ trợ nhận định rằng các trường hợp đã mã hóa hoạt động như kỳ vọng trong môi trường thử nghiệm nêu trên. Nó không chứng minh rằng MarketFlow đã sẵn sàng production, AI luôn đúng, hoặc agency tiết kiệm thời gian/tăng doanh thu.
+
+Để chứng minh các kết luận rộng hơn, cần:
+- mở rộng test case và kiểm tra chất lượng bằng rubric có người đánh giá;
+- đo các lỗi provider, retry và webhook trong staging;
+- chạy pilot với người dùng agency, có baseline và chỉ số hoàn thành công việc;
+- ghi commit SHA, môi trường và mẫu số cho từng lần đo mới.

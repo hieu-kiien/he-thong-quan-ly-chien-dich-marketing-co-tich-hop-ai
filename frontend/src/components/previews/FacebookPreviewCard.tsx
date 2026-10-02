@@ -73,10 +73,10 @@ export const FacebookPreviewCard: React.FC<FacebookPreviewCardProps> = ({
               <img
                 src={brandLogo}
                 alt={brandName}
-                className="w-10 h-10 rounded-full object-cover border border-slate-200 shadow-2xs"
+                className="w-10 h-10 rounded-full object-cover border border-slate-200 shadow"
               />
             ) : (
-              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-2xs">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow">
                 {brandName.slice(0, 2).toUpperCase()}
               </div>
             )}
@@ -158,6 +158,8 @@ export const FacebookPreviewCard: React.FC<FacebookPreviewCardProps> = ({
 
       {/* 3. Thành phần Thị giác (Banner / Product Image) */}
       <div className="relative group border-t border-slate-100 bg-slate-100">
+        {/* Vùng chọn ảnh dùng <button> gốc thay cho div onClick: đây là nút bấm
+            thật (không chứa phần tử tương tác con). */}
         {imageUrl ? (
           <div className="relative aspect-video w-full overflow-hidden bg-slate-900">
             <img
@@ -172,7 +174,7 @@ export const FacebookPreviewCard: React.FC<FacebookPreviewCardProps> = ({
             {onImageChange && (
               <button
                 onClick={() => setIsPickerOpen(!isPickerOpen)}
-                className="absolute top-2 right-2 px-2.5 py-1 bg-black/70 hover:bg-black text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition shadow backdrop-blur-xs flex items-center gap-1.5"
+                className="absolute top-2 right-2 px-2.5 py-1 bg-black/70 hover:bg-black text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition shadow backdrop-blur-sm flex items-center gap-1.5"
               >
                 <ImageIcon className="w-3.5 h-3.5" />
                 Đổi ảnh
@@ -180,16 +182,17 @@ export const FacebookPreviewCard: React.FC<FacebookPreviewCardProps> = ({
             )}
           </div>
         ) : (
-          <div
+          <button
+            type="button"
             onClick={() => onImageChange && setIsPickerOpen(true)}
-            className="aspect-video w-full flex flex-col items-center justify-center p-6 text-center bg-slate-50 border-y border-dashed border-slate-300 hover:bg-slate-100 transition cursor-pointer"
+            className="aspect-video w-full font-sans flex flex-col items-center justify-center p-6 text-center bg-slate-50 border-y border-dashed border-slate-300 hover:bg-slate-100 transition cursor-pointer"
           >
             <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 mb-2">
               <ImageIcon className="w-5 h-5" />
             </div>
             <p className="text-xs font-semibold text-slate-700">Chưa gắn ảnh banner/sản phẩm</p>
             <p className="text-[11px] text-slate-500 mt-0.5">Bấm vào đây để chọn ảnh mẫu hoặc dán liên kết</p>
-          </div>
+          </button>
         )}
 
         {/* Facebook Snippet Bar bên dưới ảnh */}
@@ -202,7 +205,7 @@ export const FacebookPreviewCard: React.FC<FacebookPreviewCardProps> = ({
               {effectiveTitle}
             </p>
           </div>
-          <button className="px-3.5 py-1.5 bg-slate-200/80 hover:bg-slate-300 text-slate-800 font-semibold text-xs rounded-md shrink-0 transition shadow-2xs border border-slate-300">
+          <button className="px-3.5 py-1.5 bg-slate-200/80 hover:bg-slate-300 text-slate-800 font-semibold text-xs rounded-md shrink-0 transition shadow border border-slate-300">
             {cta || 'Tìm hiểu thêm'}
           </button>
         </div>

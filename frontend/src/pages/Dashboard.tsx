@@ -1,38 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  Sparkles, 
-  ArrowUpRight, 
-  TrendingUp, 
-  CheckCircle2, 
-  Clock, 
-  Plus, 
-  AlertTriangle,
-  AlertCircle,
-  Check,
-  Calendar,
-  Layers,
-  ChevronRight,
-  ShieldAlert,
-  Activity,
-  ListTodo,
-  ExternalLink
-} from 'lucide-react';
-import { MetricCard } from '../components/MetricCard';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Sparkles, CheckCircle2, Clock, AlertTriangle, Loader2, Check, Calendar, ChevronRight, ShieldAlert, Activity, ListTodo } from 'lucide-react';
 import { CampaignTable } from '../components/CampaignTable';
 import { KPIGrid9, AttributionTrendChart, AIDoctorWidget } from '../components/analytics';
-import { 
-  Campaign, 
-  MarketingContent, 
-  KPISummary,
-  CommandCenterResponse,
-  CommandCenterAttentionItem,
-  CommandCenterMyWorkItem,
-  CommandCenterCampaignHealth,
-  TaskStatus
-} from '../types';
+import { Campaign, MarketingContent, CommandCenterResponse, TaskStatus } from '../types';
 import { campaignApi, contentApi, analyticsApi, commandCenterApi, taskApi, getApiErrorMessage } from '../services/api';
 import { useToast } from '../components/Toast';
-import { MetricCardSkeleton, CampaignTableSkeleton } from '../components/Skeleton';
+import { CampaignTableSkeleton } from '../components/Skeleton';
+import { useFocusTrap } from '../hooks/useFocusTrap';
+import { formatVND } from '../utils/format';
 
 interface DashboardProps {
   onSelectCampaign: (campaign: Campaign) => void;
@@ -53,36 +28,67 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [contents, setContents] = useState<MarketingContent[]>([]);
   const [dashboardKpi, setDashboardKpi] = useState<any>(null);
+  // Chi phí thực đo theo chiến dịch, từ campaign_spend của /analytics/dashboard.
+  const [campaignSpend, setCampaignSpend] = useState<Record<string, number>>({});
   const [commandCenter, setCommandCenter] = useState<CommandCenterResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  // Lỗi từng phần: KHÔNG nuốt bằng `.catch(() => null)`. Trước đây một lỗi 401/500
+  // khiến dashboard hiện banner xanh "Mọi chiến dịch đang vận hành ổn định!"
+  // kèm 9 ô KPI toàn 0 — tức là báo "mọi thứ ổn" đúng lúc hệ thống không lấy được dữ liệu.
+  const [kpiError, setKpiError] = useState<string | null>(null);
+  const [commandCenterError, setCommandCenterError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const deleteConfirmRef = useFocusTrap<HTMLDivElement>({
+    isActive: confirmDeleteId !== null,
+    onEscape: () => {
+      if (!isDeleting) setConfirmDeleteId(null);
+    }
+  });
 
-  const loadData = async () => {
+  const loadData = async (signal?: AbortSignal) => {
     try {
       setLoading(true);
+      setLoadError(null);
       const [cList, ctList, kpiData, ccData] = await Promise.all([
         campaignApi.getAll(),
         contentApi.getAll(),
-        analyticsApi.getDashboard().catch(() => ({ kpi: null })),
-        commandCenterApi.getCommandCenter().catch(() => null)
+        analyticsApi.getDashboard().catch((e: any) => {
+          if (e?.code !== 'ERR_CANCELED' && !signal?.aborted) setKpiError(getApiErrorMessage(e));
+          return { kpi: null };
+        }),
+        commandCenterApi.getCommandCenter().catch((e: any) => {
+          if (e?.code !== 'ERR_CANCELED' && !signal?.aborted) setCommandCenterError(getApiErrorMessage(e));
+          return null;
+        })
       ]);
+      if (signal?.aborted) return;
       setCampaigns(cList);
       setContents(ctList);
+      setKpiError(null);
+      setCommandCenterError(null);
+      setCampaignSpend((kpiData?.campaign_spend as Record<string, number>) ?? {});
       if (kpiData?.kpi) {
         setDashboardKpi(kpiData.kpi);
+      } else {
+        setDashboardKpi(null);
       }
-      if (ccData) {
-        setCommandCenter(ccData);
-      }
-    } catch (e) {
-      console.warn('Lỗi khi tải dữ liệu tổng quan:', e);
+      setCommandCenter(ccData);
+    } catch (e: any) {
+      if (e?.code === 'ERR_CANCELED' || signal?.aborted) return;
+      setLoadError(getApiErrorMessage(e));
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadData(controller.signal);
+    return () => controller.abort();
+  }, []);
 
   const handleApproveQuick = async (id: number) => {
     try {
@@ -105,22 +111,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const isManager = userRole === 'MANAGER' || userRole === 'AGENCY_MANAGER' || userRole === 'ADMIN';
+  const isManager = userRole === 'MANAGER' || userRole === 'AGENCY_MANAGER';
+  // Backend DELETE /campaigns/{id} chỉ cho MANAGER/AGENCY_MANAGER. isManager trước
+  // đây còn nhận ADMIN nên ADMIN thấy nút Xóa rồi nhận 403.
 
-  const handleDeleteCampaign = async (id: number) => {
-    if (!isManager) {
-      toast.warning('Chỉ Quản lý (Manager / Agency Manager) mới có quyền xóa chiến dịch');
-      return;
-    }
-
-    if (!window.confirm('Bạn có chắc chắn muốn xóa chiến dịch này?')) return;
-
+  const handleDeleteCampaign = async () => {
+    if (confirmDeleteId === null || isDeleting) return;
+    const target = campaigns.find((c) => c.id === confirmDeleteId);
     try {
-      await campaignApi.delete(id);
-      toast.success('Đã xóa chiến dịch thành công!');
-      loadData();
+      setIsDeleting(true);
+      await campaignApi.delete(confirmDeleteId);
+      toast.success(`Đã xóa chiến dịch "${target?.name ?? ''}" thành công`);
+      setConfirmDeleteId(null);
+      void loadData();
     } catch (e: any) {
       toast.error(getApiErrorMessage(e), 'Lỗi khi xóa chiến dịch');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -133,13 +140,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const pendingContents = contents.filter(c => c.status === 'IN_REVIEW');
+
+  // Nhịp chi tiêu = chi phí thực đo / ngân sách, tính từ `campaign_spend`.
+  // Chiến dịch chưa có bản ghi CampaignMetric thì KHÔNG có phần tử trong map —
+  // đó là tín hiệu "chưa có số liệu", khác với 0%.
+  const campaignSpendPercent = useMemo<Record<number, number>>(() => {
+    const out: Record<number, number> = {};
+    campaigns.forEach((c) => {
+      const spent = campaignSpend[String(c.id)];
+      if (spent === undefined) return;
+      const budget = Number(c.budget) || 0;
+      if (budget <= 0) return;
+      out[c.id] = Math.min((spent / budget) * 100, 100);
+    });
+    return out;
+  }, [campaigns, campaignSpend]);
   const attentionItems = commandCenter?.attention_items || [];
   const myWorkToday = commandCenter?.my_work_today || [];
   const campaignsHealth = commandCenter?.campaigns_health || [];
   const summaryCounts = commandCenter?.summary_counts;
 
   return (
-    <div className="p-8 space-y-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-8 max-w-7xl mx-auto">
       
       {/* Page Title & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -158,7 +180,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="flex items-center gap-3">
           <button
             onClick={() => onNavigateTab?.('my_tasks')}
-            className="flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold px-3.5 py-2.5 rounded-lg shadow-xs transition-all cursor-pointer"
+            className="flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold px-3.5 py-2.5 rounded-lg shadow-sm transition-all cursor-pointer"
           >
             <ListTodo className="w-4 h-4 text-indigo-600" />
             <span>Tác vụ của tôi ({summaryCounts?.total_my_tasks ?? 0})</span>
@@ -286,7 +308,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Left Column (6/12): MY WORK TODAY */}
-        <div className="lg:col-span-6 bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-6 bg-white rounded-xl border border-slate-200/80 p-5 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
@@ -377,7 +399,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* Right Column (6/12): ACTIVE CAMPAIGNS HEALTH */}
-        <div className="lg:col-span-6 bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-6 bg-white rounded-xl border border-slate-200/80 p-5 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
@@ -439,7 +461,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       {/* Progress / Budget Stats */}
                       <div className="space-y-1">
                         <div className="flex items-center justify-between text-[11px] text-slate-500">
-                          <span>Ngân sách: ${ch.spent.toLocaleString()} / ${ch.budget.toLocaleString()}</span>
+                          {/* Tiền trong hệ thống là VND; trước đây gắn ký hiệu `$` và
+                              gọi toLocaleString() không kèm locale nên 15000000 ra
+                              "15,000,000 $". */}
+                          <span>Ngân sách: {formatVND(ch.spent)} / {formatVND(ch.budget)}</span>
                           <span className="font-semibold">{ch.budget_utilization_pct}% đã chi</span>
                         </div>
                         <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
@@ -487,7 +512,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
           Chỉ Số Hiệu Quả Chiến Dịch (Performance Metrics)
         </h3>
-        <KPIGrid9 kpi={dashboardKpi} loading={loading} />
+        <KPIGrid9
+          kpi={dashboardKpi}
+          loading={loading}
+          error={kpiError}
+          onRetry={() => void loadData()}
+        />
       </div>
 
       {/* SECTION 4: ANALYTICS & DOCTOR HUB */}
@@ -514,13 +544,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
             {loading ? (
               <CampaignTableSkeleton rows={4} />
+            ) : loadError ? (
+              <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-center">
+                <AlertTriangle className="w-6 h-6 text-rose-500 mx-auto mb-1.5" />
+                <p className="text-xs font-bold text-rose-900">Không tải được danh sách chiến dịch</p>
+                <p className="text-[11px] text-rose-700 mt-0.5">{loadError}</p>
+                <button
+                  type="button"
+                  onClick={() => void loadData()}
+                  className="mt-2 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[11px] font-bold"
+                >
+                  Thử lại
+                </button>
+              </div>
             ) : (
               <CampaignTable
                 campaigns={campaigns}
                 onSelectCampaign={onSelectCampaign}
                 onOpenWorkflow={onOpenWorkflow}
                 onOpenAIForCampaign={onOpenAI}
-                onDeleteCampaign={handleDeleteCampaign}
+                onRequestDeleteCampaign={setConfirmDeleteId}
+                // Trước đây prop này tồn tại nhưng KHÔNG được truyền, nên bảng
+                // luôn hiện "chưa ghi nhận chi phí" dù Dashboard ngay phía trên đã
+                // tính ra tổng chi phí — hai phần của cùng một màn hình nói
+                // hai sự thật khác nhau.
+                spendPercentByCampaign={campaignSpendPercent}
                 userRole={userRole}
               />
             )}
@@ -534,14 +582,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <span>AI Doctor & Chẩn Đoán</span>
           </h3>
 
-          <AIDoctorWidget
-            campaignId={campaigns.length > 0 ? campaigns[0].id : undefined}
-            compact={true}
-            onOpenAIStudio={handleOpenAICopilot}
-          />
+          {commandCenterError ? (
+            <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3.5">
+              <p className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Không tải được sức khỏe chiến dịch
+              </p>
+              <p className="text-[11px] text-amber-800 mt-0.5">{commandCenterError}</p>
+            </div>
+          ) : (
+            <AIDoctorWidget
+              // Trước đây luôn chẩn đoán campaigns[0] bất kể người dùng đang xem
+              // chiến dịch nào; nay ưu tiên chiến dịch đang chọn.
+              campaignId={
+                campaigns.find((c) => c.status === 'ACTIVE')?.id ??
+                campaigns[0]?.id
+              }
+              compact={true}
+              onOpenAIStudio={handleOpenAICopilot}
+            />
+          )}
 
           {/* Review Queue Snippet */}
-          <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs">
+          <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-amber-500" /> Hàng đợi duyệt ({pendingContents.length})
@@ -564,7 +627,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <p className="text-[11px] text-slate-500 truncate mt-0.5">{item.body}</p>
                     {isManager && (
                       <button
+                        type="button"
                         onClick={() => handleApproveQuick(item.id)}
+                        aria-label={`Phê duyệt ngay bài: ${item.title}`}
                         className="mt-2 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
                       >
                         <CheckCircle2 className="w-3 h-3" /> Phê duyệt ngay
@@ -580,6 +645,60 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       </div>
 
+      {/* Xác nhận xóa chiến dịch — thay cho window.confirm() chặn cả trang */}
+      {confirmDeleteId !== null && (
+        <div
+          className="fixed inset-0 z-50"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="dashboard-delete-title"
+        >
+          <div
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            aria-hidden="true"
+            onClick={() => !isDeleting && setConfirmDeleteId(null)}
+          />
+          <div className="fixed inset-0 flex items-center justify-center p-4 pointer-events-none">
+            <div
+              ref={deleteConfirmRef}
+              tabIndex={-1}
+              className="relative bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 pointer-events-auto space-y-4 text-center"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 id="dashboard-delete-title" className="text-base font-bold text-slate-900">
+                  Xác nhận xóa chiến dịch?
+                </h4>
+                <p className="text-xs text-slate-500 mt-1">
+                  Chiến dịch <strong>{campaigns.find((c) => c.id === confirmDeleteId)?.name}</strong> và các mẫu
+                  quảng cáo đi kèm sẽ bị xóa. Không thể hoàn tác.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => setConfirmDeleteId(null)}
+                  className="flex-1 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl disabled:opacity-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={handleDeleteCampaign}
+                  className="flex-1 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {isDeleting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Xóa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

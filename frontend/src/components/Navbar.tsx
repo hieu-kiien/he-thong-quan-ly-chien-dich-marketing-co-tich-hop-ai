@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Sparkles, Menu, Palette, LogOut, Shield, AlertTriangle, X } from 'lucide-react';
+import { Search, Sparkles, Menu, Palette, LogOut, Shield, AlertTriangle, X, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { NotificationCenter } from './NotificationCenter';
 import { isOfflineDemoEnabled, isBackendConnected } from '../services/api';
+import { useColorScheme } from '../utils/colorScheme';
 
 interface NavbarProps {
   onOpenBrandKit: () => void;
   onOpenAIDrawer: () => void;
   onToggleSidebar?: () => void;
   onNavigateTab?: (tab: string) => void;
+  /** Nhận truy vấn tìm kiếm để điều hướng sang màn hình có thực sự lọc theo đó. */
+  onSearchCampaigns?: (query: string) => void;
   pendingReviewsCount?: number;
   activeCampaignsCount?: number;
 }
@@ -19,10 +22,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAIDrawer,
   onToggleSidebar,
   onNavigateTab,
+  onSearchCampaigns,
   pendingReviewsCount = 0,
   activeCampaignsCount = 0
 }) => {
   const { user, userRole, logout } = useAuth();
+  const { scheme, toggle: toggleColorScheme } = useColorScheme();
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -40,7 +45,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
+    const query = searchQuery.trim();
+    if (!query) return;
+    // Trước đây chỉ gọi onNavigateTab('campaigns') rồi vứt mất `searchQuery`:
+    // người dùng gõ tên chiến dịch rồi Enter (hoặc dùng Cmd+K) chỉ được chuyển tab,
+    // không hề lọc. Truyền query xuống màn hình Campaigns để nó thật sự lọc.
+    if (onSearchCampaigns) {
+      onSearchCampaigns(query);
+      return;
+    }
     if (onNavigateTab) {
       onNavigateTab('campaigns');
     }
@@ -82,9 +95,15 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="h-16 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-3 sm:px-6 flex items-center justify-between sticky top-0 z-20 shadow-xs text-slate-100 no-print">
-      {/* Left Area: Mobile Hamburger + Search Input + Workspace Switcher */}
-      <div className="flex items-center gap-2 sm:gap-3 max-w-xl min-w-0">
+    <header className="h-16 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-3 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-20 shadow-sm text-slate-100 no-print">
+      {/* Left Area: Mobile Hamburger + Workspace Switcher + Search Input
+
+          `flex-1 min-w-0` là bắt buộc, không phải mỹ thuật: vùng bên phải (nút
+          điều khiển) chiếm ~450px, còn vùng này chỉ còn ~180px. Thiếu `min-w-0`
+          thì con KHÔNG co lại được và tràn ra ngoài — đã xảy ra thật: nút chuyển
+          workspace rộng 214px trong container 179px làm ô tìm kiếm bị bóp còn 70px
+          và nút "Brand Kit" CHỒNG LÊN ô tìm kiếm (không bấm được). */}
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
         {onToggleSidebar && (
           <button
             onClick={onToggleSidebar}
@@ -102,13 +121,21 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         )}
 
-        {/* Workspace Switcher */}
-        <div className="hidden sm:block shrink-0">
+        {/* Workspace Switcher. Trước đây bọc trong `hidden sm:block` khiến trên
+            điện thoại không có đường vào đổi/tạo workspace (sidebar cũng ẩn ở
+            md), nên người dùng mobile bị kẹt ở workspace đầu tiên.
+            Giữ nó hiện ở mọi kích thước, nhưng phải cho phép co lại
+            (`min-w-0` + `max-w`), nếu không nó giữ nguyên 214px và đẩy các phần
+            tử khác ra ngoài. */}
+        <div className="min-w-0 max-w-[168px] shrink">
           <WorkspaceSwitcher onOpenBrandKit={onOpenBrandKit} />
         </div>
 
-        {/* Search Input Form */}
-        <form onSubmit={handleSearchSubmit} className="relative w-full max-w-xs hidden sm:block">
+        {/* Search Input Form. `flex-1 min-w-0` để nó co lại dần thay vì bị bóp
+            về kích thước tối thiểu rồi CHỒNG LÊN phần tử kế bên. Ẩn hoàn toàn
+            dưới `md` vì ở tầm kích thước đó ô tìm kiếm không đủ chỗ để dùng
+            hữu ích; phím tắt Cmd+K vẫn hoạt động ở mọi màn hình có bàn phím. */}
+        <form onSubmit={handleSearchSubmit} role="search" className="relative min-w-0 flex-1 max-w-xs hidden md:block">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             ref={searchInputRef}
@@ -123,6 +150,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={() => setSearchQuery('')}
+              aria-label="Xóa từ khoá tìm kiếm"
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
             >
               <X className="w-3.5 h-3.5" />
@@ -149,7 +177,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <button
           onClick={onOpenBrandKit}
           aria-label="Cấu hình Brand Kit"
-          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition-all shadow-xs"
+          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition-all shadow-sm"
           title="Cấu hình Brand Kit"
         >
           <Palette className="w-3.5 h-3.5 text-violet-400" />
@@ -173,10 +201,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           onNavigateTab={onNavigateTab}
         />
 
-        {/* User Info & Role Badge */}
+        {/* User Info & Role Badge.
+            Badge vai trò chỉ hiện từ `lg` trở lên. Trước đây hiện từ `sm` và
+            chiếm ~100px ở navbar, cộng dồn với các nút khác khiến vùng trái bị
+            bóp và chồng lấn. Tên/email bên cạnh vốn đã là `hidden lg:flex`. */}
         {user && (
-          <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-800 shrink-0">
-            <div className="hidden lg:flex flex-col text-right">
+          <div className="hidden lg:flex items-center gap-2 pl-2 border-l border-slate-800 shrink-0">
+            <div className="flex flex-col text-right">
               <span className="text-xs font-semibold text-slate-200 leading-tight">
                 {user.full_name}
               </span>
@@ -187,6 +218,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             {getRoleBadge(userRole)}
           </div>
         )}
+
+        {/* Chuyển giao diện sáng/tối. Trước đây các lớp `dark:` tồn tại trong
+            code nhưng không có đường nào để kích hoạt hay tắt, và Tailwind mặc
+            định bám `prefers-color-scheme` khiến giao diện tự đổi theo thiết bị. */}
+        <button
+          type="button"
+          onClick={toggleColorScheme}
+          aria-label={scheme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}
+          title={scheme === 'dark' ? 'Giao diện sáng' : 'Giao diện tối'}
+          className="p-2 text-slate-400 hover:text-amber-300 hover:bg-slate-800 rounded-xl border border-transparent hover:border-slate-700 transition-colors shrink-0"
+        >
+          {scheme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
 
         {/* Real Logout Button */}
         <button

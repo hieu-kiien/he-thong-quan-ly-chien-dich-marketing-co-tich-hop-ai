@@ -181,14 +181,18 @@ export const ImageAttachmentPicker: React.FC<ImageAttachmentPickerProps> = ({
             {filteredPresets.map((preset) => {
               const isSelected = currentImageUrl === preset.url;
               return (
-                <div
+              // Ô ảnh mẫu là lựa chọn (selectable option) nên dùng <button> gốc thay cho div onClick.
+                <button
                   key={preset.id}
+                  type="button"
+                  aria-pressed={isSelected}
+                  aria-label={`Chọn ảnh mẫu: ${preset.title}`}
                   onClick={() => {
                     setCustomUrl(preset.url);
                     onSelectImage(preset.url);
                     if (onClose) onClose();
                   }}
-                  className={`group relative rounded-xl overflow-hidden border-2 cursor-pointer transition transform hover:-translate-y-0.5 shadow-xs ${
+                  className={`group relative w-full block font-sans rounded-xl overflow-hidden border-2 cursor-pointer transition transform hover:-translate-y-0.5 shadow-xs ${
                     isSelected
                       ? 'border-indigo-600 ring-2 ring-indigo-200'
                       : 'border-slate-200 hover:border-indigo-400'
@@ -208,7 +212,7 @@ export const ImageAttachmentPicker: React.FC<ImageAttachmentPickerProps> = ({
                       <Check className="w-3 h-3" />
                     </div>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>

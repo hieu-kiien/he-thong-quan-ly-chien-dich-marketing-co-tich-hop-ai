@@ -38,6 +38,8 @@ _current_project_inventory.json
 **/.env
 **/.env.*
 !*.example
+# Salt PBKDF2 của BYOK vault: sinh ngẫu nhiên theo từng deployment, KHÔNG commit.
+**/.vault_salt
 
 # GitNexus local cache & database
 .gitnexus/
@@ -72,3 +74,7 @@ backend/data/*
 *.sqlite
 *.sqlite3
 
+
+# Output cua lenh tsc - file rac, khong commit
+tsc-errors.txt
+frontend/tsc-errors.txt

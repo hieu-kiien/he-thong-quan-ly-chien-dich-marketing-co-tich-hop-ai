@@ -1,25 +1,5 @@
 import React, { useState } from 'react';
-import { 
-  TrendingUp, 
-  DollarSign, 
-  BarChart2, 
-  ArrowUpRight, 
-  ArrowDownRight, 
-  Zap, 
-  Sparkles, 
-  PieChart, 
-  ThumbsUp, 
-  Mail, 
-  ExternalLink, 
-  FileText,
-  AlertTriangle,
-  CheckCircle2,
-  Brain,
-  Download,
-  BookOpen,
-  Target,
-  Award
-} from 'lucide-react';
+import { BarChart2, ArrowUpRight, Zap, ThumbsUp, Mail, ExternalLink, FileText, CheckCircle2, Brain, Download, Target, Award } from 'lucide-react';
 import { Campaign, KPISummary } from '../types';
 import { useToast } from './Toast';
 
@@ -319,7 +299,7 @@ export const ChannelROIComparison: React.FC<ChannelROIComparisonProps> = ({
             </div>
             <h4 className="text-xs font-bold text-slate-100">Hiệu ứng phễu kép (Full-Funnel)</h4>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Facebook đóng vai trò tạo nhu cầu (Brand Awareness), trong khi Google Search Ads "chốt hạ" khách hàng đang có ý định mua với ROI vượt trội <strong>+245%</strong>.
+              Facebook đóng vai trò tạo nhu cầu (Brand Awareness), trong khi Google Search Ads &ldquo;chốt hạ&rdquo; khách hàng đang có ý định mua với ROI vượt trội <strong>+245%</strong>.
             </p>
           </div>
 

@@ -34,8 +34,17 @@ def get_manager_headers(client) -> dict:
     return get_auth_headers_for(client, "manager@gmail.com", "Manager@123")
 
 
-def get_custom_role_headers(role: str, user_id: str = "1") -> dict:
-    """Helper tạo Bearer header với role tùy ý nhằm kiểm thử RBAC ma trận."""
+def get_custom_role_headers(role: str, user_id: str = "2") -> dict:
+    """Helper tạo Bearer header với claim `role` tùy ý nhằm kiểm thử RBAC ma trận.
+
+    `user_id` mặc định là "2" (marketer@gmail.com, role thật trong DB = MARKETER)
+    chứ KHÔNG phải "1" (manager). Lý do: hệ thống cố ý KHÔNG đọc quyền từ claim
+    trong token — JWT là base64 không mã hoá nên claim là dữ liệu do client kiểm
+    soát. `RoleChecker`/`get_current_user` luôn nạp vai trò thật từ DB theo `sub`.
+    Vì vậy để chứng minh "không leo thang đặc quyền bằng cách sửa token", token
+    giả phải trỏ tới một user KHÔNG có quyền trong DB; trỏ vào user 1 (manager
+    thật) thì endpoint cho phép là đúng, không phải lỗ hổng.
+    """
     token = create_access_token(data={"sub": user_id, "email": f"{role.lower()}@gmail.com", "role": role})
     return {"Authorization": f"Bearer {token}"}
 
@@ -107,8 +116,14 @@ class TestDeepRBACMatrix:
         assert "trái quyền" in resp.json()["detail"].lower()
 
     def test_rbac_viewer_role_blocked_from_mutations(self, client):
-        """5. Role VIEWER bị chặn toàn diện với HTTP 403 khi thực hiện các tác vụ thay đổi dữ liệu có bảo vệ RoleChecker."""
-        viewer_headers = get_custom_role_headers("VIEWER", user_id="1")
+        """5. Token khai vai trò VIEWER không đủ quyền thay đổi dữ liệu: HTTP 403.
+
+        Claim 'VIEWER' trong token bị bỏ qua hoàn toàn; quyền được quyết định bởi
+        role thật của user trong DB (MARKETER). Nhờ vậy sửa token không thể leo
+        thang — cũng không thể HẠ quyền được, và thay đổi vai trò trong DB có
+        hiệu lực ngay với các token đã phát.
+        """
+        viewer_headers = get_custom_role_headers("VIEWER")
 
         # Xóa chiến dịch
         assert client.delete("/api/v1/campaigns/1", headers=viewer_headers).status_code == 403
@@ -136,8 +151,14 @@ class TestDeepRBACMatrix:
         assert client.get("/api/v1/products", headers=viewer_headers).status_code == 200
 
     def test_rbac_admin_role_cannot_bypass_manager_check(self, client):
-        """7. Role ADMIN giả định không thể vượt qua RoleChecker quản lý theo nguyên tắc đặc quyền tối thiểu (Least Privilege)."""
-        admin_headers = get_custom_role_headers("ADMIN", user_id="1")
+        """7. Token tự khai vai trò ADMIN không vượt được RoleChecker (Least Privilege).
+
+        Đây là test leo thang đặc quyền quan trọng nhất: token ghi role='ADMIN'
+        nhưng `sub` trỏ tới user có role thật là MARKETER, nên mọi thao tác quản
+        trị vẫn bị chặn. Trước đây RoleChecker tin claim 'ADMIN' trong token và
+        cho qua; giờ claim bị bỏ qua hoàn toàn.
+        """
+        admin_headers = get_custom_role_headers("ADMIN")
         resp_approve = client.post("/api/v1/contents/1/approve", headers=admin_headers)
         assert resp_approve.status_code == 403
         assert "trái quyền" in resp_approve.json()["detail"].lower()
@@ -201,20 +222,32 @@ class TestDeepRBACMatrix:
         assert len(data["body"]) > 0
 
     def test_rbac_forged_unknown_role_returns_403(self, client):
-        """11. Token mang role tùy tiện không xác định (ví dụ 'HACKER') bị chặn với HTTP 403 Forbidden."""
-        hacker_headers = get_custom_role_headers("HACKER", user_id="1")
+        """11. Token mang role tùy tiện không xác lập (vd 'HACKER') bị chặn 403 vì claim bị bỏ qua."""
+        hacker_headers = get_custom_role_headers("HACKER")
         assert client.post("/api/v1/contents/1/approve", headers=hacker_headers).status_code == 403
         assert client.delete("/api/v1/campaigns/1", headers=hacker_headers).status_code == 403
 
     def test_rbac_empty_role_claim_returns_403(self, client):
-        """12. Token có trường role rỗng hoặc không chứa trường role bị RoleChecker từ chối 403."""
-        token_empty_role = create_access_token(data={"sub": "1", "role": ""})
+        """12. Token có `role` rỗng hoặc không có trường `role` vẫn bị 403.
+
+        Cả hai đều không còn mang ý nghĩa phân quyền: claim bị bỏ qua hoàn toàn và
+        vai trò lấy từ DB. Token thiếu `sub` mới thực sự bị từ chối (401).
+        """
+        marketer_sub = "2"  # role thật trong DB là MARKETER -> không đủ quyền duyệt/xoá
+        token_empty_role = create_access_token(data={"sub": marketer_sub, "role": ""})
         headers_empty = {"Authorization": f"Bearer {token_empty_role}"}
         assert client.post("/api/v1/contents/1/approve", headers=headers_empty).status_code == 403
 
-        token_no_role = create_access_token(data={"sub": "1"})
+        token_no_role = create_access_token(data={"sub": marketer_sub})
         headers_none = {"Authorization": f"Bearer {token_no_role}"}
         assert client.post("/api/v1/contents/1/approve", headers=headers_none).status_code == 403
+
+        # Token hoàn toàn không có `sub` thì bị 401 vì không xác định được người dùng.
+        token_no_sub = create_access_token(data={"role": "MANAGER"})
+        assert client.post(
+            "/api/v1/contents/1/approve",
+            headers={"Authorization": f"Bearer {token_no_sub}"}
+        ).status_code == 401
 
     def test_rbac_unauthenticated_ai_endpoints_return_401(self, client):
         """13. Toàn bộ các API dịch vụ AI từ chối truy cập 401 khi thiếu Bearer Token."""

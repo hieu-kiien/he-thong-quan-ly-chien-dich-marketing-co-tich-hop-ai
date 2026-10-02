@@ -139,14 +139,22 @@ def test_auth_login_succeeds_with_gmail_credentials(client: TestClient):
         assert data["user"]["role"] == expected_role
         assert data["user"]["full_name"] == expected_name
 
-        # Verify JWT cryptographic payload claims via decode_access_token
+        # Verify JWT cryptographic payload claims via decode_access_token.
+        #
+        # Token phải xác định được người dùng (`sub` + `exp`) và KHÔNG được chứa
+        # PII/role. JWT chỉ base64 chứ không mã hoá, nên mọi claim nhúng thêm đều
+        # đọc được bằng mắt từ localStorage và lộ ra với bất kỳ XSS nào; `role`
+        # trong token còn tệ hơn: nó là dữ liệu client kiểm soát và có thể cũ.
+        # Danh tính và quyền được phục hồi từ DB theo `sub` (get_current_user /
+        # RoleChecker), và response `data["user"]` ở trên đã chứng minh điều đó.
         token = data["access_token"]
         payload = decode_access_token(token)
-        assert payload["email"] == email
-        assert payload["role"] == expected_role
-        assert payload["full_name"] == expected_name
         assert "exp" in payload
-        assert "sub" in payload
+        assert payload["sub"], "Token phải chứa sub để phục hồi danh tính từ DB"
+        for leaked_claim in ("email", "role", "full_name"):
+            assert leaked_claim not in payload, (
+                f"Token không được nhúng '{leaked_claim}' (PII/role phải nằm ở DB, không nằm trong JWT)"
+            )
 
 
 def test_auth_negative_and_adversarial_vectors(client: TestClient):

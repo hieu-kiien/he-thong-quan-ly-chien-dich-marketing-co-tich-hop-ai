@@ -3,7 +3,7 @@ from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import func
+from sqlalchemy import func, or_, and_
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.entities import CampaignMetric, Campaign, MarketingChannel, User, CampaignMember, Workspace, WorkspaceMember, Task, MarketingContent
@@ -210,23 +210,65 @@ def get_global_dashboard(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if current_user.role not in ("ADMIN", "MANAGER"):
-        # Lọc theo phạm vi sở hữu của user nếu là Marketer
-        allowed_campaign_ids = db.query(Campaign.id).filter(
-            (Campaign.owner_id == current_user.id) |
-            (Campaign.id.in_(db.query(CampaignMember.campaign_id).filter(CampaignMember.user_id == current_user.id)))
-        ).all()
-        allowed_ids = [c[0] for c in allowed_campaign_ids]
-        metrics = db.query(CampaignMetric).filter(CampaignMetric.campaign_id.in_(allowed_ids)).all() if allowed_ids else []
+    """Bảng điều khiển tổng hợp theo đúng phạm vi tenant của người gọi.
+
+    Trước đây nhánh quản lý (`ADMIN`/`MANAGER`) gọi `db.query(...).all()` không lọc
+    workspace, nên một MANAGER thấy doanh thu/chi phí gộp từ chiến dịch của cả
+    agency khác. Toàn bộ endpoint list khác đều dùng `_apply_tenant_scope`; riêng
+    aggregate này bị bỏ sót. Ngoài ra `AGENCY_MANAGER` thiếu trong nhánh quản lý
+    nên bị hạ xuống tầm marketer ở riêng endpoint này.
+    """
+    if current_user.role == "ADMIN":
+        base_query = db.query(Campaign)
+    else:
+        ws_ids = _accessible_workspace_ids(current_user, db)
+        base_query = db.query(Campaign)
+        if ws_ids:
+            base_query = base_query.filter(
+                or_(
+                    Campaign.workspace_id.in_(ws_ids),
+                    and_(Campaign.workspace_id.is_(None), Campaign.owner_id == current_user.id),
+                )
+            )
+        else:
+            base_query = base_query.filter(
+                and_(Campaign.workspace_id.is_(None), Campaign.owner_id == current_user.id)
+            )
+
+        if current_user.role not in ("MANAGER", "AGENCY_MANAGER"):
+            # Marketer: chỉ chiến dịch mình sở hữu hoặc được thêm vào.
+            owned_or_member = or_(
+                Campaign.owner_id == current_user.id,
+                Campaign.id.in_(
+                    db.query(CampaignMember.campaign_id).filter(CampaignMember.user_id == current_user.id)
+                ),
+            )
+            base_query = base_query.filter(owned_or_member)
+
+    allowed_ids = [row[0] for row in base_query.with_entities(Campaign.id).all()]
+
+    if allowed_ids:
+        metrics = db.query(CampaignMetric).filter(CampaignMetric.campaign_id.in_(allowed_ids)).all()
         campaigns_count = len(allowed_ids)
         active_campaigns = db.query(Campaign).filter(
             Campaign.id.in_(allowed_ids),
             Campaign.status == "ACTIVE"
-        ).count() if allowed_ids else 0
+        ).count()
     else:
-        metrics = db.query(CampaignMetric).all()
-        campaigns_count = db.query(Campaign).count()
-        active_campaigns = db.query(Campaign).filter(Campaign.status == "ACTIVE").count()
+        metrics = []
+        campaigns_count = 0
+        active_campaigns = 0
+
+    # Chi phí theo từng chiến dịch. Bảng chiến dịch ở Dashboard và ở trang
+    # Quản lý đều cần nhịp chi tiêu (đã chi / ngân sách); không có field này
+    # thì giao diện buộc phải hiện "chưa ghi nhận chi phí" dù tổng chi phí ngay
+    # phía trên đã tính ra — hai phần của cùng một màn hình nói hai sự thật khác nhau.
+    # Tính ngay từ các dòng CampaignMetric đã nạp ở trên, không phát sinh truy vấn
+    # thêm.
+    campaign_spend: Dict[str, float] = {}
+    for m in metrics:
+        key = str(m.campaign_id)
+        campaign_spend[key] = round(campaign_spend.get(key, 0.0) + float(m.cost), 2)
 
     total_views = sum(m.views for m in metrics)
     total_clicks = sum(m.clicks for m in metrics)
@@ -254,12 +296,79 @@ def get_global_dashboard(
             "cpa_avg": round(cpa, 2),
             "roi_percent": round(roi, 2),
             "roas": round(roas, 2),
+            "channel_metrics": _aggregate_channel_metrics(db, allowed_ids),
         },
         "campaigns_summary": {
             "total": campaigns_count,
             "active": active_campaigns
-        }
+        },
+        # Chi phí thực đo theo từng chiến dịch (khoá là campaign_id dạng chuỗi vì
+        # JSON object bắt buộc khoá chuỗi).
+        "campaign_spend": campaign_spend,
+        # Frontend đọc trực tiếp field này để vẽ biểu đồ attribution. Trước đây
+        # response không có nó nên client rơi về `|| MOCK_CHANNEL_ATTRIBUTIONS`, tức là
+        # production hiển thị số liệu bịa đặt.
+        "channel_attributions": _aggregate_channel_attribution(db, allowed_ids),
     }
+
+
+def _aggregate_channel_metrics(db: Session, campaign_ids: List[int]) -> List[Dict[str, Any]]:
+    """Tổng hợp CampaignMetric theo kênh cho tập chiến dịch đã lọc."""
+    if not campaign_ids:
+        return []
+
+    rows = (
+        db.query(
+            MarketingChannel.id.label("channel_id"),
+            MarketingChannel.code.label("channel_code"),
+            MarketingChannel.name.label("channel_name"),
+            func.sum(CampaignMetric.views).label("views"),
+            func.sum(CampaignMetric.clicks).label("clicks"),
+            func.sum(CampaignMetric.conversions).label("conversions"),
+            func.sum(CampaignMetric.cost).label("cost"),
+            func.sum(CampaignMetric.revenue).label("revenue"),
+        )
+        .join(MarketingChannel, MarketingChannel.id == CampaignMetric.channel_id)
+        .filter(CampaignMetric.campaign_id.in_(campaign_ids))
+        .group_by(MarketingChannel.id, MarketingChannel.code, MarketingChannel.name)
+        .all()
+    )
+
+    result: List[Dict[str, Any]] = []
+    for r in rows:
+        views = int(r.views or 0)
+        clicks = int(r.clicks or 0)
+        conversions = int(r.conversions or 0)
+        cost = float(r.cost or 0)
+        revenue = float(r.revenue or 0)
+        result.append({
+            "channel_id": r.channel_id,
+            "channel_code": r.channel_code,
+            "channel_name": r.channel_name,
+            "views": views,
+            "clicks": clicks,
+            "conversions": conversions,
+            "cost": round(cost, 2),
+            "revenue": round(revenue, 2),
+            "ctr_percent": round(clicks / views * 100.0, 2) if views > 0 else 0.0,
+            "cpc_avg": round(cost / clicks, 2) if clicks > 0 else 0.0,
+            "cvr_percent": round(conversions / clicks * 100.0, 2) if clicks > 0 else 0.0,
+            "cpa_avg": round(cost / conversions, 2) if conversions > 0 else 0.0,
+            "roi_percent": round((revenue - cost) / cost * 100.0, 2) if cost > 0 else 0.0,
+            "roas": round(revenue / cost, 2) if cost > 0 else 0.0,
+        })
+    return result
+
+
+def _aggregate_channel_attribution(db: Session, campaign_ids: List[int]) -> List[Dict[str, Any]]:
+    """Dùng đúng công thức attribution của AIDoctorEngine nhưng gộp nhiều chiến dịch.
+
+    `AIDoctorEngine.compute_channel_attribution` chỉ nhận một campaign_id, nên gọi
+    nó trong vòng lặp rồi cộng tay sẽ trả kết quả sai (thiếu phần doanh thu của
+    các chiến dịch còn lại trên cùng kênh). Ở đây gộp trực tiếp từ CampaignMetric
+    theo cùng định nghĩa chỉ số.
+    """
+    return _aggregate_channel_metrics(db, campaign_ids)
 
 
 get_metrics_overview = get_global_dashboard
@@ -348,10 +457,23 @@ def get_command_center(
         ))
 
     # 3. Attention Items - Pending Approvals (Contents in IN_REVIEW, AI_DRAFT)
-    pending_contents = db.query(MarketingContent).filter(
+    #
+    # Danh sách hiển thị bị giới hạn 15 bản ghi (để payload Command Center không
+    # phình), nhưng `total_pending_approvals` phải là TỔNG số thực, không phải
+    # `len(pending_contents)` — trước đây con số này âm thầm bị chặn ở 15 và bị
+    # hiển thị cho người dùng như tổng số.
+    pending_filter = (
         MarketingContent.campaign_id.in_(camp_ids),
-        MarketingContent.status.in_(["IN_REVIEW", "AI_DRAFT"])
-    ).order_by(MarketingContent.id.desc()).limit(15).all()
+        MarketingContent.status.in_(["IN_REVIEW", "AI_DRAFT"]),
+    )
+    total_pending_approvals = db.query(func.count(MarketingContent.id)).filter(*pending_filter).scalar() or 0
+    pending_contents = (
+        db.query(MarketingContent)
+        .filter(*pending_filter)
+        .order_by(MarketingContent.id.desc())
+        .limit(15)
+        .all()
+    )
 
     for cnt in pending_contents:
         c_name = camp_map.get(cnt.campaign_id).name if cnt.campaign_id in camp_map else "Chiến dịch"
@@ -544,7 +666,7 @@ def get_command_center(
         "total_active_campaigns": len(campaigns_health),
         "total_my_tasks": len(my_work_today),
         "total_overdue_tasks": len(overdue_tasks),
-        "total_pending_approvals": len(pending_contents),
+        "total_pending_approvals": int(total_pending_approvals),
         "critical_issues": sum(1 for a in attention_items if a.severity == "CRITICAL")
     }
 

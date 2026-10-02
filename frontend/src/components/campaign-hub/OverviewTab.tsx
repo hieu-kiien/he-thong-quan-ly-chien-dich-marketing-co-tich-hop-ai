@@ -56,7 +56,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   return (
     <div className="space-y-6">
       {/* Header Action Bar */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
@@ -89,7 +89,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               <button
                 onClick={handleSaveBrief}
                 disabled={isSavingBrief}
-                className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-60"
+                className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-60"
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>{isSavingBrief ? 'Đang lưu...' : 'Lưu Thay Đổi'}</span>
@@ -110,7 +110,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       {/* 2-Column Grid: Strategic Message & Quantified KPI Target */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Box 1: Core Message & CTA */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
               <FileText className="w-4 h-4 text-indigo-600" />
@@ -136,9 +136,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             ) : (
               <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-800 leading-relaxed font-medium min-h-[72px] flex items-center">
                 {campaign?.key_message || briefKeyMessage ? (
-                  <span className="italic">"{campaign?.key_message || briefKeyMessage}"</span>
+                  <span className="italic">&ldquo;{campaign?.key_message || briefKeyMessage}&rdquo;</span>
                 ) : (
-                  <span className="text-slate-400 italic">Chưa thiết lập thông điệp cốt lõi cho chiến dịch này. Nhấn "Chỉnh Sửa Brief" để bổ sung.</span>
+                  <span className="text-slate-400 italic">Chưa thiết lập thông điệp cốt lõi cho chiến dịch này. Nhấn &ldquo;Chỉnh Sửa Brief&rdquo; để bổ sung.</span>
                 )}
               </div>
             )}
@@ -158,7 +158,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               />
             ) : (
               <div className="flex items-center gap-3">
-                <span className="px-3.5 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-xs shadow-xs inline-flex items-center gap-1.5">
+                <span className="px-3.5 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-xs shadow-sm inline-flex items-center gap-1.5">
                   <span>{campaign?.primary_cta || briefPrimaryCta || 'Chưa thiết lập CTA'}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </span>
@@ -169,7 +169,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         </div>
 
         {/* Box 2: Quantified Target & Metrics */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
               <BarChart3 className="w-4 h-4 text-emerald-600" />
@@ -256,7 +256,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       </div>
 
       {/* Section 3: Channel Budget Allocation */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
           <div>
             <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">

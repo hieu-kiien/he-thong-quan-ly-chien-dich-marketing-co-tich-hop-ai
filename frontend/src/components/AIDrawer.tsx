@@ -1,31 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  X, 
-  Sparkles, 
-  Lightbulb, 
-  FileText, 
-  BarChart3, 
-  Check, 
-  AlertCircle, 
-  Copy, 
-  Loader2,
-  ArrowRight,
-  Send,
-  SendHorizontal,
-  CheckCircle2,
-  Clock,
-  Zap,
-  Video,
-  Mail,
-  ShieldCheck,
-  ShieldAlert,
-  Lock
-} from 'lucide-react';
+import { X, Sparkles, Lightbulb, FileText, BarChart3, Check, AlertCircle, Copy, Loader2, ArrowRight, Send, SendHorizontal, CheckCircle2, Clock, Zap, Video, Mail, ShieldAlert, Lock } from 'lucide-react';
 import { Campaign, AIIdeaResponse, AIDraftResponse, AISummaryResponse, MarketingContent, OmnichannelResponse, ComplianceCheckResponse } from '../types';
 import { aiApi, contentApi, getApiErrorMessage } from '../services/api';
 import { useToast } from './Toast';
 import { ComplianceAlertBadge } from './ComplianceAlertBadge';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { copyToClipboardWithFormatting } from '../utils/copyUtils';
 
 interface AIDrawerProps {
   isOpen: boolean;
@@ -50,7 +30,6 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
   const [channelCode, setChannelCode] = useState<string>('facebook');
   const [loading, setLoading] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
-  const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [createdContent, setCreatedContent] = useState<MarketingContent | null>(null);
   const [isSubmittingReview, setIsSubmittingReview] = useState<boolean>(false);
   const [complianceResult, setComplianceResult] = useState<ComplianceCheckResponse | null>(null);
@@ -81,7 +60,6 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
   // Reset createdContent khi đổi draft hoặc campaign
   useEffect(() => {
     setCreatedContent(null);
-    setSaveSuccess(false);
   }, [activeCampaign?.id, draftData?.title]);
 
   if (!isOpen) return null;
@@ -145,7 +123,6 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
         status: 'AI_DRAFT'
       });
       setCreatedContent(res);
-      setSaveSuccess(true);
       toast.success('Đã lưu bản nháp vào hệ thống (AI_DRAFT)');
       if (onContentCreated) onContentCreated();
       return res;
@@ -208,10 +185,17 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
   };
 
   const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    toast.info('Đã sao chép nội dung vào khay nhớ tạm');
-    setTimeout(() => setCopied(false), 2000);
+    // Promise của clipboard có thể reject (ngữ cảnh không bảo mật, quyền bị chặn).
+    // Trước đây không bắt lỗi nên toast vẫn báo "đã sao chép" dù clipboard rỗng.
+    void copyToClipboardWithFormatting(text).then((ok) => {
+      if (!ok) {
+        toast.error('Trình duyệt từ chối ghi vào clipboard');
+        return;
+      }
+      setCopied(true);
+      toast.info('Đã sao chép nội dung vào khay nhớ tạm');
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   const handleAutoFixViolation = (orig: string, repl: string) => {
@@ -335,16 +319,23 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
   };
 
   return (
+    // Lớp nền (overlay) chỉ là phím tắt chuột để đóng drawer (đã kiểm tra e.target để
+    // click bên trong drawer không đóng); đóng bằng bàn phím đã có nút đóng + phím
+    // Escape qua useFocusTrap, nên overlay không mang ý nghĩa tương tác.
     <div 
-      onClick={onClose}
-      className="fixed inset-0 z-50 overflow-hidden flex justify-end bg-slate-900/40 backdrop-blur-xs transition-opacity"
+      role="none"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 overflow-hidden flex justify-end bg-slate-900/40 backdrop-blur-sm transition-opacity"
     >
+      {/* Vùng nội dung (role="dialog") không gắn onClick chặn sự kiện nữa: overlay đã tự
+          chặn bằng điều kiện e.target === e.currentTarget, tránh div role="dialog" mang sự kiện chuột. */}
       <div 
         ref={drawerRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="ai-drawer-title"
-        onClick={(e) => e.stopPropagation()}
         className="w-full max-w-xl bg-white h-full shadow-2xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-300"
       >
         
@@ -371,7 +362,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
                       if (onSelectCampaign) onSelectCampaign(found || null);
                     }}
                     aria-label="Chọn chiến dịch AI"
-                    className="text-xs text-indigo-700 font-bold bg-slate-100/90 border border-slate-200 rounded px-2 py-0.5 max-w-[220px] truncate outline-hidden cursor-pointer"
+                    className="text-xs text-indigo-700 font-bold bg-slate-100/90 border border-slate-200 rounded px-2 py-0.5 max-w-[220px] truncate outline-none cursor-pointer"
                   >
                     {campaigns.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
@@ -400,7 +391,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
               value={promptVersion}
               onChange={(e) => setPromptVersion(e.target.value)}
               aria-label="Chọn phiên bản Prompt"
-              className="bg-slate-100 border border-slate-200 rounded px-2 py-1 font-semibold text-indigo-700 outline-hidden"
+              className="bg-slate-100 border border-slate-200 rounded px-2 py-1 font-semibold text-indigo-700 outline-none"
             >
               <option value="v3">V3: Ràng buộc & Cấm ảo giác (98% Acc)</option>
               <option value="v2">V2: Structured JSON Schema</option>
@@ -414,7 +405,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
               value={channelCode}
               onChange={(e) => setChannelCode(e.target.value)}
               aria-label="Chọn kênh truyền thông"
-              className="bg-slate-100 border border-slate-200 rounded px-2 py-1 font-semibold text-slate-700 outline-hidden"
+              className="bg-slate-100 border border-slate-200 rounded px-2 py-1 font-semibold text-slate-700 outline-none"
             >
               <option value="facebook">Facebook Ads</option>
               <option value="tiktok">TikTok Video Script</option>
@@ -509,7 +500,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
                   value={omniBrief}
                   onChange={(e) => setOmniBrief(e.target.value)}
                   placeholder="Ví dụ: Chiến dịch tuyển sinh Khóa kỹ sư Trí tuệ nhân tạo thực chiến MarketFlow 2026. Đối tượng: Sinh viên CNTT, người chuyển ngành. USP: Học thực hành GPU xịn, cam kết đầu ra..."
-                  className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:border-indigo-500 focus:bg-white h-24"
+                  className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:bg-white h-24"
                 />
               </div>
 
@@ -530,7 +521,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
                       onClick={() => setOmniSubTab('facebook')}
                       className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                         omniSubTab === 'facebook'
-                          ? 'bg-white text-blue-700 shadow-xs font-bold'
+                          ? 'bg-white text-blue-700 shadow-sm font-bold'
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
@@ -541,7 +532,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
                       onClick={() => setOmniSubTab('tiktok')}
                       className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                         omniSubTab === 'tiktok'
-                          ? 'bg-white text-rose-600 shadow-xs font-bold'
+                          ? 'bg-white text-rose-600 shadow-sm font-bold'
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
@@ -552,7 +543,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
                       onClick={() => setOmniSubTab('email')}
                       className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                         omniSubTab === 'email'
-                          ? 'bg-white text-purple-700 shadow-xs font-bold'
+                          ? 'bg-white text-purple-700 shadow-sm font-bold'
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
@@ -638,7 +629,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
                                   <strong>Hình ảnh:</strong> {scene.visual_action || scene.visual}
                                 </div>
                                 <div className="text-[11px] text-slate-700">
-                                  <strong>Lời thoại:</strong> "{scene.voiceover || scene.audio}"
+                                  <strong>Lời thoại:</strong> &ldquo;{scene.voiceover || scene.audio}&rdquo;
                                 </div>
                                 {scene.audio && (
                                   <div className="text-[10px] text-slate-500 italic">
@@ -771,7 +762,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
                   {ideaData.ideas.map((item) => (
                     <div 
                       key={item.id} 
-                      className="p-3.5 rounded-lg border border-slate-200 hover:border-indigo-400 bg-white transition-all shadow-2xs group"
+                      className="p-3.5 rounded-lg border border-slate-200 hover:border-indigo-400 bg-white transition-all shadow group"
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wide bg-indigo-50 px-2 py-0.5 rounded">
@@ -810,7 +801,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
                   value={selectedIdeaText}
                   onChange={(e) => setSelectedIdeaText(e.target.value)}
                   placeholder="Nhập hoặc chọn ý tưởng từ Tab 1 để AI viết thành bài hoàn chỉnh..."
-                  className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:border-indigo-500 h-20"
+                  className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 h-20"
                 />
               </div>
 

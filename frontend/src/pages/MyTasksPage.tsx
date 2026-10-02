@@ -1,19 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  CheckCircle2, 
-  Clock, 
-  AlertCircle, 
-  Calendar, 
-  Filter, 
-  Plus, 
-  Search, 
-  ChevronRight, 
-  User as UserIcon,
-  Tag,
-  ArrowUpDown,
-  Check,
-  RotateCcw
-} from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { CheckCircle2, Clock, AlertCircle, Calendar, Plus, Search, Tag, Check, RotateCcw } from 'lucide-react';
 import { Task, TaskStatus, TaskPriority, TaskType, Campaign } from '../types';
 import { taskApi, campaignApi, getApiErrorMessage } from '../services/api';
 import { useToast } from '../components/Toast';
@@ -46,11 +32,10 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
 
   const todayStr = new Date().toISOString().split('T')[0];
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  // useCallback để effect mount chỉ phụ thuộc một hàm có identity ổn định;
+  // nếu không, effect sẽ được cảnh báo thiếu dependency và dễ bị thêm lại
+  // sai cách (chạy lại mỗi render) ở lần sửa sau.
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [myTasks, cList] = await Promise.all([
@@ -67,7 +52,13 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  // Nạp dữ liệu lúc mount. Effect phải nằm SAU khai báo loadData: nếu đặt trước,
+  // biến bị dùng trước khi khai báo và ESLint cũng không bắt được lỗi đó.
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   const handleUpdateStatus = async (task: Task, nextStatus: TaskStatus) => {
     try {
@@ -168,7 +159,7 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
           className={`p-4 rounded-xl border text-left transition-all ${
             statusFilter === 'OVERDUE'
               ? 'bg-rose-50 border-rose-300 ring-2 ring-rose-500/20'
-              : 'bg-white border-slate-200/80 hover:border-rose-200 shadow-xs'
+              : 'bg-white border-slate-200/80 hover:border-rose-200 shadow-sm'
           }`}
         >
           <div className="flex items-center justify-between text-rose-600 mb-1">
@@ -184,7 +175,7 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
           className={`p-4 rounded-xl border text-left transition-all ${
             statusFilter === 'TODAY'
               ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-500/20'
-              : 'bg-white border-slate-200/80 hover:border-amber-200 shadow-xs'
+              : 'bg-white border-slate-200/80 hover:border-amber-200 shadow-sm'
           }`}
         >
           <div className="flex items-center justify-between text-amber-600 mb-1">
@@ -200,7 +191,7 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
           className={`p-4 rounded-xl border text-left transition-all ${
             statusFilter === 'IN_PROGRESS'
               ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-500/20'
-              : 'bg-white border-slate-200/80 hover:border-indigo-200 shadow-xs'
+              : 'bg-white border-slate-200/80 hover:border-indigo-200 shadow-sm'
           }`}
         >
           <div className="flex items-center justify-between text-indigo-600 mb-1">
@@ -216,7 +207,7 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
           className={`p-4 rounded-xl border text-left transition-all ${
             statusFilter === 'DONE'
               ? 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-500/20'
-              : 'bg-white border-slate-200/80 hover:border-emerald-200 shadow-xs'
+              : 'bg-white border-slate-200/80 hover:border-emerald-200 shadow-sm'
           }`}
         >
           <div className="flex items-center justify-between text-emerald-600 mb-1">
@@ -229,7 +220,7 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-wrap items-center gap-3">
+      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex flex-wrap items-center gap-3">
         {/* Search Input */}
         <div className="flex-1 min-w-[200px] relative">
           <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
@@ -238,7 +229,7 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
             placeholder="Tìm kiếm tác vụ theo tên, mô tả..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg outline-hidden focus:border-indigo-500"
+            className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg outline-none focus:border-indigo-500"
           />
         </div>
 
@@ -295,7 +286,7 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
       </div>
 
       {/* Task List Table */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
         {loading ? (
           <div className="p-12 text-center text-slate-400 text-xs">
             <Clock className="w-6 h-6 mx-auto animate-spin mb-2 text-indigo-500" />
@@ -367,14 +358,16 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
                       )}
 
                       <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-400 pt-1">
+                        {/* Dùng <button> gốc thay cho <span onClick> vì đây là liên kết điều hướng tới chiến dịch. */}
                         {task.campaign && (
-                          <span 
+                          <button
+                            type="button"
                             onClick={() => onNavigateToCampaign?.(task.campaign_id)}
-                            className="font-medium text-indigo-600 hover:underline cursor-pointer flex items-center gap-1"
+                            className="font-medium text-indigo-600 hover:underline cursor-pointer flex items-center gap-1 text-left"
                           >
                             <Tag className="w-3 h-3" />
                             {task.campaign.name}
-                          </span>
+                          </button>
                         )}
 
                         {task.due_date && (
@@ -398,7 +391,7 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
                     <select
                       value={task.status}
                       onChange={(e) => handleUpdateStatus(task, e.target.value as TaskStatus)}
-                      className={`text-xs font-bold px-2.5 py-1.5 rounded-lg border cursor-pointer outline-hidden ${
+                      className={`text-xs font-bold px-2.5 py-1.5 rounded-lg border cursor-pointer outline-none ${
                         task.status === 'DONE'
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                           : task.status === 'IN_PROGRESS'
@@ -423,7 +416,7 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
 
       {/* Modal Tạo Tác Vụ Mới */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="text-base font-black text-slate-900">Tạo Tác Vụ Mới Cho Chiến Dịch</h3>

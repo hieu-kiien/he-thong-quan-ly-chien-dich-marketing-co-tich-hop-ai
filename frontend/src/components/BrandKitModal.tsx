@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { useAuth } from '../context/AuthContext';
-import { X, Palette, Sparkles, Plus, AlertCircle, CheckCircle2, Loader2, ShieldAlert } from 'lucide-react';
-import { BrandKit } from '../types';
+import { X, Palette, Plus, AlertCircle, CheckCircle2, Loader2, ShieldAlert } from 'lucide-react';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface BrandKitModalProps {

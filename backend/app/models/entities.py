@@ -129,6 +129,9 @@ class WorkspaceMember(Base):
         CheckConstraint("role IN ('AGENCY_MANAGER', 'MARKETER', 'CLIENT_APPROVER', 'MANAGER')", name="chk_workspace_member_role"),
         UniqueConstraint("workspace_id", "user_id", name="uq_workspace_user"),
         Index("idx_workspace_members_user", "user_id"),
+        # _accessible_workspace_ids() chạy ở MỌI request có lọc tenant và luôn
+        # lọc theo user_id; thiếu index thì mỗi request phải quét bảng thành viên.
+        Index("idx_workspace_members_workspace", "workspace_id"),
     )
 
     workspace = relationship("Workspace", back_populates="members")
@@ -189,6 +192,11 @@ class Campaign(Base):
         CheckConstraint("status IN ('DRAFT', 'PLANNED', 'ACTIVE', 'PAUSED', 'COMPLETED', 'ARCHIVED')", name="chk_campaign_status"),
         Index("idx_campaigns_owner_status", "owner_id", "status"),
         Index("idx_campaigns_dates", "start_date", "end_date"),
+        # Mỗi request list đều lọc theo `workspace_id IN (...)` qua
+        # _apply_tenant_scope. Không có index thì mỗi lần lọc là một full scan
+        # trên toàn bộ bảng chiến dịch.
+        Index("idx_campaigns_workspace", "workspace_id"),
+        Index("idx_campaigns_product", "product_id"),
     )
 
     workspace = relationship("Workspace", back_populates="campaigns")
@@ -248,6 +256,11 @@ class MarketingContent(Base):
         CheckConstraint("version_no > 0", name="chk_content_version"),
         CheckConstraint("status IN ('DRAFT', 'AI_DRAFT', 'IN_REVIEW', 'APPROVED', 'REJECTED', 'PUBLISHED')", name="chk_content_status"),
         Index("idx_contents_campaign_status", "campaign_id", "status"),
+        # Cùng lý do với idx_campaigns_workspace: mọi endpoint list nội dung đều
+        # lọc theo workspace trước, rồi mới lọc tiếp theo campaign/status.
+        Index("idx_contents_workspace", "workspace_id"),
+        Index("idx_contents_channel", "channel_id"),
+        Index("idx_contents_status", "status"),
     )
 
     workspace = relationship("Workspace", back_populates="contents")
@@ -321,6 +334,9 @@ class CampaignMetric(Base):
         CheckConstraint("clicks <= views", name="chk_clicks_le_views"),
         UniqueConstraint("campaign_id", "channel_id", "metric_date", name="uq_campaign_channel_date"),
         Index("idx_metrics_campaign_date", "campaign_id", "metric_date"),
+        # Tổng hợp theo kênh (dashboard, /campaigns/{id}/attribution) luôn group theo
+        # channel_id; index này giúp tránh quét toàn bảng metrics.
+        Index("idx_metrics_channel", "channel_id"),
     )
 
     campaign = relationship("Campaign", back_populates="metrics")
@@ -370,7 +386,10 @@ class CustomApiKey(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
     __table_args__ = (
-        CheckConstraint("provider IN ('gemini', 'openrouter', 'openai')", name="chk_api_key_provider"),
+        # Phải khớp SUPPORTED_AI_PROVIDERS trong app/core/config.py. Thiếu "opencode"
+        # ở đây khiến lưu khóa BYOK cho provider đó chết bằng IntegrityError ở
+        # tầng SQLite (HTTP 500), không phải lỗi validation gợi ý được.
+        CheckConstraint("provider IN ('gemini', 'openrouter', 'openai', 'opencode')", name="chk_api_key_provider"),
         CheckConstraint("user_id IS NOT NULL OR workspace_id IS NOT NULL", name="chk_api_key_owner"),
         Index("idx_custom_keys_user", "user_id", "provider"),
         Index("idx_custom_keys_workspace", "workspace_id", "provider"),

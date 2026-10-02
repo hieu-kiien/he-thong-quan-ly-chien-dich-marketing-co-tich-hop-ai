@@ -1,7 +1,7 @@
 import os
 import logging
 from pathlib import Path
-from typing import Optional, Set
+from typing import List, Optional, Set
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
@@ -57,23 +57,56 @@ class Settings(BaseSettings):
         "http://kienhieu.id.vn",
         "https://marketing.kienhieu.id.vn",
         "http://marketing.kienhieu.id.vn",
-        "https://*.kienhieu.id.vn",
-        "http://*.kienhieu.id.vn",
-        "https://*.onrender.com"
+        # Ghi chú: CORSMiddleware của Starlette so khớp `origin in allow_origins`
+        # theo chuỗi CHÍNH XÁC. Mẫu "https://*.kienhieu.id.vn" / "https://*.onrender.com"
+        # ở đây KHÔNG BAO GIỜ khớp được — chúng trông như có phủ nhưng thực tế
+        # không cho phép origin nào cả. Nếu cần hỗ trợ subdomain, hãy dùng
+        # `allow_origin_regex` bên dưới, đừng thêm wildcard vào danh sách này.
+    ]
+
+    # Regex CORS cho subdomain. Starlette CHỈ dùng `allow_origins` khi regex rỗng,
+    # nên đây là cách duy nhất để `https://*.kienhieu.id.vn` thật sự được phép.
+    ALLOWED_ORIGIN_REGEXES: List[str] = [
+        r"^https://([a-z0-9-]+\.)*kienhieu\.id\.vn$",
+        r"^http://([a-z0-9-]+\.)*kienhieu\.id\.vn$",
+        r"^https://([a-z0-9-]+\.)*onrender\.com$",
     ]
 
     # Base directory
     BASE_DIR: Path = Path(__file__).resolve().parent.parent.parent
     DATABASE_URL: str = "sqlite:///./marketing_campaigns.db"
 
-    # AI Configuration
-    AI_PROVIDER: str = "opencode"
-    AI_BASE_URL: str = "https://api.opencode.ai/v1"
+    # AI Configuration.
+    # AI_PROVIDER mặc định PHẢI là một provider mà ai_service thật sự xử lý
+    # (gemini/openrouter/openai). Trước đây mặc định là "opencode", không khớp
+    # nhánh nào trong ai_service -> env_key = None -> rơi im lặng xuống template
+    # dự phòng Tier 4. Người dùng tưởng đang gọi AI thật nhưng thực ra nhận nội
+    # dung mẫu, và .env.example (openrouter) + docker-compose (gemini) lại chỉ định
+    # hai giá trị khác nữa. Nay cả ba nơi thống nhất và giá trị hợp lệ được validate
+    # ngay khi khởi động.
+    AI_PROVIDER: str = "gemini"
+    AI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai"
     AI_API_KEY: str = ""
-    AI_MODEL: str = "muse-spark-1.3"
+    AI_MODEL: str = "gemini-2.5-flash"
     AI_TIMEOUT_SECONDS: int = 10
     AI_MAX_RETRIES: int = 2
     AI_ENABLE_FALLBACK: bool = True
+    # "opencode" là endpoint OpenAI-compatible của chính opencode
+    # (https://opencode.ai/zen/v1), được `ai_service` xử lý như một provider
+    # thường: chỉ khác ở chỗ không ghim base_url cứng. Nhờ vậy backend có thể
+    # dùng đúng những model opencode đang cấu hình mà không cần mua credits.
+    SUPPORTED_AI_PROVIDERS: List[str] = ["gemini", "openrouter", "openai", "opencode"]
+
+    # Scheduler nền trong tiến trình. Xem giải thích ở `on_startup` (main.py):
+    # trên Cloudflare, scheduler trong container ghi thẳng vào SQLite mà không
+    # qua HTTP nên không được snapshot lên R2, dẫn tới mất dữ liệu khi container
+    # bị evict. Đặt false cho môi trường đó.
+    SCHEDULER_ENABLED: bool = True
+
+    # Secret nội bộ để Durable Object trên Cloudflare gọi
+    # POST /api/v1/schedules/trigger-worker (xem cloudflare/src/index.ts).
+    # Để trống thì đường gọi bằng secret bị tắt và endpoint chỉ nhận Bearer token.
+    SCHEDULER_SECRET: str = ""
 
     model_config = SettingsConfigDict(
         env_file=str(Path(__file__).resolve().parent.parent.parent / ".env"),
@@ -144,6 +177,33 @@ def validate_security_configuration(
             "FATAL: Không thể khởi động ứng dụng trên Production với BYOK_ENCRYPTION_KEY / SECRET_KEY mặc định, "
             "chứa placeholder không an toàn hoặc độ dài nhỏ hơn 32 ký tự!"
         )
+
+    # 3. Validate AI_PROVIDER ngay khi khởi động.
+    # Provider không hợp lệ khiến ai_service rơi im lặng vào template dự phòng
+    # (người dùng tưởng đang gọi AI thật). Báo lỗi ngay ở khởi động thay vì để
+    # lỗi "âm thầm" này tồn tại tới khi ai đó hỏi vì sao kết quả giống mẫu.
+    provider = str(getattr(target, "AI_PROVIDER", "") or "").strip().lower()
+    supported = [str(p).strip().lower() for p in (getattr(target, "SUPPORTED_AI_PROVIDERS", None) or [])]
+    if supported and provider not in supported:
+        raise RuntimeError(
+            f"FATAL: AI_PROVIDER='{provider}' không hợp lệ. "
+            f"Các provider được hỗ trợ: {', '.join(supported)}."
+        )
+
+    # 4. Ngoài production: KHÔNG được âm thầm dùng SECRET_KEY mặc định đã công khai.
+    # `SECRET_KEY` mặc định được ship trong .env.example, tức là BẤT KỲ AI cũng biết.
+    # Trước đây việc dùng nó ở mọi môi trường chỉ sinh một dòng warning, nên một bản
+    # demo/staging cài ra internet là token JWT có thể được forge tùy ý.
+    if not is_prod:
+        for label, value in (("JWT_SECRET_KEY/SECRET_KEY", effective_jwt), ("BYOK_ENCRYPTION_KEY/SECRET_KEY", effective_byok)):
+            if _is_insecure(value):
+                logger.warning(
+                    "[Security] %s đang dùng giá trị mặc định/placeholder yếu. "
+                    "Hệ thống vẫn khởi động để phục vụ demo, nhưng token JWT và khoá vault "
+                    "có thể bị forge/decrypt nếu giá trị này bị lộ. "
+                    "Hãy đặt các biến trong .env (xem .env.example) trước khi triển khai.",
+                    label,
+                )
 
     return True
 
