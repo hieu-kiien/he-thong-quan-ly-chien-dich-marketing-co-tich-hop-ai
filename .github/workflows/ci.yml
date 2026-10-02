@@ -438,10 +438,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      # Node 22, KHÔNG phải 20: wrangler từ bản mới yêu cầu >= v22 và sẽ báo
+      # "Wrangler requires at least Node.js v22.0.0" rồi exit 1. Bước
+      # `wrangler types` bên dưới vì vậy không chạy được trên Node 20.
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: cloudflare/package-lock.json
 
