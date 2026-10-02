@@ -29,6 +29,12 @@
   // deploy duoc (tra 401 "requires the Workers Paid plan"). Da xac nhan bang
   // len deploy that: Worker upload duoc nhung moi route /api/* tra 404 vi
   // container khong khoi dong. Backend chay o Render thay cho.
+// KHONG dung `migrations`:
+  // `deleted_classes` bi Wrangler tu choi voi ly do "non-existent class" vi
+  // config nay khong con binding `durable_objects` tro toi FastApiContainer.
+  // Thay vao do src/index.ts van export stub `FastApiContainer` (tra 410) de
+  // Workers chap nhan ban moi — class da ghi trong DB tim thay stub cung ten.
+  // Stub khong co binding, khong side effect.
   "triggers": {
     // Scheduler chay trong container cua Render nen bi tu tat; Worker danh thuc
     // no moi 5 phut qua POST /api/v1/schedules/trigger-worker.

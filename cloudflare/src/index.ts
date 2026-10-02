@@ -95,6 +95,27 @@ async function proxyToBackend(request: Request, env: Env): Promise<Response> {
   }
 }
 
+/**
+ * Stub cho class `FastApiContainer` — CHỈ tồn tại để migration xoá được nó.
+ *
+ * Worker đã deploy 1 lần với class Durable Object này, nên Cloudflare đã ghi
+ * class vào DB của Worker. Bản mới không export nó thì Workers từ chối deploy
+ * (10064: "New version of script does not export class 'FastApiContainer'").
+ *
+ * Nhưng thêm `deleted_classes` khi script mới KHÔNG export class lại bị Wrangler
+ * từ chối ("Cannot apply deleted_classes migration to non-existent class") vì nó
+ * đối chiếu danh sách class với script mới. Vì vậy phải export stub, cho phép
+ * migration chạy, rồi xoá stub ở lần deploy kế tiếp.
+ *
+ * Stub không dùng gì: không binding, không fetch, không side effect.
+ */
+export class FastApiContainer implements DurableObject {
+  constructor(_state: DurableObjectState, _env: Env) {}
+  async fetch(): Promise<Response> {
+    return new Response("FastApiContainer đã bị gỡ khỏi Worker.", { status: 410 });
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const { pathname } = new URL(request.url);

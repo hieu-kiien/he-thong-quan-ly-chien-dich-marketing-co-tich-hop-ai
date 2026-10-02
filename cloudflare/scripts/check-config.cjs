@@ -81,9 +81,7 @@ console.log("cron khop: " + m[1]);
 // Backend da chuyen ra Render nen binding container phai bi goi het. Neu con
 // `containers`/`durable_objects`, len deploy se tra 401 "Workers Paid plan"
 // va moi route /api/* se 404.
-const stale = ["containers", "durable_objects", "migrations", "r2_buckets"].filter(
-  (k) => cfg[k],
-);
+const stale = ["containers", "durable_objects", "r2_buckets"].filter((k) => cfg[k]);
 if (stale.length) {
   console.error(
     "::error::wrangler.jsonc van con binding Cloudflare Container (" +
