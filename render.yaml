@@ -33,13 +33,13 @@
 services:
   - type: web
     name: marketflow-api
+    # `runtime` bat buoc theo schema cua Render, va gia tri DUNG cho Docker la
+    # `docker`. Dung `runtime: python` se bi Render tu choi: "non-docker runtime
+    # python cannot have dockerfilePath"; bo `runtime` thi: "empty but required".
+    runtime: docker
     plan: starter
     region: singapore
     rootDir: backend
-    # KHONG dat `runtime` cung voi `dockerfilePath` — Render tu choi doi voi
-    # "non-docker runtime python cannot have dockerfilePath". Docker la bat buoc
-    # o day vi backend can entrypoint chay duoi user non-root va tao file SQLite
-    # trong persistent disk (xem backend/Dockerfile + docker-entrypoint.sh).
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /health
