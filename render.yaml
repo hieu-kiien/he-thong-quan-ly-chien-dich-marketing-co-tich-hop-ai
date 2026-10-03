@@ -33,13 +33,15 @@
 services:
   - type: web
     name: marketflow-api
-    runtime: python
     plan: starter
     region: singapore
-    # Không đổi `dockerfile` -> Render tự dò. Dockerfile nằm ở backend/Dockerfile
-    # nên phải chỉ rõ rootDir.
     rootDir: backend
+    # KHONG dat `runtime` cung voi `dockerfilePath` — Render tu choi doi voi
+    # "non-docker runtime python cannot have dockerfilePath". Docker la bat buoc
+    # o day vi backend can entrypoint chay duoi user non-root va tao file SQLite
+    # trong persistent disk (xem backend/Dockerfile + docker-entrypoint.sh).
     dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /health
     # SQLite cần nhiều thời gian cold-start; Render cần biet khi nao service
     # da san sang. Timeout mac dinh la 30s, dat 60s cho phep.
