@@ -49,7 +49,18 @@ services:
     # python cannot have dockerfilePath"; bo `runtime` thi: "empty but required".
     runtime: docker
     plan: free
-    region: singapore
+    # QUAN TRONG: region cua web service phai trung region cua Postgres.
+    # Render free Postgres (plan: free) CHI co o Oregon. Neu web service de o
+    # region khac, no lay duoc hostname noi bo cua DB (vi du
+    # `dpg-xxxx-a`) va khong DNS-resolve duoc:
+    #   sqlalchemy.exc.OperationalError: (psycopg2.OperationalError)
+    #   could not translate host name "dpg-xxxx-a" to address:
+    #   Name or service not known
+    # Da xac nhan bang deploy that: service singapore + DB oregon => /health OK
+    # (vi /health khong cham DB) nhung moi endpoint can DB tra 503.
+    # Render KHONG doi duoc region cua service da tao, nen phai xoa service roi
+    # sync lai blueprint de doi region.
+    region: oregon
     rootDir: backend
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
