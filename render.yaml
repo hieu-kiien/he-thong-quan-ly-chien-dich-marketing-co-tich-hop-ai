@@ -4,31 +4,42 @@
 # VÌ SAO CẦN FILE NÀY
 # Cloudflare Worker chỉ phục vụ frontend tĩnh + proxy /api/*, không chạy được
 # backend trong Cloudflare Containers vì tài khoản này không có Workers Paid
-# plan (Cloudflare trả 401 "requires the Workers Paid plan"). Backend chạy ở đây.
+# plan (Cloudflare trả 401 "requires the Workers Paid plan").
 #
 # CÁCH DÙNG
-#   1. Đẩy code lên GitHub (đã làm).
-#   2. Render Dashboard → New → Blueprint → chọn repo này → Apply.
-#      Render đọc file này và tự tạo service.
-#   3. Trong dashboard, điền các giá trị `sync: false` (Render sẽ báo thiếu):
-#      - SECRET_KEY, JWT_SECRET_KEY, BYOK_ENCRYPTION_KEY
-#      - AI_API_KEY
-#      - SCHEDULER_SECRET
-#      Ba mật khẩu demo có thể để trống rồi sinh sau; xem README mục "Tài khoản demo".
-#   4. Lấy URL service (vd https://marketflow-api.onrender.com), dán vào
-#      `BACKEND_ORIGIN` trong cloudflare/wrangler.jsonc, rồi `npm run deploy`.
-#   5. Thêm CORS: Render tự thêm domain của service vào danh sách? KHÔNG —
-#      phải tự thêm vào ALLOWED_ORIGIN_REGEXES trong backend/app/core/config.py
-#      (đã có sẵn regex cho *.onrender.com).
+#   1. Render Dashboard → New → Blueprint → chọn repo này.
+#   2. Render tạo Postgres + web service trong một lần Apply.
+#   3. Điền các giá trị `sync: false` mà Render sẽ báo thiếu:
+#      SECRET_KEY, JWT_SECRET_KEY, BYOK_ENCRYPTION_KEY, AI_API_KEY,
+#      SCHEDULER_SECRET, và 3 mật khẩu demo.
+#   4. Lấy URL service, dán vào BACKEND_ORIGIN trong cloudflare/wrangler.jsonc,
+#      rồi `npm run deploy` trong thư mục cloudflare.
 #
-# LƯU Ý SQLite + DISK
-#   Database là SQLite trong /app/data. Render chỉ giữ được dữ liệu khi gắn
-#   Persistent Disk; không gắn thì mọi thay đổi mất khi service restart/deploy
-#   lại (filesystem là ephemeral). Blueprint dưới đây đã khai báo disk.
-#   Free plan KHÔNG cho gắn disk → phải dùng plan có disk (Starter trở lên).
-#   Nếu cần plan free để demo: bỏ `disk:` và chấp nhận dữ liệu mất mỗi lần
-#   restart, hoặc đổi DATABASE_URL sang Postgres (repo đã có psycopg2-binary).
+# HAI GIỚI HẠN NGHIÊM TRỌNG — ĐỌC TRƯỚC KHI DÙNG THẬT
+#
+#   1. POSTGRES FREE TỰ HẠN SAU 30 NGÀY. Render ghi rõ trên dashboard:
+#      "Your database will expire on <ngày +30>. The database will be deleted
+#      unless you upgrade to a paid compute plan." Tức là dữ liệu sẽ BỊ XOÁ,
+#      không phải chỉ bị khoá. Đây là lý do Render yêu cầu thẻ ở plan Starter.
+#      -> Muốn giữ dữ liệu lâu dài: nâng plan Postgres ($6/tháng) hoặc dùng
+#         DB ngoài (Neon/Supabase đều có free tier lâu hơn).
+#
+#   2. WEB SERVICE FREE NGỦ SAU 15 PHÚT KHÔNG CÓ REQUEST. Mỗi lần tỉnh dậy
+#      mất khoảng 30-60 giây (cold start). Frontend đã có banner "Máy chủ đang
+#      thức dậy" để hiển thị trong lúc chờ.
+#      -> Muốn không ngủ: Starter ($7/tháng).
+#
+# CÁNH BÁO BẢO MẬT
+#   `connectionString` của Postgres là thông tin nhạy cảm. Render tự quản lý
+#   nó trong dashboard, KHÔNG ghi vào repo. Không bao giờ commit giá trị này.
 # =============================================================================
+
+databases:
+  - name: marketflow-db
+    plan: free
+    postgresMajorVersion: "18"
+    databaseName: marketflow
+    user: marketflow
 
 services:
   - type: web
@@ -37,30 +48,29 @@ services:
     # `docker`. Dung `runtime: python` se bi Render tu choi: "non-docker runtime
     # python cannot have dockerfilePath"; bo `runtime` thi: "empty but required".
     runtime: docker
-    plan: starter
+    plan: free
     region: singapore
     rootDir: backend
     dockerfilePath: ./Dockerfile
-    dockerContext: .
     healthCheckPath: /health
-    # SQLite cần nhiều thời gian cold-start; Render cần biet khi nao service
-    # da san sang. Timeout mac dinh la 30s, dat 60s cho phep.
     autoDeploy: true
+
     envVars:
       - key: APP_ENV
         value: production
       - key: API_V1_PREFIX
         value: /api/v1
 
-      # SQLite nam tren persistent disk.
+      # Render tu lap connection string tu database khai bao o tren.
+      # Khong hardcode: doi ten DB se lam connection string cu cap nhat.
       - key: DATABASE_URL
-        value: sqlite:////app/data/marketing_campaigns.db
-      - key: MARKETFLOW_DATA_DIR
-        value: /app/data
+        fromDatabase:
+          name: marketflow-db
+          property: connectionString
 
       # --- AI that: OpenCode Zen ---
       # AI_BASE_URL mac dinh trong config.py la Gemini. Backend tren Render
-      # phai tro ve OpenCode de khop voi cai da deploy o local/CI.
+      # phai tro ve OpenCode de khop voi cai da verify khi chay that.
       - key: AI_PROVIDER
         value: opencode
       - key: AI_BASE_URL
@@ -68,7 +78,7 @@ services:
       - key: AI_MODEL
         value: space-bunny-free
       # OpenCode zen phai 83-214 giay cho mot lan goi. Mac dinh 10 giay se
-      # fail lien tuc; dat 420 nhu da xac nhan khi chay that.
+      # fail lien tuc; dat 420 nhu da do khi chay that.
       - key: AI_TIMEOUT_SECONDS
         value: "420"
       - key: AI_ENABLE_FALLBACK
@@ -83,6 +93,8 @@ services:
         sync: false
       - key: AI_API_KEY
         sync: false
+      # Cron 5 phut/lan cua Worker goi POST /api/v1/schedules/trigger-worker
+      # voi header nay. Gia tri phai TRUNG với SCHEDULER_SECRET tren Cloudflare.
       - key: SCHEDULER_SECRET
         sync: false
       - key: MARKETFLOW_MANAGER_PASSWORD
@@ -91,8 +103,3 @@ services:
         sync: false
       - key: MARKETFLOW_APPROVER_PASSWORD
         sync: false
-
-    disk:
-      name: marketflow-data
-      mountPath: /app/data
-      sizeGB: 1
