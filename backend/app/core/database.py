@@ -1,5 +1,5 @@
 import logging
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from app.core.config import settings
 
@@ -371,11 +371,20 @@ def ensure_postgres_schema_compatibility(db_engine=engine) -> None:
     checks = (
         ("campaign_metrics", "source", "VARCHAR(20)"),
     )
+    # `exec_driver_sql` NHẬN SQL THÔ, không bind tham số. Dùng `:t`/`:c` ở đây
+    # sẽ được gửi thẳng xuống Postgres như chữ thường -> SyntaxError -> bị nuốt
+    # trong except -> cột KHÔNG BAO GIỜ được tạo -> mọi truy vấn `source` sau đó
+    # ném ProgrammingError và API trả 500. Đã xảy ra thật trên production.
+    # Vì tên bảng/cột nằm trong hằng số của chính file này (không phải input
+    # người dùng) nên nội suy trực tiếp là an toàn; `text()` được dùng cho
+    # phần so sánh để không phụ thuộc cú pháp bind của driver.
     with db_engine.begin() as conn:
         for table, column, coltype in checks:
-            exists = conn.exec_driver_sql(
-                "SELECT 1 FROM information_schema.columns "
-                "WHERE table_name = :t AND column_name = :c",
+            exists = conn.execute(
+                text(
+                    "SELECT 1 FROM information_schema.columns "
+                    "WHERE table_name = :t AND column_name = :c"
+                ),
                 {"t": table, "c": column},
             ).fetchone()
             if exists:
@@ -386,5 +395,10 @@ def ensure_postgres_schema_compatibility(db_engine=engine) -> None:
                 )
                 logger.info("Migration: added %s.%s", table, column)
             except Exception:
-                logger.debug("Migration %s.%s skipped", table, column, exc_info=True)
+                # KHÔNG nuốt im lặng: đây là loại lỗi từng làm production trả 500
+                # mà không có dấu vết. Ghi cảnh báo để thấy được ngay.
+                logger.warning(
+                    "Migration FAILED to add %s.%s — các truy vấn cột này sẽ lỗi",
+                    table, column, exc_info=True,
+                )
 

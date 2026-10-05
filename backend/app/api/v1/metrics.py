@@ -1,5 +1,6 @@
 from typing import List, Dict, Any, Optional
 from datetime import datetime, date
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -7,6 +8,8 @@ from sqlalchemy import func, or_, and_
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.entities import CampaignMetric, Campaign, MarketingChannel, User, CampaignMember, Workspace, WorkspaceMember, Task, MarketingContent
+
+logger = logging.getLogger(__name__)
 from app.schemas.schemas import (
     MetricCreate,
     MetricResponse,
@@ -283,6 +286,26 @@ def get_global_dashboard(
     roi = ((total_revenue - total_cost) / total_cost * 100.0) if total_cost > 0 else 0.0
     roas = (total_revenue / total_cost) if total_cost > 0 else 0.0
 
+    # Nguồn gốc số liệu. Tồn tại vì dashboard tổng hợp thẳng từ CampaignMetric
+    # mà bảng này có thể chứa dữ liệu MẪU do `seed` nạp. Không phân biệt thì
+    # "15.700 lượt xem" từ dữ liệu mẫu sẽ hiện y hệt kết quả thật, và người
+    # mua sản phẩm sẽ hiểu sai. `has_demo_data=true` bắt buộc UI hiện cảnh báo.
+    #
+    # PHÒNG THỦ: đọc `source` bằng getattr và bắt lỗi. Nếu cột `source` chưa
+    # được tạo (migration lỗi trên CSDL cũ), truy vấn `m.source` sẽ ném
+    # ProgrammingError và làm TOÀN BỘ dashboard trả 500 — tệ hơn nhiều so với
+    # mất cảnh báo. Đã xảy ra thật trên production một lần.
+    seed_rows = 0
+    try:
+        seed_rows = sum(1 for m in metrics if getattr(m, "source", None) == "seed")
+    except Exception:
+        seed_rows = 0
+        logger.warning(
+            "campaign_metrics.source khong doc duoc — bo qua canh bao du lieu mau. "
+            "Kiem tra migration ALTER TABLE campaign_metrics ADD COLUMN source.",
+            exc_info=True,
+        )
+
     return {
         "kpi": {
             "total_views": total_views,
@@ -314,9 +337,9 @@ def get_global_dashboard(
         # "15.700 lượt xem" từ dữ liệu mẫu sẽ hiện y hệt kết quả thật, và người
         # mua sản phẩm sẽ hiểu sai. `has_demo_data=true` bắt buộc UI hiện cảnh báo.
         "data_provenance": {
-            "has_demo_data": any(m.source == "seed" for m in metrics),
-            "seed_rows": sum(1 for m in metrics if m.source == "seed"),
-            "real_rows": sum(1 for m in metrics if m.source != "seed"),
+            "has_demo_data": seed_rows > 0,
+            "seed_rows": seed_rows,
+            "real_rows": len(metrics) - seed_rows,
             "total_rows": len(metrics),
         },
     }
