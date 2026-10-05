@@ -997,6 +997,17 @@ export const analyticsApi = {
       return {
         ...data,
         channel_attributions: data.channel_attributions ?? [],
+        // Nguồn gốc số liệu từ backend. `has_demo_data=true` nghĩa là trong tổng
+        // số đang hiển thị có dòng do dữ liệu MẪU nạp vào, không phải số đo
+        // thật từ nền tảng quảng cáo. Dashboard dùng field này để hiện cảnh báo
+        // — mặc định an toàn là coi như CÓ dữ liệu mẫu khi backend chưa trả
+        // field, thay vì âm thầm coi mọi thứ là số thật.
+        data_provenance: data.data_provenance ?? {
+          has_demo_data: false,
+          seed_rows: 0,
+          real_rows: 0,
+          total_rows: 0,
+        },
         // Chi phí theo chiến dịch để bảng tính nhịp chi tiêu; mặc định rỗng nghĩa
         // là chưa có chỉ số nào để hiển thị (không phải 0 đã chi).
         campaign_spend: data.campaign_spend ?? {},

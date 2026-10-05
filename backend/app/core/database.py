@@ -298,6 +298,23 @@ def ensure_sqlite_schema_compatibility(db_engine=engine):
                     # bỏ qua, không làm hỏng toàn bộ bước migration.
                     logger.debug("Index creation skipped: %s", index_sql, exc_info=True)
 
+            # 5a. Thêm cột `campaign_metrics.source` nếu thiếu.
+            # `create_all` không ALTER bảng đã có, nên CSDL cũ sẽ thiếu cột và mọi
+            # truy vấn `source` sẽ ném OperationalError. Cột này phân biệt dữ liệu
+            # mẫu (`'seed'`) với dữ liệu nhập thật (NULL) — xem giải thích ở
+            # entities.CampaignMetric.
+            metric_cols = {
+                row[1] for row in conn.exec_driver_sql("PRAGMA table_info(campaign_metrics)")
+            }
+            if metric_cols and "source" not in metric_cols:
+                try:
+                    conn.exec_driver_sql(
+                        "ALTER TABLE campaign_metrics ADD COLUMN source VARCHAR(20)"
+                    )
+                    logger.info("Migration: added campaign_metrics.source")
+                except Exception:
+                    logger.debug("campaign_metrics.source add skipped", exc_info=True)
+
             # 5b. Nới CHECK constraint `provider` của custom_api_keys.
             # SQLite không có ALTER CONSTRAINT nên phải dựng lại bảng. CSDL cũ
             # chặn 'opencode' ở tầng DB, khiến lưu khóa BYOK chết bằng
@@ -336,4 +353,38 @@ def init_db(db_engine=engine):
     """Khởi tạo toàn bộ các bảng trong CSDL và đảm bảo tính tương thích schema SQLite."""
     Base.metadata.create_all(bind=db_engine)
     ensure_sqlite_schema_compatibility(db_engine)
+    ensure_postgres_schema_compatibility(db_engine)
+
+
+def ensure_postgres_schema_compatibility(db_engine=engine) -> None:
+    """Thêm cột còn thiếu trên Postgres (và mọi backend không phải SQLite).
+
+    `Base.metadata.create_all` chỉ tạo BẢNG mới; nó không bao giờ ALTER bảng đã
+    tồn tại. Deployment Postgres đã có sẵn bảng `campaign_metrics` từ lần chạy
+    trước nên cột `source` (phân biệt dữ liệu mẫu với dữ liệu thật) sẽ không
+    được tạo và mọi truy vấn `source` sẽ ném ProgrammingError.
+
+    Hàm chỉ làm ADD COLUMN với giá trị mặc định NULL — không phá dữ liệu đang có.
+    """
+    if str(db_engine.url).startswith("sqlite"):
+        return
+    checks = (
+        ("campaign_metrics", "source", "VARCHAR(20)"),
+    )
+    with db_engine.begin() as conn:
+        for table, column, coltype in checks:
+            exists = conn.exec_driver_sql(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_name = :t AND column_name = :c",
+                {"t": table, "c": column},
+            ).fetchone()
+            if exists:
+                continue
+            try:
+                conn.exec_driver_sql(
+                    f"ALTER TABLE {table} ADD COLUMN {column} {coltype}"
+                )
+                logger.info("Migration: added %s.%s", table, column)
+            except Exception:
+                logger.debug("Migration %s.%s skipped", table, column, exc_info=True)
 

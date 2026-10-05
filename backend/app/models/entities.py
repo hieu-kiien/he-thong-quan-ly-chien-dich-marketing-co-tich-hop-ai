@@ -325,6 +325,16 @@ class CampaignMetric(Base):
     revenue = Column(Numeric(12, 2), nullable=False, default=0)
     created_at = Column(DateTime, default=utc_now, nullable=False)
 
+    # Nguon su that cua dong so lieu. NULL (mac dinh) = nguoi dung hoac ke tich hop
+    # nhap vao = DU LIEU THAT. Gia tri 'seed' = dong sinh tu du lieu mau.
+    #
+    # VI SAO COT NAY: dashboard tong hop views/clicks/ROAS ngay tu bang nay. Neu
+    # khong phan biet, mot deployment production chay nham seed se hien "15.700
+    # views" nhu la ket qua marketing that, va nguoi mua se hieu sai. Co cot nay
+    # thi API bao cao `data_provenance` va UI bat buoc hien thi canh bao, nho do
+    # con so lieu mau bao gio duoc nhien nhu la mau chu khong phai so thuc.
+    source = Column(String(20), nullable=True, default=None)
+
     __table_args__ = (
         CheckConstraint("views >= 0", name="chk_views_nonneg"),
         CheckConstraint("clicks >= 0", name="chk_clicks_nonneg"),

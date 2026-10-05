@@ -356,7 +356,8 @@ def seed_data(session=None, force: bool = False):
                 clicks=850,
                 conversions=42,
                 cost=1850000.0,
-                revenue=8400000.0
+                revenue=8400000.0,
+                source="seed"
             ))
 
         m2 = db.query(CampaignMetric).filter(
@@ -373,7 +374,8 @@ def seed_data(session=None, force: bool = False):
                 clicks=410,
                 conversions=18,
                 cost=500000.0,
-                revenue=3600000.0
+                revenue=3600000.0,
+                source="seed"
             ))
         db.commit()
         print("   + Đã kiểm tra/nạp chỉ số đo lường hiệu quả (Metrics) mẫu.")

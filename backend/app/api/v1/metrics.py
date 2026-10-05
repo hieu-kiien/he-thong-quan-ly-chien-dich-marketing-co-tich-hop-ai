@@ -309,6 +309,16 @@ def get_global_dashboard(
         # response không có nó nên client rơi về `|| MOCK_CHANNEL_ATTRIBUTIONS`, tức là
         # production hiển thị số liệu bịa đặt.
         "channel_attributions": _aggregate_channel_attribution(db, allowed_ids),
+        # Nguồn gốc số liệu. Tồn tại vì dashboard tổng hợp thẳng từ CampaignMetric
+        # mà bảng này có thể chứa dữ liệu MẪU do `seed` nạp. Không phân biệt thì
+        # "15.700 lượt xem" từ dữ liệu mẫu sẽ hiện y hệt kết quả thật, và người
+        # mua sản phẩm sẽ hiểu sai. `has_demo_data=true` bắt buộc UI hiện cảnh báo.
+        "data_provenance": {
+            "has_demo_data": any(m.source == "seed" for m in metrics),
+            "seed_rows": sum(1 for m in metrics if m.source == "seed"),
+            "real_rows": sum(1 for m in metrics if m.source != "seed"),
+            "total_rows": len(metrics),
+        },
     }
 
 

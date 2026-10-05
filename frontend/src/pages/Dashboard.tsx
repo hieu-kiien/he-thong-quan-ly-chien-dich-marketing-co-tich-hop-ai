@@ -28,6 +28,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [contents, setContents] = useState<MarketingContent[]>([]);
   const [dashboardKpi, setDashboardKpi] = useState<any>(null);
+  // Nguồn gốc số liệu do backend báo. Dùng để hiện cảnh báo khi tổng số đang
+  // hiển thị có chứa dữ liệu MẪU — không thì người dùng tưởng ROAS/lượt xem
+  // là số đo thật từ Facebook/TikTok.
+  const [dataProvenance, setDataProvenance] = useState<{
+    has_demo_data: boolean;
+    seed_rows: number;
+    real_rows: number;
+    total_rows: number;
+  } | null>(null);
   // Chi phí thực đo theo chiến dịch, từ campaign_spend của /analytics/dashboard.
   const [campaignSpend, setCampaignSpend] = useState<Record<string, number>>({});
   const [commandCenter, setCommandCenter] = useState<CommandCenterResponse | null>(null);
@@ -70,6 +79,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       setKpiError(null);
       setCommandCenterError(null);
       setCampaignSpend((kpiData?.campaign_spend as Record<string, number>) ?? {});
+      setDataProvenance(kpiData?.data_provenance ?? null);
       if (kpiData?.kpi) {
         setDashboardKpi(kpiData.kpi);
       } else {
@@ -195,6 +205,40 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </button>
         </div>
       </div>
+
+      {/* CẢNH BÁO NGUỒN GỐC SỐ LIỆU.
+
+          Dashboard tổng hợp ROAS / lượt xem / chi phí thẳng từ bảng
+          `campaign_metrics`. Bảng đó có thể chứa dòng do dữ liệu MẪU nạp vào,
+          không phải số đo thật từ Facebook/TikTok/Google. Nếu không nói rõ,
+          người dùng và khách hàng sẽ đọc "15.700 lượt xem" là kết quả thật.
+
+          Backend báo `data_provenance.has_demo_data`; hiển thị ở đây để con số
+          luôn đi kèm nguồn gốc. Đây là điều kiện tiên quyết để bán sản phẩm
+          này cho người dùng thật. */}
+      {dataProvenance?.has_demo_data && (
+        <div
+          role="status"
+          className="flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900"
+        >
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="text-xs leading-relaxed">
+            <p className="font-bold">Số liệu dưới đây có chứa dữ liệu MẪU, không phải số đo thật.</p>
+            <p className="mt-1">
+              Trong {dataProvenance.total_rows} dòng chỉ số đang hiển thị,{' '}
+              <strong>{dataProvenance.seed_rows} dòng là dữ liệu mẫu</strong> tự sinh lúc khởi tạo
+              {dataProvenance.real_rows > 0 && (
+                <>
+                  {' '}({dataProvenance.real_rows} dòng là số bạn đã nhập thật)
+                </>
+              )}
+              . Chúng không đến từ Facebook, TikTok hay Google Ads. Nhập chỉ số thật qua
+              <code className="px-1 mx-0.5 rounded bg-amber-100">Quản Lý Chiến Dịch → Ghi chỉ số</code>
+              , hoặc xoá dữ liệu mẫu, để màn hình này chỉ còn số thật.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* SECTION 1: WHAT NEEDS ATTENTION (VIỆC CẦN CHÚ Ý) */}
       <div className="space-y-3">
