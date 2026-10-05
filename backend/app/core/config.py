@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     BYOK_ROTATION_KEYS: Optional[str] = None
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+
+    # Email cua tai khoan ADMIN duoc bootstrap. Xem app/core/bootstrap_admin.py.
+    # Rong (mac dinh) => khong tao gi, he thong chay ma khong co ADMIN.
+    BOOTSTRAP_ADMIN_EMAIL: Optional[str] = None
+    BOOTSTRAP_ADMIN_PASSWORD: Optional[str] = None
+    BOOTSTRAP_ADMIN_NAME: str = "Platform Admin"
     
     # CORS Origins
     # 4173 la cong `vite preview` mac dinh cua Playwright. Workflow CI cap rieng

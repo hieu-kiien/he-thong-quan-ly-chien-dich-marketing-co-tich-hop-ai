@@ -123,6 +123,10 @@ def on_startup():
             logger.info("Initializing automatic zero-cold-start seed data...")
             seed_data()
             logger.info("Database initialized and auto-seeded successfully.")
+        # Chay o ca dev va production: self-host khong co duong nao tao ADMIN
+        # qua API, nen moi deployment deu can bien moi truong nay.
+        from app.core.bootstrap_admin import run_bootstrap_admin
+        run_bootstrap_admin()
     except DatabaseMigrationError as e:
         logger.critical(f"Critical database migration error during startup: {e}", exc_info=True)
         sys.exit(1)
