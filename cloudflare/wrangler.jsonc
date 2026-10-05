@@ -10,7 +10,7 @@
     // KHONG dat trong `secrets`: day la dia chi cong khai, khong phai bi mat.
     // Ghi chu: dong comment phai nam TREN gia tri, vi comment cung hang
     // duoc bo qua khi parse JSONC.
-    "BACKEND_ORIGIN": "https://marketflow-api-2nd5.onrender.com"
+    "BACKEND_ORIGIN": "https://marketflow-api-9onk.onrender.com"
   },
   "secrets": {
     // Chi con hai secret. Secret key/AI key/password da chuyen sang bien moi
