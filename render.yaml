@@ -8,38 +8,51 @@
 #
 # CÁCH DÙNG
 #   1. Render Dashboard → New → Blueprint → chọn repo này.
-#   2. Render tạo Postgres + web service trong một lần Apply.
-#   3. Điền các giá trị `sync: false` mà Render sẽ báo thiếu:
-#      SECRET_KEY, JWT_SECRET_KEY, BYOK_ENCRYPTION_KEY, AI_API_KEY,
-#      SCHEDULER_SECRET, và 3 mật khẩu demo.
+#   2. Render tạo web service.
+#   3. Điền các giá trị `sync: false` mà Render sẽ báo thiếu. **Quan trọng nhất
+#      là DATABASE_URL** — xem phần DATABASE bên dưới.
 #   4. Lấy URL service, dán vào BACKEND_ORIGIN trong cloudflare/wrangler.jsonc,
 #      rồi `npm run deploy` trong thư mục cloudflare.
 #
-# HAI GIỚI HẠN NGHIÊM TRỌNG — ĐỌC TRƯỚC KHI DÙNG THẬT
+# DATABASE — ĐỌC TRƯỚC KHI DÙNG THẬT
 #
-#   1. POSTGRES FREE TỰ HẠN SAU 30 NGÀY. Render ghi rõ trên dashboard:
-#      "Your database will expire on <ngày +30>. The database will be deleted
-#      unless you upgrade to a paid compute plan." Tức là dữ liệu sẽ BỊ XOÁ,
-#      không phải chỉ bị khoá. Đây là lý do Render yêu cầu thẻ ở plan Starter.
-#      -> Muốn giữ dữ liệu lâu dài: nâng plan Postgres ($6/tháng) hoặc dùng
-#         DB ngoài (Neon/Supabase đều có free tier lâu hơn).
+#   Blueprint cố tình KHÔNG khai báo `databases:`. Lý do: Render Postgres plan
+#   free tự hạn sau 30 ngày và Render ghi rõ trên dashboard:
+#     "Your database will expire on <ngày +30>. The database will be deleted
+#      unless you upgrade to a paid compute plan."
+#   Tức là dữ liệu sẽ BỊ XOÁ, không phải chỉ bị khoá. Khai báo DB trong
+#   blueprint khiến người vận hành tưởng là đã có database bền vững.
 #
-#   2. WEB SERVICE FREE NGỦ SAU 15 PHÚT KHÔNG CÓ REQUEST. Mỗi lần tỉnh dậy
-#      mất khoảng 30-60 giây (cold start). Frontend đã có banner "Máy chủ đang
-#      thức dậy" để hiển thị trong lúc chờ.
+#   -> Hãy dùng Postgres có sở hữu lâu dài: Neon, Supabase, RDS... rồi dán
+#      connection string vào DATABASE_URL trong Dashboard.
+#
+#   `sync: false` ở DATABASE_URL là BẮT BUỘC. Nếu để Render quản lý
+#   (`fromDatabase`), lần sync blueprint sau sẽ ghi đè giá trị bạn dán và
+#   trỏ về database của Render.
+#
+#   Lưu ý kỹ thuật khi dùng Neon:
+#     - Chọn CÙNG REGION với `region:` của service ( oregon ). Giảm latency.
+#     - Dùng endpoint DIRECT, không phải pooled (`-pooler`). psycopg2 >= 2.9
+#       dùng prepared statement sau 5 lần execute, còn PgBouncer ở transaction
+#       mode không hỗ trợ -> lỗi lúc chạy thật.
+#     - Giữ `?sslmode=require` trong connection string.
+#
+#   Nếu tự dựng Postgres của riêng bạn, nhớ bật `PRAGMA` tương đương cho
+#   foreign key. Code đã tự bật khi dùng SQLite; với Postgres thì FK được
+#   enforce sẵn ở mức server.
+#
+# GIỚI HẠN CÒN LẠI
+#
+#   WEB SERVICE FREE NGỦ SAU 15 PHÚT KHÔNG CÓ REQUEST. Mỗi lần tỉnh dậy mất
+#   khoảng 30-60 giây (cold start). Frontend đã có banner "Máy chủ đang thức
+#   dậy" để hiển thị trong lúc chờ. Worker có cron */5 phút gọi scheduler nên
+#   thường giữ service thức.
 #      -> Muốn không ngủ: Starter ($7/tháng).
 #
 # CÁNH BÁO BẢO MẬT
-#   `connectionString` của Postgres là thông tin nhạy cảm. Render tự quản lý
-#   nó trong dashboard, KHÔNG ghi vào repo. Không bao giờ commit giá trị này.
+#   Connection string Postgres là thông tin nhạy cảm. Đặt trong Dashboard với
+#   `sync: false`, KHÔNG ghi vào repo. Không bao giờ commit giá trị này.
 # =============================================================================
-
-databases:
-  - name: marketflow-db
-    plan: free
-    postgresMajorVersion: "18"
-    databaseName: marketflow
-    user: marketflow
 
 services:
   - type: web
@@ -49,17 +62,11 @@ services:
     # python cannot have dockerfilePath"; bo `runtime` thi: "empty but required".
     runtime: docker
     plan: free
-    # QUAN TRONG: region cua web service phai trung region cua Postgres.
-    # Render free Postgres (plan: free) CHI co o Oregon. Neu web service de o
-    # region khac, no lay duoc hostname noi bo cua DB (vi du
-    # `dpg-xxxx-a`) va khong DNS-resolve duoc:
-    #   sqlalchemy.exc.OperationalError: (psycopg2.OperationalError)
-    #   could not translate host name "dpg-xxxx-a" to address:
-    #   Name or service not known
-    # Da xac nhan bang deploy that: service singapore + DB oregon => /health OK
-    # (vi /health khong cham DB) nhung moi endpoint can DB tra 503.
-    # Render KHONG doi duoc region cua service da tao, nen phai xoa service roi
-    # sync lai blueprint de doi region.
+    # Giu oregon de cung region voi Neon (neu dung Neon) va de gan voi Render
+    # Postgres neu ban van dung DB cua Render.
+    #
+    # Render KHONG doi duoc region cua service da tao. Neu service dang o region
+    # khac, phai xoa roi sync lai blueprint.
     region: oregon
     rootDir: backend
     dockerfilePath: ./Dockerfile
@@ -72,12 +79,16 @@ services:
       - key: API_V1_PREFIX
         value: /api/v1
 
-      # Render tu lap connection string tu database khai bao o tren.
-      # Khong hardcode: doi ten DB se lam connection string cu cap nhat.
+      # --- DATABASE (bat buoc gan tay) ---
+      # Endpoint dang ky co chu dong chan leo thang dac quyen, nen khong co duong
+      # nao tao ADMIN qua API. `sync: false` + `app/core/bootstrap_admin.py` la
+      # duong duy nhat de co tai khoan ADMIN tren moi deployment.
       - key: DATABASE_URL
-        fromDatabase:
-          name: marketflow-db
-          property: connectionString
+        sync: false
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
 
       # --- AI that: OpenCode Zen ---
       # AI_BASE_URL mac dinh trong config.py la Gemini. Backend tren Render
@@ -108,6 +119,8 @@ services:
       # voi header nay. Gia tri phai TRUNG với SCHEDULER_SECRET tren Cloudflare.
       - key: SCHEDULER_SECRET
         sync: false
+      # Mat khau cua 3 tai khoan demo. KHONG dung o production: bo cac bien
+      # nay va tao tai khoan that qua BOOTSTRAP_ADMIN_* + luong dang ky.
       - key: MARKETFLOW_MANAGER_PASSWORD
         sync: false
       - key: MARKETFLOW_MARKETER_PASSWORD
