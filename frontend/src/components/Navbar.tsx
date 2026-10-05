@@ -104,7 +104,12 @@ export const Navbar: React.FC<NavbarProps> = ({
     // `bg-slate-900/90` + `backdrop-blur`, axe không xác định được màu nền hiệu
     // dụng và lấy nhầm nền sáng của trang, khiến mọi chữ màu nhạt trong header bị
     // báo fail. Đục hoàn toàn giữ đúng ý đồ thiết kế và cho tỷ lệ ổn định.
-    <header className="min-h-16 py-1.5 sm:py-0 bg-slate-900 border-b border-slate-800 px-3 sm:px-6 sm:h-16 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 sticky top-0 z-20 shadow-sm text-slate-100 no-print">
+    //
+    // `flex-wrap` cho phép vùng điều khiển xuống hàng khi hết chỗ (320px @ 200%
+    // zoom). Vì vậy CHỈ dùng `min-h-16`, tuyệt đối không thêm `sm:h-16`: chiều
+    // cao cố định 64px cắt mất hàng thứ hai, khiến các nút tràn ra ngoài header
+    // và đè lên nội dung trang. Đã xảy ra thật trên production.
+    <header className="min-h-16 py-1.5 sm:py-0 bg-slate-900 border-b border-slate-800 px-3 sm:px-6 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 sticky top-0 z-20 shadow-sm text-slate-100 no-print">
       {/* Left Area: Mobile Hamburger + Workspace Switcher + Search Input
 
           `flex-1 min-w-0` là bắt buộc, không phải mỹ thuật: vùng bên phải (nút
