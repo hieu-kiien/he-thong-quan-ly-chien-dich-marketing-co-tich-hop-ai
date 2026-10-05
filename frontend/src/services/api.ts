@@ -1004,7 +1004,9 @@ export const analyticsApi = {
         // field, thay vì âm thầm coi mọi thứ là số thật.
         data_provenance: data.data_provenance ?? {
           has_demo_data: false,
+          has_unverified_data: false,
           seed_rows: 0,
+          unverified_rows: 0,
           real_rows: 0,
           total_rows: 0,
         },

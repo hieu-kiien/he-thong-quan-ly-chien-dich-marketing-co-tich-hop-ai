@@ -33,7 +33,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // là số đo thật từ Facebook/TikTok.
   const [dataProvenance, setDataProvenance] = useState<{
     has_demo_data: boolean;
+    has_unverified_data: boolean;
     seed_rows: number;
+    unverified_rows: number;
     real_rows: number;
     total_rows: number;
   } | null>(null);
@@ -216,25 +218,36 @@ export const Dashboard: React.FC<DashboardProps> = ({
           Backend báo `data_provenance.has_demo_data`; hiển thị ở đây để con số
           luôn đi kèm nguồn gốc. Đây là điều kiện tiên quyết để bán sản phẩm
           này cho người dùng thật. */}
-      {dataProvenance?.has_demo_data && (
+      {(dataProvenance?.has_demo_data || dataProvenance?.has_unverified_data) && (
         <div
           role="status"
           className="flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900"
         >
           <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" aria-hidden="true" />
           <div className="text-xs leading-relaxed">
-            <p className="font-bold">Số liệu dưới đây có chứa dữ liệu MẪU, không phải số đo thật.</p>
+            <p className="font-bold">
+              {dataProvenance.has_demo_data
+                ? 'Số liệu dưới đây có chứa dữ liệu MẪU, không phải số đo thật.'
+                : 'Chưa xác minh được nguồn gốc của một phần số liệu dưới đây.'}
+            </p>
             <p className="mt-1">
-              Trong {dataProvenance.total_rows} dòng chỉ số đang hiển thị,{' '}
-              <strong>{dataProvenance.seed_rows} dòng là dữ liệu mẫu</strong> tự sinh lúc khởi tạo
-              {dataProvenance.real_rows > 0 && (
+              Trong {dataProvenance.total_rows} dòng chỉ số đang hiển thị:{' '}
+              {dataProvenance.seed_rows > 0 && (
                 <>
-                  {' '}({dataProvenance.real_rows} dòng là số bạn đã nhập thật)
+                  <strong>{dataProvenance.seed_rows} dòng là dữ liệu mẫu</strong> tự sinh lúc
+                  khởi tạo{'; '}
                 </>
               )}
-              . Chúng không đến từ Facebook, TikTok hay Google Ads. Nhập chỉ số thật qua
+              {dataProvenance.unverified_rows > 0 && (
+                <>
+                  <strong>{dataProvenance.unverified_rows} dòng chưa được ghi nhận nguồn gốc</strong>{' '}
+                  (có thể là dữ liệu nhập trước khi hệ thống bắt đầu ghi nhận){'; '}
+                </>
+              )}
+              {dataProvenance.real_rows} dòng là số bạn đã nhập thật. Chúng không đến từ Facebook,
+              TikTok hay Google Ads. Nhập chỉ số thật qua
               <code className="px-1 mx-0.5 rounded bg-amber-100">Quản Lý Chiến Dịch → Ghi chỉ số</code>
-              , hoặc xoá dữ liệu mẫu, để màn hình này chỉ còn số thật.
+              .
             </p>
           </div>
         </div>

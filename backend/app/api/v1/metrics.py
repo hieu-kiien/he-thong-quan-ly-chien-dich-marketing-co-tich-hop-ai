@@ -296,10 +296,18 @@ def get_global_dashboard(
     # ProgrammingError và làm TOÀN BỘ dashboard trả 500 — tệ hơn nhiều so với
     # mất cảnh báo. Đã xảy ra thật trên production một lần.
     seed_rows = 0
+    unverified_rows = 0
     try:
         seed_rows = sum(1 for m in metrics if getattr(m, "source", None) == "seed")
+        # Dòng có `source IS NULL` là dữ liệu KHÔNG xác minh được nguồn gốc, KHÔNG
+        # phải dữ liệu thật. Đây là trạng thái phổ biến của mọi CSDL đã có số liệu
+        # từ trước khi cột `source` được thêm: các dòng seed cũ rơi vào đây. Gọi
+        # chúng là "thật" là khẳng định sai — nên báo riêng thay vì gộp vào
+        # `real_rows`.
+        unverified_rows = sum(1 for m in metrics if getattr(m, "source", None) is None)
     except Exception:
         seed_rows = 0
+        unverified_rows = 0
         logger.warning(
             "campaign_metrics.source khong doc duoc — bo qua canh bao du lieu mau. "
             "Kiem tra migration ALTER TABLE campaign_metrics ADD COLUMN source.",
@@ -338,8 +346,13 @@ def get_global_dashboard(
         # mua sản phẩm sẽ hiểu sai. `has_demo_data=true` bắt buộc UI hiện cảnh báo.
         "data_provenance": {
             "has_demo_data": seed_rows > 0,
+            # Cần cảnh báo khi có dòng KHÔNG xác minh được nguồn, không chỉ khi
+            # biết chắc là dữ liệu mẫu. Thiếu nhánh này thì mọi số liệu seed có
+            # sẵn từ trước migration đều bị trình bày như dữ liệu thật.
+            "has_unverified_data": unverified_rows > 0,
             "seed_rows": seed_rows,
-            "real_rows": len(metrics) - seed_rows,
+            "unverified_rows": unverified_rows,
+            "real_rows": len(metrics) - seed_rows - unverified_rows,
             "total_rows": len(metrics),
         },
     }
