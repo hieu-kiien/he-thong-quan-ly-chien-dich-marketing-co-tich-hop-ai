@@ -398,6 +398,22 @@ def evaluate_provider_failover(db):
 
 def evaluate_latency_benchmark(db):
     print("\n--- 4. Evaluating Deterministic Engine Latency ---")
+
+    # WARMUP: bo qua cac lan goi dau tien.
+    #
+    # Ly do: lan goi dau tien tren mot process moi ton thoi gian biên dich cau
+    # lenh SQLAlchemy + tao statement cache + mo ket noi DB. Do do gom no vao
+    # p95 lam p95 phu thuoc trang thai may chu (runner dung chung), khong do
+    # duoc toc do cua engine. Da xay ra that tren CI: Gate 5 fail mot lan voi
+    # `Latency p95 exceeded threshold` trong khi chay lai thi xanh, tren cung
+    # mot commit, chung to do la nhieu cua runner chu khong phai loi code.
+    #
+    # Warmup KHONG phai la lam nhe bai: no loai bo chi mot lan khoi dong, va
+    # nguong p95 <= 50ms duoc GIU NGUYEN cho 50 lan do steady-state.
+    WARMUP_RUNS = 5
+    for _ in range(WARMUP_RUNS):
+        AIDoctorEngine.diagnose_campaign(1, db)
+
     latencies = []
 
     # Run 50 iterations of AI Doctor diagnosis
