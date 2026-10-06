@@ -76,6 +76,18 @@ const isAiPath = (url?: string): boolean =>
 //   (mặc định false trong .env, Dockerfile và .env.example đều khoá false).
 export const isOfflineDemoEnabled = (): boolean => import.meta.env.VITE_ENABLE_OFFLINE_DEMO === 'true';
 
+// Nhan nguon goc cho du lieu mau cuc bo.
+//
+// KHI backend khong tra loi, frontend tra ve noi dung mau gan san. Nhung doan
+// do KHONG phai do AI viet, va KHONG duoc gan nhan ten model nao - neu gan,
+// nguoi dung se tin rang Gemini (hoac bat ky model nao) da that su sinh ra
+// noi dung, trong khi thuc te may chay hoan toan khong co mang.
+//
+// Nhan duoc dung o day de moi noi dung demo deu bao nguon goc dung mot cach,
+// va de test kiem tra duoc rang buoc nay bang cach so sanh chuoi cu the.
+export const OFFLINE_DEMO_PROVIDER = 'offline-demo-fixture';
+export const OFFLINE_DEMO_MODEL_LABEL = 'Dữ liệu mẫu cục bộ (không gọi AI)';
+
 // Helper quản lý bộ nhớ đệm LocalStorage cho chế độ Offline/Cloudflare Demo
 function getStoredList<T>(key: string, defaultData: T[]): T[] {
   try {
@@ -811,7 +823,9 @@ export const aiApi = {
         ],
         warnings: [],
         assumptions: ['Mô hình AI vận hành ở chế độ dự phòng thông minh'],
-        model_used: 'Gemini 2.5 Flash (Smart Fallback)',
+        model_used: OFFLINE_DEMO_MODEL_LABEL,
+        model_provider: OFFLINE_DEMO_PROVIDER,
+        is_fallback: true,
         prompt_version: 'v3'
       };
     }
@@ -845,7 +859,9 @@ export const aiApi = {
         cta: 'Đăng ký nhận tài liệu và dùng thử miễn phí',
         warnings: [],
         assumptions: ['Định dạng kênh tương thích cao'],
-        model_used: 'Gemini 2.5 Flash (Smart Fallback)',
+        model_used: OFFLINE_DEMO_MODEL_LABEL,
+        model_provider: OFFLINE_DEMO_PROVIDER,
+        is_fallback: true,
         prompt_version: 'v3'
       };
     }
@@ -876,7 +892,9 @@ export const aiApi = {
           'Tối ưu hóa nội dung Email Marketing nhằm cải thiện tỷ lệ mở thư và nâng cao giá trị đơn hàng trung bình.'
         ],
         warnings: [],
-        model_used: 'Gemini 2.5 Flash (Smart Fallback)',
+        model_used: OFFLINE_DEMO_MODEL_LABEL,
+        model_provider: OFFLINE_DEMO_PROVIDER,
+        is_fallback: true,
         prompt_version: 'v3'
       };
     }
@@ -892,10 +910,11 @@ export const aiApi = {
       const briefName = req.brief || 'Chiến dịch Tiếp thị Toàn diện';
       return {
         task_type: 'OMNICHANNEL',
-        model_used: 'Gemini 2.5 Flash (Smart Fallback)',
+        model_used: OFFLINE_DEMO_MODEL_LABEL,
+        model_provider: OFFLINE_DEMO_PROVIDER,
+        is_fallback: true,
         warnings: [],
         compliance_score: 100,
-        is_fallback: true,
         facebook: {
           title: `Bùng Nổ Doanh Số & Dẫn Đầu Xu Hướng Cùng ${briefName.slice(0, 40)}`,
           headline: `Bùng Nổ Doanh Số & Dẫn Đầu Xu Hướng Cùng ${briefName.slice(0, 40)}`,

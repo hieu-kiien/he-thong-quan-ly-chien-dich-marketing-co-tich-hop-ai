@@ -2538,9 +2538,9 @@ useEffect(() => {
                         <Sparkles className="w-6 h-6 animate-pulse" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-slate-900">Sinh trọn bộ Mẫu Quảng Cáo Đa Kênh bằng Google Gemini</h4>
+                        <h4 className="text-sm font-bold text-slate-900">Sinh trọn bộ Mẫu Quảng Cáo Đa Kênh bằng AI</h4>
                         <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                          Gemini 2.5 Flash sẽ tự động tạo bài viết Facebook chuẩn định dạng, kịch bản video TikTok 9:16 có phân cảnh chi tiết và thư Email marketing kêu gọi hành động.
+                          AI sẽ tự động tạo bài viết Facebook chuẩn định dạng, kịch bản video TikTok 9:16 có phân cảnh chi tiết và thư Email marketing kêu gọi hành động. Nhà cung cấp và model dùng theo cấu hình trong Cài đặt.
                         </p>
                       </div>
 

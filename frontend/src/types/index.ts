@@ -195,6 +195,12 @@ export interface AIIdeaResponse {
   assumptions: string[];
   model_used: string;
   prompt_version: string;
+  /** Backend tra ve true khi noi dung thuc ra la template du phong, khong phai do
+   *  mo hinh viet. Giao dien PHAI hien thi canh bao khi truong nay true. */
+  is_fallback: boolean;
+  /** Ten nguon goc that ("gemini", "anthropic", "ollama-system", ...). Khong
+   *  nen do lai bang mot ten model gan cung o giao dien. */
+  model_provider?: string | null;
 }
 
 export interface AIDraftResponse {
@@ -206,6 +212,8 @@ export interface AIDraftResponse {
   assumptions: string[];
   model_used: string;
   prompt_version: string;
+  is_fallback: boolean;
+  model_provider?: string | null;
 }
 
 export interface AISummaryResponse {
@@ -217,6 +225,8 @@ export interface AISummaryResponse {
   warnings: string[];
   model_used: string;
   prompt_version: string;
+  is_fallback: boolean;
+  model_provider?: string | null;
 }
 
 // ==========================================

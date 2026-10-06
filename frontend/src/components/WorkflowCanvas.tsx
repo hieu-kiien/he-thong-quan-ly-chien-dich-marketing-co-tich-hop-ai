@@ -1490,7 +1490,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
               <span>Luồng nghiệp vụ tự động hóa Marketing tuân thủ 100% nguyên tắc kiểm duyệt con người (Human-in-the-loop).</span>
             </div>
             <div className="text-[11px] text-slate-500 font-mono">
-              Model: Gemini 2.5 Flash • Production: marketflow-7vt.pages.dev
+              AI: nhà cung cấp theo cấu hình workspace · marketing.kienhieu.id.vn
             </div>
           </div>
         </div>

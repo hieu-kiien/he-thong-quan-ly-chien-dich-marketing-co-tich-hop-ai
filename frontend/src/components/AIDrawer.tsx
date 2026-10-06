@@ -349,7 +349,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
               <h3 id="ai-drawer-title" className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
                 AI Marketing Copilot
                 <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">
-                  Google Gemini 2.5
+                  Đa nhà cung cấp
                 </span>
               </h3>
               {campaigns && campaigns.length > 0 ? (
@@ -471,7 +471,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
               <div className="bg-gradient-to-r from-amber-50 to-indigo-50 border border-amber-200/60 rounded-xl p-3.5 text-xs text-slate-700 space-y-2">
                 <div className="flex items-center gap-1.5 font-bold text-slate-900">
                   <Zap className="w-4 h-4 text-amber-500" />
-                  <span>1-Click Sáng tạo Đa kênh (R2 • Gemini 2.5 Flash)</span>
+                  <span>1-Click Sáng tạo Đa kênh (R2 • AI đa nhà cung cấp)</span>
                 </div>
                 <p className="text-[11px] text-slate-600 leading-relaxed">
                   Nhập một Brief tiếp thị duy nhất để AI tự động sinh trọn bộ 3 kênh: <strong>Facebook Feed/Ads</strong>, <strong>TikTok Script (4 cảnh)</strong> và <strong>Email Sequence (A/B testing)</strong> kế thừa Brand Kit.
