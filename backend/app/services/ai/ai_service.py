@@ -600,9 +600,23 @@ class AIService:
             "facebook": facebook_data,
             "tiktok": tiktok_data,
             "email": email_data,
-            "warnings": ["Dữ liệu được tạo từ chế độ Smart Fallback (mạng ngoại vi không khả dụng hoặc chưa cấu hình API key)."],
+            "warnings": ["Dữ liệu được tạo từ chế độ Smart Fallback (mạng ngoại vi không khả dụng hoặc chưa cấu hình API key).",
+                         "Nội dung dự phòng CHƯA được chấm điểm tuân thủ. Hãy chạy kiểm tra tuân thủ trên nội dung đã chỉnh sửa."],
             "assumptions": ["Kế thừa thông số Brand Kit và ngữ cảnh chiến dịch mặc định."],
-            "compliance_score": 100,
+            # KHÔNG tự gán compliance_score cho nội dung dự phòng.
+            #
+            # Bản trước đặt cứng `compliance_score: 100`, tức là tuyên bố bộ
+            # template "đạt chuẩn 100/100" dù nó chưa từng đi qua
+            # `compliance_service`. Người dùng đọc thấy điểm tuyệt đối và tin
+            # rằng bản nháp đã được kiểm duyệt tự động — trong khi thực tế nó
+            # chỉ là khuôn mẫu chưa ai kiểm. Đó đúng là loại nhận định sai mà
+            # rubric Tuần 3 mục 6 ("dừng người cảnh giác", "có cảnh báo rõ
+            # ràng") yêu cầu phải tránh.
+            #
+            # Để trống (None) để UI hiển thị "chưa chấm" thay vì hiển thị điểm
+            # giả. Điểm thật chỉ do `POST /contents/compliance-check` tính từ
+            # Brand Kit và chính sách quảng cáo.
+            "compliance_score": None,
             "is_fallback": True,
             "model_provider": "template-fallback-engine"
         }

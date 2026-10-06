@@ -134,6 +134,41 @@ def offline_ai_for_tests(request):
 
 
 @pytest.fixture(autouse=True)
+def reset_ai_service_overrides():
+    """Khôi phục các ghi đè trạng thái trên singleton `ai_service` sau mỗi test.
+
+    `AIService` là singleton, và nhiều test gán trực tiếp
+    `ai_service.api_key = "..."` / `ai_service.fallback_enabled = False` để ép
+    một nhánh xử lý. Property của lớp đọc giá trị đã gán trước, rồi mới tới
+    `settings` — nên một test quên `del` là mọi test chạy sau đó thừa hưởng
+    cấu hình AI của test đó.
+
+    Hậu quả quan sát được: bộ test chạy đúng khi chạy lẻ từng file nhưng fail
+    khi chạy đủ bộ, và kết quả phụ thuộc thứ tự file. Fixture này chụp lại
+    trạng thái trước và trả về sau, nên thứ tự test không còn ảnh hưởng kết quả.
+
+    Ghi chú: phải dùng `monkeypatch.setattr(..., raising=False)` thay vì `delattr`
+    vì một số test thay chính object singleton bằng object giả thiếu sẵn các
+    thuộc tính này.
+    """
+    from app.services.ai import ai_service as ai_service_module
+
+    service = getattr(ai_service_module, "ai_service", None)
+    if service is None:
+        yield
+        return
+
+    attrs = ("_api_key", "_model", "_base_url", "_timeout", "_max_retries", "_fallback_enabled")
+    snapshot = {attr: getattr(service, attr, None) for attr in attrs}
+    yield
+    for attr, value in snapshot.items():
+        try:
+            setattr(service, attr, value)
+        except Exception:
+            pass
+
+
+@pytest.fixture(autouse=True)
 def reset_rate_limiters():
     """Xoá bộ đếm rate-limit/quota trong bộ nhớ trước mỗi test.
 

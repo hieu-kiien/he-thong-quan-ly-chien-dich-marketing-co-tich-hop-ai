@@ -271,6 +271,78 @@ def generate_summary(
             return AISummaryResponse.model_validate(fallback)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Lỗi dịch vụ AI: {str(e)}")
 
+def _score_omnichannel_compliance(payload: dict, brand_kit: Optional[BrandKit], db: Session) -> Optional[int]:
+    """Chấm điểm tuân thủ TRÊN CHÍNH NỘI DUNG VỪA SINH, bằng bộ quy tắc tất định.
+
+    Vì sao cần đo thay vì đặt hằng số: trước đây `OmnichannelResponse.compliance_score`
+    mặc định là 100 và KHÔNG mã nào từng gán lại nó. Kết quả là mọi phản hồi — kể
+    cả template dự phòng — đều báo "100/100 đạt chuẩn", dù không có bộ quét nào
+    chạy. Đó là một tuyên bố không có cơ sở mà người dùng dựa vào để quyết định có
+    duyệt bài hay không.
+
+    Nay điểm đến từ `ComplianceScanner.scan` — cùng bộ quét mà
+    `POST /contents/compliance-check` dùng, đối chiếu từ khóa cấm của Brand Kit
+    và chính sách quảng cáo. Nhờ vậy con số là kết quả đo, kể cả với nội dung
+    dự phòng, và hệ thống vẫn chạy được khi AI tắt vì bộ quét này không gọi LLM.
+
+    Quét cả 3 kênh và lấy điểm thấp nhất: một email sạch không bù được cho một
+    bài Facebook vi phạm. Trả `None` khi không có Brand Kit để đối chiếu, hoặc
+    khi không có nội dung nào để quét — để UI hiển thị "chưa chấm" thay vì bịa
+    điểm.
+    """
+    from app.services.compliance.compliance_service import ComplianceScanner
+
+    if brand_kit is None or brand_kit.workspace_id is None:
+        return None
+
+    workspace_id = brand_kit.workspace_id
+    scores: List[int] = []
+
+    fb = payload.get("facebook") or {}
+    if fb.get("title") or fb.get("body") or fb.get("primary_text"):
+        scores.append(ComplianceScanner.scan(
+            title=fb.get("title") or fb.get("headline") or "",
+            body=fb.get("body") or fb.get("primary_text") or "",
+            cta=fb.get("cta"),
+            workspace_id=workspace_id,
+            db=db,
+        ).score)
+
+    tk = payload.get("tiktok") or {}
+    tk_visual = " ".join(
+        str(scene.get("visual_action") or scene.get("visual") or "")
+        for scene in (tk.get("scenes") or [])
+        if isinstance(scene, dict)
+    )
+    tk_text = " ".join([tk.get("hook_3s") or "", tk_visual, tk.get("caption_with_hashtags") or ""]).strip()
+    if tk_text:
+        scores.append(ComplianceScanner.scan(
+            title=tk.get("hook_3s") or "",
+            body=tk_text,
+            cta=None,
+            workspace_id=workspace_id,
+            db=db,
+        ).score)
+
+    em = payload.get("email") or {}
+    em_text = " ".join([
+        em.get("subject_line_a") or "",
+        em.get("subject_line_b") or "",
+        em.get("body") or em.get("body_content") or "",
+        em.get("cta_button") or "",
+    ]).strip()
+    if em_text:
+        scores.append(ComplianceScanner.scan(
+            title=em.get("subject_line_a") or "",
+            body=em_text,
+            cta=em.get("cta_button"),
+            workspace_id=workspace_id,
+            db=db,
+        ).score)
+
+    return min(scores) if scores else None
+
+
 @router.post("/omnichannel", response_model=OmnichannelResponse, response_model_exclude_none=True)
 def generate_omnichannel(
     req: OmnichannelRequest,
@@ -373,6 +445,7 @@ def generate_omnichannel(
         res.setdefault("is_fallback", False)
         res["prompt_version"] = req.prompt_version
         res["task_type"] = "OMNICHANNEL"
+        res["compliance_score"] = _score_omnichannel_compliance(res, brand_kit, db)
         return res
 
     try:

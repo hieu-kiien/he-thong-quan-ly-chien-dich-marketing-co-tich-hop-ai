@@ -795,6 +795,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
       {/* 3. TAB 1: BẢNG ĐIỀU PHỐI NỘI DUNG (CONTENT TAB) */}
       {activeTab === 'pipeline' && (
         <ContentTab
+          campaignId={campaign?.id}
           draftContents={draftContents}
           rejectedContents={rejectedContents}
           inReviewContents={inReviewContents}
@@ -812,6 +813,9 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
           onOpenCopilot={() => setActiveTab('copilot')}
           onOpenCalendar={() => setActiveTab('calendar')}
           onOpenDoctor={() => setActiveTab('doctor')}
+          // Nội dung do prop `contents` cấp xuống; sau khi tạo bài thủ công thì
+          // gọi `onRefreshData` để App nạp lại danh sách chiến dịch.
+          onRefresh={() => onRefreshData?.()}
         />
       )}
 

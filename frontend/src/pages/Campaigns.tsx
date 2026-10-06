@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Megaphone, Plus, Search, DollarSign, CheckCircle2, AlertTriangle, TrendingUp, BarChart3, Sparkles, Trash2, Copy, Eye, X, Loader2, LayoutGrid, Table as TableIcon, Users, Sliders, ShieldCheck, Zap, Layers, Mail, FileText, ChevronRight, RefreshCw, ArrowUpRight, Check, Package, Clock } from 'lucide-react';
+import { Megaphone, Plus, Search, DollarSign, CheckCircle2, AlertTriangle, TrendingUp, BarChart3, Sparkles, Trash2, Copy, Eye, X, Loader2, LayoutGrid, Table as TableIcon, Users, Sliders, ShieldCheck, Zap, Layers, Mail, FileText, ChevronRight, RefreshCw, ArrowUpRight, Check, Package, Clock, PencilLine } from 'lucide-react';
 import { 
   Campaign, 
   Product, 
@@ -27,6 +27,7 @@ import { channelIdByCode, channelPresentation, channelCodeById, channelNameById,
 import { formatNumber, formatRatio, addDaysLocalISO, todayLocalISO } from '../utils/format';
 import { useToast } from '../components/Toast';
 import { CampaignCardSkeleton, CampaignTableSkeleton } from '../components/Skeleton';
+import { ManualContentComposer } from '../components/ManualContentComposer';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { copyToClipboardWithFormatting } from '../utils/copyUtils';
 
@@ -151,6 +152,10 @@ export const Campaigns: React.FC<CampaignsProps> = ({
   const [budgetConfirmOpen, setBudgetConfirmOpen] = useState<boolean>(false);
   const [isApplyingBudget, setIsApplyingBudget] = useState<boolean>(false);
   const [isUpdatingStatusId, setIsUpdatingStatusId] = useState<number | null>(null);
+
+  // Trình soạn thảo thủ công (đường tạo nội dung KHÔNG dùng AI). Mở từ tab
+  // "Mẫu Quảng Cáo & Creatives" của drawer chiến dịch.
+  const [isManualComposerOpen, setIsManualComposerOpen] = useState<boolean>(false);
 
   // 4-Step Creation Wizard Modal
   const [isWizardOpen, setIsWizardOpen] = useState<boolean>(false);
@@ -1769,16 +1774,33 @@ useEffect(() => {
                       <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                         Danh sách Mẫu Quảng Cáo trong Chiến dịch
                       </span>
-                      <button
-                        onClick={() => {
-                          onOpenAI(selectedDrawerCampaign);
-                          setSelectedDrawerCampaign(null);
-                        }}
-                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Thêm mẫu QC mới</span>
-                      </button>
+                      {/*
+                          Hai đường tạo nội dung ngang hàng: tự viết và dùng AI.
+                          Trước đây chỉ có nút "Thêm mẫu QC mới" gọi thẳng AI
+                          Studio, nên người không dùng được AI không thêm được
+                          mẫu nào từ màn hình này.
+                        */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setIsManualComposerOpen(true)}
+                          className="text-xs font-bold text-slate-700 hover:text-slate-900 flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50"
+                          title="Tự viết nội dung, không cần gọi AI"
+                        >
+                          <PencilLine className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>Soạn thủ công</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            onOpenAI(selectedDrawerCampaign);
+                            setSelectedDrawerCampaign(null);
+                          }}
+                          className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                          title="Nhờ AI sinh nội dung"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Thêm mẫu QC bằng AI</span>
+                        </button>
+                      </div>
                     </div>
 
                     {drawerLoadingContents ? (
@@ -1791,17 +1813,27 @@ useEffect(() => {
                         <FileText className="w-8 h-8 text-slate-400 mx-auto mb-2" />
                         <p className="text-xs font-semibold text-slate-700">Chưa có Mẫu Quảng Cáo nào được liên kết</p>
                         <p className="text-[11px] text-slate-500 mt-0.5">
-                          Sử dụng Trợ lý AI Copilot để sinh kịch bản TikTok, Facebook Ad và Email marketing tức thì.
+                          Tự viết nội dung, hoặc nhờ AI Copilot sinh kịch bản TikTok, Facebook Ad và
+                          Email marketing.
                         </p>
-                        <button
-                          onClick={() => {
-                            onOpenAI(selectedDrawerCampaign);
-                            setSelectedDrawerCampaign(null);
-                          }}
-                          className="mt-4 px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-bold"
-                        >
-                          Sinh Mẫu QC bằng AI
-                        </button>
+                        <div className="mt-4 flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => setIsManualComposerOpen(true)}
+                            className="px-3 py-1.5 bg-white text-slate-700 border border-slate-300 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-slate-50"
+                          >
+                            <PencilLine className="w-3.5 h-3.5 text-indigo-600" />
+                            Soạn thủ công (không cần AI)
+                          </button>
+                          <button
+                            onClick={() => {
+                              onOpenAI(selectedDrawerCampaign);
+                              setSelectedDrawerCampaign(null);
+                            }}
+                            className="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-bold"
+                          >
+                            Sinh Mẫu QC bằng AI
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       drawerContents.map((item) => (
@@ -2990,6 +3022,19 @@ useEffect(() => {
             </div>
           </div>
         </div>
+      )}
+
+      {isManualComposerOpen && selectedDrawerCampaign && (
+        <ManualContentComposer
+          campaignId={selectedDrawerCampaign.id}
+          onClose={() => setIsManualComposerOpen(false)}
+          onCreated={() => {
+            // Nạp lại nội dung của chiến dịch để bài vừa tạo hiện ngay trong
+            // drawer, rồi báo lên App để các bảng khác cập nhật theo.
+            void loadDrawerDetails(selectedDrawerCampaign.id);
+            onRefreshData?.();
+          }}
+        />
       )}
     </div>
   );

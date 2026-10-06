@@ -835,7 +835,18 @@ class OmnichannelResponse(BaseModel):
     tiktok: Optional[TikTokCreative] = None
     email: Optional[EmailCreative] = None
     is_fallback: bool = False
-    compliance_score: int = 100
+    # Điểm tuân thủ ĐO THẬT bởi `ComplianceScanner` trên chính nội dung vừa sinh.
+    # `None` = chưa chấm (không có Brand Kit để đối chiếu, hoặc chưa chạy quét).
+    #
+    # Trước đây đây là `int = 100`: không mã nào từng tính nó, nên mọi phản hồi —
+    # kể cả template dự phòng — đều báo "100/100 đạt chuẩn". Người dùng đọc
+    # điểm tuyệt đối đó là bằng chứng nội dung đã được kiểm duyệt tự động, trong
+    # khi thực tế chưa có bộ quét nào chạy. Nay điểm chỉ được gán khi đã quét
+    # thật; vẫn là số 100 thì là kết quả quét, không phải giá trị mặc định.
+    compliance_score: Optional[int] = Field(
+        None,
+        description="Điểm tuân thủ 0-100 đo bằng ComplianceScanner. None = chưa chấm.",
+    )
     warnings: List[str] = Field(default_factory=list)
     assumptions: List[str] = Field(default_factory=list)
     model_used: str = "gemini-2.5-flash"

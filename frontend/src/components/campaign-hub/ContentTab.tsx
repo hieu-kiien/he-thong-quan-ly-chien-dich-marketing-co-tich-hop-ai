@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   FileText, 
   Send, 
@@ -9,12 +9,15 @@ import {
   Clock, 
   ShieldCheck, 
   Wand2, 
+  PencilLine,
   Zap, 
   ArrowRight 
 } from 'lucide-react';
 import { MarketingContent } from '../../types';
+import { ManualContentComposer } from '../ManualContentComposer';
 
 interface ContentTabProps {
+  campaignId?: number;
   draftContents: MarketingContent[];
   rejectedContents: MarketingContent[];
   inReviewContents: MarketingContent[];
@@ -32,9 +35,11 @@ interface ContentTabProps {
   onOpenCopilot: () => void;
   onOpenCalendar: () => void;
   onOpenDoctor: () => void;
+  onRefresh?: () => void;
 }
 
 export const ContentTab: React.FC<ContentTabProps> = ({
+  campaignId,
   draftContents,
   rejectedContents,
   inReviewContents,
@@ -52,7 +57,12 @@ export const ContentTab: React.FC<ContentTabProps> = ({
   onOpenCopilot,
   onOpenCalendar,
   onOpenDoctor,
+  onRefresh,
 }) => {
+  // Đường soạn thảo thủ công: không gọi AI. Xem `ManualContentComposer` để hiểu
+  // vì sao nó là đường ngang hàng chứ không phải đường dự phòng.
+  const [isManualComposerOpen, setManualComposerOpen] = useState(false);
+
   return (
     <div className="space-y-4">
       {/* Operational Guidance Card for Step 3: Sau đó làm gì? */}
@@ -70,9 +80,21 @@ export const ContentTab: React.FC<ContentTabProps> = ({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {/* Hai đường tạo nội dung ngang hàng: có AI và không AI. */}
+          {campaignId !== undefined && (
+            <button
+              onClick={() => setManualComposerOpen(true)}
+              className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs shadow transition-colors flex items-center gap-1.5"
+              title="Tự viết nội dung, không cần gọi AI"
+            >
+              <PencilLine className="w-3.5 h-3.5 text-indigo-600" />
+              Soạn thủ công
+            </button>
+          )}
           <button
             onClick={onOpenCopilot}
             className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs shadow transition-colors"
+            title="Dùng AI gợi ý ý tưởng và viết bản nháp"
           >
             + Sáng tạo bài mới
           </button>
@@ -141,7 +163,14 @@ export const ContentTab: React.FC<ContentTabProps> = ({
 
           {draftContents.length === 0 && rejectedContents.length === 0 && (
             <div className="p-6 text-center text-[11px] text-slate-500 bg-white rounded-lg border border-dashed border-slate-200">
-              Chưa có bản nháp nào. Bấm nút phía trên để AI gợi ý nội dung.
+              {campaignId !== undefined ? (
+                <>
+                  Chưa có bản nháp nào. Bấm <strong>&ldquo;Soạn thủ công&rdquo;</strong> để tự viết,
+                  hoặc <strong>&ldquo;+ Sáng tạo bài mới&rdquo;</strong> để nhờ AI gợi ý.
+                </>
+              ) : (
+                'Chưa có bản nháp nào.'
+              )}
             </div>
           )}
         </div>
@@ -273,6 +302,17 @@ export const ContentTab: React.FC<ContentTabProps> = ({
           )}
         </div>
       </div>
+
+      {isManualComposerOpen && campaignId !== undefined && (
+        <ManualContentComposer
+          campaignId={campaignId}
+          onClose={() => setManualComposerOpen(false)}
+          onCreated={() => {
+            setManualComposerOpen(false);
+            onRefresh?.();
+          }}
+        />
+      )}
     </div>
   );
 };
