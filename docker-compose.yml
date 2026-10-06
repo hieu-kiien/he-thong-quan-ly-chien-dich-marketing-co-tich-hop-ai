@@ -70,6 +70,26 @@ services:
       # đang cố tránh. Mặc định 420 khớp backend/.env.
       - AI_TIMEOUT_SECONDS=${AI_TIMEOUT_SECONDS:-420}
       - AI_ENABLE_FALLBACK=true
+      # Trần token đầu ra cho Anthropic. Anthropic bắt buộc có `max_tokens`
+      # trong payload; quá thấp sẽ cắt mất JSON đa kênh và rơi về Smart Fallback.
+      - ANTHROPIC_MAX_TOKENS=${ANTHROPIC_MAX_TOKENS:-8192}
+      # --- Provider AI chạy cục bộ / không cần API key ---
+      # Ollama nói đúng giao thức OpenAI ở http://host.docker.internal:11434/v1.
+      # Để dùng Ollama trên máy Windows: chạy `ollama serve` rồi đặt
+      # MARKETFLOW_OLLAMA_BASE_URL=http://host.docker.internal:11434/v1 trong .env
+      # (biến CỐ Ý có tiền tố MARKETFLOW_ để không đụng biến đã có sẵn trong
+      # môi trường hệ thống — xem .env.example).
+      - MARKETFLOW_OLLAMA_BASE_URL=${MARKETFLOW_OLLAMA_BASE_URL:-}
+      - MARKETFLOW_HF_BASE_URL=${MARKETFLOW_HF_BASE_URL:-}
+      - MARKETFLOW_ANTHROPIC_BASE_URL=${MARKETFLOW_ANTHROPIC_BASE_URL:-}
+      # --- Khoá riêng theo provider (tầng SYSTEM) ---
+      # Mỗi provider tự tra biến riêng trước AI_API_KEY chung, nên cấu hình một
+      # provider không bị lẫn sang provider khác.
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY:-}
       # --- Role passwords (P0) ---
       # Mac dinh RONG. Root user trong backend co fallback ve mat khau demo neu
       # bien nay rong - xem backend/app/core/config.py. Dat rong o day de khong

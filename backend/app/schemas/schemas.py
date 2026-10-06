@@ -2,6 +2,7 @@ import json
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field, model_validator, field_validator, ConfigDict, ValidationInfo
+from app.services.ai.providers import PROVIDER_PATTERN, normalize_provider_slug, validate_model_for, get_provider
 
 # --- AUTH & USER ---
 class UserBase(BaseModel):
@@ -856,17 +857,29 @@ EmailContentResponse = EmailCreative
 # ==============================================================================
 
 class AIKeyTestRequest(BaseModel):
-    # Pattern phải khớp SUPPORTED_AI_PROVIDERS trong app/core/config.py. Thiếu
-    # "opencode" ở đây khiến mọi thao tác kiểm tra/lưu khóa BYOK cho provider đó
-    # bị 422 từ validator, dù backend đã hỗ trợ đầy đủ.
-    provider: str = Field("gemini", pattern="^(gemini|openrouter|openai|opencode)$", description="Nhà cung cấp AI ('gemini', 'openrouter', 'openai', 'opencode')")
+    # Pattern lấy từ registry `app/services/ai/providers.py` nên không bao giờ
+    # lệch với `SUPPORTED_AI_PROVIDERS` trong app/core/config.py. Trước đây
+    # pattern viết tay ở đây thiếu "opencode" khiến mọi thao tác kiểm tra/lưu
+    # khoá BYOK cho provider đó bị 422 dù backend đã hỗ trợ đầy đủ.
+    provider: str = Field(
+        "gemini",
+        pattern=PROVIDER_PATTERN,
+        description="Nhà cung cấp AI ('gemini', 'openrouter', 'openai', 'anthropic', 'huggingface', 'ollama', 'opencode')",
+    )
     api_key: str = Field(..., description="API Key cần kiểm tra")
     model: Optional[str] = Field("gemini-2.5-flash", description="Model AI cần kiểm tra")
 
     @field_validator("api_key")
     @classmethod
-    def validate_api_key_not_empty(cls, v: str) -> str:
-        if not v or not v.strip():
+    def validate_api_key_not_empty(cls, v: str, info: ValidationInfo) -> str:
+        # Ollama và HuggingFace phục vụ model mà KHÔNG cần token, nên khoá rỗng
+        # là cấu hình hợp lệ cho hai provider đó. Các provider còn lại vẫn bắt
+        # buộc có khoá để không lưu một bản ghi chắc chắn không dùng được.
+        # `provider` khai báo trước nên đã có trong info.data tại đây.
+        provider = info.data.get("provider", "gemini") if info.data else "gemini"
+        spec = get_provider(provider)
+        requires_key = spec.requires_api_key if spec else True
+        if requires_key and (not v or not v.strip()):
             raise ValueError("API Key không được để trống hoặc chỉ chứa khoảng trắng.")
         return v.strip()
 
@@ -874,57 +887,16 @@ class AIKeyTestRequest(BaseModel):
     @classmethod
     def validate_provider(cls, v: Any) -> str:
         # Chạy TRƯỚC ràng buộc `pattern` của field để trả thông báo lỗi thân thiện,
-        # đồng thời chuẩn hoá alias ("google" -> "gemini", "gpt" -> "openai") về đúng
-        # các provider trong whitelist. `pattern` vẫn là lớp phòng thủ thứ hai.
-        if not isinstance(v, str):
-            raise ValueError(f"Nhà cung cấp '{v}' không được hỗ trợ. Chỉ hỗ trợ 'gemini', 'openrouter', 'openai', 'opencode'.")
-        lower_p = v.lower().strip()
-        if lower_p in ["google", "gemini"]:
-            return "gemini"
-        if lower_p == "openrouter":
-            return "openrouter"
-        if lower_p in ["openai", "gpt"]:
-            return "openai"
-        if lower_p in ["opencode", "oc", "zen"]:
-            return "opencode"
-        raise ValueError(f"Nhà cung cấp '{v}' không được hỗ trợ. Chỉ hỗ trợ 'gemini', 'openrouter', 'openai', 'opencode'.")
+        # đồng thời chuẩn hoá alias ("google" -> "gemini", "claude" -> "anthropic")
+        # về slug trong registry. `pattern` vẫn là lớp phòng thủ thứ hai.
+        return normalize_provider_slug(v)
 
     @field_validator("model")
     @classmethod
     def validate_model(cls, v: Optional[str], info: ValidationInfo) -> str:
+        # `provider` đã chuẩn hoá ở validator trước nên info.data là slug hợp lệ.
         provider = info.data.get("provider", "gemini") if info.data else "gemini"
-        if not v or not v.strip():
-            if provider == "openai":
-                return "gpt-4o"
-            elif provider == "openrouter":
-                return "meta-llama/llama-3.3-70b-instruct"
-            elif provider == "opencode":
-                return "space-bunny-free"
-            return "gemini-2.5-flash"
-        clean_m = v.strip()
-        lower_m = clean_m.lower()
-
-        if provider == "gemini":
-            if not lower_m.startswith("gemini"):
-                raise ValueError(f"Mô hình '{v}' không thuộc hệ sinh thái Google Gemini.")
-            return lower_m
-        elif provider == "openai":
-            valid_prefixes = ("gpt-", "o1", "o3", "text-embedding-", "chatgpt-")
-            if not any(lower_m.startswith(p) for p in valid_prefixes):
-                raise ValueError(f"Mô hình '{v}' không thuộc hệ sinh thái OpenAI.")
-            return lower_m
-        elif provider == "openrouter":
-            if "/" not in clean_m or len(clean_m) < 3:
-                raise ValueError(f"Mô hình '{v}' không hợp lệ cho OpenRouter (cần định dạng tác giả/tên-mô-hình, ví dụ 'meta-llama/llama-3.3-70b-instruct').")
-            return clean_m
-        elif provider == "opencode":
-            # Slug model của opencode zen tự do ("space-bunny-free",
-            # "muse-spark-1.3", ...) nên không áp mẫu của provider nào khác.
-            # Danh sách hợp lệ lấy từ GET {AI_BASE_URL}/models.
-            if len(clean_m) < 2:
-                raise ValueError(f"Mô hình '{v}' không hợp lệ cho OpenCode.")
-            return clean_m
-        return clean_m
+        return validate_model_for(provider, v)
 
     @model_validator(mode="after")
     def validate_provider_and_model_compatibility(self) -> "AIKeyTestRequest":
@@ -956,8 +928,13 @@ class AIKeyTestResponse(BaseModel):
 
 
 class AIKeyCreate(BaseModel):
-    # Xem ghi chú ở AIKeyTestRequest: pattern phải khớp config.
-    provider: str = Field("gemini", pattern="^(gemini|openrouter|openai|opencode)$", description="Nhà cung cấp AI ('gemini', 'openrouter', 'openai', 'opencode')")
+    # Xem ghi chú tại AIKeyTestRequest: pattern/validator lấy từ registry chung
+    # (`app/services/ai/providers.py`) nên không lệch với config.
+    provider: str = Field(
+        "gemini",
+        pattern=PROVIDER_PATTERN,
+        description="Nhà cung cấp AI ('gemini', 'openrouter', 'openai', 'anthropic', 'huggingface', 'ollama', 'opencode')",
+    )
     api_key: str = Field(..., description="API Key cần lưu trữ an toàn")
     model: Optional[str] = Field("gemini-2.5-flash", description="Model AI lựa chọn")
     workspace_id: Optional[int] = Field(None, description="ID Workspace nếu lưu khóa cho Workspace")
@@ -965,64 +942,31 @@ class AIKeyCreate(BaseModel):
 
     @field_validator("api_key")
     @classmethod
-    def validate_api_key_not_empty(cls, v: str) -> str:
-        if not v or not v.strip():
+    def validate_api_key_not_empty(cls, v: str, info: ValidationInfo) -> str:
+        # Xem ghi chú ở AIKeyTestRequest: Ollama và HuggingFace không cần token.
+        provider = info.data.get("provider", "gemini") if info.data else "gemini"
+        spec = get_provider(provider)
+        requires_key = spec.requires_api_key if spec else True
+        if requires_key and (not v or not v.strip()):
             raise ValueError("API Key không được để trống hoặc chỉ chứa khoảng trắng.")
         return v.strip()
 
     @field_validator("provider", mode="before")
     @classmethod
     def validate_provider(cls, v: Any) -> str:
-        # Chạy TRƯỚC ràng buộc `pattern` của field để trả thông báo lỗi thân thiện,
-        # đồng thời chuẩn hoá alias ("google" -> "gemini", "gpt" -> "openai") về đúng
-        # các provider trong whitelist. `pattern` vẫn là lớp phòng thủ thứ hai.
-        if not isinstance(v, str):
-            raise ValueError(f"Nhà cung cấp '{v}' không được hỗ trợ. Chỉ hỗ trợ 'gemini', 'openrouter', 'openai', 'opencode'.")
-        lower_p = v.lower().strip()
-        if lower_p in ["google", "gemini"]:
-            return "gemini"
-        if lower_p == "openrouter":
-            return "openrouter"
-        if lower_p in ["openai", "gpt"]:
-            return "openai"
-        if lower_p in ["opencode", "oc", "zen"]:
-            return "opencode"
-        raise ValueError(f"Nhà cung cấp '{v}' không được hỗ trợ. Chỉ hỗ trợ 'gemini', 'openrouter', 'openai', 'opencode'.")
+        return normalize_provider_slug(v)
 
     @field_validator("model")
     @classmethod
     def validate_model(cls, v: Optional[str], info: ValidationInfo) -> str:
         provider = info.data.get("provider", "gemini") if info.data else "gemini"
-        if not v or not v.strip():
-            if provider == "openai":
-                return "gpt-4o"
-            elif provider == "openrouter":
-                return "meta-llama/llama-3.3-70b-instruct"
-            elif provider == "opencode":
-                return "space-bunny-free"
-            return "gemini-2.5-flash"
-        clean_m = v.strip()
-        lower_m = clean_m.lower()
+        return validate_model_for(provider, v)
 
-        if provider == "gemini":
-            if not lower_m.startswith("gemini"):
-                raise ValueError(f"Mô hình '{v}' không thuộc hệ sinh thái Google Gemini.")
-            return lower_m
-        elif provider == "openai":
-            valid_prefixes = ("gpt-", "o1", "o3", "text-embedding-", "chatgpt-")
-            if not any(lower_m.startswith(p) for p in valid_prefixes):
-                raise ValueError(f"Mô hình '{v}' không thuộc hệ sinh thái OpenAI.")
-            return lower_m
-        elif provider == "openrouter":
-            if "/" not in clean_m or len(clean_m) < 3:
-                raise ValueError(f"Mô hình '{v}' không hợp lệ cho OpenRouter (cần định dạng tác giả/tên-mô-hình, ví dụ 'meta-llama/llama-3.3-70b-instruct').")
-            return clean_m
-        elif provider == "opencode":
-            # Slug tự do, xem ghi chú ở AIKeyTestRequest.validate_model.
-            if len(clean_m) < 2:
-                raise ValueError(f"Mô hình '{v}' không hợp lệ cho OpenCode.")
-            return clean_m
-        return clean_m
+    @model_validator(mode="after")
+    def validate_provider_and_model_compatibility(self) -> "AIKeyCreate":
+        # Lớp phòng thủ thứ hai cho hợp đồng provider/model, xem AIKeyTestRequest.
+        self.model = validate_model_for(self.provider, self.model)
+        return self
 
 
 AISettingsUpdate = AIKeyCreate

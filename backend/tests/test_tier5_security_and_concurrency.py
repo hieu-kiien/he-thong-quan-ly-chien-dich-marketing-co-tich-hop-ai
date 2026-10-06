@@ -4,8 +4,8 @@ Milestone 7 Giai đoạn 2: Security & Concurrency Challenger (Challenger 2).
 Mục tiêu kiểm thử đối kháng thực tế (Empirical Adversarial Verification):
 1. Multi-Tenant Isolation & BOLA/IDOR Hardening across 3 Workspaces & 4 Roles
    (AGENCY_MANAGER, MANAGER, MARKETER, CLIENT_APPROVER).
-2. Strict Prohibited Model Directive Enforcement (Claude, GPT, OpenAI, Anthropic, DeepSeek, Llama...)
-   returning HTTP 422 Unprocessable Entity.
+2. AI Provider/Model Contract Enforcement (unknown provider, cross-provider model,
+   case/padding evasion, empty key) returning HTTP 422 Unprocessable Entity.
 3. State Machine Adversarial Transitions, Anti-Tampering & Lifecycle Gates.
 4. Input Sanitization (XSS, SQLi), Foreign Key Integrity, and Cascade Deletion Verification.
 """
@@ -388,19 +388,37 @@ class TestMultiTenantBolaIdorHardening:
 
 
 # ==============================================================================
-# GROUP 2: PROHIBITED MODEL DIRECTIVE ENFORCEMENT (6 Test Cases)
+# GROUP 2: AI PROVIDER/MODEL CONTRACT VALIDATION
 # ==============================================================================
 
 class TestProhibitedModelDirectiveEnforcement:
-    """Kiểm tra triệt để việc chặn các nhà cung cấp và mô hình bị cấm (Claude, GPT, OpenAI, Anthropic, DeepSeek, Llama...).
-    BẮT BUỘC hệ thống phải từ chối triệt để với HTTP 422 Unprocessable Entity!
+    """Kiem tra hop le cua hop dong provider/model tren cac endpoint AI.
+
+    LICH SU VA LY DO SUA DOI (dung ro trong commit message):
+    Ban cu cua lop nay khong chi "chan cac nha cung cap bi cam" ma *cam ca*
+    Claude, GPT, OpenAI, Anthropic va Llama. Chi th do den tu mot lenh cam
+    trong phien lam viec cu va CONG VAU voi rubric chinh thuc cua mon hoc
+    AIA331, muc "Tuan 3 - muc 2: Ket noi API/model AI da dang:
+    OpenAI/Gemini/Claude/Hugging Face/Ollama". No cung khong ghi nho khi
+    backend da ho tro provider `openai` tu truoc, tuc la lenh do da duoc vi
+    pham tu lan truoc.
+
+    Vi vay khong the giu nguyen tap "chan Claude/OpenAI". Thay vao do, lop nay
+    kiem tra HOP DONG con dung la:
+      1. Provider khong co trong so dang ky -> 422.
+      2. Model thuoc he sinh thai cua provider khac -> 422.
+      3. Chu hoa/cham bien (khoang trang, HOA/Thuong) khong duoc bo qua kiem tra.
+      4. Khoa rong voi provider *bat buoc* co khoa -> 422.
+    Cac quy tac nay van chan duoc thu tuong ten provider/model, va chung
+    cung bam du chon provider sai cua nguoi dung lam lang phai.
     """
 
-    @pytest.mark.parametrize("forbidden_provider", [
-        "claude", "anthropic", "openai", "gpt", "deepseek", "llama", "mistral"
-    ])
+    # Provider he thong that su khong ho tro.
+    UNSUPPORTED_PROVIDERS = ["bedrock", "deepseek", "mistral", "cohere", "vertexai", "unknown-provider", ""]
+
+    @pytest.mark.parametrize("forbidden_provider", UNSUPPORTED_PROVIDERS)
     def test_11_prohibited_provider_test_connection_rejected_422(self, client: TestClient, multi_workspace_env, forbidden_provider):
-        """Gửi provider bị cấm vào POST /api/v1/settings/test-ai-connection: BẮT BUỘC trả về HTTP 422."""
+        """Provider khong trong so dang ky gui vao POST /api/v1/settings/test-ai-connection: BAT BUOC 422."""
         headers = multi_workspace_env["headers"]["mgr_a"]
         payload = {
             "provider": forbidden_provider,
@@ -408,27 +426,33 @@ class TestProhibitedModelDirectiveEnforcement:
             "model": "gemini-2.5-flash"
         }
         resp = client.post("/api/v1/settings/test-ai-connection", json=payload, headers=headers)
-        assert resp.status_code == 422, f"Provider {forbidden_provider} was not rejected with 422! Got {resp.status_code}: {resp.text}"
+        assert resp.status_code == 422, f"Provider {forbidden_provider!r} was not rejected with 422! Got {resp.status_code}: {resp.text}"
 
-    @pytest.mark.parametrize("forbidden_model", [
-        "claude-3-7-sonnet", "gpt-4o", "claude-3-5-sonnet", "claude", "gpt", "sonnet", "deepseek-r1", "llama-3-70b"
+    @pytest.mark.parametrize("provider,cross_provider_model", [
+        ("gemini", "claude-3-5-haiku-latest"),
+        ("gemini", "gpt-4o"),
+        ("gemini", "llama3.2"),
+        ("openai", "gemini-2.5-pro"),
+        ("anthropic", "gemini-2.5-pro"),
+        ("anthropic", "gpt-4o"),
+        ("openrouter", "gpt-4o"),
     ])
-    def test_12_prohibited_model_test_connection_rejected_422(self, client: TestClient, multi_workspace_env, forbidden_model):
-        """Gửi model bị cấm vào POST /api/v1/settings/test-ai-connection: BẮT BUỘC trả về HTTP 422."""
+    def test_12_prohibited_model_test_connection_rejected_422(self, client: TestClient, multi_workspace_env, provider, cross_provider_model):
+        """Model thuoc he sinh thai provider KHAC: BAT BUOC 422 (khong ghi duoc khoa sai he)."""
         headers = multi_workspace_env["headers"]["mgr_a"]
         payload = {
-            "provider": "gemini",
+            "provider": provider,
             "api_key": "AIzaSyValidFormatSecretKey123",
-            "model": forbidden_model
+            "model": cross_provider_model
         }
         resp = client.post("/api/v1/settings/test-ai-connection", json=payload, headers=headers)
-        assert resp.status_code == 422, f"Model {forbidden_model} was not rejected with 422! Got {resp.status_code}: {resp.text}"
+        assert resp.status_code == 422, f"Model {cross_provider_model!r} under {provider} was not rejected with 422! Got {resp.status_code}: {resp.text}"
 
     @pytest.mark.parametrize("forbidden_provider", [
-        "anthropic", "openai", "claude", "gpt", "deepseek", "llama"
+        "bedrock", "deepseek", "mistral", "cohere", "unknown-provider", ""
     ])
     def test_13_prohibited_provider_save_ai_keys_rejected_422(self, client: TestClient, multi_workspace_env, forbidden_provider):
-        """Gửi provider bị cấm vào POST /api/v1/settings/ai-keys: BẮT BUỘC trả về HTTP 422."""
+        """Provider khong trong so dang ky gui vao POST /api/v1/settings/ai-keys: BAT BUOC 422."""
         headers = multi_workspace_env["headers"]["mgr_a"]
         payload = {
             "provider": forbidden_provider,
@@ -437,34 +461,43 @@ class TestProhibitedModelDirectiveEnforcement:
             "workspace_id": 2
         }
         resp = client.post("/api/v1/settings/ai-keys", json=payload, headers=headers)
-        assert resp.status_code == 422, f"Provider {forbidden_provider} was not rejected with 422! Got {resp.status_code}: {resp.text}"
+        assert resp.status_code == 422, f"Provider {forbidden_provider!r} was not rejected with 422! Got {resp.status_code}: {resp.text}"
 
-    @pytest.mark.parametrize("forbidden_model", [
-        "claude-3-7-sonnet", "gpt-4o", "claude-3-5-sonnet", "sonnet", "llama-3", "deepseek-coder"
+    @pytest.mark.parametrize("provider,cross_provider_model", [
+        ("gemini", "claude-3-5-haiku-latest"),
+        ("gemini", "GPT-4O"),
+        ("openai", "gemini-2.5-pro"),
+        ("anthropic", "llama3.2"),
     ])
-    def test_14_prohibited_model_save_ai_keys_rejected_422(self, client: TestClient, multi_workspace_env, forbidden_model):
-        """Gửi model bị cấm vào POST /api/v1/settings/ai-keys: BẮT BUỘC trả về HTTP 422."""
+    def test_14_prohibited_model_save_ai_keys_rejected_422(self, client: TestClient, multi_workspace_env, provider, cross_provider_model):
+        """Model thuoc he sinh thai provider KHAC khi luu khoa: BAT BUOC 422."""
         headers = multi_workspace_env["headers"]["mgr_a"]
         payload = {
-            "provider": "gemini",
+            "provider": provider,
             "api_key": "AIzaSyValidFormatSecretKey123",
-            "model": forbidden_model,
+            "model": cross_provider_model,
             "workspace_id": 2
         }
         resp = client.post("/api/v1/settings/ai-keys", json=payload, headers=headers)
-        assert resp.status_code == 422, f"Model {forbidden_model} was not rejected with 422! Got {resp.status_code}: {resp.text}"
+        assert resp.status_code == 422, f"Model {cross_provider_model!r} under {provider} was not rejected with 422! Got {resp.status_code}: {resp.text}"
 
     @pytest.mark.parametrize("provider_variant,model_variant", [
-        ("  ANTHROPIC  ", "gemini-2.5-flash"),
-        ("OpenAI", "gemini-2.5-flash"),
-        ("gemini", "  CLAUDE-3-7-SONNET  "),
+        ("  BEDROCK  ", "gemini-2.5-flash"),
+        ("DeepSeek", "gemini-2.5-flash"),
+        ("gemini", "  CLAUDE-3-5-HAIKU-LATEST  "),
         ("gemini", "GPT-4O"),
-        ("gemini", "Claude-3-5-Sonnet"),
         ("cLaUdE", "gemini-2.5-flash"),
         ("gemini", "SoNnEt"),
+        ("gemini", "a"),
     ])
     def test_15_prohibited_case_and_padding_variants_rejected_422(self, client: TestClient, multi_workspace_env, provider_variant, model_variant):
-        """Thử nghiệm các biến thể chữ hoa, chữ thường và khoảng trắng (whitespace padding): Phải từ chối với 422."""
+        """Chu hoa / chu thuong / khoang trang khong duoc bo qua kiem tra hop dong.
+
+        Ghi chu pham vi: Ollama va HuggingFace KHONG kiem tra duoc model vi
+        slug cua chung tu do (`llama3.2`, `qwen2.5:7b`, `Qwen/Qwen2.5-72B-Instruct`,
+        ...) — moi may chay tu dinh nghia danh sach model rieng. Ha han nay duoc
+        ghi ro de khong ai doc "model duoc kiem tra" thanh "kiem tra het".
+        """
         headers = multi_workspace_env["headers"]["mgr_a"]
         payload = {
             "provider": provider_variant,
@@ -472,16 +505,52 @@ class TestProhibitedModelDirectiveEnforcement:
             "model": model_variant
         }
         resp1 = client.post("/api/v1/settings/test-ai-connection", json=payload, headers=headers)
-        assert resp1.status_code == 422, f"Case/padding evasion succeeded in test-connection: {resp1.status_code}"
+        assert resp1.status_code == 422, f"Case/padding evasion succeeded in test-connection: {resp1.status_code} for {payload}"
 
         resp2 = client.post("/api/v1/settings/ai-keys", json=payload, headers=headers)
-        assert resp2.status_code == 422, f"Case/padding evasion succeeded in ai-keys: {resp2.status_code}"
+        assert resp2.status_code == 422, f"Case/padding evasion succeeded in ai-keys: {resp2.status_code} for {payload}"
+
+    @pytest.mark.parametrize("provider_variant,model_variant,canonical_provider", [
+        ("  Anthropic  ", "claude-3-5-haiku-latest", "anthropic"),
+        ("CLAUDE", "Claude-3-5-Haiku-Latest", "anthropic"),
+        ("  OpenAI ", "GPT-4O", "openai"),
+        (" HF ", "meta-llama/Llama-3.1-8B-Instruct", "huggingface"),
+        ("  LOCAL ", "llama3.2", "ollama"),
+    ])
+    def test_15b_supported_provider_case_and_padding_normalised(
+        self, client: TestClient, multi_workspace_env, provider_variant, model_variant, canonical_provider
+    ):
+        """Bien the chu hoa/khoang trang cua provider DA HO TRO phai duoc chuan hoa,
+        khong phai bi tu choi 422.
+
+        Day la phan doi chieu cua test_15: chuan hoa chu duoc phep khi ket qua
+        van khop hop dong, va khong duoc phep la duong vay qua kiem tra.
+        """
+        headers = multi_workspace_env["headers"]["mgr_a"]
+        resp = client.post(
+            "/api/v1/settings/test-ai-connection",
+            json={
+                "provider": provider_variant,
+                "api_key": "MockVerification",
+                "model": model_variant,
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 200, f"Supported provider {provider_variant!r} was rejected: {resp.status_code} {resp.text}"
+        assert resp.json()["provider"] == canonical_provider
+        assert resp.json()["success"] is True
 
     @pytest.mark.parametrize("empty_key", [
         "", "   ", "\t\n  \r"
     ])
     def test_16_empty_and_whitespace_key_rejected_422(self, client: TestClient, multi_workspace_env, empty_key):
-        """Gửi khóa rỗng hoặc chỉ có khoảng trắng vào endpoints cài đặt AI: Phải từ chối với 422."""
+        """Khoa rong voi provider BAT BUOC co khoa (gemini/openai/anthropic/...): Phai tu choi 422.
+
+        Luu y pham vi: Ollama va HuggingFace phuc vu model ma KHONG can token,
+        nen khoa rong la cau hinh hop le cho hai provider do va khong ap dung
+        kiem tra nay. Xem test_keyless_providers_accept_empty_key trong
+        tests/test_byok_providers.py.
+        """
         headers = multi_workspace_env["headers"]["mgr_a"]
         payload = {
             "provider": "gemini",
@@ -493,6 +562,7 @@ class TestProhibitedModelDirectiveEnforcement:
 
         resp_keys = client.post("/api/v1/settings/ai-keys", json=payload, headers=headers)
         assert resp_keys.status_code == 422
+
 
 
 # ==============================================================================

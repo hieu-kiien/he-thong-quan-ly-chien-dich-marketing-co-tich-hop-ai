@@ -1,7 +1,8 @@
 """Comprehensive BYOK Multi-Provider Expansion Test Suite (Worker M4).
 
-Validates schema validation, multi-provider model validation (Gemini, OpenRouter, OpenAI),
-multi-tier key resolution, live connection test endpoint, and cryptographic vault storage.
+Validates schema validation, multi-provider model validation (Gemini, OpenRouter, OpenAI,
+Anthropic, HuggingFace, Ollama), multi-tier key resolution, live connection test endpoint,
+and cryptographic vault storage.
 """
 
 import pytest
@@ -16,30 +17,59 @@ from app.core.crypto import encrypt_api_key, decrypt_api_key
 
 
 def test_schema_valid_providers():
-    """Verify AIKeyTestRequest and AIKeyCreate accept gemini, openrouter, and openai with valid models."""
+    """Verify AIKeyTestRequest and AIKeyCreate accept every registered provider with a valid model."""
     sample_models = {
         "gemini": "gemini-2.5-flash",
         "openrouter": "meta-llama/llama-3.3-70b-instruct",
         "openai": "gpt-4o",
+        "anthropic": "claude-3-5-haiku-latest",
+        "huggingface": "meta-llama/Llama-3.1-8B-Instruct",
+        "ollama": "llama3.2",
+        "opencode": "space-bunny-free",
     }
-    for prov in ["gemini", "openrouter", "openai"]:
-        req = AIKeyTestRequest(provider=prov, api_key="sk-test-key-12345", model=sample_models[prov])
+    for prov, model in sample_models.items():
+        req = AIKeyTestRequest(provider=prov, api_key="sk-test-key-12345", model=model)
         assert req.provider == prov
 
-        create_req = AIKeyCreate(provider=prov, api_key="sk-test-key-12345", model=sample_models[prov], is_active=True)
+        create_req = AIKeyCreate(provider=prov, api_key="sk-test-key-12345", model=model, is_active=True)
         assert create_req.provider == prov
 
 
-def test_schema_rejects_unsupported_providers():
-    """Verify schema rejects providers other than gemini, openrouter, and openai."""
-    with pytest.raises(ValidationError):
-        AIKeyTestRequest(provider="anthropic", api_key="sk-test-key-12345")
+def test_schema_rejects_unknown_providers():
+    """Verify schema rejects providers that are genuinely not in the registry.
 
-    with pytest.raises(ValidationError):
-        AIKeyCreate(provider="claude", api_key="sk-test-key-12345")
+    Ghi chú lịch sử: bản cũ của test này khẳng định `anthropic` và `claude` phải
+    bị từ chối. Điều đó phản ánh trạng thái đúng tại thời điểm đó (backend chưa có
+    adapter Anthropic), nhưng rubric môn học AIA331 yêu cầu hỗ trợ Claude nên
+    khẳng định đó không còn đúng. Test được sửa thay vì xoá, và phạm vi được thu
+    hẹp lại đúng những provider hệ thống thực sự không hỗ trợ.
+    """
+    for unknown in ("bedrock", "vertexai", "midjourney", ""):
+        with pytest.raises(ValidationError):
+            AIKeyTestRequest(provider=unknown, api_key="sk-test-key-12345")
 
+        with pytest.raises(ValidationError):
+            AIKeyCreate(provider=unknown, api_key="sk-test-key-12345")
+
+
+def test_schema_accepts_provider_aliases():
+    """Alias người dùng gõ phải chuẩn hoá về slug trong registry."""
+    assert AIKeyTestRequest(provider="Claude", api_key="sk-ant-x", model="claude-3-5-haiku-latest").provider == "anthropic"
+    assert AIKeyTestRequest(provider="HF", api_key="hf_x", model="Qwen/Qwen2.5-72B-Instruct").provider == "huggingface"
+    assert AIKeyTestRequest(provider="local", api_key="", model="llama3.2").provider == "ollama"
+    assert AIKeyTestRequest(provider="google", api_key="AIzaSyX", model="gemini-2.5-flash").provider == "gemini"
+
+
+def test_schema_rejects_cross_provider_model():
+    """Model thuộc hệ sinh thái provider khác phải bị từ chối."""
+    # Claude model đi kèm provider OpenAI -> 422
     with pytest.raises(ValidationError):
-        AIKeyTestRequest(provider="bedrock", api_key="sk-test-key-12345")
+        AIKeyTestRequest(provider="openai", api_key="sk-x", model="claude-3-5-haiku-latest")
+    # Model Gemini đi kèm provider Anthropic -> 422
+    with pytest.raises(ValidationError):
+        AIKeyTestRequest(provider="anthropic", api_key="sk-ant-x", model="gemini-2.5-flash")
+    with pytest.raises(ValidationError):
+        AIKeyCreate(provider="gemini", api_key="AIzaSyX", model="llama3.2")
 
 
 def test_schema_model_validation_per_provider():
@@ -64,6 +94,28 @@ def test_schema_model_validation_per_provider():
 
     with pytest.raises(ValidationError):
         AIKeyCreate(provider="openai", api_key="sk-openai-test", model="gemini-2.5-pro")
+
+    # Anthropic models
+    req_an = AIKeyCreate(provider="anthropic", api_key="sk-ant-test", model="claude-3-5-haiku-latest")
+    assert req_an.model == "claude-3-5-haiku-latest"
+
+    with pytest.raises(ValidationError):
+        AIKeyCreate(provider="anthropic", api_key="sk-ant-test", model="gpt-4o")
+
+
+def test_keyless_providers_accept_empty_key():
+    """Ollama và HuggingFace chạy được không cần token nên khoá rỗng hợp lệ.
+
+    Provider cần khoá vẫn phải từ chối khoá rỗng — nếu không, người dùng có thể
+    lưu một bản ghi chắc chắn không dùng được và tin là AI đã được cấu hình.
+    """
+    assert AIKeyTestRequest(provider="ollama", api_key="", model="llama3.2").api_key == ""
+    assert AIKeyTestRequest(provider="huggingface", api_key="   ", model="Qwen/Qwen2.5-72B-Instruct").api_key == ""
+
+    with pytest.raises(ValidationError):
+        AIKeyTestRequest(provider="gemini", api_key="", model="gemini-2.5-flash")
+    with pytest.raises(ValidationError):
+        AIKeyCreate(provider="anthropic", api_key="  ", model="claude-3-5-haiku-latest")
 
 
 def test_test_connection_endpoint_mock_tokens_all_providers(client: TestClient, rbac_headers):
@@ -96,6 +148,33 @@ def test_test_connection_endpoint_mock_tokens_all_providers(client: TestClient, 
     )
     assert res_oa.status_code == 200
     assert res_oa.json()["success"] is True
+
+    # 4. Anthropic
+    res_an = client.post(
+        "/api/v1/settings/test-ai-connection",
+        json={"provider": "anthropic", "api_key": "sk-mock-anthropic-key", "model": "claude-3-5-haiku-latest"},
+        headers=headers,
+    )
+    assert res_an.status_code == 200
+    assert res_an.json()["success"] is True
+
+    # 5. Ollama — không cần khoá, vẫn qua được token kiểm thử giả
+    res_ol = client.post(
+        "/api/v1/settings/test-ai-connection",
+        json={"provider": "ollama", "api_key": "mock-ollama", "model": "llama3.2"},
+        headers=headers,
+    )
+    assert res_ol.status_code == 200
+    assert res_ol.json()["success"] is True
+
+    # 6. HuggingFace
+    res_hf = client.post(
+        "/api/v1/settings/test-ai-connection",
+        json={"provider": "huggingface", "api_key": "mock-hf-key", "model": "meta-llama/Llama-3.1-8B-Instruct"},
+        headers=headers,
+    )
+    assert res_hf.status_code == 200
+    assert res_hf.json()["success"] is True
 
 
 def test_save_and_retrieve_multi_provider_keys(client: TestClient, rbac_headers, db_session: Session):

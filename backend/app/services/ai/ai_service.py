@@ -10,25 +10,23 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.entities import AILog
 from app.services.ai.prompt_engine import prompt_engine
+from app.services.ai import providers as provider_registry
+from app.services.ai import anthropic_adapter
 
 import logging
 
 logger = logging.getLogger("marketflow.ai_service")
 
-# Model mặc định theo provider. Dùng cho khoá BYOK không khai báo model và cho
-# nhánh fallback. Trước đây nhánh lặp `if/else` viết tay ở nhiều chỗ và quên
-# provider `opencode`, nên khoá opencode không khai báo model sẽ nhận slug của
-# provider khác rồi fail 404.
+# Model mặc định theo provider. Trước đây là dict viết tay ở đây và thiếu
+# provider opencode, nên khoá BYOK không khai báo model sẽ nhận slug của provider
+# khác rồi fail 404. Nay đọc từ registry chung nên không thể lệch nữa.
 _DEFAULT_MODELS_BY_PROVIDER: Dict[str, str] = {
-    "gemini": "gemini-2.5-flash",
-    "openrouter": "meta-llama/llama-3.3-70b-instruct",
-    "openai": "gpt-4o",
-    "opencode": "space-bunny-free",
+    spec.slug: spec.default_model for spec in provider_registry.PROVIDERS
 }
 
 
 def _default_model_for(provider: Optional[str]) -> str:
-    return _DEFAULT_MODELS_BY_PROVIDER.get((provider or "").lower().strip(), "gemini-2.5-flash")
+    return provider_registry.default_model_for(provider)
 
 
 def _sanitize_ai_error(err_msg: Optional[str], active_key: Optional[str] = None) -> str:
@@ -167,8 +165,13 @@ class AIService:
         """Multi-tier Key Resolver (FEAT-BE-26):
         1. Workspace Custom Key (Ưu tiên cao nhất nếu is_active=True).
         2. User Personal Custom Key (Ưu tiên tiếp theo nếu Workspace không có).
-        3. System Default Key (Lấy từ GEMINI_API_KEY hoặc settings.AI_API_KEY / OPENROUTER / OPENAI).
+        3. System Default Key (biến môi trường riêng của provider rồi tới AI_API_KEY chung).
         4. Smart Fallback Engine (Sinh dữ liệu mẫu khi không có key hoặc lỗi kết nối).
+
+        Provider `requires_api_key=False` (Ollama, HuggingFace) dừng ở tầng 3
+        với `api_key` rỗng và `tier="SYSTEM"`: với các provider này "không có
+        khoá" là trạng thái bình thường, không phải lỗi cấu hình, nên không
+        được đẩy xuống template dự phòng.
         """
         import os
         from app.models.entities import CustomApiKey
@@ -182,6 +185,8 @@ class AIService:
             provider = kwargs["provider"]
 
         provider = (provider or "gemini").lower().strip()
+        spec = provider_registry.get_provider(provider)
+        requires_api_key = spec.requires_api_key if spec else True
 
         # Tier 1: Workspace Custom Key
         if workspace_id is not None:
@@ -244,23 +249,24 @@ class AIService:
                 logger.error("[KeyResolver] Lỗi truy vấn User Key: %s", str(e))
 
         # Tier 3: System Default Key
-        env_key = None
         # Ưu tiên biến chuyên dụng theo provider, rồi mới tới AI_API_KEY chung — nếu
         # không thì provider "openrouter"/"openai" sẽ rơi xuống Tier 4 và im lặng
-        # sinh nội dung template dù .env đã có khoá.
+        # sinh nội dung template dù .env đã có khoá. Danh sách biến lấy từ
+        # registry nên provider mới không cần sửa thêm chỗ này.
         system_model = settings.AI_MODEL or _default_model_for(provider)
-        if provider == "gemini":
-            env_key = os.environ.get("GEMINI_API_KEY") or getattr(settings, "GEMINI_API_KEY", None) or settings.AI_API_KEY
-        elif provider == "openrouter":
-            env_key = os.environ.get("OPENROUTER_API_KEY") or getattr(settings, "OPENROUTER_API_KEY", None) or settings.AI_API_KEY
-        elif provider == "openai":
-            env_key = os.environ.get("OPENAI_API_KEY") or getattr(settings, "OPENAI_API_KEY", None) or settings.AI_API_KEY
-        elif provider == "opencode":
-            env_key = (
-                os.environ.get("OPENCODE_API_KEY")
-                or getattr(settings, "OPENCODE_API_KEY", None)
-                or settings.AI_API_KEY
-            )
+        env_key = None
+        if spec is not None:
+            for env_name in spec.env_key_names:
+                candidate = os.environ.get(env_name)
+                if candidate is None and hasattr(settings, env_name):
+                    candidate = getattr(settings, env_name)
+                if candidate and str(candidate).strip():
+                    env_key = str(candidate)
+                    break
+            if env_key is None:
+                env_key = settings.AI_API_KEY
+        else:
+            env_key = settings.AI_API_KEY
 
         if env_key and env_key.strip():
             return {
@@ -269,6 +275,17 @@ class AIService:
                 "provider": provider,
                 "tier": "SYSTEM",
                 "source_id": None
+            }
+
+        if not requires_api_key:
+            # Ollama / HuggingFace: gọi được với khoá rỗng.
+            return {
+                "api_key": None,
+                "model": system_model or _default_model_for(provider),
+                "provider": provider,
+                "tier": "SYSTEM",
+                "source_id": None,
+                "requires_api_key": False,
             }
 
         # Tier 4: Fallback
@@ -280,6 +297,27 @@ class AIService:
             "tier": "FALLBACK",
             "source_id": None
         }
+
+    def _detect_provider(self, key_to_use: Optional[str], model_to_use: Optional[str]) -> str:
+        """Suy đoán provider khi caller không truyền tên.
+
+        Giữ nguyên thứ tự suy đoán của bản cũ (OpenRouter -> OpenAI -> Gemini)
+        để không đổi hành vi cho các provider đã chạy; chỉ bổ sung nhánh cho
+        provider mới theo dấu hiệu riêng của chúng.
+        """
+        if key_to_use and key_to_use.startswith("sk-ant-"):
+            return "anthropic"
+        if key_to_use and (key_to_use.startswith("sk-or-") or (model_to_use and "/" in model_to_use)):
+            return "openrouter"
+        if key_to_use and (key_to_use.startswith("sk-proj-") or key_to_use.startswith("sk-")) and not key_to_use.startswith("sk-or-"):
+            return "openai"
+        if model_to_use and (model_to_use.startswith("gpt-") or model_to_use.startswith("o1") or model_to_use.startswith("o3")):
+            return "openai"
+        if model_to_use and model_to_use.lower().startswith("claude"):
+            return "anthropic"
+        if (model_to_use and "gemini" in model_to_use.lower()) or (key_to_use and key_to_use.startswith("AIzaSy")):
+            return "gemini"
+        return "gemini"
 
     def _call_provider_with_retry(
         self,
@@ -295,53 +333,51 @@ class AIService:
         # Determine effective provider
         eff_provider = (provider or "").lower().strip()
         if not eff_provider:
-            if key_to_use and (key_to_use.startswith("sk-or-") or (model_to_use and "/" in model_to_use)):
-                eff_provider = "openrouter"
-            elif key_to_use and (key_to_use.startswith("sk-proj-") or key_to_use.startswith("sk-")) and not key_to_use.startswith("sk-or-"):
-                eff_provider = "openai"
-            elif model_to_use and (model_to_use.startswith("gpt-") or model_to_use.startswith("o1") or model_to_use.startswith("o3")):
-                eff_provider = "openai"
-            elif (model_to_use and "gemini" in model_to_use.lower()) or (key_to_use and key_to_use.startswith("AIzaSy")):
-                eff_provider = "gemini"
-            else:
-                eff_provider = "gemini"
+            eff_provider = self._detect_provider(key_to_use, model_to_use)
 
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {key_to_use}" if key_to_use else "",
-        }
+        spec = provider_registry.get_provider(eff_provider)
 
-        if eff_provider == "opencode":
-            # Endpoint OpenAI-compatible của opencode zen. KHÔNG ghim base_url cứng:
-            # lấy từ AI_BASE_URL để có thể trỏ sang endpoint opencode khác.
-            base_url = self.base_url
-            headers["HTTP-Referer"] = "http://localhost:5173"
-            headers["X-Title"] = "MarketFlow AI"
-        elif eff_provider == "openrouter":
-            base_url = "https://openrouter.ai/api/v1"
-            headers["HTTP-Referer"] = "https://marketflow.ai"
-            headers["X-Title"] = "MarketFlow AI"
-        elif eff_provider == "openai":
-            base_url = "https://api.openai.com/v1"
-        elif eff_provider == "gemini":
-            base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
-            headers["HTTP-Referer"] = "http://localhost:5173"
-            headers["X-Title"] = "MarketFlow AI"
+        if spec is None:
+            # Provider không có trong registry: đây là lỗi cấu hình, không phải
+            # lỗi mạng. Ném ngay để không gửi request tới base_url mặc định
+            # bằng khoá của provider khác — thao tác đó có thể rò khoá.
+            raise RuntimeError(
+                f"Nhà cung cấp AI '{eff_provider}' không có trong sổ đăng ký "
+                f"({', '.join(provider_registry.SUPPORTED_PROVIDER_SLUGS)})."
+            )
+
+        base_url = spec.resolve_base_url(settings.AI_BASE_URL)
+
+        if spec.protocol == provider_registry.PROTOCOL_ANTHROPIC:
+            url = f"{base_url}/messages"
+            headers = anthropic_adapter.build_headers(key_to_use)
+            payload = anthropic_adapter.build_messages_payload(
+                system_prompt,
+                user_prompt,
+                model_to_use,
+                temperature=0.7,
+                max_tokens=int(
+                    getattr(settings, "ANTHROPIC_MAX_TOKENS", anthropic_adapter.ANTHROPIC_MAX_TOKENS)
+                ),
+            )
         else:
-            base_url = self.base_url
-            headers["HTTP-Referer"] = "http://localhost:5173"
-            headers["X-Title"] = "MarketFlow AI"
-
-        url = f"{base_url}/chat/completions"
-
-        payload = {
-            "model": model_to_use,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            "temperature": 0.7,
-        }
+            url = f"{base_url}/chat/completions"
+            headers = {
+                "Content-Type": "application/json",
+            }
+            if key_to_use:
+                # Provider không cần khoá (Ollama) sẽ không nhận header này:
+                # httpx trả 500 nếu gửi header Authorization rỗng.
+                headers["Authorization"] = f"Bearer {key_to_use}"
+            headers.update(spec.extra_headers)
+            payload = {
+                "model": model_to_use,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "temperature": 0.7,
+            }
 
         last_error = None
         for attempt in range(self.max_retries + 1):
@@ -350,6 +386,8 @@ class AIService:
                     resp = client.post(url, headers=headers, json=payload)
                     if resp.status_code == 200:
                         data = resp.json()
+                        if spec.protocol == provider_registry.PROTOCOL_ANTHROPIC:
+                            return anthropic_adapter.extract_text(data)
                         return data["choices"][0]["message"]["content"]
                     elif resp.status_code == 429:
                         time.sleep(1.0 * (attempt + 1))
@@ -594,6 +632,9 @@ class AIService:
         active_key = None
         active_model = self.model
         key_tier = "FALLBACK"
+        # Provider không cần API key (Ollama, HuggingFace) coi "không có khoá"
+        # là cấu hình hợp lệ nên vẫn phải gọi thật, không rơi vào template.
+        provider_requires_key = True
 
         active_provider = "gemini"
         if self._api_key is not None:
@@ -628,6 +669,7 @@ class AIService:
             active_model = resolved.get("model") or self.model
             active_provider = resolved.get("provider") or req_provider
             key_tier = resolved.get("tier", "FALLBACK")
+            provider_requires_key = resolved.get("requires_api_key", True)
 
         # Xử lý các token kiểm thử trong test suite (như test_t3_cross_05)
         if active_key and ("TestResolverKey" in active_key or "MockVerification" in active_key):
@@ -637,8 +679,11 @@ class AIService:
             model_used = active_model
             is_fallback = False
             model_provider = f"{active_provider}-{key_tier.lower()}"
-        # Nếu không có API Key và bật Fallback -> Dùng Fallback trực tiếp
-        elif (not active_key or active_key.strip() == "") and self.fallback_enabled:
+        # Không có API Key, fallback bật VÀ provider bắt buộc cần khoá -> template.
+        # `provider_requires_key=False` bỏ qua nhánh này có chủ đích: Ollama và
+        # HuggingFace không cần khoá, coi hư việt là rỗng thành lỗi cấu hình sẽ
+        # khiến tính năng demo offline không bao giờ chạy được.
+        elif provider_requires_key and (not active_key or active_key.strip() == "") and self.fallback_enabled:
             logger.warning("[AI Service - Fallback Engine] No API key configured. Activating deterministic Smart Fallback for task %s.", task_code)
             output_data = self._generate_fallback(task_type, context)
             latency_ms = int((time.time() - start_time) * 1000)
@@ -659,7 +704,17 @@ class AIService:
                     latency_ms = int((time.time() - start_time) * 1000)
                     model_used = active_model
                     is_fallback = False
-                    model_provider = f"{active_provider}-{key_tier.lower()}" if key_tier in ("WORKSPACE", "USER") else (f"{active_provider}-pro" if active_model and "gemini" in str(active_model).lower() else (settings.AI_PROVIDER or "gemini-pro"))
+                    # Nguồn gốc nội dung phải nói đúng provider đã thực sự gọi.
+                    # Bản cũ rơi về `settings.AI_PROVIDER` khi model không chứa
+                    # "gemini", nên một lượt gọi qua khoá OpenAI lại báo
+                    # `gemini-pro` cho người đọc audit log — đúng loại nhận định
+                    # sai nguồn mà rubric Tuần 3 mục 6 yêu cầu phải tránh.
+                    if key_tier in ("WORKSPACE", "USER"):
+                        model_provider = f"{active_provider}-{key_tier.lower()}"
+                    elif active_model and "gemini" in str(active_model).lower():
+                        model_provider = f"{active_provider}-pro"
+                    else:
+                        model_provider = active_provider
                     logger.info("[AI Service - Live LLM] Successfully executed task %s via model %s in %d ms", task_code, active_model, latency_ms)
                 except (json.JSONDecodeError, ValidationError) as schema_err:
                     result_status = "SCHEMA_ERROR"

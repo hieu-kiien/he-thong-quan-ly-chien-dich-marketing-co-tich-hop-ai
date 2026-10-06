@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import List, Optional, Set
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.services.ai.providers import SUPPORTED_PROVIDER_SLUGS
+
 logger = logging.getLogger(__name__)
 
 INSECURE_SECRET_PATTERNS: Set[str] = {
@@ -97,11 +99,34 @@ class Settings(BaseSettings):
     AI_TIMEOUT_SECONDS: int = 10
     AI_MAX_RETRIES: int = 2
     AI_ENABLE_FALLBACK: bool = True
+    # Trần token đầu ra cho adapter Anthropic. Chỉ có tác dụng khi
+    # AI_PROVIDER=anthropic; xem app/services/ai/anthropic_adapter.py.
+    ANTHROPIC_MAX_TOKENS: int = 8192
+    # Ghi đè base URL của provider chạy cục bộ.
+    #
+    # Cố ý dùng tiền tố `MARKETFLOW_`. Biến `ANTHROPIC_BASE_URL` /
+    # `OLLAMA_BASE_URL` / `HF_BASE_URL` không có tiền tố bắt buộc, và chúng
+    # từng được đặt sẵn trong môi trường hệ thống của nhiều máy (kể cả các
+    # cấu hình công cụ AI cục bộ) và trỏ tới một endpoint khác. Đọc tên thường
+    # sẽ khiến mọi lời gọi Claude của hệ thống bị âm thầm chuyển sang đúng
+    # endpoint đó mà không có cảnh báo nào.
+    #
+    # Registry đọc biến đã có tiền tố: MARKETFLOW_OLLAMA_BASE_URL,
+    # MARKETFLOW_ANTHROPIC_BASE_URL, MARKETFLOW_HF_BASE_URL. Các khai báo ở
+    # đây giữ cho chúng hiện diện trong `settings` nhưng KHÔNG được dùng để
+    # định tuyến.
+    OLLAMA_BASE_URL: Optional[str] = None
+    ANTHROPIC_BASE_URL: Optional[str] = None
+    HF_BASE_URL: Optional[str] = None
     # "opencode" là endpoint OpenAI-compatible của chính opencode
     # (https://opencode.ai/zen/v1), được `ai_service` xử lý như một provider
     # thường: chỉ khác ở chỗ không ghim base_url cứng. Nhờ vậy backend có thể
     # dùng đúng những model opencode đang cấu hình mà không cần mua credits.
-    SUPPORTED_AI_PROVIDERS: List[str] = ["gemini", "openrouter", "openai", "opencode"]
+    #
+    # DANH SÁCH này lấy từ `app/services/ai/providers.py` — một danh sách duy
+    # nhất cho config, schema, endpoint kiểm tra kết nối, dispatcher và UI.
+    # Không thêm provider mới ở đây: thêm vào registry, mọi nơi tự nhận.
+    SUPPORTED_AI_PROVIDERS: List[str] = list(SUPPORTED_PROVIDER_SLUGS)
 
     # Scheduler nền trong tiến trình. Xem giải thích ở `on_startup` (main.py):
     # trên Cloudflare, scheduler trong container ghi thẳng vào SQLite mà không

@@ -15,6 +15,7 @@ from app.schemas.schemas import (
     AIKeyCreate, AIKeyResponse
 )
 from app.core.crypto import encrypt_api_key, decrypt_api_key, mask_api_key
+from app.services.ai import providers as provider_registry
 
 router = APIRouter(prefix="/settings", tags=["Cài đặt Doanh nghiệp & Custom AI Key (BYOK)"])
 
@@ -54,12 +55,7 @@ def test_ai_connection(
     start_time = time.time()
     clean_key = req.api_key.strip()
     provider = (req.provider or "gemini").lower().strip()
-    provider_title = {
-        "gemini": "Google Gemini",
-        "openrouter": "OpenRouter",
-        "openai": "OpenAI",
-        "opencode": "OpenCode",
-    }.get(provider, provider)
+    provider_title = provider_registry.display_name_for(provider) or provider
 
     # Backdoor guard (M2): token kiểm thử giả chỉ được chạy ngoài production.
     # Nếu bật ở production, bất kỳ ai cũng dán "mock-anything" vào đây và nhận
@@ -96,6 +92,13 @@ def test_ai_connection(
 
     # 3. Kiểm tra thực tế bằng API ping theo từng provider
     try:
+        spec = provider_registry.get_provider(provider)
+        if spec is None:
+            raise ValueError(
+                f"Nhà cung cấp {provider} không được hỗ trợ. "
+                f"Chỉ hỗ trợ: {', '.join(provider_registry.SUPPORTED_PROVIDER_SLUGS)}."
+            )
+
         if provider == "gemini":
             # M3: KHÔNG bao giờ đặt API key vào query string. `?key=...` bị ghi vào
             # access log của Cloudflare/nginx/proxy và vào lịch sử trình duyệt, tức
@@ -103,28 +106,27 @@ def test_ai_connection(
             # `x-goog-api-key` tương đương. `quote()` cũng chặn path traversal /
             # header injection qua req.model do người dùng tự do kiểm soát.
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{quote(str(req.model), safe='')}"
-            headers = {"x-goog-api-key": clean_key}
-        elif provider == "openrouter":
-            url = "https://openrouter.ai/api/v1/models"
-            headers = {
-                "Authorization": f"Bearer {clean_key}",
-                "HTTP-Referer": "https://marketflow.ai",
-                "X-Title": "MarketFlow AI",
-            }
-        elif provider == "openai":
-            url = "https://api.openai.com/v1/models"
-            headers = {"Authorization": f"Bearer {clean_key}"}
-        elif provider == "opencode":
-            # opencode zen là endpoint OpenAI-compatible: danh sách model ở
-            # {base}/models. Base lấy từ cấu hình để hỗ trợ endpoint tùy biến.
-            url = f"{settings.AI_BASE_URL.rstrip('/')}/models"
-            headers = {
-                "Authorization": f"Bearer {clean_key}",
-                "HTTP-Referer": "http://localhost:5173",
-                "X-Title": "MarketFlow AI",
-            }
+            headers = {"x-goog-api-key": clean_key} if clean_key else {}
+        elif provider == "anthropic":
+            # Anthropic không có endpoint liệt kê model. Ta ping `/v1/models`:
+            # mục đích là xác nhận endpoint còn sống và xác nhận cặp header
+            # `x-api-key` + `anthropic-version` được chấp nhận, không phải để lấy
+            # danh sách model. Header dựng từ adapter để không lệch với lúc gọi
+            # Messages API thật.
+            from app.services.ai.anthropic_adapter import build_headers as _anthropic_headers
+
+            url = f"{spec.resolve_base_url(settings.AI_BASE_URL)}{spec.ping_path}"
+            headers = _anthropic_headers(clean_key)
         else:
-            raise ValueError(f"Nhà cung cấp {provider} không được hỗ trợ")
+            # Các provider còn lại đều nói giao thức OpenAI: danh sách model ở
+            # {base}/models. Base lấy từ registry nên provider mới không cần sửa
+            # thêm chỗ này.
+            url = f"{spec.resolve_base_url(settings.AI_BASE_URL)}{spec.ping_path}"
+            headers = dict(spec.extra_headers)
+            # httpx trả 500 nếu gửi header Authorization rỗng, nên chỉ gửi khi
+            # thực sự có khoá (Ollama không cần).
+            if clean_key:
+                headers["Authorization"] = f"Bearer {clean_key}"
 
         with httpx.Client(timeout=5.0) as client:
             resp = client.get(url, headers=headers)

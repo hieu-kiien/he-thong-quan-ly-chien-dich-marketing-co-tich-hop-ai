@@ -6,6 +6,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from app.core.database import Base
+from app.services.ai.providers import SUPPORTED_PROVIDER_SLUGS
 
 def utc_now():
     return datetime.now(timezone.utc)
@@ -399,7 +400,15 @@ class CustomApiKey(Base):
         # Phải khớp SUPPORTED_AI_PROVIDERS trong app/core/config.py. Thiếu "opencode"
         # ở đây khiến lưu khóa BYOK cho provider đó chết bằng IntegrityError ở
         # tầng SQLite (HTTP 500), không phải lỗi validation gợi ý được.
-        CheckConstraint("provider IN ('gemini', 'openrouter', 'openai', 'opencode')", name="chk_api_key_provider"),
+        # Phải khớp SUPPORTED_AI_PROVIDERS trong app/core/config.py. Thiếu "opencode"
+        # ở đây khiến lưu khóa BYOK cho provider đó bằng IntegrityError từ
+        # SQLite (HTTP 500), không phải lỗi validation gợi ý được. Danh sách
+        # được sinh từ sổ đăng ký chung `app/services/ai/providers.py` để không
+        # thể lệch với validator ở tầng Pydantic.
+        CheckConstraint(
+            "provider IN (" + ", ".join(f"'{slug}'" for slug in SUPPORTED_PROVIDER_SLUGS) + ")",
+            name="chk_api_key_provider",
+        ),
         CheckConstraint("user_id IS NOT NULL OR workspace_id IS NOT NULL", name="chk_api_key_owner"),
         Index("idx_custom_keys_user", "user_id", "provider"),
         Index("idx_custom_keys_workspace", "workspace_id", "provider"),

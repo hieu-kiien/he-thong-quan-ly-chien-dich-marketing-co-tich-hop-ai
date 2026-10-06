@@ -143,8 +143,14 @@ class TestBYOKSchemaValidationChallenger:
         assert "OpenRouter" in str(exc_info.value)
 
     def test_invalid_unknown_provider(self):
-        """Stress test: unknown or prohibited provider must be rejected."""
-        unsupported = ["unknown", "anthropic", "bedrock", "cohere", "mistral_direct", "aws"]
+        """Stress test: provider không có trong sổ đăng ký phải bị từ chối.
+
+        Ghi chú lịch sử: danh sách cũ gồm `anthropic`. Provider này nay đã được
+        hỗ trợ vì rubric môn học AIA331 yêu cầu kết nối Claude, nên bị gỡ khỏi
+        danh sách "không hỗ trợ". Các provider thực sự không có adapter vẫn
+        phải bị từ chối với thông báo tiếng Việt.
+        """
+        unsupported = ["unknown", "bedrock", "cohere", "mistral_direct", "aws", "vertexai"]
         for bad_prov in unsupported:
             with pytest.raises(ValidationError) as exc_info:
                 AIKeyTestRequest(provider=bad_prov, api_key="sk-test-key-123", model="gpt-4o")
@@ -154,8 +160,34 @@ class TestBYOKSchemaValidationChallenger:
                 AIKeyCreate(provider=bad_prov, api_key="sk-test-key-123", model="gpt-4o")
             assert "không được hỗ trợ" in str(exc_info.value)
 
+    def test_newly_supported_providers_pass_stress_validation(self):
+        """Anthropic / HuggingFace / Ollama phải vượt qua stress validation.
+
+        Đây là phản chứng trực tiếp cho việc danh sách provider cũ bị thu hẹp
+        quá mức: nếu validator chưa được nối với sổ đăng ký chung thì các
+        provider mới sẽ rơi vào nhánh "không hỗ trợ".
+        """
+        cases = [
+            ("anthropic", "sk-ant-stress-key", "claude-3-5-haiku-latest"),
+            ("huggingface", "hf_stress", "meta-llama/Llama-3.1-8B-Instruct"),
+            ("ollama", "", "llama3.2"),
+            ("claude", "sk-ant-stress-key", "claude-3-5-haiku-latest"),
+            ("hf", "hf_stress", "Qwen/Qwen2.5-72B-Instruct"),
+        ]
+        for prov, key, model in cases:
+            req = AIKeyTestRequest(provider=prov, api_key=key, model=model)
+            assert req.provider in ("anthropic", "huggingface", "ollama")
+            create = AIKeyCreate(provider=prov, api_key=key, model=model)
+            assert create.provider == req.provider
+            # Model phải được chuẩn hoá về đúng hệ của provider
+            assert create.model
+
     def test_empty_or_whitespace_api_key_rejected(self):
-        """Stress test: empty or whitespace-only API keys must be rejected."""
+        """Stress test: empty or whitespace-only API keys must be rejected.
+
+        Chỉ áp dụng cho provider bắt buộc có khoá. Ollama/HuggingFace chạy được
+        không cần token nên được miễn — xem test_newly_supported_providers_pass_stress_validation.
+        """
         empty_keys = ["", "   ", "\t\n", None]
         for empty_key in empty_keys:
             with pytest.raises(ValidationError):

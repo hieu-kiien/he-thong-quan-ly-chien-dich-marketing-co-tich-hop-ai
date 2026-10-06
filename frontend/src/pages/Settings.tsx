@@ -4,7 +4,34 @@ import { settingsApi, getApiErrorMessage } from '../services/api';
 import { useToast } from '../components/Toast';
 import { CustomApiKey, AIKeyTestResponse, User as UserType, Workspace } from '../types';
 
-const PROVIDER_CONFIGS = {
+/**
+ * Cấu hình hiển thị cho từng nhà cung cấp AI.
+ *
+ * `keyless: true` nghĩa là provider phục vụ được mà KHÔNG cần API key
+ * (Ollama chạy cục bộ, HuggingFace router phục vụ model công khai). Với hai
+ * provider này, form không được chặn người dùng khi ô khóa trống — khác với
+ * provider có khóa, nơi khóa rỗng là cấu hình chắc chắn không chạy được.
+ *
+ * Danh sách slug ở đây phải khớp `SUPPORTED_AI_PROVIDERS` của backend
+ * (`backend/app/services/ai/providers.py`). Backend cũng có CHECK constraint
+ * ở tầng CSDL, nên lệch danh sách sẽ ra HTTP 500 chứ không phải 422.
+ */
+interface ProviderConfig {
+  name: string;
+  initials: string;
+  initialsColor: string;
+  badge: string;
+  badgeColor: string;
+  desc: string;
+  keyLabel: string;
+  keyLink: string;
+  linkText: string;
+  placeholder: string;
+  keyless?: boolean;
+  models: Array<{ id: string; name: string; badge: string; badgeColor: string; desc: string }>;
+}
+
+const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
   gemini: {
     name: 'Google Gemini',
     initials: 'G',
@@ -168,8 +195,127 @@ const PROVIDER_CONFIGS = {
         desc: 'Phân tích chiến lược dài, thẩm định chất lượng bản nháp.'
       }
     ]
+  },
+  // Anthropic KHÔNG dùng giao thức OpenAI. Backend có adapter riêng gọi
+  // Messages API (`backend/app/services/ai/anthropic_adapter.py`): endpoint
+  // /v1/messages, header `x-api-key` + `anthropic-version`, `max_tokens` bắt
+  // buộc. Danh sách model dưới đây là lựa chọn nhanh — backend chỉ yêu cầu
+  // model bắt đầu bằng "claude".
+  anthropic: {
+    name: 'Anthropic (Claude)',
+    initials: 'AN',
+    initialsColor: 'text-orange-700',
+    badge: 'Messages API',
+    badgeColor: 'bg-orange-100 text-orange-800',
+    desc: 'Dòng Claude của Anthropic. Dùng API Messages riêng, không phải giao thức OpenAI.',
+    keyLabel: 'Anthropic API Key',
+    keyLink: 'https://console.anthropic.com/settings/keys',
+    linkText: 'Lấy API Key tại Anthropic Console',
+    placeholder: 'sk-ant-... (Dán khóa API Anthropic tại đây)',
+    models: [
+      {
+        id: 'claude-3-5-haiku-latest',
+        name: 'Claude 3.5 Haiku',
+        badge: 'Khuyên dùng',
+        badgeColor: 'bg-indigo-100 text-indigo-700',
+        desc: 'Nhanh và tiết kiệm nhất trong dòng Claude; phù hợp sinh hàng loạt mẫu quảng cáo.'
+      },
+      {
+        id: 'claude-3-5-sonnet-latest',
+        name: 'Claude 3.5 Sonnet',
+        badge: 'Cân bằng',
+        badgeColor: 'bg-blue-100 text-blue-700',
+        desc: 'Văn phong tự nhiên, lý luận sắc bén cho chiến dịch nhiều kênh.'
+      },
+      {
+        id: 'claude-3-opus-latest',
+        name: 'Claude 3 Opus',
+        badge: 'Chất lượng cao',
+        badgeColor: 'bg-purple-100 text-purple-700',
+        desc: 'Chất lượng văn xuôi cao nhất, đắt hơn; dùng cho bản nháp cần duyệt kỹ.'
+      }
+    ]
+  },
+  // HuggingFace router nói đúng giao thức OpenAI (`/v1/chat/completions`).
+  // Token là tuỳ chọn: router phục vụ được model công khai không token, chỉ bị
+  // giới hạn tần suất.
+  huggingface: {
+    name: 'Hugging Face',
+    initials: 'HF',
+    initialsColor: 'text-amber-700',
+    badge: 'Mã nguồn mở',
+    badgeColor: 'bg-amber-100 text-amber-800',
+    desc: 'Router suy luận OpenAI-compatible của Hugging Face; chạy được model công khai không cần token.',
+    keyLabel: 'Hugging Face Token (tuỳ chọn)',
+    keyLink: 'https://huggingface.co/settings/tokens',
+    linkText: 'Lấy token tại Hugging Face',
+    placeholder: 'hf_... (Bỏ trống cũng chạy được với model công khai)',
+    keyless: true,
+    models: [
+      {
+        id: 'meta-llama/Llama-3.1-8B-Instruct',
+        name: 'Llama 3.1 8B Instruct',
+        badge: 'Khuyên dùng',
+        badgeColor: 'bg-indigo-100 text-indigo-700',
+        desc: 'Model mã nguồn mở phổ biến nhất; chất lượng ổn với nội dung ngắn.'
+      },
+      {
+        id: 'Qwen/Qwen2.5-72B-Instruct',
+        name: 'Qwen 2.5 72B',
+        badge: 'Tiếng Việt tốt',
+        badgeColor: 'bg-emerald-100 text-emerald-800',
+        desc: 'Điểm mạnh về tiếng Việt, phù hợp bản quảng cáo nhiều dấu.'
+      },
+      {
+        id: 'mistralai/Mistral-7B-Instruct-v0.3',
+        name: 'Mistral 7B Instruct',
+        badge: 'Nhẹ',
+        badgeColor: 'bg-slate-100 text-slate-700',
+        desc: 'Model nhỏ, chạy nhanh trên máy yếu hoặc suy luận tự phục vụ.'
+      }
+    ]
+  },
+  // Ollama: HTTP OpenAI-compatible mặc định http://localhost:11434/v1.
+  // Cần `ollama serve` chạy trước và đã `ollama pull <model>`.
+  ollama: {
+    name: 'Ollama (chạy cục bộ)',
+    initials: 'OL',
+    initialsColor: 'text-slate-700',
+    badge: 'Không cần API key',
+    badgeColor: 'bg-emerald-100 text-emerald-800',
+    desc: 'Chạy mô hình ngay trên máy của bạn. Không cần khóa, không mất phí, dùng được khi mạng ngoài không ổn định.',
+    keyLabel: 'Không cần API Key',
+    keyLink: 'https://ollama.com/library',
+    linkText: 'Xem các model có sẵn trên Ollama',
+    placeholder: 'Không cần khóa — chỉ cần Ollama đang chạy ở máy',
+    keyless: true,
+    models: [
+      {
+        id: 'llama3.2',
+        name: 'llama3.2',
+        badge: 'Khuyên dùng',
+        badgeColor: 'bg-indigo-100 text-indigo-700',
+        desc: 'Model mặc định của hệ thống; chạy được cả trên máy yếu.'
+      },
+      {
+        id: 'qwen2.5:7b',
+        name: 'qwen2.5:7b',
+        badge: 'Tiếng Việt',
+        badgeColor: 'bg-emerald-100 text-emerald-800',
+        desc: 'Sinh văn bản tiếng Việt tự nhiên hơn Llama ở cùng kích thước.'
+      },
+      {
+        id: 'mistral',
+        name: 'mistral',
+        badge: 'Cân bằng',
+        badgeColor: 'bg-blue-100 text-blue-700',
+        desc: 'Văn phong trực tiếp, hợp với thân bài quảng cáo ngắn.'
+      }
+    ]
   }
 };
+
+type ProviderSlug = 'gemini' | 'openrouter' | 'openai' | 'anthropic' | 'huggingface' | 'ollama' | 'opencode';
 
 interface SettingsProps {
   currentUser?: UserType | null;
@@ -181,9 +327,9 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
   const [activeTab, setActiveTab] = useState<'byok' | 'profile' | 'workspace'>('byok');
 
   // BYOK Form States
-  // Khớp SUPPORTED_AI_PROVIDERS của backend. Thiếu 'opencode' ở đây khiến tab
-// provider đó không thể chọn được dù đã có cấu hình hiển thị.
-  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'openrouter' | 'openai' | 'opencode'>('gemini');
+  // Khớp SUPPORTED_AI_PROVIDERS của backend (xem backend/app/services/ai/providers.py).
+  // Thiếu một slug ở đây thì tab provider đó không chọn được dù backend đã hỗ trợ.
+  const [selectedProvider, setSelectedProvider] = useState<ProviderSlug>('gemini');
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
@@ -225,8 +371,17 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
     void loadKeys();
   }, [loadKeys]);
 
-  const handleTestConnection = async () => {
-    if (!apiKey.trim()) {
+  /**
+ * Provider hiện tại có bắt buộc nhập API key không.
+ *
+ * Ollama và HuggingFace phục vụ được mà không cần token. Nếu chặn ô khóa rỗng
+ * với hai provider đó thì tính năng demo offline (cắm Ollama vào rồi chạy) không
+ * bao giờ dùng được qua UI — trong khi backend vẫn hỗ trợ.
+ */
+const selectedProviderRequiresKey = !PROVIDER_CONFIGS[selectedProvider]?.keyless;
+
+const handleTestConnection = async () => {
+    if (selectedProviderRequiresKey && !apiKey.trim()) {
       setTestResult({
         success: false,
         latency_ms: 0,
@@ -263,7 +418,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
 
   const handleSaveKey = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!apiKey.trim()) {
+    if (selectedProviderRequiresKey && !apiKey.trim()) {
       setSaveErrorMessage('API Key không được để trống.');
       return;
     }
@@ -439,7 +594,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
                           type="button"
                           aria-pressed={isSelected}
                           onClick={() => {
-                            setSelectedProvider(pKey);
+                            setSelectedProvider(pKey as ProviderSlug);
                             setSelectedModel(p.models[0].id);
                           }}
                           className={`w-full text-left font-sans p-3.5 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
@@ -582,16 +737,38 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
                       </a>
                     )}
                   </div>
-                  <div className="relative">
-                    <input
-                      type={showKey ? 'text' : 'password'}
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder={PROVIDER_CONFIGS[selectedProvider].placeholder}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm pr-12 transition-all shadow-sm"
-                    />
-                    <button
-                      type="button"
+                  {/* Provider không cần khoá: ẩn hẳn ô nhập và nút hiện/ẩn khoá.
+                      Hiển thị ô nhập rỗng bắt người dùng nhập gì đó vô nghĩa chỉ để
+                      hệ thống bỏ qua, đó là thói quen dễ dẫn tới việc dán nhầm khoá
+                      của provider khác vào ô này. */}
+                  {!selectedProviderRequiresKey ? (
+                    <div className="flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5">
+                      <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-semibold text-emerald-900">
+                          {selectedProvider === 'ollama'
+                            ? 'Không cần API Key — chỉ cần Ollama đang chạy'
+                            : 'API Key là tuỳ chọn — để trống vẫn dùng được'}
+                        </p>
+                        <p className="text-xs text-emerald-800 mt-0.5">
+                          {selectedProvider === 'ollama'
+                            ? 'Hãy chạy `ollama serve` rồi `ollama pull ' + PROVIDER_CONFIGS[selectedProvider].models[0].id + '` trên máy của bạn. Nếu Ollama chạy ở máy khác, đặt biến môi trường MARKETFLOW_OLLAMA_BASE_URL trên backend.'
+                            : 'Router của Hugging Face phục vụ được model công khai không cần token, nhưng bị giới hạn tần suất. Điền token để có hạn mức cao hơn.'}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                    <div className="relative">
+                      <input
+                        type={showKey ? 'text' : 'password'}
+                        value={apiKey}
+                        onChange={(e) => setApiKey(e.target.value)}
+                        placeholder={PROVIDER_CONFIGS[selectedProvider].placeholder}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm pr-12 transition-all shadow-sm"
+                      />
+                      <button
+                        type="button"
                       onClick={() => setShowKey(!showKey)}
                       aria-label={showKey ? "Ẩn khóa API" : "Hiện khóa API"}
                       className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
@@ -599,6 +776,8 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
                       {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Live Test Connection & Results (FEAT-FE-18) */}
@@ -606,7 +785,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
                   <div className="flex flex-wrap items-center gap-3">
                     <button
                       type="button"
-                      disabled={isTesting || !apiKey.trim()}
+                      disabled={isTesting || (selectedProviderRequiresKey && !apiKey.trim())}
                       onClick={handleTestConnection}
                       className="px-4 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 font-semibold text-sm text-slate-700 flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                     >
@@ -625,7 +804,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
 
                     <button
                       type="submit"
-                      disabled={isSaving || !apiKey.trim()}
+                      disabled={isSaving || (selectedProviderRequiresKey && !apiKey.trim())}
                       className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-sm flex items-center gap-2 transition-all shadow-md hover:shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSaving ? (

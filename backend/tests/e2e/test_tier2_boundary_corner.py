@@ -349,17 +349,31 @@ class TestTier2BoundaryCornerR6:
         assert_endpoint_or_skip_milestone(resp, "/api/v1/settings/ai-keys", "M6")
         assert resp.status_code in (400, 422)
 
-    def test_t2_r6_02_prohibited_ai_providers_rejected(self, client: TestClient, manager_headers):
-        """Verify models from prohibited providers (Claude 3.7, Sonnet, GPT) are strictly rejected."""
-        prohibited_models = ["claude-3-7-sonnet", "gpt-4o", "claude-3-5-sonnet"]
-        for model in prohibited_models:
+    def test_t2_r6_02_cross_provider_model_rejected(self, client: TestClient, manager_headers):
+        """Model thuộc hệ sinh thái provider khác phải bị từ chối.
+
+        Ghi chú lịch sử: bản cũ kiểm tra provider `anthropic` bị từ chối toàn bộ
+        theo một lệnh cấm mô hình từng tồn tại trong dự án. Lệnh đó mâu thuẫn với
+        rubric chính thức (AIA331, Tuần 3 mục 2 yêu cầu hỗ trợ Claude) nên phạm
+        vi được sửa thành ràng buộc còn đúng: provider hợp lệ đi kèm model của
+        provider khác vẫn bị chặn.
+        """
+        mismatched = [
+            ("anthropic", "gpt-4o"),
+            ("anthropic", "gemini-2.5-pro"),
+            ("gemini", "claude-3-5-haiku-latest"),
+            ("openai", "llama3.2"),
+        ]
+        for provider, model in mismatched:
             resp = client.post("/api/v1/settings/test-ai-connection", json={
-                "provider": "anthropic",
+                "provider": provider,
                 "api_key": "test_key",
                 "model": model
             }, headers=manager_headers)
             assert_endpoint_or_skip_milestone(resp, "/api/v1/settings/test-ai-connection", "M6")
-            assert resp.status_code in (400, 422)
+            assert resp.status_code in (400, 422), (
+                f"{model} under {provider} should be rejected, got {resp.status_code}"
+            )
 
     def test_t2_r6_03_test_connection_invalid_key_fails_cleanly(self, client: TestClient, manager_headers):
         """Verify testing an invalid dummy key returns success: false cleanly without unhandled exception."""

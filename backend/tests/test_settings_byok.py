@@ -138,22 +138,49 @@ def test_12_schema_ai_key_test_request_empty_key_rejected():
         AIKeyTestRequest(provider="gemini", api_key="   ")
 
 
-def test_13_schema_ai_key_test_request_prohibited_provider():
-    """Schema AIKeyTestRequest từ chối các provider ngoài Gemini (OpenAI, Anthropic)."""
-    with pytest.raises(ValidationError):
-        AIKeyTestRequest(provider="anthropic", api_key="sk-ant-test-key")
+def test_13_schema_ai_key_test_request_unsupported_provider():
+    """Schema AIKeyTestRequest chỉ chấp nhận provider có trong sổ đăng ký.
 
-    with pytest.raises(ValidationError):
-        AIKeyTestRequest(provider="openai", api_key="sk-test-key")
+    Ghi chú lịch sử: bản cũ của test này khẳng định `anthropic` và `openai`
+    phải bị từ chối. Khẳng định đó đúng tại thời điểm đó nhưng mâu thuẫn với
+    rubric chính thức của môn học (AIA331, Tuần 3 mục 2: hỗ trợ
+    OpenAI/Gemini/Claude/Hugging Face/Ollama), nên phạm vi được sửa lại thành
+    các provider hệ thống thực sự không hỗ trợ.
+    """
+    for unsupported in ("bedrock", "vertexai", "deepseek", "mistral", "cohere"):
+        with pytest.raises(ValidationError):
+            AIKeyTestRequest(provider=unsupported, api_key="sk-test-key")
 
 
-def test_14_schema_ai_key_test_request_prohibited_model():
-    """Schema AIKeyTestRequest từ chối mô hình cấm (Claude, GPT)."""
+def test_13b_schema_ai_key_test_request_accepts_all_supported_providers():
+    """Mọi provider đăng ký trong sổ đăng ký đều qua được validator."""
+    supported = {
+        "gemini": ("AIzaSyTest", "gemini-2.5-flash"),
+        "openrouter": ("sk-or-test", "meta-llama/llama-3.3-70b-instruct"),
+        "openai": ("sk-test", "gpt-4o"),
+        "anthropic": ("sk-ant-test", "claude-3-5-haiku-latest"),
+        "huggingface": ("hf_test", "meta-llama/Llama-3.1-8B-Instruct"),
+        "ollama": ("", "llama3.2"),
+        "opencode": ("sk-test", "space-bunny-free"),
+    }
+    for prov, (key, model) in supported.items():
+        assert AIKeyTestRequest(provider=prov, api_key=key, model=model).provider == prov
+
+
+def test_14_schema_ai_key_test_request_cross_provider_model():
+    """Model thuộc hệ sinh thái provider khác vẫn bị từ chối.
+
+    Đây là phần ràng buộc còn giữ nguyên ý nghĩa sau khi bỏ lệnh cấm model:
+    không cho lưu khoá Anthropic kèm model GPT.
+    """
     with pytest.raises(ValidationError):
-        AIKeyTestRequest(provider="gemini", api_key="test-key", model="claude-3-7-sonnet")
+        AIKeyTestRequest(provider="gemini", api_key="test-key", model="claude-3-5-haiku-latest")
 
     with pytest.raises(ValidationError):
         AIKeyTestRequest(provider="gemini", api_key="test-key", model="gpt-4o")
+
+    with pytest.raises(ValidationError):
+        AIKeyTestRequest(provider="anthropic", api_key="sk-ant-test", model="gpt-4o")
 
 
 def test_15_schema_ai_key_create_valid():
