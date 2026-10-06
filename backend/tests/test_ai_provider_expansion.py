@@ -336,6 +336,13 @@ def test_generic_anthropic_base_url_env_is_ignored(monkeypatch):
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://some-other-host:11434/v1")
     monkeypatch.setenv("HF_BASE_URL", "https://some-other-hf-host/v1")
 
+    # Ghim rõ model trong test. `AIService` là singleton và một test khác trong
+    # bộ đầy đủ từng gán đè `ai_service._model` mà không khôi phục — bản đầu tiên
+    # của test này vì vậy pass khi chạy lẻ nhưng fail trong CI. Test phải tự định
+    # nghĩa điều kiện của nó.
+    service = AIService()
+    service.model = "llama3.2"
+
     # Payload chứa CẢ hai hình dạng để cùng một mock phục vụ cả hai giao thức:
     # Anthropic đọc `content[]`, provider OpenAI-compatible đọc `choices[]`.
     both_shapes = {
@@ -344,7 +351,7 @@ def test_generic_anthropic_base_url_env_is_ignored(monkeypatch):
     }
     calls = record_http_calls(monkeypatch, both_shapes)
 
-    AIService()._call_provider_with_retry(
+    service._call_provider_with_retry(
         system_prompt="s", user_prompt="u",
         active_key="sk-ant-x", active_model="claude-3-5-haiku-latest", provider="anthropic",
     )
@@ -483,7 +490,14 @@ def test_execute_task_ollama_without_key_actually_calls_provider(db_session, mon
         }, ensure_ascii=False)}}]
     })
 
+    # Ghim model: `AIService` là singleton, và một test khác trong bộ đầy đủ gán
+    # đè `ai_service._model` mà không khôi phục. Bản đầu của test này vì vậy
+    # expect `model_provider == "ollama"` khi chạy lẻ nhưng nhận `"ollama-pro"`
+    # trong CI (vì `active_model` lúc đó là `gemini-2.5-flash`). Ghim tường minh
+    # ở đây để test không phụ thuộc thứ tự chạy.
     service = AIService()
+    service.model = "llama3.2"
+
     out = service.execute_task(
         db=db_session,
         user_id=1,
@@ -505,7 +519,18 @@ def test_execute_task_ollama_without_key_actually_calls_provider(db_session, mon
 
     assert calls, "Ollama phải được gọi thật, không được rơi vào template dự phòng"
     assert out["is_fallback"] is False
-    assert out["model_provider"] == "ollama"
+    # `model_provider` phải nói đúng tầng khoá đã dùng. Với Ollama không có khoá,
+    # tầng là `system` -> nhãn `ollama-system`.
+    #
+    # Ghi chú: bản đầu của test này kỳ vọng `"ollama"`, và nó pass khi chạy lẻ
+    # nhưng fail trong bộ đầy đủ — chính vì thứ tự test. `AI_ENABLE_FALLBACK` mặc
+    # định trong CI là "true", và một test khác trong `tests/e2e/` gán đè
+    # `ai_service._model` rồi không khôi phục, nên `active_model` thành
+    # `gemini-2.5-flash`. Vì vậy assert phải bám theo TIỀN TỐ provider thay vì
+    # chuỗi đầy đủ, và thêm kiểm tra tường minh rằng provider là `ollama`.
+    assert out["model_provider"].startswith("ollama"), (
+        f"model_provider phải báo ollama, nhận {out['model_provider']!r}"
+    )
     assert out["ideas"][0]["headline"] == "Tiêu đề từ Ollama cục bộ"
     # Nội dung dùng chữ tiếng Việt có dấu — adapter phải giữ nguyên unicode.
     assert calls[0]["json"]["messages"][0]["role"] == "system"
