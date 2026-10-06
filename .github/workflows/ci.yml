@@ -397,6 +397,21 @@ jobs:
       - name: Run AI Grounding, Schema Adherence, and Anti-Hallucination benchmark (evaluate_ai_grounding.py)
         run: python scripts/evaluate_ai_grounding.py
 
+      # Tuần 3 mục 4 rubric AIA331: so sánh 3 phiên bản prompt trên tập case
+      # cố định. Lời gọi mô hình được stub tất định nên không tốn credit, không
+      # cần network, và cho kết quả tái lập được trên mỗi lần chạy CI.
+      #
+      # Gate này chỉ fail khi script hỏng (không sinh được báo cáo), KHÔNG fail
+      # theo kết quả so sánh: v3 có thể thắng v1 hôm nay và thua ngày mai sau khi
+      # ta sửa prompt, và đó là dữ liệu chứ không phải lỗi hạ tầng. Cổng chất
+      # lượng thật của prompt nằm ở con người đọc bảng trong
+      # `docs/PROMPT_VARIANT_COMPARISON.md`.
+      - name: Run prompt-variant comparison harness (compare_prompt_variants.py)
+        run: |
+          python scripts/compare_prompt_variants.py
+          test -f docs/PROMPT_VARIANT_COMPARISON.md || (echo "Missing docs/PROMPT_VARIANT_COMPARISON.md" && exit 1)
+          test -f scripts/prompt_variant_results.json || (echo "Missing scripts/prompt_variant_results.json" && exit 1)
+
   # =========================================================================
   # Gate 6: Secret & Dependency Safety
   # =========================================================================

@@ -1,0 +1,193 @@
+{
+  "generated_at": "2026-10-06T07:24:10.875235+00:00",
+  "harness": "deterministic-stub",
+  "negative_control": {
+    "banned_keyword_detector_works": true,
+    "banned_keywords_caught": [
+      "săn mãi",
+      "chắc chắn hiệu quả"
+    ],
+    "placeholder_detector_works": true
+  },
+  "banned_keywords": [
+    "săn mãi",
+    "bảo hành trọn đời",
+    "chắc chắn hiệu quả"
+  ],
+  "cases_per_variant": 4,
+  "variants": {
+    "v1": {
+      "summary": {
+        "cases": 4,
+        "schema_valid": 0,
+        "schema_valid_rate": 0.0,
+        "banned_keyword_leaks": 0,
+        "required_field_coverage": 0.0,
+        "unfilled_placeholders": 0,
+        "avg_prompt_chars": 249
+      },
+      "cases": [
+        {
+          "task": "idea_generation",
+          "schema_valid": false,
+          "required_fields_present": false,
+          "missing_required_fields": [
+            "ideas.0.headline",
+            "ideas.0.concept",
+            "ideas.0.target_emotion"
+          ],
+          "banned_keyword_leak": [],
+          "unfilled_placeholders": [],
+          "prompt_chars": 206
+        },
+        {
+          "task": "content_draft",
+          "schema_valid": false,
+          "required_fields_present": false,
+          "missing_required_fields": [
+            "title",
+            "body",
+            "cta"
+          ],
+          "banned_keyword_leak": [],
+          "unfilled_placeholders": [],
+          "prompt_chars": 154
+        },
+        {
+          "task": "performance_summary",
+          "schema_valid": false,
+          "required_fields_present": false,
+          "missing_required_fields": [
+            "executive_summary",
+            "strengths",
+            "weaknesses",
+            "recommendations"
+          ],
+          "banned_keyword_leak": [],
+          "unfilled_placeholders": [],
+          "prompt_chars": 165
+        },
+        {
+          "task": "omnichannel_generation",
+          "schema_valid": false,
+          "required_fields_present": false,
+          "missing_required_fields": [
+            "facebook.title",
+            "facebook.body",
+            "facebook.cta",
+            "facebook.hashtags",
+            "tiktok.hook_3s",
+            "tiktok.scenes",
+            "email.body"
+          ],
+          "banned_keyword_leak": [],
+          "unfilled_placeholders": [],
+          "prompt_chars": 470
+        }
+      ]
+    },
+    "v2": {
+      "summary": {
+        "cases": 4,
+        "schema_valid": 3,
+        "schema_valid_rate": 75.0,
+        "banned_keyword_leaks": 0,
+        "required_field_coverage": 75.0,
+        "unfilled_placeholders": 0,
+        "avg_prompt_chars": 426
+      },
+      "cases": [
+        {
+          "task": "idea_generation",
+          "schema_valid": true,
+          "required_fields_present": true,
+          "missing_required_fields": [],
+          "banned_keyword_leak": [],
+          "unfilled_placeholders": [],
+          "prompt_chars": 320
+        },
+        {
+          "task": "content_draft",
+          "schema_valid": true,
+          "required_fields_present": true,
+          "missing_required_fields": [],
+          "banned_keyword_leak": [],
+          "unfilled_placeholders": [],
+          "prompt_chars": 347
+        },
+        {
+          "task": "performance_summary",
+          "schema_valid": false,
+          "required_fields_present": false,
+          "missing_required_fields": [
+            "executive_summary",
+            "strengths",
+            "weaknesses",
+            "recommendations"
+          ],
+          "banned_keyword_leak": [],
+          "unfilled_placeholders": [],
+          "prompt_chars": 247
+        },
+        {
+          "task": "omnichannel_generation",
+          "schema_valid": true,
+          "required_fields_present": true,
+          "missing_required_fields": [],
+          "banned_keyword_leak": [],
+          "unfilled_placeholders": [],
+          "prompt_chars": 792
+        }
+      ]
+    },
+    "v3": {
+      "summary": {
+        "cases": 4,
+        "schema_valid": 4,
+        "schema_valid_rate": 100.0,
+        "banned_keyword_leaks": 0,
+        "required_field_coverage": 100.0,
+        "unfilled_placeholders": 0,
+        "avg_prompt_chars": 1900
+      },
+      "cases": [
+        {
+          "task": "idea_generation",
+          "schema_valid": true,
+          "required_fields_present": true,
+          "missing_required_fields": [],
+          "banned_keyword_leak": [],
+          "unfilled_placeholders": [],
+          "prompt_chars": 1255
+        },
+        {
+          "task": "content_draft",
+          "schema_valid": true,
+          "required_fields_present": true,
+          "missing_required_fields": [],
+          "banned_keyword_leak": [],
+          "unfilled_placeholders": [],
+          "prompt_chars": 884
+        },
+        {
+          "task": "performance_summary",
+          "schema_valid": true,
+          "required_fields_present": true,
+          "missing_required_fields": [],
+          "banned_keyword_leak": [],
+          "unfilled_placeholders": [],
+          "prompt_chars": 843
+        },
+        {
+          "task": "omnichannel_generation",
+          "schema_valid": true,
+          "required_fields_present": true,
+          "missing_required_fields": [],
+          "banned_keyword_leak": [],
+          "unfilled_placeholders": [],
+          "prompt_chars": 4620
+        }
+      ]
+    }
+  }
+}
