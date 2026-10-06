@@ -2,7 +2,7 @@
 
 > **Tài liệu này được sinh tự động.** Generator: [`scripts/compare_prompt_variants.py`](../scripts/compare_prompt_variants.py). Đổi script thì phải sinh lại file này. Không sửa tay.
 
-**Thời điểm chạy:** 2026-10-06 07:24 UTC  
+**Thời điểm chạy:** 2026-10-06 07:30 UTC  
 **Mã nguồn:** xem `git log -1 --format=%H` trên commit sinh ra file này
 
 ## 1. Phạm vi kết luận — đọc trước khi trích số

@@ -165,6 +165,8 @@ tự do với vai trò đặc quyền (`MANAGER`, `AGENCY_MANAGER`, `CLIENT_APPR
 - [Kiến trúc](docs/ARCHITECTURE.md)
 - [Kiểm thử và CI](docs/TESTING.md)
 - [AI evaluation](docs/AI_EVALUATION_REPORT.md)
+- [So sánh phiên bản prompt](docs/PROMPT_VARIANT_COMPARISON.md)
+- [Đạo đức AI & giám sát của con người](docs/AI_ETHICS_AND_HUMAN_OVERSIGHT.md)
 - [Cloudflare deployment](cloudflare/README.md)
 - [Hồ sơ đối chiếu đồ án](docs/UNIVERSITY_DEFENSE_RUBRIC_ALIGNMENT.md)
 
