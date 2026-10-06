@@ -12,9 +12,10 @@ Tài liệu này là mục lục cho **tài liệu sống của dự án**. Các
 | Chạy hoặc đọc kết quả kiểm thử | [Testing và CI](TESTING.md) |
 | Hiểu phạm vi benchmark AI, kết quả và giới hạn | [AI evaluation report](AI_EVALUATION_REPORT.md) |
 | Xem bối cảnh release V9.5 | [Release notes lịch sử](RELEASE_NOTES_V9.5_OPERATIONS.md) |
+| Đọc phân tích yêu cầu, tác nhân, use case và thiết kế prompt | [Phân tích yêu cầu & thiết kế](REQUIREMENTS_AND_DESIGN.md) |
 | Hiểu cơ chế giám sát của con người và đạo đức AI trong hệ thống | [Đạo đức AI & giám sát](AI_ETHICS_AND_HUMAN_OVERSIGHT.md) |
 | Xem bảng so sánh 3 phiên bản prompt | [So sánh prompt](PROMPT_VARIANT_COMPARISON.md) |
-| Chuẩn bị nội dung đối chiếu đồ án | [Rubric alignment](UNIVERSITY_DEFENSE_RUBRIC_ALIGNMENT.md) |
+| Chuẩn bị nội dung đối chiếu đồ án | [Đối chiếu rubric 40 tiêu chí](UNIVERSITY_DEFENSE_RUBRIC_ALIGNMENT.md) |
 | Hiểu cách deploy Cloudflare và giới hạn lưu trữ | [Cloudflare README](../cloudflare/README.md) |
 
 ## Nguồn sự thật theo chủ đề

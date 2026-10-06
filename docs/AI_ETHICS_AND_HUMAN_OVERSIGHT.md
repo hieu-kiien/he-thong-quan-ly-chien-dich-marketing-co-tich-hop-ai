@@ -42,7 +42,7 @@ do AI viết trong khi thực ra là khuôn mẫu dự phòng.
 | Mọi phản hồi AI mang cờ `is_fallback` | `False` = mô hình thật, `True` = template | `app/services/ai/ai_service.py` | `test_v3_security_and_state_machine.py` |
 | `model_provider` nói đúng nguồn | ví dụ `ollama-system`, `anthropic-workspace` | `ai_service.py` | `test_ai_provider_expansion.py` |
 | Bảng cảnh báo hổ phách trong AI Studio | Nhãn "Nội dung dự phòng (không phải do AI viết)" | `frontend/src/pages/AIStudio.tsx` | Playwright `works-without-ai.spec.ts` |
-| Vị trí nhận biết khi fallback | `role="alert"` + `role="status"` tùy tình huống | `AIStudio.tsx` | Kiểm thử WCAG Gate 4 |
+| Vị trí nhận biết khi fallback | `role={omniData.is_fallback ? 'alert' : 'status'}` — trình đọc màn hình đọc ngay, không cần nhìn màu | `AIStudio.tsx` | Kiểm thử WCAG Gate 4 |
 
 Mọi template dự phòng đều phải kèm `warnings` giải thích lý do, và nhãn nguồn
 phải là `template-fallback-engine` chứ không phải tên model:

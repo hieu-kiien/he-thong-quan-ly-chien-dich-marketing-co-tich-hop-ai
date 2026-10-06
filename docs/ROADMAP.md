@@ -1,8 +1,16 @@
 # Lộ trình dài hạn MarketFlow AI
 
 **Loại tài liệu:** Đề xuất định hướng; chưa phải cam kết lịch phát hành.
-**Baseline repo:** `main` tại `b99ac876a06993edfb5a88d866c22080434e7372` (2026-09-29).
+**Trạng thái mã nguồn:** mô tả theo trạng thái hiện tại trên `main` (FastAPI trên Render
++ Cloudflare Worker làm static/proxy). Xem `git log -1` trên commit sửa tài liệu này
+để biết baseline chính xác.
 **Nguồn định hướng:** [Nghiên cứu đối thủ](https://chatgpt.com/share/6abb25a6-2328-83ec-8402-0038059a95a2), [đánh giá dự án và vấn đề người dùng](https://chatgpt.com/share/6aba47a2-feb0-83ec-a47f-16757fd55d17), cùng mã nguồn và CI hiện tại.
+
+> **Ghi chú lịch sử.** Các mục cũ trong bản trước nói "Worker tuần tự hoá write và
+> sao lưu toàn bộ file SQLite lên R2" và "lưu trữ triển khai Cloudflare đã hiện
+> thực". Cả hai **không còn đúng**: tài khoản không có Workers Paid plan nên
+> containers không deploy được (Cloudflare trả 401), và kiến trúc hiện tại là
+> Postgres trên Render. Các mục đó đã được sửa ở bên dưới.
 
 ## 1. Tóm tắt quyết định
 
@@ -27,17 +35,19 @@ Các trạng thái được dùng trong tài liệu này:
 - **Đề xuất:** việc tương lai, chưa được tính là tính năng.
 - **Chưa xác nhận:** repo chưa có bằng chứng đủ để kết luận.
 
-| Năng lực | Trạng thái tại baseline | Bằng chứng hoặc giới hạn |
+| Năng lực | Trạng thái hiện tại | Bằng chứng hoặc giới hạn |
 |---|---|---|
 | Workspace, vai trò và ranh giới truy cập | Đã hiện thực; có kiểm thử | Backend, test bảo mật và các gate CI. |
 | Chiến dịch, brief, tác vụ, ngân sách và KPI mục tiêu | Đã hiện thực; có kiểm thử | API chiến dịch/tác vụ và màn hình Campaign Hub. |
 | Soạn nội dung bằng AI và quy trình người duyệt | Đã hiện thực; có kiểm thử | AI API, Review Queue và state machine nội dung. |
-| Dashboard vận hành và chẩn đoán AI | Đã hiện thực; có kiểm thử trong phạm vi CI | Các chỉ số hiện có chưa chứng minh cải thiện hiệu quả marketing của khách hàng. |
 | Lên lịch và trạng thái PUBLISHED | Đã hiện thực ở mức trạng thái nội bộ | Scheduler đổi lịch sang EXECUTED và nội dung sang PUBLISHED; chưa có kết nối gửi mạng xã hội/email trong luồng này. |
 | Gửi email thật và nhận sự kiện gửi | Đề xuất; chưa hiện thực | Chưa tìm thấy tích hợp SendGrid/provider trong backend hoặc frontend. |
-| CI | Đã kiểm thử | Lần chạy tại baseline xanh; Gate 6 vẫn cho phép advisory từ dependency audit đi qua dưới dạng cảnh báo. Xem [Testing](TESTING.md). |
-| Dùng thử với agency và kiểm chứng lợi ích | Chưa xác nhận | Chưa tìm thấy dữ liệu pilot, phỏng vấn hoặc chỉ số sử dụng trong tài liệu repo. |
-| Lưu trữ triển khai Cloudflare | Đã hiện thực, có giới hạn cần xử lý | Worker tuần tự hóa write và sao lưu toàn bộ file SQLite lên R2 sau mỗi write; chi phí và độ trễ tăng theo kích thước DB. Xem [Cloudflare deployment](../cloudflare/README.md). |
+| Dashboard vận hành và chẩn đoán AI | Đã hiện thực; có kiểm thử trong phạm vi CI | Các chỉ số hiện có chưa chứng minh cải thiện hiệu quả marketing của khách hàng. |
+| Soạn nội dung **không** dùng AI | Đã hiện thực; có kiểm thử | `ManualContentComposer.tsx` + `test_offline_core_works_without_ai.py` + `works-without-ai.spec.ts`. |
+| Nhiều nhà cung cấp AI | Đã hiện thực; có kiểm thử (mock, không gọi mạng) | Registry tại `providers.py`; adapter Anthropic; Ollama/HuggingFace không bắt buộc khoá. |
+| So sánh 3 phiên bản prompt | Đã hiện thực; chỉ đo đặc tả trên stub | [PROMPT_VARIANT_COMPARISON.md](PROMPT_VARIANT_COMPARISON.md). |
+| Cơ chế đạo đức & giám sát | Đã hiện thực; có tài liệu và test ràng buộc tài liệu | [AI_ETHICS_AND_HUMAN_OVERSIGHT.md](AI_ETHICS_AND_HUMAN_OVERSIGHT.md). |
+| Lưu trữ triển khai | Postgres trên Render | Cloudflare Worker chỉ phục vụ static và proxy `/api/*`; không giữ dữ liệu. Xem [ARCHITECTURE.md](ARCHITECTURE.md) mục 1. |
 
 CI xanh chứng minh các gate đã chạy đạt ở commit tương ứng; điều đó không thay thế thử nghiệm usability, pilot, hay xác nhận độ bền lưu trữ dưới tải thật. Báo cáo AI hiện là benchmark có tập mẫu hữu hạn, không phải cam kết tổng quát về chất lượng mọi đầu ra.
 
@@ -113,8 +123,9 @@ Thời lượng dưới đây là khung tương đối để lập kế hoạch.
 
 - Đổi nhãn PUBLISHED, lịch và thông báo đến khi có connector gửi thật; thể hiện riêng trạng thái “đã duyệt”, “đã lên lịch”, “đã gửi provider xác nhận” và “đã nhận sự kiện delivered”.
 - Kiểm tra đường tenant/RBAC của các thao tác tác vụ, chiến dịch, nội dung và metrics theo từng vai trò.
-- Kiểm chứng Cloudflare backup/restore, lỗi R2, khởi động lại container, write queue, tranh chấp ghi và hành vi endpoint đọc có side-effect.
-- Trước khi đưa dữ liệu khách hàng thật vào Cloudflare, quyết định mô hình lưu trữ sau khi đo: PostgreSQL quản lý, Durable Object SQL/SQLite với giao thức lưu bền phù hợp, hoặc phương án khác được thử nghiệm.
+- Kiểm chứng backup/restore của Postgres trên Render và Neon: sao lưu tự động có thật không, thời gian khôi phục, và hành vi khi mất kết nối giữa chừng.
+- Chốt `DATABASE_URL` production (Render Postgres hay Neon `marketflow-prod`) và ghi lại lựa chọn cùng lý do. Bước này cần làm tay trong Render Dashboard — xem [ARCHITECTURE.md](ARCHITECTURE.md) mục 2.
+- Có đường dẫn `ALTER TABLE` tài liệu hoá cho cột mới, vì ứng dụng dùng `create_all()` chứ không dùng migration.
 - Rà soát các advisory npm/pip; ghi từng advisory, mức ảnh hưởng, quyết định nâng cấp/waiver và ngày xem lại. Nâng các GitHub Actions còn bị ép chạy Node 24 theo kế hoạch nâng runtime.
 - Kiểm tra seed account, secret và cấu hình demo để không dùng mật khẩu mặc định trong môi trường thật.
 
@@ -244,7 +255,10 @@ Các hạng mục này có thể được xem xét lại khi dữ liệu pilot h
 |---|---|---|
 | Phạm vi nhiều phân hệ làm mất luồng chính | Người dùng không hiểu lợi ích, khó hoàn tất campaign | Giữ một persona/luồng ưu tiên; yêu cầu evidence trước khi thêm feature. |
 | PUBLISHED bị hiểu là đã đăng/gửi thật | Báo cáo sai, mất niềm tin | Đổi semantics và chỉ xác nhận khi có provider event phù hợp. |
-| Snapshot toàn SQLite lên R2 sau từng write | Độ trễ/chi phí tăng theo DB, write queue tạo điểm nghẽn | Đo rồi chọn kiến trúc lưu trữ; kiểm thử restore và concurrency trước pilot. |
+| Danh sách không phân trang | `GET /campaigns`, `/contents`, `/tasks` trả toàn bộ kết quả; chậm và nặng khi dữ liệu lớn | Thêm `limit`/`offset` + tổng số; đo trước khi chọn cursor hay offset. |
+| Postgres trên Render chưa có quy trình migration | `create_all()` không sửa bảng đã có; thêm cột mới dễ bị bỏ sót ở production | Ghi checklist `ALTER TABLE` cho mỗi thay đổi schema; cân nhắc Alembic. |
+| AI không tự trợ được qua Worker | Mọi lời gọi AI thật trả `524` sau ~100 giây | Đã sửa bằng cách gọi thẳng Render (đo được 237 giây, HTTP 200); cần theo dõi để không vô tình gom nhóm AI về Worker. |
+| `compliance_score` bị đọc là điểm tự chấm của AI | Người dùng tin điểm tuyệt đối rồi bỏ qua duyệt | Đo bằng `ComplianceScanner.scan`; trả `None` khi không chấm được. Xem [AI_ETHICS_AND_HUMAN_OVERSIGHT.md](AI_ETHICS_AND_HUMAN_OVERSIGHT.md) mục 3. |
 | Dependency audit chỉ cảnh báo | Dependency có advisory vẫn qua CI | Phân loại advisory, đặt ngưỡng chặn phù hợp, ghi waiver có thời hạn. |
 | Benchmark AI bị diễn giải thành đảm bảo chung | Tuyên bố vượt phạm vi dữ liệu thử | Ghi sample, môi trường, commit, mẫu số và giới hạn ở mọi báo cáo. |
 | Hai màn hình hiển thị điểm sức khỏe theo quy tắc/ngưỡng và nhãn khác nhau | Người dùng có thể hiểu điểm Command Center và AI Doctor là cùng một phép đo | Thống nhất semantics hoặc đặt tên/phạm vi rõ; xác nhận bằng usability test trước khi quảng bá chỉ số chung. |

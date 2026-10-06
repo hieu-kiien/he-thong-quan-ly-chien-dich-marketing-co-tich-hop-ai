@@ -1,9 +1,19 @@
 # MarketFlow AI — System Architecture & Technical Specifications
 
 **Dự án**: Hệ thống quản lý chiến dịch marketing có tích hợp AI (MarketFlow AI)
-**Baseline mô tả**: main tại b99ac876a06993edfb5a88d866c22080434e7372 (2026-09-29)
+**Cập nhật**: mô tả theo trạng thái triển khai hiện tại (Render + Cloudflare Worker).
+Xem `git log -1` trên commit sửa tài liệu này để biết baseline chính xác.
 **Phạm vi**: Tóm tắt kiến trúc được thể hiện trong code hiện tại; đây không phải tuyên bố HA, production-ready hoặc bảo đảm AI không thể tạo nội dung sai.
 **Nguồn chuẩn**: backend/frontend, database configuration, deployment configuration và [bằng chứng CI](TESTING.md).
+
+> **Ghi chú về lịch sử tài liệu.** Bản cũ của tài liệu này mô tả kiến trúc
+> "FastAPI chạy trong Cloudflare Containers với Durable Object giữ SQLite và
+> snapshot toàn bộ database lên R2". **Kiến trúc đó không còn tồn tại.** Tài khoản
+> Cloudflare không có Workers Paid plan nên Cloudflare trả 401 khi thử deploy
+> containers; backend đã chuyển sang Render. Phần còn sót lại của mô hình cũ
+> trong code là stub `FastApiContainer` trong `cloudflare/src/index.ts`, tồn tại
+> chỉ vì Workers chặn deploy bản script mới nếu xoá hẳn class đã từng khai báo.
+> Chi tiết ở [cloudflare/README.md](../cloudflare/README.md).
 
 ---
 
@@ -13,36 +23,96 @@ MarketFlow AI được xây dựng theo mô hình **Kiến trúc Phân tầng (L
 
 ```mermaid
 graph TD
-    Client["Frontend SPA (React 18 + Vite + Tailwind CSS)"]
-    API["FastAPI REST Engine (Async / Pydantic v2)"]
-    Auth["Bảo Mật & Phân Quyền (JWT + RBAC + Multi-Tenant Boundary)"]
-    Operations["Khối Vận Hành Nghiệp Vụ (Command Center, Tasks, Budgets, KPIs)"]
-    AIDoctor["Động Cơ Bác Sĩ AI (Deterministic Diagnostic Engine)"]
-    AIEngine["Động Cơ AI Generative (Prompt Engine v1-v3 + Smart Fallback)"]
-    DB[(SQLite in local / CI / Cloudflare deployment)]
-    ExternalAI["Nhà Cung Cấp AI Ngoại Vi (Google Gemini / OpenRouter / OpenAI)"]
+    Browser["Trình duyệt — Frontend SPA (React 18 + Vite + Tailwind)"]
 
-    Client -->|HTTPS RESTful API| API
+    subgraph Edge["Cloudflare Worker (marketing.kienhieu.id.vn)"]
+        Assets["Phục vụ file tĩnh (ASSETS binding)"]
+        Proxy["Proxy /api/* và /health → BACKEND_ORIGIN"]
+        Cron["Cron */5: đánh thức scheduler của backend"]
+    end
+
+    subgraph App["FastAPI trên Render (marketflow-api-9onk.onrender.com)"]
+        API["REST Engine (Pydantic v2)"]
+        Auth["Bảo mật & phân quyền (JWT + RBAC + ranh giới workspace)"]
+        Operations["Khối vận hành nghiệp vụ (Command Center, Tasks, Budgets, KPIs)"]
+        AIDoctor["Động cơ Bác sĩ AI (quy tắc tất định, KHÔNG gọi LLM)"]
+        Compliance["Bộ quét tuân thủ (quy tắc tất định, KHÔNG gọi LLM)"]
+        AIEngine["Động cơ AI sinh nội dung (Prompt Engine v1-v3 + Smart Fallback)"]
+    end
+
+    DB[("Postgres (Neon hoặc Render)<br/>SQLite ở local/CI")]
+    ExternalAI["Nhà cung cấp AI: Gemini · OpenRouter · OpenAI ·<br/>Anthropic · HuggingFace · Ollama · OpenCode"]
+
+    Browser --> Assets
+    Browser --> Proxy
+    Proxy -->|HTTPS| API
+    Cron -->|POST /api/v1/schedules/trigger-worker + secret| API
+
     API --> Auth
     Auth --> Operations
     Auth --> AIDoctor
+    Auth --> Compliance
     Auth --> AIEngine
     Operations --> DB
     AIDoctor --> DB
-    AIEngine -->|Live Call with Timeout| ExternalAI
-    AIEngine -.->|Graceful Fallback| DB
+    Compliance --> DB
+    AIEngine -->|Lời gọi trực tiếp, timeout + retry| ExternalAI
+    AIEngine -.->|Khi provider lỗi: template có nhãn is_fallback| DB
 ```
 
+### Ba quyết định kiến trúc đáng nói
+
+**1. Worker chỉ làm hai việc.** Nó phục vụ file tĩnh và proxy `/api/*`. Nó **không**
+chạy backend, **không** giữ dữ liệu, **không** có Durable Object hay R2. Lý do
+lịch sử ở [cloudflare/README.md](../cloudflare/README.md).
+
+**2. Đường gọi AI đi thẳng Render, không qua Worker.** Đây là quyết định có số
+đo kèm theo: Cloudflare giới hạn subrequest ở khoảng 100 giây. Đo trên production,
+`POST /api/v1/ai/omnichannel` qua Worker trả `error 524` sau ~100 giây, trong khi
+gọi thẳng Render cùng endpoint đó trả `200` sau **237 giây** với `is_fallback=false`.
+Nói cách khác: mọi lời gọi AI thật đều chết nếu đi qua Worker. Vì vậy frontend
+tách riêng nhóm endpoint AI (`isAiPath()` trong `frontend/src/services/api.ts` và
+biến `VITE_AI_API_URL`). Hệ quả cần nói thẳng: **URL backend lộ ra trong JavaScript
+gửi tới trình duyệt**, và chỉ endpoint AI mới có đường này — mọi endpoint khác
+vẫn qua Worker.
+
+**3. AI là tùy chọn, không phải phụ thuộc.** Mọi luồng nghiệp vụ cốt lõi hoàn
+thành được khi không có AI. Nguồn gốc của thiết kế này là yêu cầu "nhiều người không
+cần tính năng AI vẫn làm được". Bằng chứng: `backend/tests/test_offline_core_works_without_ai.py`
+và `frontend/tests/e2e/works-without-ai.spec.ts`. Xem
+[AI_ETHICS_AND_HUMAN_OVERSIGHT.md](AI_ETHICS_AND_HUMAN_OVERSIGHT.md).
+
 ### Nguyên tắc Thiết kế Cốt lõi:
-1. **Deterministic business rules**: Các phép tính KPI/health và một số quyết định trạng thái được thực hiện bằng code/backend; AI không phải nguồn dữ liệu gốc cho metrics. Chi tiết từng phép tính cần đối chiếu implementation và test liên quan.
+1. **Deterministic business rules**: Các phép tính KPI/health, quét tuân thủ và một số quyết định trạng thái được thực hiện bằng code/backend; AI không phải nguồn dữ liệu gốc cho metrics. Hai cơ chế này **không** gọi LLM nên vẫn chạy khi AI tắt.
 2. **Workspace and role checks**: Các endpoint kiểm tra vai trò và ranh giới workspace theo tài nguyên/thao tác. Tuyên bố bảo mật chỉ áp dụng tới những đường đi đã được kiểm tra; xem test matrix thay vì suy ra rằng mọi endpoint đều đã được chứng minh an toàn.
-3. **AI fallback**: Tác vụ AI có cơ chế xử lý lỗi/fallback trong những nhánh được kiểm thử. Điều đó không bảo đảm mọi trải nghiệm không gián đoạn hoặc mọi nội dung sinh ra chính xác.
+3. **AI fallback**: Tác vụ AI có cơ chế xử lý lỗi/fallback trong những nhánh được kiểm thử. Nội dung dự phòng luôn mang `is_fallback=true` — không bao giờ được gán nhãn như do mô hình viết.
+4. **Điểm số phải đo, không đặt hằng số**: `compliance_score` của nội dung đa kênh đến từ `ComplianceScanner.scan`; không có Brand Kit hoặc không quét được thì trả `None` để hiển thị "chưa chấm".
 
 ---
 
 ## 2. Mô Hình Dữ Liệu Quan Hệ (Entity-Relationship Model - ERD)
 
-Model quan hệ và constraint được định nghĩa trong SQLAlchemy. Local/CI và Cloudflare deployment hiện dùng SQLite. Việc cấu hình URL cho một database engine khác không tự chứng minh migration, concurrency hay hành vi production đã được xác nhận.
+Model quan hệ và constraint được định nghĩa trong SQLAlchemy.
+
+**Engine theo môi trường:**
+
+| Môi trường | Engine | Ghi chú |
+|---|---|---|
+| Local / CI / Docker Compose | SQLite | `sqlite:///./data/marketing_campaigns.db` |
+| Render (production) | Postgres | `DATABASE_URL` gán tay qua Render Dashboard |
+
+Không dùng SQLite ở production vì giới hạn khoá ghi ở mức file. Với Postgres cần
+điểm endpoint **direct**, không phải pooled (`-pooler`): `psycopg2` ≥ 2.9 dùng
+prepared statement nên đi qua PgBouncer ở transaction mode sẽ lỗi ngay khi chạy
+thật. Giữ `?sslmode=require`. Ràng buộc kiểu `PRAGMA` chỉ áp dụng cho SQLite; với
+Postgres, foreign key được enforce sẵn ở mức server.
+
+Xem [`render.yaml`](../render.yaml) để biết các biến bắt buộc phải đặt tay.
+
+Lưu ý về schema: ứng dụng dùng `Base.metadata.create_all()` để tạo bảng khi khởi
+động. Cơ chế này **không** phải migration — nó không sửa bảng đã có. Với một
+deployment đã có dữ liệu, thêm cột mới cần `ALTER TABLE` thủ công (ví dụ cột
+`campaign_metrics.source` được thêm như vậy).
 
 ```mermaid
 erDiagram
@@ -103,7 +173,7 @@ flowchart TD
 
 ## 4. Điểm sức khỏe chiến dịch
 
-Ở baseline này có **hai phép tính riêng**, phục vụ hai luồng khác nhau. Không nên trình bày chúng như một công thức hay một nhãn trạng thái thống nhất.
+Hiện có **hai phép tính riêng**, phục vụ hai luồng khác nhau. Không nên trình bày chúng như một công thức hay một nhãn trạng thái thống nhất.
 
 | Luồng | Cách tính ở mức khái quát | Trạng thái | Nguồn chuẩn |
 |---|---|---|---|
@@ -120,6 +190,8 @@ Ngưỡng và điểm cụ thể là quy tắc hiện hành trong implementation
 - Các đường sinh nội dung có kiểm tra cấu trúc/validation theo hợp đồng dữ liệu tương ứng. Phạm vi kiểm tra cần xác định theo từng endpoint; không khẳng định toàn bộ đầu ra của mọi model đều qua cùng một schema.
 - Một số đường AI có fallback và ghi log, nhưng không đồng nghĩa mọi provider failure đều được xử lý giống nhau hoặc mọi lời gọi đều được lưu audit log.
 - [Báo cáo benchmark](AI_EVALUATION_REPORT.md) giới hạn kết luận theo bộ case, commit và môi trường đã ghi. Không dùng các cụm “zero hallucination”, “không thể sinh số liệu sai” hoặc “sẵn sàng production” như kết luận tổng quát.
+- Ba phiên bản prompt `v1/v2/v3` đã được đo trên một stub tất định; bảng so sánh ở [PROMPT_VARIANT_COMPARISON.md](PROMPT_VARIANT_COMPARISON.md). Kết quả đó đo **mức đáp ứng đặc tả** (schema, trường bắt buộc, placeholder), không đo chất lượng văn phong của mô hình thật.
+- Cơ chế giám sát của con người và các giới hạn được liệt kê ở [AI_ETHICS_AND_HUMAN_OVERSIGHT.md](AI_ETHICS_AND_HUMAN_OVERSIGHT.md).
 
 ---
 
@@ -129,8 +201,8 @@ Số liệu benchmark thay đổi theo commit, runner và workload nên không l
 
 ## 7. Trạng thái năng lực và giới hạn hiện tại
 
-- Scheduler xử lý lịch trong database và đổi trạng thái content sang PUBLISHED; API publish cũng cập nhật trạng thái nội bộ. Trong baseline mô tả ở đây chưa có connector gửi email/xã hội thật gắn với các đường đi này.
+- Scheduler xử lý lịch trong database và đổi trạng thái content sang PUBLISHED; API publish cũng cập nhật trạng thái nội bộ. Trong mô tả này chưa có connector gửi email/xã hội thật gắn với các đường đi này.
 - PUBLISHED vì vậy không đồng nghĩa với provider đã nhận/gửi thành công. UI, báo cáo và tài liệu phải thể hiện rõ khác biệt này.
-- Cloudflare worker dùng một Durable Object/SQLite container, tuần tự hóa các thao tác ghi và tải snapshot database lên R2 sau mỗi write. Mã worker ghi nhận độ trễ/chi phí O(kích thước DB) và queue toàn cục là nợ kỹ thuật; xem [cloudflare/README.md](../cloudflare/README.md).
+- Cloudflare Worker chỉ phục vụ file tĩnh và proxy `/api/*`; không giữ dữ liệu, không có Durable Object, không có snapshot R2. Mọi trạng thái nằm trong Postgres trên Render (xem mục 1).
 - Cần đánh giá restore, concurrency và database production trước khi đưa dữ liệu agency thật vào môi trường triển khai này.
 - Việc dùng AI draft hoặc AI Doctor không chứng minh hiệu quả campaign. Kết quả hữu ích và usability cần đo qua người dùng/pilot.

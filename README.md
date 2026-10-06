@@ -2,7 +2,23 @@
 
 Ứng dụng mẫu quản lý chiến dịch marketing có tích hợp AI. Phạm vi hiện tại tập trung vào workspace, campaign, tác vụ, ngân sách/KPI mục tiêu, tạo nội dung và quy trình phê duyệt.
 
-> **Trạng thái:** prototype đang được phát triển. Lịch có thể đổi trạng thái nội bộ sang PUBLISHED; baseline hiện chưa gửi bài thật lên mạng xã hội hoặc gửi email qua provider. Xem [lộ trình](docs/ROADMAP.md) và [kiến trúc hiện tại](docs/ARCHITECTURE.md).
+> **Trạng thái:** prototype đang được phát triển. Lịch có thể đổi trạng thái nội bộ sang PUBLISHED; hiện chưa gửi bài thật lên mạng xã hội hoặc gửi email qua provider. Xem [lộ trình](docs/ROADMAP.md) và [kiến trúc hiện tại](docs/ARCHITECTURE.md).
+
+## Triển khai ở đâu
+
+| Tầng | Chạy ở đâu | Vai trò |
+|---|---|---|
+| Frontend (static) | Cloudflare Worker — `marketing.kienhieu.id.vn` | Phục vụ file tĩnh, proxy `/api/*`, cron đánh thức scheduler |
+| Backend FastAPI | Render — `marketflow-api-9onk.onrender.com` | Toàn bộ nghiệp vụ và dữ liệu |
+| Database | Postgres (`DATABASE_URL`, gán tay trong Render Dashboard) | Mọi trạng thái nghiệp vụ |
+
+Worker **không** chạy backend và **không** giữ dữ liệu. Nhóm endpoint AI là ngoại
+lệ duy nhất: frontend gọi thẳng Render vì Cloudflare giới hạn ~100 giây trong khi
+lời gọi AI thật đo được 237 giây (`524` nếu đi qua Worker). Chi tiết ở
+[cloudflare/README.md](cloudflare/README.md).
+
+SQLite chỉ dùng ở local và CI. Production không dùng SQLite vì Render Free tier
+không có persistent disk.
 
 ## Dự án giúp ai làm việc gì?
 
@@ -45,12 +61,13 @@ Giao diện local: http://localhost
 
 Seed data dành cho local/demo. Không dùng database, mật khẩu mặc định hoặc secret của môi trường thật cho demo công khai hay production. Không ghi credential vào tài liệu hoặc commit.
 
-Trên Cloudflare, nhớ đặt `SCHEDULER_ENABLED=false` cho container (xem mục *Biến môi
-trường đáng chú ý* bên dưới) để lịch đăng không bị mất khi container bị evict.
+Trên production, nhớ đặt `SCHEDULER_ENABLED=false` cho backend (xem mục *Biến môi
+trường đáng chú ý* bên dưới) và để cron của Worker đánh thức scheduler mỗi 5 phút —
+nếu không, lịch đăng sẽ không bao giờ chạy.
 
 ## Kiểm tra chất lượng
 
-Workflow canonical nằm tại [.github/workflows/ci.yml](.github/workflows/ci.yml). [Run gần nhất tại baseline b99ac87](https://github.com/hieu-kiien/he-thong-quan-ly-chien-dich-marketing-co-tich-hop-ai/actions/runs/36537065686) thành công với các gate CI và Docker verification. Gate dependency vẫn ghi advisory thành warning; cần đọc log trước khi kết luận tình trạng bảo mật.
+Workflow canonical nằm tại [.github/workflows/ci.yml](.github/workflows/ci.yml) với 8 gate: lint, typecheck, unit test, E2E, Docker build, dependency audit, secret scan và rubric check. Xem tab Actions trên `main` để lấy run gần nhất — số CI được ghi ở link sẽ lỗi thời sau vài tuần. Gate dependency vẫn ghi advisory thành warning; cần đọc log trước khi kết luận tình trạng bảo mật.
 
 Xem [docs/TESTING.md](docs/TESTING.md) để chạy test và hiểu giới hạn các số liệu. Không xem benchmark trên tập test hữu hạn là bằng chứng về giá trị kinh doanh hoặc cam kết AI không thể sai.
 
@@ -61,7 +78,7 @@ Xem [docs/TESTING.md](docs/TESTING.md) để chạy test và hiểu giới hạn
 - scripts/: công cụ benchmark; một số script sinh báo cáo vào docs/.
 - docs/: kiến trúc, roadmap, kiểm thử, đánh giá AI và tài liệu đồ án.
 - Bao_Cao_AIA331_80300_ICTU_V8/ và Bao_Cao_AIA331_80300_ICTU_V9/: source/PDF báo cáo học thuật theo phiên bản.
-- cloudflare/: cấu hình triển khai Cloudflare; xem giới hạn snapshot SQLite/R2 trước khi dùng dữ liệu thật.
+- cloudflare/: Worker static + proxy; xem [cloudflare/README.md](cloudflare/README.md) trước khi dùng dữ liệu thật.
 
 ## Cổng chất lượng (quality gate) của frontend
 
@@ -84,11 +101,11 @@ Ngoài `.env.example`, ba biến sau ảnh hưởng trực tiếp tới an toàn
 
 | Biến | Mặc định | Vì sao quan trọng |
 | --- | --- | --- |
-| `SCHEDULER_ENABLED` | `true` | Đặt `false` khi chạy trên Cloudflare. Scheduler trong container ghi thẳng vào SQLite mà không qua HTTP nên **không** được snapshot lên R2; bài đã "đăng" sẽ mất âm thầm khi container bị evict. Khi đó lịch đăng do Cron Trigger của Worker điều phối. |
+| `SCHEDULER_ENABLED` | `true` | Đặt `false` khi chạy trên Render. Scheduler trong tiến trình backend ghi thẳng vào database ngoài HTTP path, nên lịch đăng do Cron Trigger của Worker điều phối (mỗi 5 phút). Bật cả hai cùng lúc sẽ chạy trùng job. |
 | `SCHEDULER_SECRET` | *(rỗng)* | Dùng Worker gọi `POST /api/v1/schedules/trigger-worker`. Rỗng thì đường gọi bằng secret tắt, endpoint chỉ nhận Bearer token. **Trên Cloudflare đây là secret bắt buộc** (`secrets.required` trong `cloudflare/wrangler.jsonc`): Cron 5 phút/lần sẽ bỏ qua và ghi cảnh báo nếu thiếu. Đặt bằng `wrangler secret put SCHEDULER_SECRET`. |
 | `BYOK_PBKDF2_SALT` | *(tự sinh)* | Salt của khoá vault. Để trống thì ứng dụng tự sinh salt ngẫu nhiên và lưu ở `backend/.vault_salt` (không commit). Chỉ đặt khi hạ tầng cấp secret riêng. |
 
-| `AI_PROVIDER` | `opencode` | Phải thuộc `gemini \| openrouter \| openai \| opencode`; backend từ chối khởi động nếu không, vì giá trị sai từng khiến hệ thống rơi im lặng xuống template dự phòng. `opencode` trỏ tới endpoint OpenAI-compatible của opencode zen (`https://opencode.ai/zen/v1`) và dùng đúng model bạn đang cấu hình, **không cần mua credits**. Danh sách model hợp lệ: `GET {AI_BASE_URL}/models`. |
+| `AI_PROVIDER` | `opencode` | Phải thuộc danh sách provider trong `backend/app/services/ai/providers.py`: `gemini \| openrouter \| openai \| anthropic \| huggingface \| ollama \| opencode`; backend từ chối khởi động nếu không, vì giá trị sai từng khiến hệ thống rơi im lặng xuống template dự phòng. `opencode` trỏ tới endpoint OpenAI-compatible của opencode zen (`https://opencode.ai/zen/v1`) và dùng đúng model bạn đang cấu hình, **không cần mua credits**. `anthropic` dùng Messages API riêng (`/v1/messages`); `ollama` và `huggingface` không bắt buộc khoá. Danh sách model hợp lệ: `GET {AI_BASE_URL}/models`. |
 | `AI_TIMEOUT_SECONDS` | `420` | Timeout gọi provider. Phải lớn hơn thời gian sinh nội dung thật: `/api/v1/ai/omnichannel` đo được 83–214 giây cho 3 kênh. Timeout nhỏ sẽ kích hoạt Smart Fallback dù provider hoàn toàn ổn. Frontend dùng timeout riêng 600s cho nhóm endpoint AI (`AI_LONG_TIMEOUT` trong `frontend/src/services/api.ts`). |
 
 ## AI thật hay nội dung dự phòng?
@@ -155,12 +172,15 @@ tự do với vai trò đặc quyền (`MANAGER`, `AGENCY_MANAGER`, `CLIENT_APPR
 
 1. PUBLISHED hiện là trạng thái của hệ thống. Chưa có bằng chứng rằng content đã được gửi và xác nhận từ một nền tảng bên ngoài.
 2. Chỉ số AI/backend trong CI là kết quả của môi trường và workload đã ghi; chúng không chứng minh campaign tạo thêm doanh thu hoặc người dùng tiết kiệm thời gian.
-3. Cloudflare hiện serialize thao tác ghi và snapshot toàn bộ SQLite lên R2 sau mỗi write. Cần giải quyết/đo đường lưu trữ, khôi phục và concurrency trước khi dùng như dịch vụ agency production.
-4. Mọi chỉ số trên giao diện đều đọc từ `CampaignMetric` trong database. Nếu chưa nhập chỉ số thì giao diện hiển thị "chưa có dữ liệu" chứ không tự sinh số ước tính — đây là chủ ý, không phải thiếu sót. Chạy `python backend/seed/seed_data.py` để nạp dữ liệu mẫu.
+3. Cloudflare Worker chỉ phục vụ static và proxy; không có cơ chế sao lưu nào ở tầng đó. Toàn bộ dữ liệu nằm ở Postgres phía Render, và ứng dụng dùng `create_all()` chứ không có migration — thêm cột mới ở production cần `ALTER TABLE` thủ công. Cần có quy trình backup/restore được diễn tập trước khi dùng như dịch vụ agency production.
+4. Mọi chỉ số trên giao diện đều đọc từ `CampaignMetric` trong database. Nếu chưa nhập chỉ số thì giao diện hiển thị "chưa có dữ liệu" chứ không tự sinh số ước tính — đây là chủ ý, không phải thiếu sót. Chạy `python backend/seed/seed_data.py` để nạp dữ liệu mẫu. Dữ liệu mẫu được đánh dấu bằng `CampaignMetric.source = 'seed'` và giao diện hiện cảnh báo.
+5. Điểm `compliance_score` của nội dung đa kênh đến từ bộ quét quy tắc từ khoá, không phải chấm điểm của AI; không có Brand Kit thì hiển thị "chưa chấm". Xem [đạo đức AI & giám sát](docs/AI_ETHICS_AND_HUMAN_OVERSIGHT.md).
+6. Bảng so sánh prompt v1/v2/v3 chạy trên stub tất định — đo mức đáp ứng đặc tả, không đo chất lượng văn phong của mô hình thật. Xem [so sánh prompt](docs/PROMPT_VARIANT_COMPARISON.md).
 
 ## Tài liệu
 
 - [Mục lục tài liệu](docs/README.md)
+- [Phân tích yêu cầu & thiết kế](docs/REQUIREMENTS_AND_DESIGN.md)
 - [Lộ trình dài hạn](docs/ROADMAP.md)
 - [Kiến trúc](docs/ARCHITECTURE.md)
 - [Kiểm thử và CI](docs/TESTING.md)
@@ -168,6 +188,6 @@ tự do với vai trò đặc quyền (`MANAGER`, `AGENCY_MANAGER`, `CLIENT_APPR
 - [So sánh phiên bản prompt](docs/PROMPT_VARIANT_COMPARISON.md)
 - [Đạo đức AI & giám sát của con người](docs/AI_ETHICS_AND_HUMAN_OVERSIGHT.md)
 - [Cloudflare deployment](cloudflare/README.md)
-- [Hồ sơ đối chiếu đồ án](docs/UNIVERSITY_DEFENSE_RUBRIC_ALIGNMENT.md)
+- [Đối chiếu rubric 40 tiêu chí](docs/UNIVERSITY_DEFENSE_RUBRIC_ALIGNMENT.md)
 
 V8/V9 và các biên bản/test readiness trước đây được giữ như hồ sơ snapshot. Mục lục tài liệu phân biệt rõ tài liệu hiện hành với hồ sơ lịch sử.
