@@ -181,6 +181,7 @@ tự do với vai trò đặc quyền (`MANAGER`, `AGENCY_MANAGER`, `CLIENT_APPR
 
 - [Mục lục tài liệu](docs/README.md)
 - [Phân tích yêu cầu & thiết kế](docs/REQUIREMENTS_AND_DESIGN.md)
+- [Phân tích khoảng cách](docs/REQUIREMENTS_GAP_ANALYSIS.md)
 - [Lộ trình dài hạn](docs/ROADMAP.md)
 - [Kiến trúc](docs/ARCHITECTURE.md)
 - [Kiểm thử và CI](docs/TESTING.md)

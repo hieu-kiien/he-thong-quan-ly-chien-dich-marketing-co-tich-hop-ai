@@ -29,6 +29,10 @@ DOCS = ROOT / "docs"
 
 REQUIREMENTS_DOC = DOCS / "REQUIREMENTS_AND_DESIGN.md"
 RUBRIC_DOC = DOCS / "UNIVERSITY_DEFENSE_RUBRIC_ALIGNMENT.md"
+GAP_DOC = DOCS / "REQUIREMENTS_GAP_ANALYSIS.md"
+
+# Tài liệu nào phải được kiểm tra toàn vẹn đường dẫn và không chứa secret.
+_VERIFIED_DOCS = [REQUIREMENTS_DOC, RUBRIC_DOC, GAP_DOC]
 
 
 @pytest.fixture(scope="module")
@@ -43,14 +47,14 @@ def rubric_text() -> str:
     return RUBRIC_DOC.read_text(encoding="utf-8")
 
 
-@pytest.mark.parametrize("doc_path", [REQUIREMENTS_DOC, RUBRIC_DOC])
+@pytest.mark.parametrize("doc_path", _VERIFIED_DOCS)
 def test_documentation_files_exist_and_are_substantial(doc_path):
     assert doc_path.exists(), f"Thiếu {doc_path}"
     text = doc_path.read_text(encoding="utf-8")
     assert len(text) > 3000, f"{doc_path.name} quá ngắn để là tài liệu thiết kế"
 
 
-@pytest.mark.parametrize("doc_path", [REQUIREMENTS_DOC, RUBRIC_DOC])
+@pytest.mark.parametrize("doc_path", _VERIFIED_DOCS)
 def test_no_secret_patterns(doc_path):
     """Không tài liệu thiết kế nào được chứa thứ giống secret."""
     text = doc_path.read_text(encoding="utf-8")
@@ -67,7 +71,7 @@ def test_no_secret_patterns(doc_path):
         assert match is None, f"{doc_path.name} chứa chuỗi giống {label}"
 
 
-@pytest.mark.parametrize("doc_path", [REQUIREMENTS_DOC, RUBRIC_DOC])
+@pytest.mark.parametrize("doc_path", _VERIFIED_DOCS)
 def test_linked_docs_exist(doc_path):
     """Liên kết nội bộ trong docs/ phải dẫn tới file có thật."""
     text = doc_path.read_text(encoding="utf-8")
@@ -78,7 +82,7 @@ def test_linked_docs_exist(doc_path):
     assert not missing, f"{doc_path.name} liên kết tới file không tồn tại: {missing}"
 
 
-@pytest.mark.parametrize("doc_path", [REQUIREMENTS_DOC, RUBRIC_DOC])
+@pytest.mark.parametrize("doc_path", _VERIFIED_DOCS)
 def test_referenced_test_files_exist(doc_path):
     """Mọi tên file test được nhắc tới phải tồn tại trong backend/tests/.
 
@@ -96,7 +100,7 @@ def test_referenced_test_files_exist(doc_path):
     assert not missing, f"{doc_path.name} nhắc tới file test không tồn tại: {missing}"
 
 
-@pytest.mark.parametrize("doc_path", [REQUIREMENTS_DOC, RUBRIC_DOC])
+@pytest.mark.parametrize("doc_path", _VERIFIED_DOCS)
 def test_referenced_backend_paths_exist(doc_path):
     """Đường dẫn `app/...` trong tài liệu phải tồn tại dưới backend/."""
     text = doc_path.read_text(encoding="utf-8")
@@ -241,6 +245,42 @@ def test_requirements_doc_is_linked_from_docs_index():
     assert "REQUIREMENTS_AND_DESIGN.md" in index, (
         "docs/README.md chưa liên kết REQUIREMENTS_AND_DESIGN.md."
     )
+
+
+def test_gap_doc_flags_the_model_restriction_conflict():
+    """Tài liệu khoảng cách phải nêu mâu thuẫn cấm Claude/GPT.
+
+    Yêu cầu viết (2026-09-23) cấm Claude/GPT, còn rubric Bài 3 mục 2 bắt buộc hỗ
+    trợ Claude. Đây là nơi dễ mất điểm nhất: nếu tài liệu im lặng, giảng viên mở
+    `ORIGINAL_REQUEST.md` ra thấy mâu thuẫn và hỏi — mà không có sẵn câu trả lời
+    đã nghĩ kỹ.
+    """
+    gap_text = GAP_DOC.read_text(encoding="utf-8")
+    assert "Claude" in gap_text and "GPT" in gap_text
+    for marker in ("TUYỆT ĐỐI KHÔNG", "Bài 3 mục 2"):
+        assert marker in gap_text, (
+            f"Tài liệu khoảng cách phải trích nguyên văn xung đột ({marker!r}) "
+            "để giảng viên thấy rằng mâu thuẫn là có thật và đã được xử lý."
+        )
+    assert "rubric" in gap_text.lower()
+
+
+def test_gap_doc_records_the_realm_of_unmet_requirements():
+    """Phần "chưa làm" phải có đủ các mục thiếu đã biết."""
+    gap_text = GAP_DOC.read_text(encoding="utf-8")
+    for topic in ("Phân trang", "Mutation", "Excel/PDF", "backup/restore", "thiên lệch"):
+        assert topic in gap_text, (
+            f"Tài liệu khoảng cách thiếu mục chưa làm: {topic!r}. "
+            "Giấu khoảng cách tệ hơn thừa nhận nó."
+        )
+    assert "CHƯA LÀM" in gap_text or "MỘT PHẦN" in gap_text
+
+
+def test_gap_doc_concludes_the_it_thesis_subproject():
+    """Phải kết luận về thư mục `it-thesis-...` để không ai hỏi lại."""
+    gap_text = GAP_DOC.read_text(encoding="utf-8")
+    assert "it-thesis-research-documentation-engineer" in gap_text
+    assert "công cụ" in gap_text.lower()
 
 
 def test_role_enum_claim_matches_code(requirements_text):

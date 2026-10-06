@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Sparkles, ArrowRight, ShieldCheck, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react';
-import { getApiErrorMessage } from '../services/api';
+import { getApiErrorMessage, isOfflineDemoEnabled } from '../services/api';
 
 interface LoginPageProps {
   onNavigateToRegister: () => void;
@@ -37,6 +37,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToRegister }) =>
     setPassword(quickPass);
     setError(null);
   };
+
+  // Khoi nhanh chon tai khoan seed KHONG duoc render o moi truong.
+  //
+  // Ly do: Vite bake bien moi truong vao bundle tai `npm run build`. Neu khoi nay
+  // luon hien thi, mat khau seed ("Manager@123"...) bien mot chuoi ro trong
+  // JavaScript gui toi trinh duyet cua moi nguoi dung that. Chi nen bat o moi
+  // trien khai co du lieu mau cuc bo (VITE_ENABLE_OFFLINE_DEMO=true).
+  const showQuickLogin = isOfflineDemoEnabled();
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4 relative overflow-hidden font-sans text-slate-100">
@@ -132,7 +140,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToRegister }) =>
             </button>
           </form>
 
-          {/* Quick-chips for testing */}
+          {/* Quick-chips for testing. Chi bat o moi co du lieu mau (xem showQuickLogin). */}
+          {showQuickLogin && (
           <div className="mt-6 pt-5 border-t border-slate-800/80">
             <p className="text-xs font-medium text-slate-400 mb-3 flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
@@ -162,6 +171,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToRegister }) =>
               </button>
             </div>
           </div>
+          )}
         </div>
 
         {/* Footer switch to register */}
