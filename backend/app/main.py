@@ -17,6 +17,7 @@ from app.api.v1.campaigns import router as campaigns_router
 from app.api.v1.contents import router as contents_router
 from app.api.v1.metrics import router as metrics_router
 from app.api.v1.ai import router as ai_router
+from app.api.v1.ai_jobs import router as ai_jobs_router
 from app.api.v1.channels import router as channels_router
 from app.api.v1.schedules import router as schedules_router
 from app.api.v1.workspaces import router as workspaces_router
@@ -96,6 +97,7 @@ app.include_router(campaigns_router, prefix=settings.API_V1_PREFIX)
 app.include_router(contents_router, prefix=settings.API_V1_PREFIX)
 app.include_router(metrics_router, prefix=settings.API_V1_PREFIX)
 app.include_router(ai_router, prefix=settings.API_V1_PREFIX)
+app.include_router(ai_jobs_router, prefix=settings.API_V1_PREFIX)
 app.include_router(channels_router, prefix=settings.API_V1_PREFIX)
 app.include_router(schedules_router, prefix=settings.API_V1_PREFIX)
 app.include_router(workspaces_router, prefix=settings.API_V1_PREFIX)
@@ -110,6 +112,7 @@ app.include_router(export_router, prefix=settings.API_V1_PREFIX)
 from app.core.database import init_db, DatabaseMigrationError
 from seed.seed_data import seed_data
 from app.services.scheduler.worker import start_scheduler_task, stop_scheduler_task
+from app.services.ai.job_worker import start_ai_job_worker, stop_ai_job_worker
 
 
 def on_startup():
@@ -132,6 +135,22 @@ def on_startup():
         sys.exit(1)
     except Exception as e:
         logger.error(f"Error during database startup seed: {e}", exc_info=True)
+
+    # Worker hàng đợi AI bất đồng bộ (POST /ai/jobs -> GET /ai/jobs/{id}).
+    #
+    # Đây là đường thay thế cho các endpoint AI đồng bộ, vốn giữ thread suốt thời
+    # gian chờ LLM: `/ai/omnichannel` đo mất 237 giây trên Render free (512 MB) và
+    # bị Cloudflare cắt ở ~100 giây (error 524). Hàng đợi nằm trong chính CSDL và
+    # worker chỉ chạy tối đa `AI_JOB_CONCURRENCY` job đồng thời.
+    #
+    # KHỞI ĐỘNG TRƯỚC khối scheduler vì khối scheduler có `return` sớm khi
+    # `SCHEDULER_ENABLED=false` — mà đó đúng là cấu hình của bản deploy Cloudflare.
+    # Đặt sau đây thì trên bản deploy đó worker AI sẽ không bao giờ chạy.
+    #
+    # `start_ai_job_worker` tự bắt mọi lỗi và trả None. Cố ý không để lỗi ở đây
+    # làm hỏng startup: nếu không bật được worker thì API vẫn phải phục vụ được mọi
+    # route không liên quan tới AI, và job đã enqueue vẫn nằm an toàn trong hàng đợi.
+    start_ai_job_worker(app)
 
     # Scheduler nền.
     #
@@ -156,6 +175,11 @@ def on_startup():
 
 
 def on_shutdown():
+    try:
+        stop_ai_job_worker(app)
+    except Exception as e:
+        logger.error(f"Error stopping AI job worker: {e}", exc_info=True)
+
     try:
         stop_scheduler_task(app)
         logger.info("Background scheduler task stopped cleanly on shutdown.")

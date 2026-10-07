@@ -115,6 +115,10 @@ class Workspace(Base):
     campaigns = relationship("Campaign", back_populates="workspace")
     contents = relationship("MarketingContent", back_populates="workspace")
     custom_api_keys = relationship("CustomApiKey", back_populates="workspace", cascade="all, delete-orphan")
+    # Job AI bất đồng bộ: xoá workspace thì xoá luôn lịch sử job của tenant đó,
+    # nếu không các bản ghi mồ côi sẽ mọc lên và bị tầng phân quyền từ chối
+    # (fail-closed) khiến chúng chỉ tốn chỗ vô ích.
+    ai_jobs = relationship("AIJob", back_populates="workspace", cascade="all, delete-orphan")
 
 
 class WorkspaceMember(Base):
@@ -416,6 +420,89 @@ class CustomApiKey(Base):
 
     user = relationship("User", back_populates="custom_api_keys")
     workspace = relationship("Workspace", back_populates="custom_api_keys")
+
+
+class AIJob(Base):
+    """Hàng đợi công việc AI bất đồng bộ, LƯU TRONG CHÍNH CSDL (không broker ngoài).
+
+    Vì sao cần bảng này: trước đây mọi endpoint AI là hàm `def` đồng bộ, nên mỗi
+    lượt gọi giữ một thread của worker trong suốt thời gian chờ LLM trả lời. Trên
+    Render free (512 MB RAM, 0.1 CPU) vài lượt gọi đồng thời là đủ để bộ nhớ cạn
+    và bóp chết mọi route API thường; lệnh `/ai/omnichannel` đo được 237 giây.
+
+    Vì sao không Celery/Redis: 512 MB không chịu nổi thêm một tiến trình broker.
+    Hàng đợi nằm trong Postgres, worker nền ghi bằng `SELECT ... FOR UPDATE SKIP
+    LOCKED` nên nhiều tiến trình có thể dùng chung một hàng đợi mà không chạy trùng.
+
+    Ranh giới tenant: `workspace_id` là BẮT BUỘC cho mọi lần đọc/ghi. Bản ghi có
+    `workspace_id IS NULL` bị tầng phân quyền từ chối (fail-closed) — cùng quy tắc
+    với `check_workspace_boundary` / `check_content_access` trong
+    app/api/v1/contents.py. Không có ngoại lệ "tôi là người tạo nên tôi thấy".
+    """
+
+    __tablename__ = "ai_jobs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    # Cho phép NULL ở tầng schema (đồng cấu với Campaign/MarketingContent: cột cũ
+    # không bị migration phá), nhưng NULL KHÔNG phải là giá trị hợp lệ ở tầng phân
+    # quyền — xem app/api/v1/ai_jobs.py (assert_workspace_access).
+    workspace_id = Column(Integer, ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id", onupdate="CASCADE", ondelete="SET NULL"), nullable=True)
+    # 'ideas' | 'draft' | 'summary' | 'omnichannel' (khớp endpoint đồng bộ tương ứng)
+    kind = Column(String(30), nullable=False)
+    # 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
+    status = Column(String(20), nullable=False, default="queued")
+    # Payload đã chuẩn hoá (đã bỏ field None) — đây là thứ được đưa vào
+    # request model của endpoint đồng bộ khi worker chạy lại tác vụ.
+    payload_json = Column(Text, nullable=False, default="{}")
+    result_json = Column(Text, nullable=True)
+    error_message = Column(Text, nullable=True)
+    # Khoá chống gọi trùng (double-click / retry mạng / nút bấm hai lần). Ràng
+    # buộc duy nhất đặt theo (user_id, idempotency_key) — KHÔNG theo workspace_id:
+    # NULL trong UNIQUE không kẹp nhau ở cả SQLite lẫn Postgres, nên ràng buộc theo
+    # workspace sẽ KHÔNG chống được trùng cho job tenant-less.
+    idempotency_key = Column(String(200), nullable=True)
+    # SHA-256 của (kind + payload chuẩn hoá). Dùng để phát hiện trường hợp tái
+    # sử dụng cùng một khoá idempotency với payload KHÁC — lúc đó phải trả 409
+    # chứ không được âm thầm trả lại kết quả của lần gọi trước.
+    payload_hash = Column(String(64), nullable=True)
+    attempts = Column(Integer, nullable=False, default=0)
+    max_attempts = Column(Integer, nullable=False, default=3)
+    queued_at = Column(DateTime, nullable=False, default=utc_now)
+    # Mốc chờ lần chạy kế tiếp (retry backoff): job 'queued' chỉ được nhặt khi
+    # available_at <= now, nên backoff không cần thread ngủ.
+    available_at = Column(DateTime, nullable=False, default=utc_now)
+    started_at = Column(DateTime, nullable=True)
+    finished_at = Column(DateTime, nullable=True)
+    cancelled_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
+
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('ideas', 'draft', 'summary', 'omnichannel')",
+            name="chk_ai_job_kind",
+        ),
+        CheckConstraint(
+            "status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')",
+            name="chk_ai_job_status",
+        ),
+        CheckConstraint("attempts >= 0", name="chk_ai_job_attempts"),
+        CheckConstraint("max_attempts >= 1", name="chk_ai_job_max_attempts"),
+        # NULL idempotency_key không kẹp nhau (chuẩn SQL), nên vẫn cho phép enqueue
+        # không khoá bao nhiêu lần cũng được.
+        UniqueConstraint("user_id", "idempotency_key", name="uq_ai_job_user_idempotency"),
+        # Đường quét của worker: status + available_at là điều kiện lọc mỗi vòng.
+        Index("idx_ai_jobs_claim", "status", "available_at"),
+        Index("idx_ai_jobs_workspace_status", "workspace_id", "status"),
+        Index("idx_ai_jobs_user_created", "user_id", "created_at"),
+        Index("idx_ai_jobs_kind_status", "kind", "status"),
+    )
+
+    workspace = relationship("Workspace", back_populates="ai_jobs")
+    user = relationship("User")
+    campaign = relationship("Campaign")
 
 
 class Notification(Base):

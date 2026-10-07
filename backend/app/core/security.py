@@ -6,6 +6,8 @@ import re
 import threading
 import time
 from collections import defaultdict, deque
+from contextlib import contextmanager
+from contextvars import ContextVar
 import bcrypt
 import jwt
 
@@ -365,6 +367,28 @@ def reset_login_rate_limit(identifier: str) -> None:
 QUOTA_MAX_CALLS = 30
 QUOTA_WINDOW_SECONDS = 60 * 60
 
+# Cờ "hạn mứng đã được tính ở tầng khác".
+#
+# Job AI bất đồng bộ (POST /ai/jobs) chạy lại ĐÚNG endpoint đồng bộ, mà endpoint
+# đó tự gọi `enforce_quota` ở đầu hàm. Nếu ta gọi `enforce_quota` thêm một lần ở
+# lúc enqueue thì mỗi job bị tính HAI lần, tức hạn mứng 30 lượt/giờ chỉ còn ~15
+# job/giờ mà không có gì giải thích được cho người dùng. `quota_already_enforced()`
+# giải quyết đúng chỗ đó: tính một lần khi nhận job, rồi bọc lời gọi endpoint trong
+# ngữ cảnh "đã tính rồi".
+#
+# Additif: không ai bọc context này thì `enforce_quota` y hệt cũ.
+_quota_suppressed: ContextVar[bool] = ContextVar("marketflow_quota_suppressed", default=False)
+
+
+@contextmanager
+def quota_already_enforced():
+    """Trong khối này, `enforce_quota` trở thành no-op (hạn mứng đã tiêu ở tầng API)."""
+    token = _quota_suppressed.set(True)
+    try:
+        yield
+    finally:
+        _quota_suppressed.reset(token)
+
 _quota_buckets: Dict[str, deque] = defaultdict(deque)
 _quota_lock = threading.Lock()
 
@@ -388,6 +412,9 @@ def enforce_quota(identifier: str, max_calls: int = QUOTA_MAX_CALLS, window_seco
     Gọi TRƯỚC khi thực hiện tác vụ tốn tài nguyên (gọi nhà cung cấp AI, tạo workspace).
     """
     if not identifier:
+        return
+    # Bỏ qua khi tiến trình đã tiêu hạn mứng ở tầng API xong (xem quota_already_enforced).
+    if _quota_suppressed.get():
         return
     now = time.monotonic()
     retry_after = 0

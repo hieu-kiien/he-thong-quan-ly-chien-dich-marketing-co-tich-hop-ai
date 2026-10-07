@@ -13,6 +13,26 @@ from app.schemas.schemas import (
 )
 from app.services.ai.ai_service import ai_service
 
+# ==============================================================================
+# DEPRECATED (giữ nguyên để không làm hỏng gì trong lúc chuyển dịch sang hàng đợi)
+# ==============================================================================
+# Các endpoint dưới đây (/ideas, /draft, /generate, /summary, /summarize,
+# /omnichannel) là đường ĐỒNG BỘ và đã bị đánh dấu `deprecated=True` trong
+# OpenAPI. Chúng vẫn chạy và vẫn được kiểm thử đầy đủ.
+#
+# LÝ DO BỎ ĐƯỜNG ĐỒNG BỘ (số đo, không phải phỏng đoán):
+#   * Mỗi endpoint là hàm `def`, nên FastAPI đẩy nó sang threadpool và giữ một
+#     thread trong suốt thời gian chờ LLM trả lời.
+#   * `/ai/omnichannel` đo mất 237 giây trên deployment thật. Cloudflare Worker
+#     phía trước cắt ở ~100 giây và trả `error code: 524`.
+#   * Deployment là Render free: 512 MB RAM / 0.1 CPU. Vài lượt gọi AI đồng thời là
+#     đủ để cạn bộ nhớ và bóp chết mọi route API thường.
+#
+# ĐƯỜNG MỚI: `POST /api/v1/ai/jobs` (trả 202 ngay) + `GET /api/v1/ai/jobs/{job_id}`
+# (thăm dò) trong app/api/v1/ai_jobs.py, hàng đợi nằm trong Postgres, worker nền giới
+# hạn số job AI chạy đồng thời. Frontend sẽ chuyển sang đường mới ở đợt sau.
+# ==============================================================================
+
 router = APIRouter(prefix="/ai", tags=["Tính năng Trí Tuệ Nhân Tạo (AI Engine)"])
 
 def check_campaign_access_for_ai(campaign_id: int, user: User, db: Session) -> Campaign:
@@ -67,7 +87,13 @@ def check_campaign_access_for_ai(campaign_id: int, user: User, db: Session) -> C
         detail="Not authorized to access this resource"
     )
 
-@router.post("/ideas", response_model=AIIdeaResponse)
+# DEPRECATED: xem khối giải thích ngay trên `router`. Hãy dùng POST /ai/jobs.
+@router.post(
+    "/ideas",
+    response_model=AIIdeaResponse,
+    deprecated=True,
+    description="[DEPRECATED] Đồng bộ. Dùng `POST /ai/jobs` với `kind=ideas`.",
+)
 def generate_ideas(
     req: AIIdeaRequest,
     current_user: User = Depends(get_current_user),
@@ -138,8 +164,19 @@ def generate_ideas(
             return AIIdeaResponse.model_validate(fallback)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Lỗi dịch vụ AI: {str(e)}")
 
-@router.post("/draft", response_model=AIDraftResponse)
-@router.post("/generate", response_model=AIDraftResponse)
+# DEPRECATED: xem khối giải thích ngay trên `router`. Hãy dùng POST /ai/jobs.
+@router.post(
+    "/draft",
+    response_model=AIDraftResponse,
+    deprecated=True,
+    description="[DEPRECATED] Đồng bộ. Dùng `POST /ai/jobs` với `kind=draft`.",
+)
+@router.post(
+    "/generate",
+    response_model=AIDraftResponse,
+    deprecated=True,
+    description="[DEPRECATED] Đồng bộ. Dùng `POST /ai/jobs` với `kind=draft`.",
+)
 def generate_draft(
     req: AIDraftRequest,
     current_user: User = Depends(get_current_user),
@@ -203,8 +240,19 @@ def generate_draft(
             return AIDraftResponse.model_validate(fallback)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Lỗi dịch vụ AI: {str(e)}")
 
-@router.post("/summary", response_model=AISummaryResponse)
-@router.post("/summarize", response_model=AISummaryResponse)
+# DEPRECATED: xem khối giải thích ngay trên `router`. Hãy dùng POST /ai/jobs.
+@router.post(
+    "/summary",
+    response_model=AISummaryResponse,
+    deprecated=True,
+    description="[DEPRECATED] Đồng bộ. Dùng `POST /ai/jobs` với `kind=summary`.",
+)
+@router.post(
+    "/summarize",
+    response_model=AISummaryResponse,
+    deprecated=True,
+    description="[DEPRECATED] Đồng bộ. Dùng `POST /ai/jobs` với `kind=summary`.",
+)
 def generate_summary(
     req: AISummaryRequest,
     current_user: User = Depends(get_current_user),
@@ -343,7 +391,15 @@ def _score_omnichannel_compliance(payload: dict, brand_kit: Optional[BrandKit], 
     return min(scores) if scores else None
 
 
-@router.post("/omnichannel", response_model=OmnichannelResponse, response_model_exclude_none=True)
+# DEPRECATED: xem khối giải thích ngay trên `router`. Hãy dùng POST /ai/jobs.
+@router.post(
+    "/omnichannel",
+    response_model=OmnichannelResponse,
+    response_model_exclude_none=True,
+    deprecated=True,
+    description="[DEPRECATED] Đồng bộ (237 giây trên production, Cloudflare trả 524). "
+                "Dùng `POST /ai/jobs` với `kind=omnichannel`.",
+)
 def generate_omnichannel(
     req: OmnichannelRequest,
     current_user: User = Depends(get_current_user),

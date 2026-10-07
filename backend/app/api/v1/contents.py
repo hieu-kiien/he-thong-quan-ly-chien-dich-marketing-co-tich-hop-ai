@@ -19,16 +19,45 @@ router = APIRouter(prefix="/contents", tags=["Quản lý Nội dung Marketing"])
 
 logger = logging.getLogger(__name__)
 
-def check_workspace_boundary(content: MarketingContent, user: User, db: Session):
-    """Xác thực người dùng có quyền truy cập Workspace của nội dung (là owner hoặc member)."""
-    if user.role == "ADMIN":
-        return
+def resolve_workspace_id_for_content(content: MarketingContent, db: Session) -> Optional[int]:
+    """Suy ra tenant của một nội dung: ưu tiên `workspace_id` của chính nó, khi
+    NULL thì lấy từ campaign cha (dữ liệu legacy chưa được migration gán).
 
+    Trả về `None` nghĩa là KHÔNG xác định được tenant — người gọi phải fail-closed.
+    """
     ws_id = content.workspace_id
     if ws_id is None and content.campaign_id:
         campaign = db.query(Campaign).filter(Campaign.id == content.campaign_id).first()
         if campaign:
             ws_id = campaign.workspace_id
+    return ws_id
+
+
+def assert_workspace_access(
+    ws_id: Optional[int],
+    user: User,
+    db: Session,
+    *,
+    denied_detail: str = "User does not have access to this workspace content",
+) -> None:
+    """Quy tắc FAIL-CLOSED dùng chung cho mọi tài nguyên thuộc workspace.
+
+    Cấp quyền khi và CHỈ khi cả hai điều kiện đúng:
+    1. Xác định được tenant (`ws_id` khác NULL). Không xác định được tenant thì
+       không có ranh giới nào để tin cậy -> từ chối, kể cả với chính người tạo.
+    2. `user` là chủ sở hữu workspace (`Workspace.owner_id`) hoặc thành viên
+       (`WorkspaceMember`).
+
+    Đây là điểm dùng chung của `check_workspace_boundary` và `check_content_access`
+    (trong file này) và `assert_ai_job_access` (app/api/v1/ai_jobs.py). Trước đó
+    quy tắc này bị viết lại ở từng nơi; một bản nới lỏng ở đây sẽ âm thầm mở lỗ
+    đọc chéo tenant ở mọi endpoint kế thừa nó, nên nay chỉ còn một nguồn sự thật.
+
+    `denied_detail` cho phép mỗi call site giữ nguyên thông báo lỗi cũ của nó (nội
+    dung kiểm thử và thông báo cho người dùng đều đã được viện dẫn).
+    """
+    if user.role == "ADMIN":
+        return
 
     if ws_id is None:
         # Fail-closed: không xác định được tenant thì không được cấp quyền.
@@ -47,39 +76,30 @@ def check_workspace_boundary(content: MarketingContent, user: User, db: Session)
     if not (is_owner or is_member):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="User does not have access to this workspace content"
+            detail=denied_detail
         )
+
+
+def check_workspace_boundary(content: MarketingContent, user: User, db: Session):
+    """Xác thực người dùng có quyền truy cập Workspace của nội dung (là owner hoặc member)."""
+    assert_workspace_access(
+        resolve_workspace_id_for_content(content, db),
+        user,
+        db,
+    )
 
 def check_content_access(content: MarketingContent, user: User, db: Session):
     """Xác thực phân quyền mức bản ghi (Record-level authorization) & cách ly Workspace."""
+    # Tenant Isolation: Nếu content thuộc Workspace cụ thể, kiểm tra user có thuộc workspace đó không
+    assert_workspace_access(
+        resolve_workspace_id_for_content(content, db),
+        user,
+        db,
+        denied_detail="Not authorized to access resources in this workspace",
+    )
+
     if user.role == "ADMIN":
         return
-
-    ws_id = content.workspace_id
-    if ws_id is None and content.campaign_id:
-        campaign = db.query(Campaign).filter(Campaign.id == content.campaign_id).first()
-        if campaign:
-            ws_id = campaign.workspace_id
-
-    # Tenant Isolation: Nếu content thuộc Workspace cụ thể, kiểm tra user có thuộc workspace đó không
-    if ws_id is None:
-        # Fail-closed: không xác định được tenant thì không được cấp quyền.
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Không xác định được không gian làm việc của tài nguyên. Từ chối truy cập.",
-        )
-
-    ws = db.query(Workspace).filter(Workspace.id == ws_id).first()
-    is_ws_owner = ws is not None and ws.owner_id == user.id
-    is_ws_member = db.query(WorkspaceMember).filter(
-        WorkspaceMember.workspace_id == ws_id,
-        WorkspaceMember.user_id == user.id
-    ).first() is not None
-    if not (is_ws_owner or is_ws_member):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access resources in this workspace"
-        )
 
     if user.role in ("MANAGER", "AGENCY_MANAGER"):
         return

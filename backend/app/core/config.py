@@ -139,6 +139,55 @@ class Settings(BaseSettings):
     # Để trống thì đường gọi bằng secret bị tắt và endpoint chỉ nhận Bearer token.
     SCHEDULER_SECRET: str = ""
 
+    # ------------------------------------------------------------------
+    # Hàng đợi công việc AI bất đồng bộ (xem app/services/jobs/queue.py và
+    # app/services/ai/job_worker.py).
+    #
+    # Bối cảnh đo được: deployment chạy Render free = 512 MB RAM / 0.1 CPU,
+    # Postgres Neon serverless. `/ai/omnichannel` đo mất 237 giây, Cloudflare
+    # Worker phía trước cắt ở ~100 giây (error 524). Endpoint AI cũ là hàm `def`
+    # đồng bộ nên mỗi lượt gọi giữ một thread suốt thời gian chờ LLM.
+    # ------------------------------------------------------------------
+
+    # Bật/tắt worker nền. Tắt (false) khi muốn dựng API-only, hoặc khi muốn chạy
+    # worker ở tiến trình riêng (mỗi tiến trình có hạn mức slot riêng).
+    AI_JOB_WORKER_ENABLED: bool = True
+
+    # Trần số job AI chạy ĐỒNG THỜI trong một tiến trình. Đây là lớp bảo vệ bộ
+    # nhớ chính: worker chỉ nhặt job khi còn slot trống, và KHÔNG bao giờ vượt
+    # trần này kể cả khi hàng đợi dồn hàng trăm job.
+    #   1-2  : phù hợp 512 MB RAM / 0.1 CPU (mặc định 2).
+    #   >4   : chỉ khi đã nâng cấp RAM/CPU; mỗi job đang chạy giữ một thread và
+    #           một phiên HTTP tới provider.
+    AI_JOB_CONCURRENCY: int = 2
+
+    # Thời hạn cứng cho một job (giây). Quá hạn thì job bị đánh `failed` với lý do
+    # rõ ràng và BUÔNG SLOT — một job kẹt không bao giờ giữ slot vô hạn.
+    # Mặc định 300s: cao hơn thời gian đo được 237s của `/ai/omnichannel` để một
+    # lượt gọi ĐÚNG vẫn kịp xong, đồng thời chặn một thread treo vĩnh viễn.
+    AI_JOB_TIMEOUT_SECONDS: int = 300
+
+    # Chu kỳ quét hàng đợi của worker (giây). Cũng là độ trễ tối đa mà một job quá
+    # hạn bị phát hiện. Giữ nhỏ để hàng đợi phản hồi nhanh mà vẫn rẻ: mỗi vòng
+    # chỉ là một vài câu SQL có index.
+    AI_JOB_POLL_INTERVAL_SECONDS: float = 2.0
+
+    # Số lần thử tối đa cho một job (kể cả lần đầu). Retry CHỈ dành cho lỗi tạm
+    # thời (mạng, timeout, 429, 5xx của provider) — lỗi vĩnh viễn thì thất bại
+    # ngay để không đốt tiền gọi LLM vô ích.
+    AI_JOB_MAX_ATTEMPTS: int = 3
+
+    # Backoff luỹ tiến: lần thứ n chờ min(base * 2**(n-1), max) giây.
+    AI_JOB_RETRY_BASE_SECONDS: float = 10.0
+    AI_JOB_RETRY_MAX_SECONDS: float = 300.0
+
+    # Dọn job đã kết thúc (succeeded/failed/cancelled) sau N ngày. Bảng
+    # `ai_jobs` chứa cả payload lẫn kết quả AI nên phải có chính sách dọn;
+    # job đang chạy/đang chờ KHÔNG bao giờ bị dọn.
+    AI_JOB_RETENTION_DAYS: int = 7
+    AI_JOB_CLEANUP_INTERVAL_SECONDS: float = 3600.0
+    AI_JOB_CLEANUP_BATCH: int = 200
+
     model_config = SettingsConfigDict(
         env_file=str(Path(__file__).resolve().parent.parent.parent / ".env"),
         extra="allow"
