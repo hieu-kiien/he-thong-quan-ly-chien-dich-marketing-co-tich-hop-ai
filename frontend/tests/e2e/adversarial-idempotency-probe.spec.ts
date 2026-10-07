@@ -220,6 +220,86 @@ test.describe('Adversarial Frontend Debounce & Idempotency Probes', () => {
     expect(campaignCreateCount).toBe(1);
   });
 
+  /**
+   * Bộ đếm lượt gọi AI cho hàng đợi bất đồng bộ.
+   *
+   * Từ khi frontend chuyển sang `POST /ai/jobs` + poll `GET /ai/jobs/{id}`, "một
+   * lượt gọi AI" được đo bằng SỐ LẦN ENQUEUE chứ không phải số request HTTP tới
+   * `/ai/omnichannel`. Bộ đếm này đếm `POST /ai/jobs` và trả lời poll, nên một
+   * double-click tạo ra hai lần gọi AI thật vẫn bị bắt đúng như trước.
+   *
+   * `minPollsBeforeSuccess` = 1 nghĩa là phải poll ít nhất một vòng trước khi
+   * trả kết quả: nếu UI bỏ qua bước thăm dò mà lấy thẳng kết quả, probe vẫn
+   * phải thất bại.
+   */
+  const queueCounter = () => ({
+    enqueues: 0,
+    polls: 0,
+    idempotencyKeys: [] as string[],
+  });
+
+  type QueueCounter = ReturnType<typeof queueCounter>;
+
+  /**
+   * Cài hàng đợi AI giả lập trên trang: `POST /ai/jobs` trả 202, `GET
+   * /ai/jobs/{id}` đi qua `running` rồi mới `succeeded`.
+   *
+   * Trả lời poll chỉ thành công sau `minPollsBeforeSuccess` vòng để probe bắt
+   * được hành vi thăm dò thật, và độ trễ 1500ms ở lúc enqueue để nút kịp ở
+   * trạng thái in-flight khi double-click.
+   */
+  const installAiJobQueue = async (
+    page: import('@playwright/test').Page,
+    state: QueueCounter,
+    result: Record<string, unknown>,
+    opts: { minPollsBeforeSuccess?: number; enqueueLatencyMs?: number } = {},
+  ) => {
+    const minPolls = opts.minPollsBeforeSuccess ?? 1;
+    const latency = opts.enqueueLatencyMs ?? 1500;
+    const pollsByJob: Record<number, number> = {};
+
+    await page.route('**/ai/jobs', async (route) => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      state.enqueues += 1;
+      const body = route.request().postDataJSON() || {};
+      if (body.idempotency_key) state.idempotencyKeys.push(body.idempotency_key);
+      const jobId = 9000 + state.enqueues;
+      pollsByJob[jobId] = 0;
+      await new Promise((resolve) => setTimeout(resolve, latency));
+      return route.fulfill({
+        status: 202,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          job_id: jobId,
+          status: 'queued',
+          kind: body.kind,
+          deduplicated: false,
+          poll_url: `/api/v1/ai/jobs/${jobId}`,
+        }),
+      });
+    });
+
+    await page.route(/\/ai\/jobs\/\d+$/, async (route) => {
+      state.polls += 1;
+      const jobId = Number(new URL(route.request().url()).pathname.split('/').pop());
+      pollsByJob[jobId] = (pollsByJob[jobId] || 0) + 1;
+      const done = pollsByJob[jobId] > minPolls;
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          job_id: jobId,
+          kind: 'omnichannel',
+          status: done ? 'succeeded' : 'running',
+          attempts: 1,
+          max_attempts: 3,
+          error: null,
+          result: done ? result : null,
+        }),
+      });
+    });
+  };
+
   // --- PROBE 4: AI Generation Rapid Double-Click in Campaign Wizard ---
   test('Probe 4: Rapid double-click on AI Omnichannel generation button disables during in-flight, preventing duplicate LLM requests', async ({ managerPage }) => {
     // 1. Navigate to Campaigns page via Sidebar "Quản Lý Chiến Dịch"
@@ -237,41 +317,36 @@ test.describe('Adversarial Frontend Debounce & Idempotency Probes', () => {
     await managerPage.click('button:has-text("Tiếp theo")'); // to Step 3
     await expect(managerPage.locator('text=Sinh trọn bộ Mẫu Quảng Cáo Đa Kênh')).toBeVisible();
 
-    // 3. Intercept AI generation endpoint (POST /api/v1/ai/omnichannel) with 1500ms latency and counter
-    let aiCallCount = 0;
-    await managerPage.route('**/ai/omnichannel', async (route) => {
-      aiCallCount++;
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          task_type: 'OMNICHANNEL',
-          model_used: 'Gemini 2.5 Flash',
-          warnings: [],
-          compliance_score: 100,
-          is_fallback: false,
-          facebook: {
-            title: 'Adversarial Test Headline',
-            headline: 'Adversarial Test Headline',
-            body: 'Adversarial Test Body Text',
-            primary_text: 'Adversarial Test Body Text',
-            cta: 'Click Now',
-            hashtags: ['#Test', '#AI'],
-          },
-          tiktok: {
-            hook_3s: 'Adversarial TikTok Hook',
-            scenes: [
-              { scene_number: 1, visual_action: 'Scene 1', voiceover_script: 'Voiceover 1', duration_seconds: 5 },
-            ],
-          },
-          email: {
-            subject: 'Adversarial Email Subject',
-            body: 'Adversarial Email Body',
-            cta: 'Learn More',
-          },
-        }),
-      });
+    // 3. Chặn hàng đợi AI: `POST /ai/jobs` (202) + poll `GET /ai/jobs/{id}`.
+    // Bộ đếm đo SỐ LẦN ENQUEUE — đó mới là "một lượt gọi AI" sau khi frontend
+    // chuyển sang hàng đợi bất đồng bộ.
+    const state = queueCounter();
+    await installAiJobQueue(managerPage, state, {
+      task_type: 'OMNICHANNEL',
+      model_used: 'probe-model',
+      model_provider: 'probe-provider',
+      warnings: [],
+      compliance_score: 100,
+      is_fallback: false,
+      facebook: {
+        title: 'Adversarial Test Headline',
+        headline: 'Adversarial Test Headline',
+        body: 'Adversarial Test Body Text',
+        primary_text: 'Adversarial Test Body Text',
+        cta: 'Click Now',
+        hashtags: ['#Test', '#AI'],
+      },
+      tiktok: {
+        hook_3s: 'Adversarial TikTok Hook',
+        scenes: [
+          { scene_number: 1, visual_action: 'Scene 1', voiceover_script: 'Voiceover 1', duration_seconds: 5 },
+        ],
+      },
+      email: {
+        subject: 'Adversarial Email Subject',
+        body: 'Adversarial Email Body',
+        cta: 'Learn More',
+      },
     });
 
     // 4. Locate "1-Click Sinh Toàn Bộ Mẫu Quảng Cáo" button
@@ -282,19 +357,31 @@ test.describe('Adversarial Frontend Debounce & Idempotency Probes', () => {
     // 5. Adversarial Action: Rapid double-click
     await generateBtn.click({ noWaitAfter: true });
 
-    // Verify immediate disabled state & spinner text ("Gemini đang sáng tạo nội dung...")
-    const inFlightBtn = managerPage.locator('button:has-text("Gemini đang sáng tạo nội dung...")');
+    // Nhãn in-flight không còn ghi cứng "Gemini": provider thật có thể là
+    // opencode/openrouter. Assert vào nhãn trung lập đã dùng ở probe 5.
+    const inFlightBtn = managerPage.locator('button:has-text("AI đang sáng tạo nội dung...")');
     await expect(inFlightBtn).toBeVisible({ timeout: 2000 });
     await expect(inFlightBtn).toBeDisabled();
 
     // Attempt second click during in-flight
     await inFlightBtn.click({ force: true, noWaitAfter: true }).catch(() => {});
 
-    // 6. Verify completion
-    await expect(managerPage.locator('text=Google Gemini đã sinh thành công trọn bộ Mẫu Quảng Cáo Đa Kênh!').first()).toBeVisible({ timeout: 7000 });
+    // 6. Verify completion. Toast nêu provider/model lấy từ kết quả thật, nên
+    // assert vào phần ổn định rồi kiểm tra có tên provider kèm theo.
+    const successToast = managerPage
+      .locator('text=Đã sinh thành công trọn bộ Mẫu Quảng Cáo Đa Kênh bằng')
+      .first();
+    await expect(successToast).toBeVisible({ timeout: 10_000 });
+    await expect(successToast).toContainText('probe-provider/probe-model');
 
-    // 7. Empirical Invariant Assertion:
-    expect(aiCallCount).toBe(1);
+    // 7. Empirical Invariant Assertions:
+    //   - đúng MỘT lần enqueue => đúng một lượt gọi AI, không trừ hạn mứng hai lần;
+    //   - có thăm dò thật (không lấy kết quả bằng cách bỏ qua poll);
+    //   - khoá idempotency phải được gửi đi để backend có lớp chống trùng thứ hai.
+    expect(state.enqueues).toBe(1);
+    expect(state.polls).toBeGreaterThanOrEqual(2);
+    expect(state.idempotencyKeys).toHaveLength(1);
+    expect(state.idempotencyKeys[0]).toBeTruthy();
   });
 
   // --- PROBE 5: AI Studio Omnichannel Rapid Double-Click ---
@@ -303,25 +390,18 @@ test.describe('Adversarial Frontend Debounce & Idempotency Probes', () => {
     await managerPage.click('aside button:has-text("Xưởng Sáng Tạo AI")');
     await expect(managerPage.locator('text=AI Marketing Copilot & Performance Doctor')).toBeVisible();
 
-    // 2. Intercept AI generation endpoint (POST /api/v1/ai/omnichannel) with 1500ms latency
-    let studioAiCount = 0;
-    await managerPage.route('**/ai/omnichannel', async (route) => {
-      studioAiCount++;
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          task_type: 'OMNICHANNEL',
-          model_used: 'Gemini 2.5 Flash',
-          warnings: [],
-          compliance_score: 100,
-          is_fallback: false,
-          facebook: { headline: 'Studio FB', primary_text: 'Body', cta: 'CTA' },
-          tiktok: { hook_3s: 'Studio TikTok', scenes: [] },
-          email: { subject_line_a: 'Studio Email', body_content: 'Email Body', cta_button: 'CTA' },
-        }),
-      });
+    // 2. Chặn hàng đợi AI (POST /ai/jobs + poll) với 1500ms độ trễ lúc enqueue.
+    const state = queueCounter();
+    await installAiJobQueue(managerPage, state, {
+      task_type: 'OMNICHANNEL',
+      model_used: 'probe-model',
+      model_provider: 'probe-provider',
+      warnings: [],
+      compliance_score: 100,
+      is_fallback: false,
+      facebook: { headline: 'Studio FB', primary_text: 'Body', cta: 'CTA' },
+      tiktok: { hook_3s: 'Studio TikTok', scenes: [] },
+      email: { subject_line_a: 'Studio Email', body_content: 'Email Body', cta_button: 'CTA' },
     });
 
     // 3. Locate the generate button
@@ -350,11 +430,12 @@ test.describe('Adversarial Frontend Debounce & Idempotency Probes', () => {
     // "...cho cả 3 kênh tiếp thị". Assert vào phần ổn định và kiểm tra provider
     // đi kèm để vẫn bắt được việc toast phải nói đúng nguồn sinh nội dung.
     const successToast = managerPage.locator('text=Đã tạo thành công nội dung cho cả 3 kênh').first();
-    await expect(successToast).toBeVisible({ timeout: 7000 });
-    await expect(successToast).toContainText('/');
+    await expect(successToast).toBeVisible({ timeout: 10_000 });
+    await expect(successToast).toContainText('probe-provider/probe-model');
 
-    // 6. Empirical Invariant Assertion:
-    expect(studioAiCount).toBe(1);
+    // 6. Empirical Invariant Assertions: đúng một lần enqueue, có thăm dò thật.
+    expect(state.enqueues).toBe(1);
+    expect(state.polls).toBeGreaterThanOrEqual(2);
   });
 
   // --- PROBE 6: AIDrawer Slide-Over AI Generation Rapid Double-Click ---
@@ -367,25 +448,18 @@ test.describe('Adversarial Frontend Debounce & Idempotency Probes', () => {
     // 2. Verify AIDrawer is open
     await expect(managerPage.locator('#ai-drawer-title')).toBeVisible();
 
-    // 3. Intercept Omnichannel generation
-    let drawerAiCount = 0;
-    await managerPage.route('**/ai/omnichannel', async (route) => {
-      drawerAiCount++;
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          task_type: 'OMNICHANNEL',
-          model_used: 'Gemini 2.5 Flash',
-          warnings: [],
-          compliance_score: 100,
-          is_fallback: false,
-          facebook: { headline: 'Drawer FB', primary_text: 'Body', cta: 'CTA' },
-          tiktok: { hook_3s: 'Drawer TikTok', scenes: [] },
-          email: { subject_line_a: 'Drawer Email', body_content: 'Email Body', cta_button: 'CTA' },
-        }),
-      });
+    // 3. Chặn hàng đợi AI (POST /ai/jobs + poll) với 1500ms độ trễ lúc enqueue.
+    const state = queueCounter();
+    await installAiJobQueue(managerPage, state, {
+      task_type: 'OMNICHANNEL',
+      model_used: 'probe-model',
+      model_provider: 'probe-provider',
+      warnings: [],
+      compliance_score: 100,
+      is_fallback: false,
+      facebook: { headline: 'Drawer FB', primary_text: 'Body', cta: 'CTA' },
+      tiktok: { hook_3s: 'Drawer TikTok', scenes: [] },
+      email: { subject_line_a: 'Drawer Email', body_content: 'Email Body', cta_button: 'CTA' },
     });
 
     // 4. Locate drawer omnichannel button
@@ -407,10 +481,15 @@ test.describe('Adversarial Frontend Debounce & Idempotency Probes', () => {
     await drawerOmniBtn.click({ force: true, noWaitAfter: true }).catch(() => {});
 
     // 6. Wait for success toast
-    await expect(managerPage.locator('text=Đã sinh thành công nội dung sáng tạo cho cả 3 kênh!').first()).toBeVisible({ timeout: 7000 });
+    const successToast = managerPage
+      .locator('text=Đã sinh thành công nội dung sáng tạo cho cả 3 kênh!')
+      .first();
+    await expect(successToast).toBeVisible({ timeout: 10_000 });
+    await expect(successToast).toContainText('probe-provider/probe-model');
 
-    // 7. Empirical Invariant Assertion:
-    expect(drawerAiCount).toBe(1);
+    // 7. Empirical Invariant Assertions: đúng một lần enqueue, có thăm dò thật.
+    expect(state.enqueues).toBe(1);
+    expect(state.polls).toBeGreaterThanOrEqual(2);
   });
 
 });

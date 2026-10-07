@@ -3,7 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { Sparkles, Lightbulb, FileText, SendHorizontal, Copy, Check, Loader2, ArrowRight, CheckCircle2, Zap, Stethoscope, RefreshCw, AlertTriangle, ThumbsUp, Video, Mail, ExternalLink, ShieldCheck, Eye, Lock } from 'lucide-react';
 import { Campaign, AIIdeaResponse, AIDraftResponse, MarketingContent, AISummaryResponse, KPISummary, OmnichannelResponse, ComplianceCheckResponse } from '../types';
 
-import { aiApi, contentApi, campaignApi, getApiErrorMessage } from '../services/api';
+import { contentApi, campaignApi, getApiErrorMessage } from '../services/api';
+import { AIJobError, describeAIJobFailure, describeAIResultOrigin } from '../services/aiJobPoller';
+import { useAIJob } from '../hooks/useAIJob';
+import { AIJobProgress } from '../components/AIJobProgress';
 
 import { useToast } from '../components/Toast';
 
@@ -117,6 +120,37 @@ export const AIStudio: React.FC<AIStudioProps> = ({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const [submittedSuccess, setSubmittedSuccess] = useState<boolean>(false);
+
+  // Hàng đợi AI bất đồng bộ: một hook cho mỗi loại việc vì chúng có thể chạy
+  // song song và mỗi cái cần trạng thái + đồng hồ + nút huỷ riêng.
+  const ideasJob = useAIJob();
+
+  const draftJob = useAIJob();
+
+  const omniJob = useAIJob();
+
+  const doctorJob = useAIJob();
+
+  /**
+   * Báo lỗi job AI theo đúng loại đã phân loại, kèm nguyên văn lý do từ server.
+   *
+   * Không dùng `getApiErrorMessage` cho lỗi hàng đợi: `AIJobError` không phải lỗi
+   * axios nên không có `response.data.detail` để đọc, và thông báo chung chung
+   * "không xác định được lỗi" khiến người dùng không biết phải làm gì tiếp theo.
+   */
+  const reportJobError = (error: unknown, fallbackTitle: string) => {
+    if (error instanceof AIJobError) {
+      // `disposed` = component đã bị tháo giữa lúc chờ. Không phải lỗi của
+      // người dùng nên không toast gì cả.
+      if (error.disposed) return;
+      const { title, hint } = describeAIJobFailure(error.kind);
+      const parts = [hint];
+      if (error.backendReason) parts.push(`Thông báo từ máy chủ: ${error.backendReason}`);
+      toast.error(parts.join('\n'), title);
+      return;
+    }
+    toast.error(getApiErrorMessage(error), fallbackTitle);
+  };
 
 
 
@@ -254,17 +288,48 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
 
 
-      const res = await aiApi.generateIdeas(cid, channelCode, 'v3', customData);
+      // Qua hàng đợi, không gọi thẳng `/ai/ideas`. Endpoint đồng bộ giữ một
+      // thread của worker suốt thời gian chờ LLM; qua Worker thì Cloudflare cắt
+      // ở ~100s (error 524) trong khi job thật mất 237s.
+      const res = await ideasJob.run<AIIdeaResponse>({
+
+        kind: 'ideas',
+
+        ...(cid ? { campaign_id: cid } : {}),
+
+        channel_code: channelCode,
+
+        prompt_version: 'v3',
+
+        ...(customData.topic ? { custom_topic: customData.topic } : {}),
+
+        ...(customData.product ? { custom_product: customData.product } : {}),
+
+        ...(customData.usp ? { custom_usp: customData.usp } : {}),
+
+        ...(customData.tone ? { tone: customData.tone } : {})
+
+      });
 
       setIdeaData(res);
 
       setActiveTab('ideas');
 
-      toast.success(`Đã sinh ${res.ideas.length} góc ý tưởng tiếp thị chất lượng cao từ Gemini!`);
+      const origin = describeAIResultOrigin(res);
+
+      if (origin.isFallback) {
+
+        toast.warning(`Đã tạo ${res.ideas.length} ý tưởng từ ${origin.label}.`, 'Không gọi được AI');
+
+      } else {
+
+        toast.success(`Đã sinh ${res.ideas.length} góc ý tưởng tiếp thị từ ${origin.label}!`);
+
+      }
 
     } catch (e: any) {
 
-      toast.error(getApiErrorMessage(e), 'Lỗi khi gọi AI sinh ý tưởng');
+      reportJobError(e, 'Lỗi khi gọi AI sinh ý tưởng');
 
     } finally {
 
@@ -304,17 +369,43 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
 
 
-      const res = await aiApi.generateDraft(cid, ideaToUse, channelCode, 'v3', customData);
+      const res = await draftJob.run<AIDraftResponse>({
+
+        kind: 'draft',
+
+        selected_idea: ideaToUse,
+
+        ...(cid ? { campaign_id: cid } : {}),
+
+        channel_code: channelCode,
+
+        prompt_version: 'v3',
+
+        ...(customData?.product ? { custom_product: customData.product } : {}),
+
+        ...(customData?.usp ? { custom_usp: customData.usp } : {})
+
+      });
 
       setDraftData(res);
 
       setActiveTab('draft');
 
-      toast.success('Bản nháp bài viết đa kênh đã được hoàn thiện thành công!');
+      const origin = describeAIResultOrigin(res);
+
+      if (origin.isFallback) {
+
+        toast.warning(`Bản nháp dưới đây là ${origin.label}.`, 'Không gọi được AI');
+
+      } else {
+
+        toast.success(`Bản nháp bài viết đã được hoàn thiện bởi ${origin.label}!`);
+
+      }
 
     } catch (e: any) {
 
-      toast.error(getApiErrorMessage(e), 'Lỗi khi gọi AI sinh bản thảo');
+      reportJobError(e, 'Lỗi khi gọi AI sinh bản thảo');
 
     } finally {
 
@@ -692,11 +783,16 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
     try {
 
-      const res = await aiApi.generateOmnichannel({
+      // Đây là lời gọi nặng nhất của hệ thống: đo thật 237 giây trên Render
+      // free, qua Cloudflare Worker là chết 524. Đi qua hàng đợi để request
+      // trả 202 ngay và việc gọi LLM do worker nền đảm nhiệm.
+      const res = await omniJob.run<OmnichannelResponse>({
+
+        kind: 'omnichannel',
 
         brief: briefToUse,
 
-        campaign_id: activeCampaign?.id || null,
+        ...(activeCampaign?.id ? { campaign_id: activeCampaign.id } : {}),
 
         channels: ['facebook', 'tiktok', 'email']
 
@@ -706,20 +802,22 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
       // Toast phải nói đúng nguồn gốc. Trước đây luôn ghi "(Gemini 2.5 Flash)"
       // kể cả khi backend đã chuyển sang template dự phòng vì không gọi được AI.
-      if (res.is_fallback) {
+      const origin = describeAIResultOrigin(res);
+
+      if (origin.isFallback) {
         toast.warning(
           'Không gọi được AI — đã dùng nội dung template dự phòng. Xem mục cảnh báo bên dưới để biết lý do.',
           'Nội dung không phải do AI tạo',
         );
       } else {
         toast.success(
-          `Đã tạo thành công nội dung cho cả 3 kênh (${res.model_provider ?? 'gemini'}/${res.model_used})!`,
+          `Đã tạo thành công nội dung cho cả 3 kênh (${origin.label})!`,
         );
       }
 
     } catch (e: any) {
 
-      toast.error(getApiErrorMessage(e), 'Lỗi khi gọi AI sinh nội dung đa kênh');
+      reportJobError(e, 'Lỗi khi gọi AI sinh nội dung đa kênh');
 
     } finally {
 
@@ -913,15 +1011,33 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
       setLoadingDoctor(true);
 
-      const res = await aiApi.generateSummary(activeC.id);
+      const res = await doctorJob.run<AISummaryResponse>({
+
+        kind: 'summary',
+
+        campaign_id: activeC.id,
+
+        prompt_version: 'v3'
+
+      });
 
       setDoctorData(res);
 
-      toast.success('Bác sĩ AI đã hoàn tất phân tích sức khỏe chiến dịch!');
+      const origin = describeAIResultOrigin(res);
+
+      if (origin.isFallback) {
+
+        toast.warning(`Báo cáo chẩn đoán là ${origin.label}.`, 'Không gọi được AI');
+
+      } else {
+
+        toast.success(`Bác sĩ AI đã hoàn tất phân tích sức khỏe chiến dịch bằng ${origin.label}!`);
+
+      }
 
     } catch (e: any) {
 
-      toast.error(getApiErrorMessage(e), 'Lỗi khi chạy chẩn đoán');
+      reportJobError(e, 'Lỗi khi chạy chẩn đoán');
 
     } finally {
 
@@ -1365,15 +1481,24 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
               >
 
-                {omniLoading ? (
+{omniLoading ? (
 
-                  <>
+                      <>
 
                     <Loader2 className="w-4 h-4 animate-spin" />
 
-                    <span>AI đang sáng tạo 3 kênh (có thể mất vài phút)...</span>
+                    {/* Nhãn phụ "đang xếp hàng" cho biết việc còn nằm trong hàng
+                        đợi hay đã được worker nhặt lên. Nhánh nền giữ nguyên cụm
+                        "AI đang sáng tạo 3 kênh" để các probe đo hành vi
+                        double-click vẫn bám đúng nhãn này. */}
+                    <span>
+                      {(omniJob.phase === 'queued' || omniJob.phase === 'enqueuing')
+                        ? 'Đang xếp hàng — '
+                        : ''}
+                      AI đang sáng tạo 3 kênh{omniJob.busy ? '...' : ''}
+                    </span>
 
-                  </>
+                      </>
 
                 ) : (
 
@@ -1390,6 +1515,11 @@ export const AIStudio: React.FC<AIStudioProps> = ({
               </button>
 
             </div>
+
+            {/* Trạng thái chờ: hàng đợi, đồng hồ, huỷ. Hiện cả khi đang chờ lẫn
+                khi đã thất bại, nên người dùng luôn thấy kết quả cuối cùng của
+                lần bấm vừa rồi. */}
+            <AIJobProgress job={omniJob} label="3 kênh (Facebook, TikTok, Email)" onRetry={handleGenerateOmnichannel} />
 
           </div>
 
@@ -3020,6 +3150,10 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
                   </button>
 
+                  <AIJobProgress job={ideasJob} label="5 góc ý tưởng tiếp thị" onRetry={handleGenerateIdeas} />
+
+                  <AIJobProgress job={draftJob} label="bản nháp bài viết" onRetry={() => handleGenerateDraft()} />
+
                 </div>
 
               </div>
@@ -3542,13 +3676,15 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
                   {loadingDoctor ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Stethoscope className="w-4 h-4" />}
 
-                  <span>{loadingDoctor ? 'Đang phân tích số liệu...' : `Khám cho: ${activeC.name}`}</span>
+                  <span>{loadingDoctor ? (doctorJob.phase === 'queued' ? 'Đang xếp hàng chẩn đoán...' : 'Đang phân tích số liệu...') : `Khám cho: ${activeC.name}`}</span>
 
                 </button>
 
               )}
 
             </div>
+
+            <AIJobProgress job={doctorJob} label={`chẩn đoán chiến dịch ${activeC?.name ?? ''}`} onRetry={handleRunDoctor} />
 
 
 

@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Sparkles, ShieldCheck, BarChart3, ArrowRight, CheckCircle2, XCircle, ZoomIn, ZoomOut, Calendar, Target, Users, Layers, FileText, Check, Copy, Stethoscope, RefreshCw, ThumbsUp, MessageSquare, Share2, Mail, Video, ExternalLink, Eye, CalendarCheck, ShieldAlert, Wand2, X, PieChart, ListTodo } from 'lucide-react';
-import { Campaign, MarketingContent, KPISummary, AIIdeaItem, AIDraftResponse, ContentComplianceCheck, Task, TaskStatus, TaskPriority, TaskType } from '../types';
-import { campaignApi, contentApi, aiApi, scheduleApi, taskApi, budgetApi, evaluateMarketingCompliance, getApiErrorMessage } from '../services/api';
+import { Campaign, MarketingContent, KPISummary, AIIdeaItem, AIIdeaResponse, AIDraftResponse, ContentComplianceCheck, Task, TaskStatus, TaskPriority, TaskType } from '../types';
+import { campaignApi, contentApi, scheduleApi, taskApi, budgetApi, evaluateMarketingCompliance, getApiErrorMessage } from '../services/api';
+import { AIJobError, describeAIJobFailure, describeAIResultOrigin } from '../services/aiJobPoller';
+import { useAIJob } from '../hooks/useAIJob';
+import { AIJobProgress } from './AIJobProgress';
 import { useToast } from './Toast';
 import { copyToClipboardWithFormatting } from '../utils/copyUtils';
 import { 
@@ -90,6 +93,22 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   const [generatedDraft, setGeneratedDraft] = useState<AIDraftResponse | null>(null);
   const [savingAction, setSavingAction] = useState<boolean>(false);
   const [copiedDraft, setCopiedDraft] = useState<boolean>(false);
+
+  // Hàng đợi AI bất đồng bộ cho hai việc của Copilot trong hub.
+  const copilotIdeaJob = useAIJob();
+  const copilotDraftJob = useAIJob();
+
+  const reportJobError = (error: unknown, fallbackTitle: string) => {
+    if (error instanceof AIJobError) {
+      if (error.disposed) return;
+      const { title, hint } = describeAIJobFailure(error.kind);
+      const parts = [hint];
+      if (error.backendReason) parts.push(`Thông báo từ máy chủ: ${error.backendReason}`);
+      toast.error(parts.join('\n'), title);
+      return;
+    }
+    toast.error(getApiErrorMessage(error), fallbackTitle);
+  };
 
   // AI Compliance State
   const [complianceResult, setComplianceResult] = useState<ContentComplianceCheck | null>(null);
@@ -333,16 +352,25 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   const handleGenerateIdeas = async () => {
     try {
       setGeneratingIdeas(true);
-      const res = await aiApi.generateIdeas(campaign.id, channel, 'v3', {
-        tone: `${tone} (${framework} framework)`
+      const res = await copilotIdeaJob.run<AIIdeaResponse>({
+        kind: 'ideas',
+        campaign_id: campaign.id,
+        channel_code: channel,
+        prompt_version: 'v3',
+        tone: `${tone} (${framework} framework)`,
       });
       setIdeas(res.ideas || []);
       if (res.ideas && res.ideas.length > 0) {
         setSelectedIdea(res.ideas[0].headline);
       }
-      toast.success(`Đã sinh ${res.ideas?.length || 0} ý tưởng góc nhìn sáng tạo!`);
+      const origin = describeAIResultOrigin(res);
+      if (origin.isFallback) {
+        toast.warning(`Đã tạo ${res.ideas?.length || 0} ý tưởng từ ${origin.label}.`, 'Không gọi được AI');
+      } else {
+        toast.success(`Đã sinh ${res.ideas?.length || 0} ý tưởng góc nhìn sáng tạo bằng ${origin.label}!`);
+      }
     } catch (e: any) {
-      toast.error(getApiErrorMessage(e), 'Lỗi sinh ý tưởng AI');
+      reportJobError(e, 'Lỗi sinh ý tưởng AI');
     } finally {
       setGeneratingIdeas(false);
     }
@@ -357,11 +385,22 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     try {
       setGeneratingDraft(true);
       setComplianceResult(null);
-      const res = await aiApi.generateDraft(campaign.id, selectedIdea, channel, 'v3');
+      const res = await copilotDraftJob.run<AIDraftResponse>({
+        kind: 'draft',
+        campaign_id: campaign.id,
+        selected_idea: selectedIdea,
+        channel_code: channel,
+        prompt_version: 'v3',
+      });
       setGeneratedDraft(res);
-      toast.success('AI Copilot đã hoàn thành bản thảo đa kênh!');
+      const origin = describeAIResultOrigin(res);
+      if (origin.isFallback) {
+        toast.warning(`Bản thảo dưới đây là ${origin.label}.`, 'Không gọi được AI');
+      } else {
+        toast.success(`AI Copilot đã hoàn thành bản thảo đa kênh bằng ${origin.label}!`);
+      }
     } catch (e: any) {
-      toast.error(getApiErrorMessage(e), 'Lỗi sinh bản thảo AI');
+      reportJobError(e, 'Lỗi sinh bản thảo AI');
     } finally {
       setGeneratingDraft(false);
     }
@@ -977,8 +1016,10 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                 className="w-full py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-violet-600/20 transition-all active:scale-95"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>{generatingIdeas ? 'Gemini đang tìm góc tiếp cận...' : '1. Tìm ý tưởng góc nhìn sáng tạo'}</span>
+                <span>{generatingIdeas ? (copilotIdeaJob.phase === 'queued' ? 'Đang xếp hàng...' : 'AI đang tìm góc tiếp cận...') : '1. Tìm ý tưởng góc nhìn sáng tạo'}</span>
               </button>
+
+              <AIJobProgress job={copilotIdeaJob} label="góc nhìn sáng tạo" onRetry={handleGenerateIdeas} />
             </div>
 
             {/* Ideas Selector */}
@@ -1016,8 +1057,10 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                   className="w-full mt-2 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-indigo-600/20 transition-all active:scale-95"
                 >
                   <FileText className="w-4 h-4" />
-                  <span>{generatingDraft ? 'AI đang viết bài hoàn chỉnh...' : '2. Viết nội dung hoàn chỉnh'}</span>
+                  <span>{generatingDraft ? (copilotDraftJob.phase === 'queued' ? 'Đang xếp hàng...' : 'AI đang viết bài hoàn chỉnh...') : '2. Viết nội dung hoàn chỉnh'}</span>
                 </button>
+
+                <AIJobProgress job={copilotDraftJob} label="bản thảo hoàn chỉnh" onRetry={handleGenerateDraft} />
               </div>
             )}
           </div>

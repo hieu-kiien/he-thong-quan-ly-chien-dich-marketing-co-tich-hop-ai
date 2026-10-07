@@ -308,6 +308,114 @@ export const INITIAL_BYOK_KEYS = [
   }
 ];
 
+/**
+ * Kết quả AI dùng chung cho cả hai đường: hàng đợi bất đồng bộ (`POST /ai/jobs`
+ * → poll) và endpoint đồng bộ cũ (`POST /ai/ideas` v.v, vẫn được giữ vì backend
+ * đánh dấu deprecated nhưng chưa bỏ).
+ *
+ * Tách ra khỏi handler để hai đường không trôi lệch nội dung với nhau: trước đây
+ * payload nằm inline trong từng handler, nên chỉ cần sửa một bên là test chạy được
+ * nhưng hành vi thật thì lệch.
+ */
+export const MOCK_AI_IDEAS = {
+  task_type: 'IDEA',
+  ideas: [
+    {
+      id: 1,
+      angle: 'Hiệu Năng & Thực Chiến',
+      target_emotion: 'Khao khát bứt phá',
+      headline: 'Chinh phục kỷ nguyên AI cùng thực hành GPU đỉnh cao',
+      concept: 'Nhấn mạnh năng lực thực chiến với cơ sở hạ tầng hiện đại',
+      key_benefit: 'Cam kết việc làm và cơ hội nhận học bổng 50%',
+    },
+    {
+      id: 2,
+      angle: 'Chuyên Gia Đầu Ngành',
+      target_emotion: 'Tin cậy vững chắn',
+      headline: 'Học AI từ chuyên gia doanh nghiệp hàng đầu',
+      concept: 'Lộ trình đào tạo chuẩn quốc tế gắn liền dự án thật',
+      key_benefit: 'Tự tay huấn luyện mô hình LLM từ con số 0',
+    },
+    {
+      id: 3,
+      angle: 'Học Bổng Tài Năng',
+      target_emotion: 'Hào hứng khám phá',
+      headline: 'Học bổng Tài Năng Công nghệ Trí tuệ Nhân tạo 2026',
+      concept: 'Đãi ngộ đặc biệt cho tài năng trẻ khao khát đổi mới sáng tạo',
+      key_benefit: 'Miễn 100% học phí và tài trợ kinh phí nghiên cứu Lab',
+    },
+  ],
+  warnings: [],
+  assumptions: [],
+  prompt_version: 'v3',
+  is_fallback: false,
+  model_used: 'mock-model-v3',
+  model_provider: 'mock-ai-provider',
+};
+
+export const MOCK_AI_DRAFT = {
+  task_type: 'DRAFT',
+  title: 'Khởi đầu sự nghiệp Kỹ sư AI cùng chương trình thực hành chuẩn quốc tế 2026',
+  body: 'Làn sóng trí tuệ nhân tạo đang mở ra hàng ngàn cơ hội đột phá. Tham gia ngay chương trình đào tạo để cam kết 100% việc làm và trải nghiệm môi trường học tập đẳng cấp, tự tay xây dựng các mô hình Machine Learning thực tế.\n\nThời gian nhận hồ sơ xét tuyển có hạn, hãy nhanh tay nắm bắt tấm vé vàng!',
+  cta: 'Đăng ký nhận tư vấn lộ trình và học bổng ngay',
+  warnings: [],
+  assumptions: [],
+  prompt_version: 'v3',
+  is_fallback: false,
+  model_used: 'mock-model-v3',
+  model_provider: 'mock-ai-provider',
+};
+
+export const MOCK_AI_OMNICHANNEL = {
+  task_type: 'OMNICHANNEL',
+  model_used: 'mock-model-v3',
+  model_provider: 'mock-ai-provider',
+  warnings: [],
+  compliance_score: 100,
+  is_fallback: false,
+  facebook: {
+    title: 'Bứt Phá Thu Nhập Cùng Nghề Kỹ Sư AI Thực Chiến',
+    headline: 'Bứt Phá Thu Nhập Cùng Nghề Kỹ Sư AI Thực Chiến',
+    body: 'Thực hành trực tiếp trên hạ tầng máy chủ GPU công suất lớn. Đăng ký nhận thông tin xét tuyển đợt 1 ngay!',
+    primary_text: 'Thực hành trực tiếp trên hạ tầng máy chủ GPU công suất lớn. Đăng ký nhận thông tin xét tuyển đợt 1 ngay!',
+    cta: 'Đăng ký ngay',
+    hashtags: ['#AI2026', '#KySuAI', '#ICTU', '#CongNgheSo'],
+    visual_suggestion: 'Ảnh phòng Lab hiện đại với sinh viên thao tác trên máy trạm.',
+  },
+  tiktok: {
+    hook_3s: 'Bạn có biết sinh viên ngành AI làm gì một ngày trên phòng Lab?',
+    scenes: [
+      {
+        scene: 1,
+        scene_number: 1,
+        title: 'Mở màn ấn tượng',
+        visual_action: 'Cận cảnh màn hình terminal đang chạy mô hình Deep Learning',
+        voiceover: 'Một ngày tại phòng Lab AI thực chiến có gì đặc biệt?',
+        duration_seconds: 4,
+        audio: 'Upbeat tech soundtrack',
+      },
+      {
+        scene: 2,
+        scene_number: 2,
+        title: 'Thực hành GPU',
+        visual_action: 'Sinh viên thảo luận cùng giảng viên bên cụm máy chủ',
+        voiceover: 'Được tự tay huấn luyện các mô hình AI tiến bộ nhất hiện nay.',
+        duration_seconds: 5,
+        audio: 'Lofi study beat',
+      }
+    ],
+    sound_recommendation: 'Trending tech synthwave music',
+  },
+  email: {
+    subject_line_a: '[Thư mời] Trải nghiệm một ngày làm Kỹ sư AI tại ICTU',
+    subject_line_b: 'Khám phá bí quyết chinh phục ngành công nghệ hot nhất 2026',
+    preheader: 'Cơ hội nhận học bổng 50% dành cho ứng viên đăng ký sớm',
+    body_content: 'Chào bạn,\n\nNgành trí tuệ nhân tạo đang khát nhân lực hơn bao giờ hết. Chúng tôi trân trọng mời bạn tham dự ngày hội trải nghiệm công nghệ.',
+    cta_button: 'Xác nhận tham gia',
+    ps_note: 'Số lượng vé tham dự có hạn cho đợi này.',
+  },
+};
+
 export interface SetupMockOptions {
   userRole?: 'MARKETER' | 'MANAGER' | 'CLIENT_APPROVER' | 'AGENCY_MANAGER';
   customContents?: any[];
@@ -734,39 +842,110 @@ export async function setupMockApiRoutes(page: Page, options: SetupMockOptions =
       });
     }
 
-    // 5. AI Endpoints
-    if (path.endsWith('/ai/ideas') && method === 'POST') {
+    // ---------------------------------------------------------------------
+    // 5a. HÀNG ĐỢI AI BẤT ĐỒNG BỘ (POST /ai/jobs -> poll GET /ai/jobs/{id})
+    //
+    // Mock bám đúng hợp đồng backend thật (app/api/v1/ai_jobs.py): 202 với
+    // {job_id,status}, poll trả queued -> running -> succeeded, huỷ chỉ được
+    // khi đang queued. Job đi qua `queued` và `running` trước khi xong để các
+    // test chạm đúng đường poll thật thay vì đường "thành công ngay lập tức".
+    // ---------------------------------------------------------------------
+    if (path.endsWith('/ai/jobs') && method === 'POST') {
+      const body = request.postDataJSON() || {};
+      const jobId = (setupMockApiRoutes._nextJobId = (setupMockApiRoutes._nextJobId || 9000) + 1);
+
+      // Nhớ `kind` + số lần poll để `GET /ai/jobs/{id}` trả đúng kết quả.
+      setupMockApiRoutes._jobs[jobId] = { kind: body.kind, polls: 0 };
+
+      return route.fulfill({
+        status: 202,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          job_id: jobId,
+          status: 'queued',
+          kind: body.kind,
+          deduplicated: false,
+          poll_url: `/api/v1/ai/jobs/${jobId}`,
+        }),
+      });
+    }
+
+    if (path.endsWith('/ai/jobs') && method === 'GET') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ items: [], total: 0, page: 1, page_size: 20, has_next: false }),
+      });
+    }
+
+    const cancelMatch = path.match(/\/ai\/jobs\/(\d+)\/cancel$/);
+    if (cancelMatch && method === 'POST') {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          ideas: [
-            {
-              id: 1,
-              angle: 'Hiệu Năng & Thực Chiến',
-              target_emotion: 'Khao khát bứt phá',
-              headline: 'Chinh phục kỷ nguyên AI cùng thực hành GPU đỉnh cao',
-              concept: 'Nhấn mạnh năng lực thực chiến với cơ sở hạ tầng hiện đại',
-              key_benefit: 'Cam kết việc làm và cơ hội nhận học bổng 50%',
-            },
-            {
-              id: 2,
-              angle: 'Chuyên Gia Đầu Ngành',
-              target_emotion: 'Tin cậy vững chắc',
-              headline: 'Học AI từ chuyên gia doanh nghiệp hàng đầu',
-              concept: 'Lộ trình đào tạo chuẩn quốc tế gắn liền dự án thật',
-              key_benefit: 'Tự tay huấn luyện mô hình LLM từ con số 0',
-            },
-            {
-              id: 3,
-              angle: 'Học Bổng Tài Năng',
-              target_emotion: 'Hào hứng khám phá',
-              headline: 'Học bổng Tài năng Công nghệ Trí tuệ Nhân tạo 2026',
-              concept: 'Đãi ngộ đặc biệt cho tài năng trẻ khao khát đổi mới sáng tạo',
-              key_benefit: 'Miễn 100% học phí và tài trợ kinh phí nghiên cứu Lab',
-            },
-          ],
+          job_id: Number(cancelMatch[1]),
+          status: 'cancelled',
+          kind: 'omnichannel',
+          deduplicated: false,
+          poll_url: `/api/v1/ai/jobs/${cancelMatch[1]}`,
         }),
+      });
+    }
+
+    const jobMatch = path.match(/\/ai\/jobs\/(\d+)$/);
+    if (jobMatch && method === 'GET') {
+      const jobId = Number(jobMatch[1]);
+      const job = (setupMockApiRoutes._jobs[jobId] ||= { kind: 'omnichannel', polls: 0 });
+      job.polls += 1;
+      const kind = job.kind;
+
+      // 2 vòng đầu chỉ trả trạng thái, vòng thứ 3 mới trả kết quả. Đủ để test
+      // phải thật sự thăm dò, nhưng vẫn nhanh (mỗi vòng 1.5 giây backoff).
+      if (job.polls < 2) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            job_id: jobId,
+            kind,
+            status: job.polls === 1 ? 'queued' : 'running',
+            attempts: 1,
+            max_attempts: 3,
+            error: null,
+            result: null,
+          }),
+        });
+      }
+
+      const results: Record<string, any> = {
+        ideas: MOCK_AI_IDEAS,
+        draft: MOCK_AI_DRAFT,
+        omnichannel: MOCK_AI_OMNICHANNEL,
+      };
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          job_id: jobId,
+          kind,
+          status: 'succeeded',
+          attempts: 1,
+          max_attempts: 3,
+          error: null,
+          result: results[kind] || MOCK_AI_OMNICHANNEL,
+        }),
+      });
+    }
+
+    // 5. AI Endpoints ĐỒNG BỘ (backend đánh dấu deprecated nhưng vẫn còn, giữ mock
+    // để không vỡ nếu còn mã gọi tới). Nội dung dùng chung với hàng đợi ở trên.
+    if (path.endsWith('/ai/ideas') && method === 'POST') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(MOCK_AI_IDEAS),
       });
     }
 
@@ -774,11 +953,7 @@ export async function setupMockApiRoutes(page: Page, options: SetupMockOptions =
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          title: 'Khởi đầu sự nghiệp Kỹ sư AI cùng chương trình thực hành chuẩn quốc tế 2026',
-          body: 'Làn sóng trí tuệ nhân tạo đang mở ra hàng ngàn cơ hội đột phá. Tham gia ngay chương trình đào tạo để cam kết 100% việc làm và trải nghiệm môi trường học tập đẳng cấp, tự tay xây dựng các mô hình Machine Learning thực tế.\n\nThời gian nhận hồ sơ xét tuyển có hạn, hãy nhanh tay nắm bắt tấm vé vàng!',
-          cta: 'Đăng ký nhận tư vấn lộ trình và học bổng ngay',
-        }),
+        body: JSON.stringify(MOCK_AI_DRAFT),
       });
     }
 
@@ -786,57 +961,9 @@ export async function setupMockApiRoutes(page: Page, options: SetupMockOptions =
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          task_type: 'OMNICHANNEL',
-          model_used: 'Gemini 2.5 Flash',
-          warnings: [],
-          compliance_score: 100,
-          is_fallback: false,
-          facebook: {
-            title: 'Bứt Phá Thu Nhập Cùng Nghề Kỹ Sư AI Thực Chiến',
-            headline: 'Bứt Phá Thu Nhập Cùng Nghề Kỹ Sư AI Thực Chiến',
-            body: 'Thực hành trực tiếp trên hạ tầng máy chủ GPU công suất lớn. Đăng ký nhận thông tin xét tuyển đợt 1 ngay!',
-            primary_text: 'Thực hành trực tiếp trên hạ tầng máy chủ GPU công suất lớn. Đăng ký nhận thông tin xét tuyển đợt 1 ngay!',
-            cta: 'Đăng ký ngay',
-            hashtags: ['#AI2026', '#KySuAI', '#ICTU', '#CongNgheSo'],
-            visual_suggestion: 'Ảnh phòng Lab hiện đại với sinh viên thao tác trên máy trạm.',
-          },
-          tiktok: {
-            hook_3s: 'Bạn có biết sinh viên ngành AI làm gì một ngày trên phòng Lab?',
-            scenes: [
-              {
-                scene: 1,
-                scene_number: 1,
-                title: 'Mở màn ấn tượng',
-                visual_action: 'Cận cảnh màn hình terminal đang chạy mô hình Deep Learning',
-                voiceover: 'Một ngày tại phòng Lab AI thực chiến có gì đặc biệt?',
-                duration_seconds: 4,
-                audio: 'Upbeat tech soundtrack',
-              },
-              {
-                scene: 2,
-                scene_number: 2,
-                title: 'Thực hành GPU',
-                visual_action: 'Sinh viên thảo luận cùng giảng viên bên cụm máy chủ',
-                voiceover: 'Được tự tay huấn luyện các mô hình AI tiên tiến nhất hiện nay.',
-                duration_seconds: 5,
-                audio: 'Lofi study beat',
-              }
-            ],
-            sound_recommendation: 'Trending tech synthwave music',
-          },
-          email: {
-            subject_line_a: '[Thư mời] Trải nghiệm một ngày làm Kỹ sư AI tại ICTU',
-            subject_line_b: 'Khám phá bí quyết chinh phục ngành công nghệ hot nhất 2026',
-            preheader: 'Cơ hội nhận học bổng 50% dành cho ứng viên đăng ký sớm',
-            body_content: 'Chào bạn,\n\nNgành trí tuệ nhân tạo đang khát nhân lực hơn bao giờ hết. Chúng tôi trân trọng mời bạn tham dự ngày hội trải nghiệm công nghệ.',
-            cta_button: 'Xác nhận tham gia',
-            ps_note: 'Số lượng vé tham dự có hạn cho đợt này.',
-          },
-        }),
+        body: JSON.stringify(MOCK_AI_OMNICHANNEL),
       });
     }
-
     // 6. Analytics
     if (path.endsWith('/analytics/dashboard') && method === 'GET') {
       return route.fulfill({
@@ -999,3 +1126,7 @@ export async function setupMockApiRoutes(page: Page, options: SetupMockOptions =
 }
 
 setupMockApiRoutes._warned = new Set<string>();
+/** Bộ nhớ job của hàng đợi AI giả lập: `{ kind, polls }` cho từng `job_id`. */
+setupMockApiRoutes._jobs = {} as Record<number, { kind: string; polls: number }>;
+/** `job_id` kế tiếp; bắt đầu từ 9000 để không đụng id của nội dung/chiến dịch mẫu. */
+setupMockApiRoutes._nextJobId = 9000;

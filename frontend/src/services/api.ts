@@ -1,6 +1,13 @@
 import axios from 'axios';
 import { Campaign, MarketingContent, KPISummary, AIIdeaResponse, AIDraftResponse, AISummaryResponse, OmnichannelRequest, OmnichannelResponse, User, Product, MarketingSchedule, ContentComplianceCheck, Workspace, BrandKit, ComplianceCheckRequest, ComplianceCheckResponse, ComplianceViolation, ChannelAttribution, AIDoctorReport, CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse, AppNotification, Task, TaskCreate, TaskUpdate, BudgetAllocation, KPITarget, CommandCenterResponse } from '../types';
 import { MarketingChannel, getChannelRegistry } from '../utils/channels';
+import type {
+  AIJobAccepted,
+  AIJobCreateRequest,
+  AIJobListResponse,
+  AIJobSnapshot,
+  AIJobTransport,
+} from './aiJobPoller';
 
 import { 
   MOCK_PRODUCTS, 
@@ -62,9 +69,18 @@ const apiClient = axios.create({
  */
 const AI_LONG_TIMEOUT = 600000;
 
-/** Danh sách path AI cần timeout dài (khớp prefix router backend `/api/v1/ai`). */
+/**
+ * Danh sách path AI cần timeout dài (khớp prefix router backend `/api/v1/ai`).
+ *
+ * `/ai/jobs` nằm trong danh sách vì lý do NHẤT QUÁN, không vì cần thời gian chờ:
+ * `POST /ai/jobs` trả 202 và `GET /ai/jobs/{id}` trả vài trăm byte, đều nhanh. Nhưng
+ * đây vẫn là nhóm `/ai/*` và đi cùng đường với endpoint đồng bộ, nên cho nó cùng
+ * một cơ chế định tuyến thay vì tạo ra một đường thứ hai chỉ vì "nhanh". Hệ quả:
+ * nếu `VITE_AI_API_URL` rỗng (cấu hình sai), hàng đợi sẽ đi qua Worker — lỗi đó
+ * hiện ra dưới dạng message có kiểm chứng thay vì im lặng.
+ */
 const isAiPath = (url?: string): boolean =>
-  !!url && (url.includes('/ai/omnichannel') || url.includes('/ai/generate') || url.includes('/ai/draft') || url.includes('/ai/ideas') || url.includes('/ai/summary') || url.includes('/ai/summarize') || url.includes('/ai-doctor'));
+  !!url && (url.includes('/ai/omnichannel') || url.includes('/ai/generate') || url.includes('/ai/draft') || url.includes('/ai/ideas') || url.includes('/ai/summary') || url.includes('/ai/summarize') || url.includes('/ai/jobs') || url.includes('/ai-doctor'));
 
 // Helper kiểm tra chế độ Demo Offline (chỉ kích hoạt khi có cờ VITE_ENABLE_OFFLINE_DEMO=true tường minh)
 //
@@ -771,6 +787,150 @@ export const contentApi = {
       return updated.find(c => c.id === id)!;
     }
   }
+};
+
+// ===========================================================================
+// HÀNG ĐỢI AI BẤT ĐỒNG BỘ (POST /ai/jobs → poll GET /ai/jobs/{id})
+// ===========================================================================
+//
+// VÌ SAO THÊM, KHI CÁC ENDPOINT ĐỒNG BỘ VẪN CÒN:
+// Endpoint đồng bộ (`aiApi` bên dưới) là hàm `def`, mỗi lượt gọi giữ một thread
+// của worker suốt thời gian chờ LLM. Đo thật trên production: `/ai/omnichannel`
+// mất 237 giây, Cloudflare Worker phía trước cắt ở ~100 giây và trả
+// `error code: 524`. Hàng đợi mới trả 202 ngay và để worker nền gọi LLM.
+//
+// Endpoint đồng bộ GIỮ NGUYÊN vì backend đánh dấu deprecated nhưng vẫn có thể
+// còn được dùng. Ở đây chỉ thêm đường mới, không sửa đường cũ.
+
+/**
+ * Job "ảo" cho chế độ Demo Offline.
+ *
+ * Chỉ dùng khi `VITE_ENABLE_OFFLINE_DEMO=true` và backend không phản hồi: khi
+ * đó `POST /ai/jobs` không có nơi để đẩy job, nên ta tự tạo một job đã xong ngay
+ * với nội dung mẫu của `aiApi`. Nhãn nguồn gốc vẫn do `aiApi` gán
+ * (`is_fallback=true`, `model_used=OFFLINE_DEMO_MODEL_LABEL`) nên không bao giờ
+ * bị trình bày như kết quả do AI thật tạo ra.
+ */
+const offlineDemoJobs = new Map<number, AIJobSnapshot>();
+let nextOfflineDemoJobId = 1;
+
+const buildOfflineDemoSnapshot = async (
+  request: AIJobCreateRequest,
+): Promise<AIJobSnapshot> => {
+  // Gọi lại đúng hàm đồng bộ để dùng lại đúng bộ nội dung mẫu và đúng nhãn
+  // nguồn gốc (`is_fallback=true`, `model_used=OFFLINE_DEMO_MODEL_LABEL`).
+  const campaignId = typeof request.campaign_id === 'number' ? request.campaign_id : null;
+  let result: Record<string, unknown>;
+  switch (request.kind) {
+    case 'ideas':
+      result = (await aiApi.generateIdeas(campaignId, request.channel_code ?? 'facebook', request.prompt_version ?? 'v3', {
+        topic: request.custom_topic,
+        product: request.custom_product,
+        usp: request.custom_usp,
+        tone: request.tone,
+      })) as unknown as Record<string, unknown>;
+      break;
+    case 'draft':
+      result = (await aiApi.generateDraft(campaignId, request.selected_idea, request.channel_code ?? 'facebook', request.prompt_version ?? 'v3', {
+        product: request.custom_product,
+        usp: request.custom_usp,
+      })) as unknown as Record<string, unknown>;
+      break;
+    case 'summary':
+      result = (await aiApi.generateSummary(campaignId ?? 1, request.prompt_version ?? 'v3')) as unknown as Record<string, unknown>;
+      break;
+    case 'omnichannel':
+      result = (await aiApi.generateOmnichannel({
+        brief: request.brief ?? 'Demo offline',
+        campaign_id: campaignId,
+        channels: request.channels ?? ['facebook', 'tiktok', 'email'],
+        product_name: request.product_name,
+        product_usp: request.product_usp,
+        prompt_version: request.prompt_version,
+      })) as unknown as Record<string, unknown>;
+      break;
+    default:
+      result = {};
+  }
+  const id = nextOfflineDemoJobId++;
+  const snapshot: AIJobSnapshot = {
+    job_id: id,
+    kind: request.kind,
+    status: 'succeeded',
+    attempts: 1,
+    max_attempts: 3,
+    error: null,
+    result,
+    queued_at: new Date().toISOString(),
+    finished_at: new Date().toISOString(),
+  };
+  offlineDemoJobs.set(id, snapshot);
+  return snapshot;
+};
+
+export const aiJobsApi = {
+  /**
+   * Đẩy một tác vụ AI vào hàng đợi. Trả 202 ngay, không chờ LLM.
+   *
+   * `idempotency_key` do `createAIJobTask` sinh: gửi lại cùng khoá + cùng payload
+   * thì backend trả lại đúng job cũ, không tạo thêm lượt gọi AI nào (và không
+   * trừ hạn mứng lần hai).
+   */
+  enqueue: async (request: AIJobCreateRequest): Promise<AIJobAccepted> => {
+    try {
+      const res = await apiClient.post('/ai/jobs', request);
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] aiJobsApi.enqueue: không có backend, dựng job mẫu cục bộ');
+      const snapshot = await buildOfflineDemoSnapshot(request);
+      return {
+        job_id: snapshot.job_id,
+        status: snapshot.status,
+        kind: snapshot.kind,
+        deduplicated: false,
+        poll_url: `/api/v1/ai/jobs/${snapshot.job_id}`,
+      };
+    }
+  },
+
+  getJob: async (jobId: number): Promise<AIJobSnapshot> => {
+    const demo = offlineDemoJobs.get(jobId);
+    if (demo) {
+      offlineDemoJobs.delete(jobId);
+      return demo;
+    }
+    const res = await apiClient.get(`/ai/jobs/${jobId}`);
+    return res.data;
+  },
+
+  cancelJob: async (jobId: number): Promise<AIJobAccepted> => {
+    const demo = offlineDemoJobs.get(jobId);
+    if (demo) {
+      offlineDemoJobs.delete(jobId);
+      return { job_id: jobId, status: 'cancelled', kind: demo.kind, deduplicated: false, poll_url: `/api/v1/ai/jobs/${jobId}` };
+    }
+    const res = await apiClient.post(`/ai/jobs/${jobId}/cancel`);
+    return res.data;
+  },
+
+  list: async (params?: {
+    status?: string;
+    kind?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<AIJobListResponse> => {
+    const res = await apiClient.get('/ai/jobs', { params });
+    return res.data;
+  },
+};
+
+/** Transport đưa hàng đợi thật vào `createAIJobTask`. */
+export const aiJobTransport: AIJobTransport = {
+  enqueue: (request) => aiJobsApi.enqueue(request),
+  getJob: (jobId) => aiJobsApi.getJob(jobId),
+  cancelJob: (jobId) => aiJobsApi.cancelJob(jobId),
 };
 
 export const aiApi = {

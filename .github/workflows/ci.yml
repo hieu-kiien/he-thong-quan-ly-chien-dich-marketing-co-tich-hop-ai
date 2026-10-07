@@ -187,7 +187,7 @@ jobs:
       # cho tung invocation la cach loai bo hoan toan xung dot nay.
       - name: Free stale E2E ports before the first run
         run: |
-          for p in 4173 4174 4175 4180 8000; do
+          for p in 4173 4174 4175 4176 4180 8000; do
             fuser -k -9 ${p}/tcp 2>/dev/null || true
           done
           echo "Stale E2E ports cleared."
@@ -241,6 +241,20 @@ jobs:
                   sys.exit(1)
           print("OK: du lieu seed cho E2E_MODE=live da san sang.")
           PY
+
+      # Lop polling hang doi AI (frontend/src/services/aiJobPoller.ts) chay
+      # trong Node voi dong ho ao va transport gia: KHONG goi mang that, khong
+      # goi AI that, khong ton credit. Fail o day thi la loi logic that cua
+      # polling (deadline, huy, don submit), khong phai loi ha tang.
+      #
+      # Cap port rieng (4176) de khong trung port voi cac invocation khac.
+      - name: "Playwright unit suite - AI job queue polling (tests/unit)"
+        run: npx playwright test tests/unit --reporter=list
+        working-directory: frontend
+        env:
+          E2E_MODE: mock
+          E2E_LOG_MODE: "1"
+          E2E_FRONTEND_PORT: "4176"
 
       - name: Run Playwright Visual & Interaction Probes (tests/adversarial-interaction-probes.spec.ts)
         run: npx playwright test tests/adversarial-interaction-probes.spec.ts

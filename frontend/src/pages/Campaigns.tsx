@@ -16,7 +16,6 @@ import {
   campaignApi, 
   productApi, 
   contentApi, 
-  aiApi, 
   brandKitApi,
   budgetApi,
   channelApi,
@@ -29,6 +28,9 @@ import { useToast } from '../components/Toast';
 import { CampaignCardSkeleton, CampaignTableSkeleton } from '../components/Skeleton';
 import { ManualContentComposer } from '../components/ManualContentComposer';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { useAIJob } from '../hooks/useAIJob';
+import { AIJobProgress } from '../components/AIJobProgress';
+import { AIJobError, describeAIJobFailure, describeAIResultOrigin } from '../services/aiJobPoller';
 import { copyToClipboardWithFormatting } from '../utils/copyUtils';
 
 /** Tổng hợp chỉ số thực đo của một chiến dịch, gom từ /campaigns/{id}/metrics. */
@@ -162,6 +164,8 @@ export const Campaigns: React.FC<CampaignsProps> = ({
   const [wizardStep, setWizardStep] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState<boolean>(false);
+  // Hàng đợi AI bất đồng bộ cho bước sinh mẫu quảng cáo trong wizard.
+  const wizardCreativeJob = useAIJob();
   const [isSavingDrawer, setIsSavingDrawer] = useState<boolean>(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
@@ -625,18 +629,37 @@ export const Campaigns: React.FC<CampaignsProps> = ({
     try {
       setIsGeneratingAI(true);
       const selectedProd = products.find(p => p.id === Number(wizardData.product_id));
-      const res = await aiApi.generateOmnichannel({
-        campaign_id: undefined,
+      // Qua hàng đợi: `POST /ai/omnichannel` đồng bộ mất 237 giây và chết 524
+      // qua Cloudflare Worker, còn hàng đợi trả 202 ngay rồi thăm dò kết quả.
+      const res = await wizardCreativeJob.run<OmnichannelResponse>({
+        kind: 'omnichannel',
         brief: `${wizardData.name} - Mục tiêu: ${wizardData.objectiveTitle} - Đối tượng: ${wizardData.audience}`,
         tone: brandKit?.tone_of_voice || 'Chuyên nghiệp, lôi cuốn, thúc đẩy hành động',
         prompt_version: 'v3',
-        product_name: selectedProd?.name,
-        product_usp: selectedProd?.usp
+        ...(selectedProd?.name ? { product_name: selectedProd.name } : {}),
+        ...(selectedProd?.usp ? { product_usp: selectedProd.usp } : {}),
       });
       setGeneratedCreatives(res);
-      toast.success('Google Gemini đã sinh thành công trọn bộ Mẫu Quảng Cáo Đa Kênh!');
+      // Nhãn provider đọc từ kết quả thật. Ghi cứng "Google Gemini" là nói dối
+      // khi backend đang chạy provider khác (opencode/openrouter), và khi
+      // `is_fallback` thì tên model chỉ là cấu hình chứ chưa ai viết nội dung.
+      const origin = describeAIResultOrigin(res);
+      if (origin.isFallback) {
+        toast.warning('Không gọi được AI — nội dung dưới đây là template dự phòng, không phải do mô hình ngôn ngữ viết.', 'Nội dung không phải do AI tạo');
+      } else {
+        toast.success(`Đã sinh thành công trọn bộ Mẫu Quảng Cáo Đa Kênh bằng ${origin.label}!`);
+      }
     } catch (e) {
-      toast.error(getApiErrorMessage(e), 'Lỗi khi sinh nội dung đa kênh');
+      if (e instanceof AIJobError) {
+        if (!e.disposed) {
+          const { title, hint } = describeAIJobFailure(e.kind);
+          const parts = [hint];
+          if (e.backendReason) parts.push(`Thông báo từ máy chủ: ${e.backendReason}`);
+          toast.error(parts.join('\n'), title);
+        }
+      } else {
+        toast.error(getApiErrorMessage(e), 'Lỗi khi sinh nội dung đa kênh');
+      }
     } finally {
       setIsGeneratingAI(false);
     }
@@ -2553,7 +2576,15 @@ useEffect(() => {
                         {isGeneratingAI ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Gemini đang sáng tạo nội dung...</span>
+                            {/* Nhãn phụ "đang xếp hàng" phân biệt "còn nằm trong hàng
+                                đợi" với "worker đã nhặt lên và đang gọi AI". Không ghi
+                                cứng tên provider: đang chạy có thể là opencode,
+                                openrouter hay gemini. */}
+                            <span>
+                              {wizardCreativeJob.phase === 'queued' || wizardCreativeJob.phase === 'enqueuing'
+                                ? 'Đang xếp hàng AI...'
+                                : 'AI đang sáng tạo nội dung...'}
+                            </span>
                           </>
                         ) : (
                           <>
@@ -2562,6 +2593,15 @@ useEffect(() => {
                           </>
                         )}
                       </button>
+
+                      {/* Hàng đợi: trạng thái chờ + đồng hồ + nút huỷ. Một lần sinh đa
+                          kênh mất hàng phút nên không thể chỉ hiện vòng quay. */}
+                      <AIJobProgress
+                        job={wizardCreativeJob}
+                        label="mẫu quảng cáo đa kênh"
+                        onRetry={handleGenerateOmnichannelCreatives}
+                        className="mt-3 text-left"
+                      />
                     </div>
                   ) : (
                     <div className="space-y-3">

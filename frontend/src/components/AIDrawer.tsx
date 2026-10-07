@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { X, Sparkles, Lightbulb, FileText, BarChart3, Check, AlertCircle, Copy, Loader2, ArrowRight, Send, SendHorizontal, CheckCircle2, Clock, Zap, Video, Mail, ShieldAlert, Lock } from 'lucide-react';
 import { Campaign, AIIdeaResponse, AIDraftResponse, AISummaryResponse, MarketingContent, OmnichannelResponse, ComplianceCheckResponse } from '../types';
-import { aiApi, contentApi, getApiErrorMessage } from '../services/api';
+import { contentApi, getApiErrorMessage } from '../services/api';
+import { AIJobError, describeAIJobFailure, describeAIResultOrigin } from '../services/aiJobPoller';
+import { useAIJob } from '../hooks/useAIJob';
+import { AIJobProgress } from './AIJobProgress';
 import { useToast } from './Toast';
 import { ComplianceAlertBadge } from './ComplianceAlertBadge';
 import { useFocusTrap } from '../hooks/useFocusTrap';
@@ -35,6 +38,49 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
   const [complianceResult, setComplianceResult] = useState<ComplianceCheckResponse | null>(null);
   const [isCheckingCompliance, setIsCheckingCompliance] = useState<boolean>(false);
 
+  // Một hook cho mỗi loại việc AI trong drawer. Tách vì mỗi loại có thể chạy
+  // song song và mỗi cái cần trạng thái chờ + đồng hồ + nút huỷ riêng.
+  const ideaJob = useAIJob();
+  const draftJob = useAIJob();
+  const summaryJob = useAIJob();
+  const omniJob = useAIJob();
+
+  /**
+   * Báo lỗi job AI theo loại đã phân loại kèm nguyên văn lý do từ server.
+   * `AIJobError` không phải lỗi axios nên `getApiErrorMessage` không đọc được
+   * `response.data.detail`; dùng nó ở đây sẽ ra thông báo vô dụng.
+   */
+  const reportJobError = (error: unknown, fallbackTitle: string) => {
+    if (error instanceof AIJobError) {
+      if (error.disposed) return;
+      const { title, hint } = describeAIJobFailure(error.kind);
+      const parts = [hint];
+      if (error.backendReason) parts.push(`Thông báo từ máy chủ: ${error.backendReason}`);
+      toast.error(parts.join('\n'), title);
+      return;
+    }
+    toast.error(getApiErrorMessage(error), fallbackTitle);
+  };
+
+  /**
+   * Toast thành công có nói rõ nguồn gốc.
+   *
+   * Backend trả `is_fallback=true` khi không gọi được AI và dựng nội dung bằng
+   * template dự phòng. Toast màu xanh "đã sinh ... bằng <model>" trong trường hợp
+   * đó là nói dối: model chỉ là tên cấu hình, không phải thứ đã viết nội dung.
+   */
+  const toastGenerated = (
+    result: { is_fallback?: boolean | null; model_used?: string | null; model_provider?: string | null },
+    successText: (label: string) => string,
+  ) => {
+    const origin = describeAIResultOrigin(result);
+    if (origin.isFallback) {
+      toast.warning(successText(origin.label), 'Không gọi được AI');
+      return;
+    }
+    toast.success(successText(origin.label));
+  };
+
   // Omnichannel States
   const [omniBrief, setOmniBrief] = useState<string>('');
   const [omniData, setOmniData] = useState<OmnichannelResponse | null>(null);
@@ -67,11 +113,16 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
   const handleGenerateIdeas = async () => {
     setLoading(true);
     try {
-      const res = await aiApi.generateIdeas(activeCampaign?.id || null, channelCode, promptVersion);
+      const res = await ideaJob.run<AIIdeaResponse>({
+        kind: 'ideas',
+        channel_code: channelCode,
+        prompt_version: promptVersion,
+        ...(activeCampaign?.id ? { campaign_id: activeCampaign.id } : {}),
+      });
       setIdeaData(res);
-      toast.success(`Đã sinh thành công ${res.ideas.length} góc ý tưởng tiếp thị!`);
+      toastGenerated(res, (label) => `Đã sinh thành công ${res.ideas.length} góc ý tưởng tiếp thị bằng ${label}!`);
     } catch (e: any) {
-      toast.error(getApiErrorMessage(e), 'Lỗi khi gọi AI sinh ý tưởng');
+      reportJobError(e, 'Lỗi khi gọi AI sinh ý tưởng');
     } finally {
       setLoading(false);
     }
@@ -81,12 +132,18 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
     setLoading(true);
     try {
       const ideaToUse = selectedIdeaText || 'Giải pháp đột phá nâng cao năng suất cùng AI';
-      const res = await aiApi.generateDraft(activeCampaign?.id || null, ideaToUse, channelCode, promptVersion);
+      const res = await draftJob.run<AIDraftResponse>({
+        kind: 'draft',
+        selected_idea: ideaToUse,
+        channel_code: channelCode,
+        prompt_version: promptVersion,
+        ...(activeCampaign?.id ? { campaign_id: activeCampaign.id } : {}),
+      });
       setDraftData(res);
       setCreatedContent(null);
-      toast.success('Bản nháp nội dung đã được khởi tạo thành công!');
+      toastGenerated(res, (label) => `Bản nháp nội dung đã được khởi tạo bởi ${label}!`);
     } catch (e: any) {
-      toast.error(getApiErrorMessage(e), 'Lỗi khi gọi AI sinh bản nháp');
+      reportJobError(e, 'Lỗi khi gọi AI sinh bản nháp');
     } finally {
       setLoading(false);
     }
@@ -99,11 +156,15 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
     }
     setLoading(true);
     try {
-      const res = await aiApi.generateSummary(activeCampaign.id, promptVersion);
+      const res = await summaryJob.run<AISummaryResponse>({
+        kind: 'summary',
+        campaign_id: activeCampaign.id,
+        prompt_version: promptVersion,
+      });
       setSummaryData(res);
-      toast.success('Đã phân tích và tóm tắt chỉ số chiến dịch!');
+      toastGenerated(res, (label) => `Đã phân tích và tóm tắt chỉ số chiến dịch bằng ${label}!`);
     } catch (e: any) {
-      toast.error(getApiErrorMessage(e), 'Lỗi khi gọi AI phân tích chỉ số');
+      reportJobError(e, 'Lỗi khi gọi AI phân tích chỉ số');
     } finally {
       setLoading(false);
     }
@@ -222,15 +283,18 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
     }
     setLoading(true);
     try {
-      const res = await aiApi.generateOmnichannel({
+      const res = await omniJob.run<OmnichannelResponse>({
+        kind: 'omnichannel',
         brief: briefToUse,
-        campaign_id: activeCampaign?.id || null,
-        channels: ['facebook', 'tiktok', 'email']
+        channels: ['facebook', 'tiktok', 'email'],
+        ...(activeCampaign?.id ? { campaign_id: activeCampaign.id } : {}),
       });
       setOmniData(res);
-      toast.success('Đã sinh thành công nội dung sáng tạo cho cả 3 kênh!');
+      // Cụm "…cho cả 3 kênh!" giữ nguyên vị trí và dấu chấm than để các probe
+      // đo hành vi double-click bám đúng chuỗi này; nguồn gốc thật ghi sau nó.
+      toastGenerated(res, (label) => `Đã sinh thành công nội dung sáng tạo cho cả 3 kênh! (${label})`);
     } catch (e: any) {
-      toast.error(getApiErrorMessage(e), 'Lỗi khi gọi AI sinh nội dung đa kênh');
+      reportJobError(e, 'Lỗi khi gọi AI sinh nội dung đa kênh');
     } finally {
       setLoading(false);
     }
@@ -510,8 +574,13 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
                 className="w-full py-2.5 bg-gradient-to-r from-amber-500 via-indigo-600 to-violet-600 hover:from-amber-600 hover:to-violet-700 disabled:bg-slate-300 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-indigo-600/20 transition-all cursor-pointer disabled:cursor-not-allowed"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-                <span>Sáng tạo 3 kênh đồng thời (Facebook, TikTok, Email)</span>
+                <span>
+                  {(omniJob.phase === 'queued' || omniJob.phase === 'enqueuing') ? 'Đang xếp hàng — ' : ''}
+                  Sáng tạo 3 kênh đồng thời (Facebook, TikTok, Email)
+                </span>
               </button>
+
+              <AIJobProgress job={omniJob} label="3 kênh (Facebook, TikTok, Email)" onRetry={handleGenerateOmnichannel} />
 
               {omniData && (
                 <div className="space-y-3 mt-4">
@@ -747,8 +816,13 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
                 className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-indigo-600/20 transition-all cursor-pointer disabled:cursor-not-allowed"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                <span>Khởi tạo 5 ý tưởng tiếp thị</span>
+                <span>
+                  {(ideaJob.phase === 'queued' || ideaJob.phase === 'enqueuing') ? 'Đang xếp hàng — ' : ''}
+                  Khởi tạo 5 ý tưởng tiếp thị
+                </span>
               </button>
+
+              <AIJobProgress job={ideaJob} label="5 góc ý tưởng tiếp thị" onRetry={handleGenerateIdeas} />
 
               {ideaData && (
                 <div className="space-y-3 mt-4">
@@ -811,8 +885,13 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
                 className="w-full py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 disabled:bg-slate-300 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-violet-600/20 transition-all cursor-pointer disabled:cursor-not-allowed"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                <span>Sinh nội dung nháp (Title, Body, CTA)</span>
+                <span>
+                  {(draftJob.phase === 'queued' || draftJob.phase === 'enqueuing') ? 'Đang xếp hàng — ' : ''}
+                  Sinh nội dung nháp (Title, Body, CTA)
+                </span>
               </button>
+
+              <AIJobProgress job={draftJob} label="bản nháp bài viết" onRetry={handleGenerateDraft} />
 
               {draftData && (
                 <div className="space-y-3 mt-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
@@ -955,8 +1034,13 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
                 className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-indigo-600/20 transition-all cursor-pointer disabled:cursor-not-allowed"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <BarChart3 className="w-4 h-4" />}
-                <span>Phân tích hiệu quả chiến dịch này</span>
+                <span>
+                  {(summaryJob.phase === 'queued' || summaryJob.phase === 'enqueuing') ? 'Đang xếp hàng — ' : ''}
+                  Phân tích hiệu quả chiến dịch này
+                </span>
               </button>
+
+              <AIJobProgress job={summaryJob} label="phân tích chỉ số chiến dịch" onRetry={handleGenerateSummary} />
 
               {summaryData && (
                 <div className="space-y-3 mt-4">
