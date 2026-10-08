@@ -5,6 +5,7 @@ from sqlalchemy import and_, false, or_
 from app.core.database import get_db
 from app.core.pagination import Page, PageParams, page_params, paginate_query
 from app.core.security import RoleChecker, get_current_user
+from app.services import quota
 from app.models.entities import Campaign, Product, User, CampaignMember, WorkspaceMember, Workspace, MarketingContent, CampaignBudgetAllocation, CampaignKPITarget, MarketingChannel
 from app.schemas.schemas import CampaignCreate, CampaignUpdate, CampaignResponse, ContentResponse, BudgetAllocationCreate, BudgetAllocationResponse, KPITargetCreate, KPITargetResponse
 
@@ -312,6 +313,12 @@ def create_campaign(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Người dùng không thuộc bất kỳ workspace nào hoặc không có quyền truy cập."
             )
+
+    # Hạn mức sản phẩm: số chiến dịch của workspace này. Kiểm tra SAU khi đã
+    # chốt được tenant và SAU khi đã xác thực quyền — nếu kiểm tra sớm hơn thì
+    # một workspace khác trả lỗi 429 thay vì 403, tức lộ trạng thái hạn mức của
+    # tenant mà người gọi không thuộc về.
+    quota.enforce(db, quota.LIMIT_CAMPAIGNS, user=current_user, workspace_id=ws_id)
 
     campaign = Campaign(
         workspace_id=ws_id,

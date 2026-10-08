@@ -54,6 +54,7 @@ from app.schemas.schemas import (
 )
 from app.services.jobs import queue as job_queue
 from app.services.jobs.queue import AIJobExecutionError, is_transient_failure
+from app.services import quota
 
 logger = logging.getLogger("marketflow.ai_jobs")
 
@@ -370,6 +371,21 @@ def enqueue_ai_job(
     # thay vì xem job chết sau vài phút chờ. Worker sẽ không tính lần nữa
     # (xem `quota_already_enforced` trong `execute_ai_job`).
     enforce_quota(f"{_KIND_QUOTA_PREFIX[kind]}:user={current_user.id}")
+
+    # Hạn mứng SẢN PHẨM theo workspace (đối lập `enforce_quota` ở trên, vốn là
+    # rate limiter theo user). Đặt SAU kiểm tra idempotency nên retry cùng một
+    # yêu cầu logic không bị tính hai lần; và đặt TRƯỚC `enqueue_job` nên lượt
+    # tiêu được tính đúng lúc job được nhận.
+    #
+    # Lượt tiêu CHÍNH LÀ hàng trong bảng `ai_jobs`, nên sau khi `enqueue_job`
+    # commit, lần đo kế tiếp tự thấy lượt vừa tiêu — không cần bộ đếm riêng,
+    # không thể lệch, và không thể bị tính đôi.
+    quota.enforce(
+        db,
+        quota.LIMIT_AI_JOBS_PER_DAY,
+        user=current_user,
+        workspace_id=target_ws_id,
+    )
 
     job, deduplicated = job_queue.enqueue_job(
         db,

@@ -7,9 +7,10 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.pagination import Page, PageParams, page_params, paginate_query
 from app.core.security import get_current_user, security_bearer
+from app.services import quota
 from app.models.entities import MarketingSchedule, MarketingContent, User, Workspace, WorkspaceMember, Campaign, CampaignMember
 from app.schemas.schemas import ScheduleCreate, ScheduleUpdate, ScheduleResponse
-from app.api.v1.contents import check_content_access
+from app.api.v1.contents import check_content_access, resolve_workspace_id_for_content
 from app.services.scheduler.worker import process_due_schedules
 
 router = APIRouter(tags=["Quản lý Lịch đăng"])
@@ -105,6 +106,12 @@ def schedule_content(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Chỉ có thể lập lịch cho nội dung đã được Quản lý phê duyệt (APPROVED). Trạng thái hiện tại: {content.status}"
         )
+
+    # Hạn mức số lịch đăng của workspace. Tenant lấy từ chính nội dung cha, và
+    # `check_content_access` vừa xác nhận người gọi có quyền với tenant đó.
+    ws_id = resolve_workspace_id_for_content(content, db)
+    if ws_id is not None:
+        quota.enforce(db, quota.LIMIT_SCHEDULES, user=current_user, workspace_id=ws_id)
 
     schedule = MarketingSchedule(
         content_id=content.id,

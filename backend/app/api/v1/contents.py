@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.database import get_db
 from app.core.pagination import Page, PageParams, page_params, paginate_query
 from app.core.security import RoleChecker, get_current_user
+from app.services import quota
 from app.models.entities import MarketingContent, Campaign, MarketingChannel, ContentReview, User, CampaignMember, Workspace, WorkspaceMember
 from app.schemas.schemas import (
     ContentCreate, ContentUpdate, ContentResponse, ReviewCreate,
@@ -290,6 +291,12 @@ def create_content(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to access content in this workspace"
             )
+
+    # Hạn mức sản phẩm: số bài nội dung của workspace cha. `ws_id` lấy từ
+    # campaign — cùng nguồn tenant mà `check_campaign_access_for_content` vừa
+    # kiểm tra, nên không mở ra khả năng đo nhầm sang workspace khác.
+    if ws_id is not None:
+        quota.enforce(db, quota.LIMIT_CONTENTS, user=current_user, workspace_id=ws_id)
 
     content = MarketingContent(
         workspace_id=ws_id,

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.pagination import Page, PageParams, page_params, paginate_query
 from app.core.security import get_current_user
+from app.services import quota
 from app.models.entities import User, Workspace, WorkspaceMember, BrandKit
 from app.schemas.schemas import (
     WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse,
@@ -115,6 +116,13 @@ def create_workspace(
         owner_id=current_user.id,
         status="ACTIVE"
     )
+
+    # Hạn mức số workspace MỖI NGƯỜI DÙNG sở hữu. Kiểm tra trước khi insert.
+    quota.enforce(
+        db, quota.LIMIT_WORKSPACES_PER_USER,
+        user=current_user, workspace_id=None, user_id=current_user.id,
+    )
+
     db.add(workspace)
     db.commit()
     db.refresh(workspace)
@@ -175,6 +183,28 @@ def update_workspace(
     db.refresh(workspace)
     return WorkspaceResponse.model_validate(workspace)
 
+@router.get("/{workspace_id}/quota")
+def get_workspace_quota(
+    workspace_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Trạng thái hạn mức gói miễn phí của workspace, để UI hiện đếm ngược.
+
+    Dùng chung `check_workspace_access` với `GET /workspaces/{id}`: đây là dữ
+    liệu của một tenant, không được đọc chéo. Quyền xem hạn mức KHÔNG đồng nghĩa
+    quyền vượt hạn mứng — nơi thực thi vẫn là các endpoint tạo mới.
+    """
+    workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
+    if not workspace:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không gian làm việc không tồn tại")
+
+    check_workspace_access(workspace, current_user, db)
+    return quota.snapshot_workspace(
+        db, workspace_id=workspace.id, user_id=current_user.id
+    )
+
+
 @router.post("/{workspace_id}/members", response_model=WorkspaceMemberResponse, status_code=status.HTTP_201_CREATED)
 def add_workspace_member(
     workspace_id: int,
@@ -198,6 +228,13 @@ def add_workspace_member(
     ).first()
     if existing_member:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Người dùng đã là thành viên của không gian làm việc này")
+
+    # Hạn mức thành viên: kiểm tra sau khi đã chặn trùng lặp, để một lời gọi lặp
+    # lại báo "đã là thành viên" (lỗi của người gọi) chứ không phải 429.
+    quota.enforce(
+        db, quota.LIMIT_WORKSPACE_MEMBERS,
+        user=current_user, workspace_id=workspace.id,
+    )
 
     member = WorkspaceMember(
         workspace_id=workspace.id,

@@ -188,6 +188,37 @@ class Settings(BaseSettings):
     AI_JOB_CLEANUP_INTERVAL_SECONDS: float = 3600.0
     AI_JOB_CLEANUP_BATCH: int = 200
 
+    # ------------------------------------------------------------------
+    # Hạn mức gói miễn phí theo workspace (xem app/services/quota.py).
+    #
+    # KHÁC `enforce_quota` trong security.py: đó là rate limiter chống lạm dụng
+    # (đếm trong RAM, cửa sổ trượt, mất khi restart). Ở đây là GIỚI HẠN SẢN
+    # PHẨM: đếm trong CSDL theo workspace, bền qua restart. Hai tầng độc lập.
+    #
+    # Vì sao số này: hạn mứng phải đủ rộng để một nhóm sinh viên demo lớp học
+    # (20-30 người) chạy trọn buổi mà không vướng, nhưng hữu hạn để còn ý
+    # nghĩa. Xem giải thích từng dòng trong .env.example.
+    # ------------------------------------------------------------------
+
+    # AI job mỗi 24 giờ (cửa sổ TRƯỜT, không phải ngày lịch UTC). Mỗi lượt gọi
+    # LLM thật mất 80-240 giây và worker chỉ chạy 2 job đồng thời, nên 50 lượt
+    # là "demo liên tục cả ngày" chứ không phải trần lý thuyết.
+    QUOTA_AI_JOBS_PER_DAY: int = 50
+
+    # Tài nguyên tích luỹ, tính theo số bản ghi đang tồn tại của workspace.
+    QUOTA_MAX_CAMPAIGNS: int = 25
+    QUOTA_MAX_CONTENTS: int = 500
+    QUOTA_MAX_WORKSPACE_MEMBERS: int = 10
+    QUOTA_MAX_SCHEDULES: int = 200
+
+    # Tính theo người dùng (sở hữu bao nhiêu workspace), không theo workspace.
+    QUOTA_MAX_WORKSPACES_PER_USER: int = 5
+
+    # Đường ghi đè cho quản trị viên: danh sách id workspace miễn trần, cách
+    # nhau bởi dấu phẩy. Rỗng = không miễn gì. Mọi lần dùng đều được ghi log.
+    # Cần thiết vì admin khoá ngoài chính instance của mình thì không tự sửa được.
+    QUOTA_OVERRIDE_WORKSPACE_IDS: str = ""
+
     model_config = SettingsConfigDict(
         env_file=str(Path(__file__).resolve().parent.parent.parent / ".env"),
         extra="allow"
