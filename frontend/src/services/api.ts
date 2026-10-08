@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Campaign, MarketingContent, KPISummary, AIIdeaResponse, AIDraftResponse, AISummaryResponse, OmnichannelRequest, OmnichannelResponse, User, Product, MarketingSchedule, ContentComplianceCheck, Workspace, BrandKit, ComplianceCheckRequest, ComplianceCheckResponse, ComplianceViolation, ChannelAttribution, AIDoctorReport, CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse, AppNotification, Task, TaskCreate, TaskUpdate, BudgetAllocation, KPITarget, CommandCenterResponse } from '../types';
+import { Campaign, MarketingContent, KPISummary, AIIdeaResponse, AIDraftResponse, AISummaryResponse, OmnichannelRequest, OmnichannelResponse, User, Product, MarketingSchedule, ContentComplianceCheck, Workspace, BrandKit, ComplianceCheckRequest, ComplianceCheckResponse, ComplianceViolation, ChannelAttribution, AIDoctorReport, CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse, AppNotification, Task, TaskCreate, TaskUpdate, BudgetAllocation, KPITarget, CommandCenterResponse, Page, QuotaSnapshot, QuotaErrorDetail, CampaignSort, ContentSort } from '../types';
 import { MarketingChannel, getChannelRegistry } from '../utils/channels';
 import type {
   AIJobAccepted,
@@ -280,6 +280,10 @@ export const isBackendConnected = (): boolean => backendReachable;
 
 // Helper trích xuất thông báo lỗi chuẩn từ FastAPI backend hoặc lỗi mạng
 export const getApiErrorMessage = (error: any): string => {
+  // Lỗi hạn mứng có thân riêng — trả về thông báo cụ thể thay vì JSON.stringify
+  // đống chữ. Xem `isQuotaError`.
+  const quota = getQuotaError(error);
+  if (quota) return quota.message;
   if (!error?.response) {
     if (error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')) {
       return 'Máy chủ backend (Render) đang khởi động lại (cold start) hoặc phản hồi quá thời gian chờ (60s). Vui lòng thử lại sau giây lát.';
@@ -296,6 +300,58 @@ export const getApiErrorMessage = (error: any): string => {
   }
   return error?.message || 'Đã xảy ra lỗi không xác định';
 };
+
+/**
+ * Nhận diện lỗi hạn mứng (429 với `detail.error === 'quota_exceeded'`).
+ *
+ * Backend trả thân có cấu trúc để client KHÔNG phải đoán: `limit_code` cho biết
+ * vượt trần nào, `used`/`limit` để vẽ thanh tiến trình, `resets_at` để đếm
+ * ngược. Trả `null` nếu không phải lỗi hạn mứng.
+ */
+export const getQuotaError = (error: any): QuotaErrorDetail | null => {
+  const detail = error?.response?.data?.detail;
+  if (detail && typeof detail === 'object' && detail.error === 'quota_exceeded') {
+    return detail as QuotaErrorDetail;
+  }
+  return null;
+};
+
+/** Chuẩn hoá mọi hình dạng response về `Page<T>`.
+
+ * Chấp nhận CẢ mảng phẳng lẫn envelope `Page`. Nhánh mảng phẳng là để các
+ * endpoint chưa chuyển sang phân trang (kênh, sản phẩm, nhóm kênh — dữ liệu
+ * tham chiếu tĩnh, có trần nhỏ và cố định) vẫn dùng chung được component
+ * `<Pagination>` mà không phải rẽ nhánh ở từng màn hình.
+ */
+export const toPage = <T,>(data: any, fallbackPage = 1, fallbackPageSize = 20): Page<T> => {
+  if (Array.isArray(data)) {
+    return {
+      items: data as T[],
+      total: data.length,
+      page: fallbackPage,
+      page_size: fallbackPageSize,
+      total_pages: data.length === 0 ? 0 : 1,
+      has_next: false,
+      has_prev: fallbackPage > 1,
+    };
+  }
+  return {
+    items: (data?.items ?? []) as T[],
+    total: data?.total ?? 0,
+    page: data?.page ?? fallbackPage,
+    page_size: data?.page_size ?? fallbackPageSize,
+    total_pages: data?.total_pages ?? 0,
+    has_next: Boolean(data?.has_next),
+    has_prev: Boolean(data?.has_prev),
+  };
+};
+
+/** Bỏ các tham số phân trang rỗng khỏi query để không gửi `page=undefined`. */
+export const withPaging = (
+  params: Record<string, any> | undefined,
+  page: number,
+  pageSize: number,
+): Record<string, any> => ({ ...(params || {}), page, page_size: pageSize });
 
 export const authApi = {
   login: async (email: string, password: string): Promise<{ access_token: string; user: User }> => {
@@ -347,10 +403,23 @@ export const authApi = {
 };
 
 export const workspaceApi = {
+  /** Bản có phân trang — dùng khi cần biết `total` để dựng nút trang. */
+  getAllPage: async (page = 1, pageSize = 20): Promise<Page<Workspace>> => {
+    try {
+      const res = await apiClient.get('/workspaces', { params: { page, page_size: pageSize } });
+      return toPage<Workspace>(res.data, page, pageSize);
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: workspaceApi.getAll');
+      return toPage<Workspace>(getStoredList<Workspace>('mf_workspaces', MOCK_WORKSPACES), page, pageSize);
+    }
+  },
+
   getAll: async (): Promise<Workspace[]> => {
     try {
       const res = await apiClient.get('/workspaces');
-      return res.data;
+      return toPage<Workspace>(res.data).items;
     } catch (e: any) {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
@@ -461,6 +530,57 @@ export const brandKitApi = {
 };
 
 export const campaignApi = {
+  /**
+   * Bản có phân trang. `page`/`pageSize` được ghép SAU các tham số lọc, và
+   * backend áp lọc trước rồi mới cắt trang — nên `total` là tổng của tập đã lọc.
+   */
+  getAllPage: async (
+    page = 1,
+    pageSize = 20,
+    filters?: { status?: string; search?: string; workspaceId?: number; sort?: CampaignSort; objective?: string },
+  ): Promise<Page<Campaign>> => {
+    const params: Record<string, any> = {};
+    if (filters?.status) params.status = filters.status;
+    if (filters?.search) params.search = filters.search;
+    if (filters?.workspaceId) params.workspace_id = filters.workspaceId;
+    if (filters?.sort) params.sort = filters.sort;
+    if (filters?.objective) params.objective = filters.objective;
+    try {
+      const res = await apiClient.get('/campaigns', { params: withPaging(params, page, pageSize) });
+      return toPage<Campaign>(res.data, page, pageSize);
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.getAllPage');
+      let list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
+      if (filters?.workspaceId) {
+        list = list.filter(c => !c.workspace_id || c.workspace_id === filters.workspaceId);
+      }
+      if (filters?.status && filters.status !== 'ALL') {
+        list = list.filter(c => c.status === filters.status);
+      }
+      if (filters?.search) {
+        const q = filters.search.toLowerCase();
+        list = list.filter(c => c.name.toLowerCase().includes(q));
+      }
+      if (filters?.objective) {
+        const q = filters.objective.toLowerCase();
+        list = list.filter(c => (c.objective || '').toLowerCase().includes(q));
+      }
+      const total = list.length;
+      const start = (page - 1) * pageSize;
+      return {
+        items: list.slice(start, start + pageSize),
+        total,
+        page,
+        page_size: pageSize,
+        total_pages: total === 0 ? 0 : Math.ceil(total / pageSize),
+        has_next: page * pageSize < total,
+        has_prev: page > 1,
+      };
+    }
+  },
+
   getAll: async (status?: string, search?: string, workspaceId?: number): Promise<Campaign[]> => {
     try {
       const params: Record<string, any> = {};
@@ -468,7 +588,7 @@ export const campaignApi = {
       if (search) params.search = search;
       if (workspaceId) params.workspace_id = workspaceId;
       const res = await apiClient.get('/campaigns', { params });
-      return res.data;
+      return toPage<Campaign>(res.data).items;
     } catch (e: any) {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
@@ -586,10 +706,53 @@ export const campaignApi = {
       return MOCK_CHANNEL_ATTRIBUTIONS;
     }
   },
+  /** Nội dung của chiến dịch, có phân trang + lọc trạng thái / tìm kiếm / sắp xếp. */
+  getContentsPage: async (
+    campaignId: number,
+    page = 1,
+    pageSize = 20,
+    filters?: { status?: string; search?: string; sort?: ContentSort },
+  ): Promise<Page<MarketingContent>> => {
+    const params: Record<string, any> = {};
+    if (filters?.status) params.status = filters.status;
+    if (filters?.search) params.search = filters.search;
+    if (filters?.sort) params.sort = filters.sort;
+    try {
+      const res = await apiClient.get(`/campaigns/${campaignId}/contents`, {
+        params: withPaging(params, page, pageSize),
+      });
+      return toPage<MarketingContent>(res.data, page, pageSize);
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.getContentsPage');
+      let list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS)
+        .filter(c => c.campaign_id === campaignId);
+      if (filters?.status && filters.status !== 'ALL') {
+        list = list.filter(c => c.status === filters.status);
+      }
+      if (filters?.search) {
+        const q = filters.search.toLowerCase();
+        list = list.filter(c => (c.title || '').toLowerCase().includes(q));
+      }
+      const total = list.length;
+      const start = (page - 1) * pageSize;
+      return {
+        items: list.slice(start, start + pageSize),
+        total,
+        page,
+        page_size: pageSize,
+        total_pages: total === 0 ? 0 : Math.ceil(total / pageSize),
+        has_next: page * pageSize < total,
+        has_prev: page > 1,
+      };
+    }
+  },
+
   getContents: async (campaignId: number): Promise<MarketingContent[]> => {
     try {
       const res = await apiClient.get(`/campaigns/${campaignId}/contents`);
-      return res.data;
+      return toPage<MarketingContent>(res.data).items;
     } catch (e: any) {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
@@ -639,7 +802,59 @@ export const productApi = {
   }
 };
 
+/** Lọc danh sách nội dung trong kho mock offline — dùng chung cho cả hai bản
+ *  (`getAllPage` có phân trang và `getAll` trả mảng) để hai đường không lệch nhau. */
+const _filterMockContents = (filters?: {
+  campaignId?: number; status?: string; channelId?: number; search?: string; workspaceId?: number;
+}): MarketingContent[] => {
+  let list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
+  if (filters?.workspaceId) list = list.filter(c => !c.workspace_id || c.workspace_id === filters.workspaceId);
+  if (filters?.campaignId) list = list.filter(c => c.campaign_id === filters.campaignId);
+  if (filters?.status && filters.status !== 'ALL') list = list.filter(c => c.status === filters.status);
+  if (filters?.channelId) list = list.filter(c => c.channel_id === filters.channelId);
+  if (filters?.search) {
+    const q = filters.search.toLowerCase();
+    list = list.filter(c =>
+      (c.title || '').toLowerCase().includes(q) || (c.body || '').toLowerCase().includes(q));
+  }
+  return list;
+};
+
 export const contentApi = {
+  /** Danh sách nội dung có phân trang + tìm kiếm + lọc + sắp xếp. */
+  getAllPage: async (
+    page = 1,
+    pageSize = 20,
+    filters?: { campaignId?: number; status?: string; channelId?: number; search?: string; sort?: ContentSort },
+  ): Promise<Page<MarketingContent>> => {
+    const params: Record<string, any> = {};
+    if (filters?.campaignId) params.campaign_id = filters.campaignId;
+    if (filters?.status) params.status = filters.status;
+    if (filters?.channelId) params.channel_id = filters.channelId;
+    if (filters?.search) params.search = filters.search;
+    if (filters?.sort) params.sort = filters.sort;
+    try {
+      const res = await apiClient.get('/contents', { params: withPaging(params, page, pageSize) });
+      return toPage<MarketingContent>(res.data, page, pageSize);
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: contentApi.getAllPage');
+      const list = _filterMockContents(filters);
+      const total = list.length;
+      const start = (page - 1) * pageSize;
+      return {
+        items: list.slice(start, start + pageSize),
+        total,
+        page,
+        page_size: pageSize,
+        total_pages: total === 0 ? 0 : Math.ceil(total / pageSize),
+        has_next: page * pageSize < total,
+        has_prev: page > 1,
+      };
+    }
+  },
+
   getAll: async (campaignId?: number, status?: string, workspaceId?: number): Promise<MarketingContent[]> => {
     try {
       const params: Record<string, any> = {};
@@ -647,16 +862,16 @@ export const contentApi = {
       if (status) params.status = status;
       if (workspaceId) params.workspace_id = workspaceId;
       const res = await apiClient.get('/contents', { params });
-      return res.data;
+      // Backend đã chuyển sang envelope `Page` — phải bóc `.items`, không trả
+      // thẳng `res.data`. Trả thẳng sẽ đưa OBJECT vào state kiểu `MarketingContent[]`
+      // và làm hỏng mọi `.filter` phía sau (biểu hiện: "p.filter is not a
+      // function" và toàn bộ giao diện rơi vào ErrorBoundary).
+      return toPage<MarketingContent>(res.data).items;
     } catch (e: any) {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: contentApi.getAll');
-      let list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
-      if (workspaceId) list = list.filter(c => !c.workspace_id || c.workspace_id === workspaceId);
-      if (campaignId) list = list.filter(c => c.campaign_id === campaignId);
-      if (status && status !== 'ALL') list = list.filter(c => c.status === status);
-      return list;
+      return _filterMockContents({ campaignId, status, workspaceId });
     }
   },
 
@@ -931,6 +1146,39 @@ export const aiJobTransport: AIJobTransport = {
   enqueue: (request) => aiJobsApi.enqueue(request),
   getJob: (jobId) => aiJobsApi.getJob(jobId),
   cancelJob: (jobId) => aiJobsApi.cancelJob(jobId),
+};
+
+/**
+ * Hạn mức gói miễn phí của workspace — dùng để hiện số đã dùng / trần và đếm
+ * ngược tới lúc hết hạn, để người dùng thấy trước khi bị chặn.
+ */
+export const quotaApi = {
+  get: async (workspaceId: number): Promise<QuotaSnapshot | null> => {
+    try {
+      const res = await apiClient.get(`/workspaces/${workspaceId}/quota`);
+      return res.data as QuotaSnapshot;
+    } catch (e: any) {
+      // Hạn mức chỉ là thông tin hiển thị: không có nó thì màn hình vẫn dùng
+      // được, nên nuốt lỗi thay vì làm hỏng cả trang. Endpoint thực thi hạn
+      // mứng vẫn chặn ở server như thường.
+      console.warn('[Quota] Không đọc được hạn mứng, tiếp tục không hiển thị.', e?.message);
+      return null;
+    }
+  },
+};
+
+/** Định dạng mốc hết hạn cho UI: "còn 2 giờ 15 phút" hoặc "23:59 ngày mai". */
+export const describeQuotaReset = (resetsAt: string | null, now: Date = new Date()): string => {
+  if (!resetsAt) return 'Không tự đặt lại';
+  const target = new Date(resetsAt);
+  if (Number.isNaN(target.getTime())) return '';
+  const ms = target.getTime() - now.getTime();
+  if (ms <= 0) return 'Đã hết hạn';
+  const minutes = Math.floor(ms / 60000);
+  const hours = Math.floor(minutes / 60);
+  if (hours >= 1) return hours >= 24 ? `${Math.floor(hours / 24)} ngày` : `còn ${hours} giờ ${minutes % 60} phút`;
+  if (minutes >= 1) return `còn ${minutes} phút`;
+  return `còn ${Math.max(1, Math.floor(ms / 1000))} giây`;
 };
 
 export const aiApi = {
@@ -1254,10 +1502,44 @@ export const metricsApi = {
 };
 
 export const scheduleApi = {
+  getAllPage: async (
+    page = 1,
+    pageSize = 20,
+    filters?: { workspace_id?: number; status?: string; content_id?: number },
+    signal?: AbortSignal,
+  ): Promise<Page<MarketingSchedule>> => {
+    const params: Record<string, any> = {};
+    if (filters?.workspace_id) params.workspace_id = filters.workspace_id;
+    if (filters?.status) params.status = filters.status;
+    if (filters?.content_id) params.content_id = filters.content_id;
+    try {
+      const res = await apiClient.get('/schedules', { params: withPaging(params, page, pageSize), signal });
+      return toPage<MarketingSchedule>(res.data, page, pageSize);
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: scheduleApi.getAllPage');
+      let list = getStoredList<MarketingSchedule>('mf_schedules', MOCK_SCHEDULES);
+      if (filters?.status) list = list.filter(s => s.status === filters.status);
+      if (filters?.content_id) list = list.filter(s => s.content_id === filters.content_id);
+      const total = list.length;
+      const start = (page - 1) * pageSize;
+      return {
+        items: list.slice(start, start + pageSize),
+        total,
+        page,
+        page_size: pageSize,
+        total_pages: total === 0 ? 0 : Math.ceil(total / pageSize),
+        has_next: page * pageSize < total,
+        has_prev: page > 1,
+      };
+    }
+  },
+
   getAll: async (signal?: AbortSignal): Promise<MarketingSchedule[]> => {
     try {
       const res = await apiClient.get('/schedules', { signal });
-      return res.data;
+      return toPage<MarketingSchedule>(res.data).items;
     } catch (e: any) {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
@@ -1430,7 +1712,7 @@ const res = await apiClient.post('/settings/test-ai-connection', data);
     try {
       const params = workspaceId ? { workspace_id: workspaceId } : {};
       const res = await apiClient.get('/settings/ai-keys/list', { params });
-      return res.data;
+      return toPage<CustomApiKey>(res.data).items;
     } catch (e: any) {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
@@ -1550,24 +1832,53 @@ function formatNotificationRelativeTime(dateStr?: string): string {
   }
 }
 
+/** Ánh xạ một dòng notification của API sang shape dùng ở UI. */
+const _toAppNotification = (item: any): AppNotification => ({
+  id: String(item.id),
+  title: item.title,
+  message: item.message,
+  type: item.type || 'info',
+  timestamp: formatNotificationRelativeTime(item.created_at),
+  read: Boolean(item.read),
+  targetTab: item.target_tab || undefined,
+  actionLabel: item.target_tab === 'reviews'
+    ? 'Mở hàng đợi duyệt'
+    : (item.target_tab === 'campaigns'
+        ? 'Xem Chiến dịch'
+        : (item.target_tab === 'ai_studio' ? 'Mở AI Studio' : undefined)),
+});
+
 export const notificationApi = {
-  getAll: async (signal?: AbortSignal, params?: { workspace_id?: number; unread_only?: boolean; limit?: number }): Promise<AppNotification[]> => {
+  /** Bản có phân trang; trả về luôn envelope để UI biết còn bao nhiêu thông báo. */
+  getAllPage: async (
+    page = 1,
+    pageSize = 20,
+    params?: { workspace_id?: number; unread_only?: boolean },
+    signal?: AbortSignal,
+  ): Promise<Page<AppNotification>> => {
+    const query: Record<string, any> = {};
+    if (params?.workspace_id) query.workspace_id = params.workspace_id;
+    if (params?.unread_only) query.unread_only = true;
+    try {
+      const res = await apiClient.get('/notifications', {
+        params: withPaging(query, page, pageSize),
+        signal,
+      });
+      const envelope = toPage<any>(res.data, page, pageSize);
+      return { ...envelope, items: envelope.items.map((item: any) => _toAppNotification(item)) };
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: notificationApi.getAll');
+      const list = getStoredList<AppNotification>('mf_notifications', []);
+      return toPage<AppNotification>(list, page, pageSize);
+    }
+  },
+
+  getAll: async (signal?: AbortSignal, params?: { workspace_id?: number; unread_only?: boolean }): Promise<AppNotification[]> => {
     try {
       const res = await apiClient.get('/notifications', { params, signal });
-      return (res.data || []).map((item: any) => ({
-        id: String(item.id),
-        title: item.title,
-        message: item.message,
-        type: item.type || 'info',
-        timestamp: formatNotificationRelativeTime(item.created_at),
-        read: Boolean(item.read),
-        targetTab: item.target_tab || undefined,
-        actionLabel: item.target_tab === 'reviews' 
-          ? 'Mở Hàng đợi' 
-          : (item.target_tab === 'campaigns' 
-              ? 'Xem Chiến dịch' 
-              : (item.target_tab === 'ai_studio' ? 'Mở AI Studio' : undefined))
-      }));
+      return toPage<any>(res.data).items.map((item: any) => _toAppNotification(item));
     } catch (e: any) {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
@@ -1611,10 +1922,39 @@ export const notificationApi = {
 // --- TASK & OPERATIONS API SERVICES ---
 
 export const taskApi = {
+  getCampaignTasksPage: async (
+    campaignId: number,
+    page = 1,
+    pageSize = 20,
+    filters?: { status?: string; priority?: string; assignee_id?: number },
+  ): Promise<Page<Task>> => {
+    try {
+      const res = await apiClient.get(`/campaigns/${campaignId}/tasks`, {
+        params: withPaging(filters as Record<string, any>, page, pageSize),
+      });
+      return toPage<Task>(res.data, page, pageSize);
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      const tasks = getStoredList<Task>('mf_tasks', []).filter(t => t.campaign_id === campaignId);
+      const total = tasks.length;
+      const start = (page - 1) * pageSize;
+      return {
+        items: tasks.slice(start, start + pageSize),
+        total,
+        page,
+        page_size: pageSize,
+        total_pages: total === 0 ? 0 : Math.ceil(total / pageSize),
+        has_next: page * pageSize < total,
+        has_prev: page > 1,
+      };
+    }
+  },
+
   getCampaignTasks: async (campaignId: number, filters?: { status?: string; priority?: string; assignee_id?: number }): Promise<Task[]> => {
     try {
       const res = await apiClient.get(`/campaigns/${campaignId}/tasks`, { params: filters });
-      return res.data;
+      return toPage<Task>(res.data).items;
     } catch (e: any) {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
@@ -1652,10 +1992,62 @@ export const taskApi = {
     }
   },
 
+  /** Bốn con số tổng hợp phạm vi toàn bộ, không theo trang — cho các thẻ thống kê. */
+  getMyTasksSummary: async (): Promise<{ overdue: number; today: number; in_progress: number; done: number; total: number }> => {
+    try {
+      const res = await apiClient.get('/tasks/my-tasks/summary');
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      return { overdue: 0, today: 0, in_progress: 0, done: 0, total: 0 };
+    }
+  },
+
+  getMyTasksPage: async (
+    page = 1,
+    pageSize = 20,
+    filters?: {
+      status?: string;
+      priority?: string;
+      include_completed?: boolean;
+      campaign_id?: number;
+      search?: string;
+      due?: 'today' | 'overdue';
+    },
+  ): Promise<Page<Task>> => {
+    const params: Record<string, any> = {};
+    if (filters?.status) params.status = filters.status;
+    if (filters?.priority) params.priority = filters.priority;
+    if (filters?.include_completed !== undefined) params.include_completed = filters.include_completed;
+    if (filters?.campaign_id) params.campaign_id = filters.campaign_id;
+    if (filters?.search) params.search = filters.search;
+    if (filters?.due) params.due = filters.due;
+    try {
+      const res = await apiClient.get('/tasks/my-tasks', { params: withPaging(params, page, pageSize) });
+      return toPage<Task>(res.data, page, pageSize);
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      const tasks = getStoredList<Task>('mf_tasks', []);
+      const total = tasks.length;
+      const start = (page - 1) * pageSize;
+      return {
+        items: tasks.slice(start, start + pageSize),
+        total,
+        page,
+        page_size: pageSize,
+        total_pages: total === 0 ? 0 : Math.ceil(total / pageSize),
+        has_next: page * pageSize < total,
+        has_prev: page > 1,
+      };
+    }
+  },
+
   getMyTasks: async (filters?: { status?: string; priority?: string; include_completed?: boolean }): Promise<Task[]> => {
     try {
       const res = await apiClient.get('/tasks/my-tasks', { params: filters });
-      return res.data;
+      return toPage<Task>(res.data).items;
     } catch (e: any) {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;

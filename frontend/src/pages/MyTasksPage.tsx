@@ -1,16 +1,30 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { CheckCircle2, Clock, AlertCircle, Calendar, Plus, Search, Tag, Check, RotateCcw } from 'lucide-react';
-import { Task, TaskStatus, TaskPriority, TaskType, Campaign } from '../types';
+import { Task, TaskStatus, TaskPriority, TaskType, Campaign, Page } from '../types';
 import { taskApi, campaignApi, getApiErrorMessage } from '../services/api';
 import { useToast } from '../components/Toast';
+import { Pagination } from '../components/Pagination';
 
 interface MyTasksPageProps {
   onNavigateToCampaign?: (campaignId: number) => void;
 }
 
+const EMPTY_PAGE: Page<Task> = {
+  items: [],
+  total: 0,
+  page: 1,
+  page_size: 20,
+  total_pages: 0,
+  has_next: false,
+  has_prev: false,
+};
+
 export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }) => {
   const toast = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [taskPage, setTaskPage] = useState<Page<Task>>(EMPTY_PAGE);
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(20);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -32,33 +46,89 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
 
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // useCallback để effect mount chỉ phụ thuộc một hàm có identity ổn định;
-  // nếu không, effect sẽ được cảnh báo thiếu dependency và dễ bị thêm lại
-  // sai cách (chạy lại mỗi render) ở lần sửa sau.
-  const loadData = useCallback(async () => {
+  // Dải chiến dịch -> tham số `status`/`due` mà backend hiểu.
+  //
+  // `ALL` / `TODAY` / `OVERDUE` không phải trạng thái thật của Task, nên phải ánh
+  // xạ thành `due=today` / `due=overdue` thay vì gửi thẳng `status=OVERDUE`
+  // (sẽ trả về 0 dòng). `include_completed=false` dùng cho các trạng thái
+  // "còn việc" để tác vụ DONE không lọn vào danh sách việc cần làm.
+  const taskQuery = useCallback(() => {
+    const statusValues = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
+    if (statusFilter === 'TODAY' || statusFilter === 'OVERDUE') {
+      return { due: statusFilter.toLowerCase() as 'today' | 'overdue' };
+    }
+    const params: {
+      status?: string;
+      priority?: string;
+      include_completed?: boolean;
+      campaign_id?: number;
+      search?: string;
+      due?: 'today' | 'overdue';
+    } = {};
+    if (statusFilter !== 'ALL') {
+      params.status = statusFilter;
+      if (statusValues.includes(statusFilter) && statusFilter !== 'DONE') {
+        params.include_completed = false;
+      }
+    }
+    if (priorityFilter !== 'ALL') params.priority = priorityFilter;
+    if (campaignFilter !== 'ALL') params.campaign_id = Number(campaignFilter);
+    if (searchQuery.trim()) params.search = searchQuery.trim();
+    return params;
+  }, [statusFilter, priorityFilter, campaignFilter, searchQuery]);
+
+  // Lọc + phân trang ở SERVER. `total` do backend đếm trên tập đã lọc nên con số
+  // "Hiển thị x–y trên z" luôn khớp với những gì server trả về.
+  const loadTasks = useCallback(async () => {
     try {
       setLoading(true);
-      const [myTasks, cList] = await Promise.all([
-        taskApi.getMyTasks({ include_completed: true }),
-        campaignApi.getAll().catch(() => [])
-      ]);
-      setTasks(myTasks);
-      setCampaigns(cList);
-      if (cList.length > 0) {
-        setNewTaskCampaignId(cList[0].id);
-      }
+      const result = await taskApi.getMyTasksPage(page, pageSize, taskQuery());
+      setTasks(result.items);
+      setTaskPage(result);
     } catch (e: any) {
       toast.error(getApiErrorMessage(e), 'Lỗi tải danh sách tác vụ');
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [page, pageSize, taskQuery, toast]);
 
-  // Nạp dữ liệu lúc mount. Effect phải nằm SAU khai báo loadData: nếu đặt trước,
+  // Danh sách chiến dịch chỉ nạp một lần: nó là bộ lọc, không phải nội dung
+  // phân trang, nên không cần cắt trang.
+  const loadCampaigns = useCallback(async () => {
+    const cList = await campaignApi.getAll().catch(() => []);
+    setCampaigns(cList);
+    if (cList.length > 0) setNewTaskCampaignId((prev) => prev || cList[0].id);
+  }, []);
+
+  // Thẻ thống kê không phụ thuộc bộ lọc đang chọn nên nạp một lần.
+  const loadSummary = useCallback(async () => {
+    try {
+      setSummary(await taskApi.getMyTasksSummary());
+    } catch {
+      setSummary({ overdue: 0, today: 0, in_progress: 0, done: 0, total: 0 });
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadCampaigns();
+    void loadSummary();
+  }, [loadCampaigns, loadSummary]);
+
+  // Nạp dữ liệu lúc mount. Effect phải nằm SAU khai báo loadTasks: nếu đặt trước,
   // biến bị dùng trước khi khai báo và ESLint cũng không bắt được lỗi đó.
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    void loadTasks();
+  }, [loadTasks]);
+
+  // Đổi bất kỳ bộ lọc nào thì về lại trang 1, nếu không sẽ hỏng.
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, priorityFilter, campaignFilter, searchQuery]);
+
+  const handlePageSizeChange = (nextSize: number) => {
+    setPageSize(nextSize);
+    setPage(1);
+  };
 
   const handleUpdateStatus = async (task: Task, nextStatus: TaskStatus) => {
     try {
@@ -99,38 +169,20 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
     }
   };
 
-  // Lọc tác vụ
-  const filteredTasks = tasks.filter(task => {
-    if (statusFilter === 'TODO' && task.status !== 'TODO') return false;
-    if (statusFilter === 'IN_PROGRESS' && task.status !== 'IN_PROGRESS') return false;
-    if (statusFilter === 'IN_REVIEW' && task.status !== 'IN_REVIEW') return false;
-    if (statusFilter === 'DONE' && task.status !== 'DONE') return false;
-    if (statusFilter === 'OVERDUE') {
-      const isOverdue = task.due_date && task.due_date < todayStr && task.status !== 'DONE';
-      if (!isOverdue) return false;
-    }
-    if (statusFilter === 'TODAY') {
-      if (task.due_date !== todayStr) return false;
-    }
+  // Danh sách đã được lọc ở server (`loadTasks`), nên `tasks` chính là nội dung
+  // trang hiện tại — không lọc lần nữa ở client, nếu không `total` của bộ phân
+  // trang sẽ mâu thuẫn với danh sách đang hiện.
+  const filteredTasks = tasks;
 
-    if (priorityFilter !== 'ALL' && task.priority !== priorityFilter) return false;
-    if (campaignFilter !== 'ALL' && task.campaign_id !== Number(campaignFilter)) return false;
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchTitle = task.title.toLowerCase().includes(q);
-      const matchDesc = task.description?.toLowerCase().includes(q);
-      if (!matchTitle && !matchDesc) return false;
-    }
-
-    return true;
-  });
+  // Số liệu thẻ thống kê lấy từ endpoint summary (phạm vi toàn bộ), KHÔNG đếm
+  // trên `tasks` — `tasks` chỉ là một trang.
+  const [summary, setSummary] = useState({ overdue: 0, today: 0, in_progress: 0, done: 0, total: 0 });
 
   // Đếm nhanh
-  const overdueCount = tasks.filter(t => t.due_date && t.due_date < todayStr && t.status !== 'DONE').length;
-  const todayCount = tasks.filter(t => t.due_date === todayStr && t.status !== 'DONE').length;
-  const inProgressCount = tasks.filter(t => t.status === 'IN_PROGRESS').length;
-  const doneCount = tasks.filter(t => t.status === 'DONE').length;
+  const overdueCount = summary.overdue;
+  const todayCount = summary.today;
+  const inProgressCount = summary.in_progress;
+  const doneCount = summary.done;
 
   return (
     <div className="p-8 space-y-6 max-w-7xl mx-auto">
@@ -411,6 +463,18 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
               );
             })}
           </div>
+        )}
+
+        {/* Bộ phân trang chỉ hiện khi còn bản ghi — màn hình trống thì không có
+            thanh "Trang 1/1" vô nghĩa. */}
+        {!loading && filteredTasks.length > 0 && (
+          <Pagination
+            page={taskPage}
+            onPageChange={setPage}
+            onPageSizeChange={handlePageSizeChange}
+            itemLabel="tác vụ"
+            disabled={loading}
+          />
         )}
       </div>
 

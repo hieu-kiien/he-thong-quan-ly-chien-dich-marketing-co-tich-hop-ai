@@ -222,6 +222,13 @@ def get_my_tasks(
     status_filter: Optional[str] = Query(None, alias="status"),
     priority: Optional[str] = Query(None),
     include_completed: bool = Query(True),
+    campaign_id: Optional[int] = Query(None, description="Lọc theo chiến dịch"),
+    search: Optional[str] = Query(None, description="Tìm trong tiêu đề hoặc mô tả"),
+    due: Optional[str] = Query(
+        None,
+        pattern="^(today|overdue)$",
+        description="overdue = quá hạn và chưa xong; today = đến hạn đúng hôm nay",
+    ),
     pagination: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -230,6 +237,13 @@ def get_my_tasks(
 
     Nhánh `query.filter(false())` khi user không thuộc workspace nào là fail-closed
     có chủ đích: `total = 0` thay vì lộ bất kỳ tác vụ nào.
+
+    `campaign_id` / `search` / `due` tồn tại để frontend phân trang ở phía server
+    được ĐÚNG. Trước đây màn hình này lọc hoàn toàn ở client; nếu ta chỉ thêm
+    phân trang mà giữ nguyên cách lọc đó, mỗi lần đổi trang sẽ chỉ lấy trang đầu
+    của tập đã lọc rồi cắt tiếp — tức nhiều tác vụ biến mất khỏi danh sách mà
+    `total` vẫn báo đúng. Đưa bộ lọc xuống server là điều kiện để phân trang
+    tương đương, không phải mở rộng tính năng.
     """
     query = db.query(Task).filter(Task.assignee_id == current_user.id)
 
@@ -247,6 +261,20 @@ def get_my_tasks(
 
     if priority:
         query = query.filter(Task.priority == priority)
+    if campaign_id is not None:
+        query = query.filter(Task.campaign_id == campaign_id)
+    if search:
+        search_fmt = f"%{search}%"
+        query = query.filter(
+            (Task.title.ilike(search_fmt)) | (Task.description.ilike(search_fmt))
+        )
+    if due:
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+        if due == "overdue":
+            # Quá hạn = có hạn, hạn đã qua, và chưa xong.
+            query = query.filter(Task.due_date.isnot(None), Task.due_date < today, Task.status != "DONE")
+        else:
+            query = query.filter(Task.due_date == today)
 
     return paginate_query(
         query.order_by(Task.due_date.asc().nullslast(), Task.created_at.desc(), Task.id.asc()),
@@ -255,6 +283,43 @@ def get_my_tasks(
 
 
 # --- SINGLE TASK ENDPOINTS ---
+
+@router.get("/tasks/my-tasks/summary")
+def get_my_tasks_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Bốn con số tổng hợp của tác vụ được giao, phạm vi TOÀN BỘ (không theo trang).
+
+    Vì sao cần: trước đây các thẻ thống kê ở đầu màn hình đếm trên mảng `tasks`
+    mà client đã tải về. Sau khi phân trang ở server, mảng đó chỉ là trang hiện
+    tại, nên đếm trên đó sẽ báo sai ngay khi người dùng sang trang 2 — thẻ
+    "Quá hạn (3)" hóa ra là 3 trong 20 dòng của trang đó chứ không phải 3 trong
+    toàn bộ tác vụ. Đây là lớp số liệu đúng, tính bằng 4 truy vấn `COUNT`
+    có index, không phải kéo cả danh sách về client.
+
+    Dùng chung đúng bộ lọc tenant với `/tasks/my-tasks` để hai nơi không lệch nhau.
+    """
+    base = db.query(Task).filter(Task.assignee_id == current_user.id)
+    if current_user.role != "ADMIN":
+        ws_ids = _accessible_workspace_ids(current_user, db)
+        base = base.filter(Task.workspace_id.in_(ws_ids)) if ws_ids else base.filter(false())
+
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    open_clause = Task.status != "DONE"
+
+    return {
+        "overdue": int(
+            base.filter(Task.due_date.isnot(None), Task.due_date < today, open_clause).count()
+        ),
+        "today": int(
+            base.filter(Task.due_date == today, open_clause).count()
+        ),
+        "in_progress": int(base.filter(Task.status == "IN_PROGRESS").count()),
+        "done": int(base.filter(Task.status == "DONE").count()),
+        "total": int(base.count()),
+    }
+
 
 @router.get("/tasks/{task_id}", response_model=TaskResponse)
 def get_task(

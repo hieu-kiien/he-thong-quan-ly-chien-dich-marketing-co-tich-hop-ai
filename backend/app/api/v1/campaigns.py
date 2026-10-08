@@ -183,6 +183,9 @@ def get_campaigns(
     start_date: Optional[str] = Query(None, alias="start_date"),
     end_date: Optional[str] = Query(None, alias="end_date"),
     search: Optional[str] = Query(None),
+    objective: Optional[str] = Query(
+        None, description="Lọc theo mục tiêu chiến dịch (khớp chuỗi con)"
+    ),
     sort: str = Query("newest", description=_SORT_DESCRIPTION),
     pagination: PageParams = Depends(page_params),
     current_user: User = Depends(get_current_user),
@@ -223,6 +226,12 @@ def get_campaigns(
             (Campaign.objective.ilike(search_fmt)) |
             (Campaign.audience.ilike(search_fmt))
         )
+    if objective:
+        # Trước đây bộ lọc "mục tiêu" chỉ tồn tại ở client (so khớp chuỗi con với
+        # `objective`). Đưa xuống đây để phân trang ở server cho đúng: nếu vẫn lọc
+        # ở client, mỗi trang chỉ chứa phần đã lọc của riêng trang đó và `total`
+        # của envelope sẽ mâu thuẫn với những gì người dùng thấy.
+        query = query.filter(Campaign.objective.ilike(f"%{objective}%"))
 
     # Sắp xếp sau khi lọc, trước khi cắt trang. Mỗi nhánh đều kèm `Campaign.id`
     # làm khoá phá thế hoàn toàn: trang 2 không được trả lặp/mất dòng khi hai

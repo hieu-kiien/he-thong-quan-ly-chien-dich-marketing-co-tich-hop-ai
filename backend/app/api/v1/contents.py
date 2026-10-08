@@ -27,6 +27,13 @@ _CONTENT_SORT_KEYS = (
     "newest", "oldest", "name_asc", "name_desc", "status_asc", "updated_desc",
 )
 
+# Trạng thái hợp lệ của nội dung — khớp CHECK constraint `chk_content_status` ở
+# entities.py. Dùng để cho tham số `status` nhiều giá trị báo 422 thay vì âm thầm
+# trả danh sách rỗng cho một trạng thái gõ sai.
+_CONTENT_STATUSES = (
+    "DRAFT", "AI_DRAFT", "IN_REVIEW", "APPROVED", "REJECTED", "PUBLISHED",
+)
+
 _SORT_DESCRIPTION = "Thứ tự sắp xếp: " + " | ".join(_CONTENT_SORT_KEYS) + " (mặc định newest)"
 
 def resolve_workspace_id_for_content(content: MarketingContent, db: Session) -> Optional[int]:
@@ -223,7 +230,25 @@ def get_contents(
     if workspace_id is not None:
         query = query.filter(MarketingContent.workspace_id == workspace_id)
     if status_filter:
-        query = query.filter(MarketingContent.status == status_filter)
+        # Cho phép nhiều trạng thái: `status=AI_DRAFT,DRAFT,REJECTED`. Một giá trị
+        # đơn vẫn cho kết quả y hệt `==` nên không đổi hành vi cũ. Cần cho hàng
+        # đợi duyệt, vốn chia nội dung thành ba nhóm trạng thái và trước đây lọc
+        # ở client — nếu vẫn lọc ở client thì mỗi trang chỉ chứa phần đã lọc của
+        # riêng trang đó và `total` của envelope sẽ sai.
+        wanted = [s.strip().upper() for s in status_filter.split(",") if s.strip()]
+        # "ALL" là ký hiệu "không lọc" mà frontend dùng; không phải trạng thái thật.
+        wanted = [s for s in wanted if s and s != "ALL"]
+        if wanted:
+            invalid = [s for s in wanted if s not in _CONTENT_STATUSES]
+            if invalid:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"status không hợp lệ: {', '.join(invalid)}. "
+                        f"Chỉ nhận: {', '.join(_CONTENT_STATUSES)} (hoặc nhiều giá trị, cách nhau bởi dấu phẩy)."
+                    ),
+                )
+            query = query.filter(MarketingContent.status.in_(wanted))
     if channel_id:
         query = query.filter(MarketingContent.channel_id == channel_id)
     if search:

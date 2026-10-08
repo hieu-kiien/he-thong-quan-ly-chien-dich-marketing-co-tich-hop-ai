@@ -10,7 +10,10 @@ import {
   OmnichannelResponse,
   BrandKit,
   BudgetAllocation,
-  ComplianceCheckResponse
+  ComplianceCheckResponse,
+  Page,
+  CampaignSort,
+  QuotaErrorDetail
 } from '../types';
 import { 
   campaignApi, 
@@ -20,12 +23,16 @@ import {
   budgetApi,
   channelApi,
   metricsApi,
-  getApiErrorMessage 
+  analyticsApi,
+  getApiErrorMessage,
+  getQuotaError
 } from '../services/api';
 import { channelIdByCode, channelPresentation, channelCodeById, channelNameById, setChannelRegistry } from '../utils/channels';
 import { formatNumber, formatRatio, addDaysLocalISO, todayLocalISO } from '../utils/format';
 import { useToast } from '../components/Toast';
 import { CampaignCardSkeleton, CampaignTableSkeleton } from '../components/Skeleton';
+import { Pagination } from '../components/Pagination';
+import { QuotaBadge, QuotaErrorCard } from '../components/QuotaBadge';
 import { ManualContentComposer } from '../components/ManualContentComposer';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useAIJob } from '../hooks/useAIJob';
@@ -127,6 +134,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
   const [brandKit, setBrandKit] = useState<BrandKit | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Lỗi hạn mứng gói miễn phí (429). Giữ thành state thay vì chỉ báo toast để người
+  // dùng đọc kịp trần, số đã dùng và thời điểm hết hạn trước khi thử lại.
+  const [quotaError, setQuotaError] = useState<QuotaErrorDetail | null>(null);
 
   // Chỉ số thực đo theo chiến dịch. Trước đây bảng chiến dịch hiển thị các
   // literal cố định (3.82x ROAS / 2.450 clicks / 4.1% CVR / 68.4% pacing) cho
@@ -140,6 +150,17 @@ export const Campaigns: React.FC<CampaignsProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [objectiveFilter, setObjectiveFilter] = useState<string>('ALL');
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+
+  // Phân trang: server lọc + cắt trang, nên `campaignPage.total` là tổng của tập
+  // đã lọc và khớp đúng với những gì bảng đang hiện.
+  const [campaignPage, setCampaignPage] = useState<Page<Campaign>>({
+    items: [], total: 0, page: 1, page_size: 20, total_pages: 0, has_next: false, has_prev: false,
+  });
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(20);
+  // Khoá sắp xếp gửi lên server (allowlist ở backend). `newest` là mặc định
+  // và cũng là thứ tự cũ, nên hành vi mặc định không đổi.
+  const [sortOrder, setSortOrder] = useState<CampaignSort>('newest');
 
   // Slide-over Detail Drawer
   const [selectedDrawerCampaign, setSelectedDrawerCampaign] = useState<Campaign | null>(null);
@@ -377,8 +398,21 @@ export const Campaigns: React.FC<CampaignsProps> = ({
     try {
       setLoading(true);
       setLoadError(null);
-      const [cList, pList, channelList] = await Promise.all([
-        campaignApi.getAll(),
+      // Mỗi lần tải lại là một cơ hội mới nên xoá thẻ lỗi hạn mứng cũ.
+      setQuotaError(null);
+      // `objectiveFilter` là id của mục tiêu trong CAMPAIGN_OBJECTIVES; server cần
+      // CHUỖI mục tiêu để so khớp, nên ánh xạ ngược ở đây.
+      const objectiveText = objectiveFilter !== 'ALL'
+        ? (CAMPAIGN_OBJECTIVES.find(o => o.id === objectiveFilter)?.title ?? undefined)
+        : undefined;
+
+      const [campaignResult, pList, channelList] = await Promise.all([
+        campaignApi.getAllPage(page, pageSize, {
+          status: statusFilter !== 'ALL' ? statusFilter : undefined,
+          search: searchTerm.trim() || undefined,
+          sort: sortOrder,
+          objective: objectiveText,
+        }),
         productApi.getAll().catch(() => [] as Product[]),
         // Nạp danh mục kênh từ server để ánh xạ code -> id chính xác, thay vì
         // hardcode id (id 2 từng được ghi chú là TikTok trong khi DB gọi là Email).
@@ -386,7 +420,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
       ]);
       if (signal?.aborted) return;
       if (channelList.length > 0) setChannelRegistry(channelList);
+      const cList = campaignResult.items;
       setCampaigns(cList);
+      setCampaignPage(campaignResult);
       setProducts(pList);
 
       if (pList.length > 0) {
@@ -417,7 +453,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, [loadCampaignMetrics, toast]);
+  }, [loadCampaignMetrics, toast, page, pageSize, searchTerm, statusFilter, objectiveFilter, sortOrder]);
 
   // Nạp dữ liệu lúc mount. Effect phải nằm SAU khai báo `loadData` (biến block
   // scoped dùng trước khi khai báo sẽ ném lỗi runtime), và `loadData` là
@@ -428,6 +464,17 @@ export const Campaigns: React.FC<CampaignsProps> = ({
     void loadData(controller.signal);
     return () => controller.abort();
   }, [loadData]);
+
+  // Đổi bộ lọc thì về trang 1. Giữ nguyên trang cũ sẽ ra trang không tồn tại và
+  // danh sách trống — đúng cái lỗi mà bộ chọn kích thước trang đã tránh.
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, statusFilter, objectiveFilter, sortOrder]);
+
+  const handlePageSizeChange = (nextSize: number) => {
+    setPageSize(nextSize);
+    setPage(1);
+  };
 
   // Load details when Drawer opens
   useEffect(() => {
@@ -758,6 +805,10 @@ export const Campaigns: React.FC<CampaignsProps> = ({
           console.error('Không thể rollback campaign sau khi lỗi creative:', rollbackErr);
         }
       }
+      // Lỗi hạn mứng được giữ lại để hiện thẻ chi tiết, không chỉ thoáng qua
+      // trong toast: người dùng cần đọc "còn N/M" và thời điểm hết hạn.
+      const quotaErr = getQuotaError(e);
+      if (quotaErr) setQuotaError(quotaErr);
       toast.error(getApiErrorMessage(e), 'Lỗi khi khởi tạo chiến dịch');
     } finally {
       setIsSubmitting(false);
@@ -784,28 +835,48 @@ export const Campaigns: React.FC<CampaignsProps> = ({
     }
   };
 
-  // Filtered campaigns
-  const filteredCampaigns = useMemo(() => {
-    const needle = searchTerm.trim().toLowerCase();
-    return campaigns.filter(c => {
-      // Dữ liệu cũ / partial có thể thiếu audience|objective; `.toLowerCase()` trực
-      // tiếp trên undefined làm sập trang.
-      const matchSearch = needle === '' ||
-        (c.name ?? '').toLowerCase().includes(needle) ||
-        (c.audience ?? '').toLowerCase().includes(needle) ||
-        (c.objective ?? '').toLowerCase().includes(needle);
+  // Server đã lọc + sắp xếp + cắt trang (`loadData`), nên `campaigns` chính là nội
+  // dung trang hiện tại. Lọc lần nữa ở client sẽ làm `total` của envelope lệch với
+  // danh sách đang hiện — đúng cái mâu thuẫn phải tránh.
+  const filteredCampaigns = useMemo(() => campaigns, [campaigns]);
 
-      const matchStatus = statusFilter === 'ALL' || c.status === statusFilter;
+  // Thẻ số liệu phải là TỔNG THỰC TẾ của tenant, không phải tổng của trang hiện
+  // tại. Nguồn là `/analytics/dashboard` (đã giới hạn tenant sẵn ở backend).
+  // Trước khi có phân trang, các thẻ này cộng trên danh sách đã tải và vì thế đúng;
+  // bỏ qua bước này thì "Ngân sách đang chạy" trên trang 2 sẽ là ngân sách của
+  // riêng 20 dòng của trang 2 — một con số sai mà người dùng không có cách nào
+  // phát hiện.
+  const [scorecard, setScorecard] = useState<{
+    activeBudget: number;
+    activeCount: number;
+    realizedSpend: number;
+    totalClicks: number;
+    totalRevenue: number;
+    avgRoas: number | null;
+  } | null>(null);
 
-      let matchObjective = true;
-      if (objectiveFilter !== 'ALL') {
-        const objObj = CAMPAIGN_OBJECTIVES.find(o => o.id === objectiveFilter);
-        matchObjective = objObj ? (c.objective ?? '').toLowerCase().includes(objObj.title.toLowerCase()) : true;
-      }
-
-      return matchSearch && matchStatus && matchObjective;
-    });
-  }, [campaigns, searchTerm, statusFilter, objectiveFilter]);
+  useEffect(() => {
+    let cancelled = false;
+    analyticsApi.getDashboard()
+      .then((data: any) => {
+        if (cancelled) return;
+        const kpi = data?.kpi || {};
+        const summary = data?.campaigns_summary || {};
+        setScorecard({
+          activeBudget: Number(summary.active_budget ?? 0),
+          activeCount: Number(summary.active ?? 0),
+          realizedSpend: Number(kpi.total_cost ?? 0),
+          totalClicks: Number(kpi.total_clicks ?? 0),
+          totalRevenue: Number(kpi.total_revenue ?? 0),
+          avgRoas: typeof kpi.roas === 'number' && kpi.roas > 0 ? kpi.roas : null,
+        });
+      })
+      .catch(() => {
+        // Không có số liệu tổng hợp thì các thẻ hiện '—' thay vì bịa số 0.
+        if (!cancelled) setScorecard(null);
+      });
+    return () => { cancelled = true; };
+  }, [page, pageSize, searchTerm, statusFilter, objectiveFilter]);
 
   // Số nội dung + danh sách kênh theo chiến dịch, dùng cho cột "Mẫu QC" và cột
 // "Kênh" thay vì các literal cố định ("3 Mẫu QC", luôn hiện icon FB/TT/Email).
@@ -839,39 +910,37 @@ useEffect(() => {
     return () => { cancelled = true; };
   }, [campaigns]);
 
-  // Aggregate Performance Metrics for Meta Top Scorecard — chỉ tính từ số liệu thật.
+  // Aggregate Performance Metrics cho scorecard.
+  //
+  // Nguồn là `/analytics/dashboard`, KHÔNG phải `campaigns`: danh sách đã được
+  // phân trang nên chỉ chứa trang hiện tại. Những thẻ này nói về TOÀN BỘ tenant
+  // ("Ngân sách đang chạy", "Chi tiêu thực tế"), tính trên một trang sẽ ra con
+  // số sai mà không có tín hiệu nào cho biết.
   const aggregateMetrics = useMemo(() => {
-    const ids = campaigns.map(c => c.id);
-    const sum = (pick: (a: CampaignAggregate) => number) =>
-      ids.reduce((acc, id) => acc + pick(campaignMetrics[id] ?? EMPTY_AGGREGATE), 0);
-
-    const totalBudget = campaigns.reduce((acc, c) => acc + (Number(c.budget) || 0), 0);
-    const activeCampaigns = campaigns.filter(c => c.status === 'ACTIVE');
-    const activeBudget = activeCampaigns.reduce((acc, c) => acc + (Number(c.budget) || 0), 0);
-
-    const totalCost = sum(a => a.cost);
-    const totalRevenue = sum(a => a.revenue);
-    const totalClicks = sum(a => a.clicks);
-    const campaignsWithMetrics = ids.filter(id => (campaignMetrics[id]?.rowCount ?? 0) > 0);
-
+    if (!scorecard) {
+      return {
+        totalBudget: null, activeBudget: null, activeCount: null, realizedSpend: null,
+        pacingPercent: '—', totalClicks: null, totalRevenue: null, totalViews: null,
+        totalConversions: null, avgRoas: null, campaignsWithMetrics: null,
+      };
+    }
+    const { activeBudget, activeCount, realizedSpend, totalClicks, totalRevenue, avgRoas } = scorecard;
     return {
-      totalBudget,
+      totalBudget: null,
       activeBudget,
-      activeCount: activeCampaigns.length,
-      realizedSpend: totalCost,
-      pacingPercent: activeBudget > 0 ? ((totalCost / activeBudget) * 100).toFixed(1) : '—',
+      activeCount,
+      realizedSpend,
+      pacingPercent: activeBudget > 0 ? ((realizedSpend / activeBudget) * 100).toFixed(1) : '—',
       totalClicks,
       totalRevenue,
-      totalViews: sum(a => a.views),
-      totalConversions: sum(a => a.conversions),
+      totalViews: null,
+      totalConversions: null,
       // ROAS chỉ có nghĩa khi có chi phí thực; không có dữ liệu thì hiển thị "—"
-      // thay vì đặt sẵn 3.48.
-      avgRoas: totalCost > 0 && campaignsWithMetrics.length > 0
-        ? (totalRevenue / totalCost)
-        : null,
-      campaignsWithMetrics: campaignsWithMetrics.length
+      // thay vì đặt sẵn một số.
+      avgRoas,
+      campaignsWithMetrics: null,
     };
-  }, [campaigns, campaignMetrics]);
+  }, [scorecard]);
 
   // Quick preset helper for budget
   const setQuickBudget = (amount: number) => {
@@ -886,6 +955,22 @@ useEffect(() => {
 
   return (
     <div className="p-3 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 overflow-hidden">
+      {/* Hạn mứng đã chạm trần: nói rõ trần nào, đã dùng bao nhiêu, hết hạn lúc nào,
+          và cho nút "Thử lại" — thay vì toast biến mất sau vài giây. */}
+      {quotaError && (
+        <div data-testid="quota-error-banner">
+          <QuotaErrorCard detail={quotaError} />
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={() => void loadData()}
+              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold"
+            >
+              Thử lại
+            </button>
+          </div>
+        </div>
+      )}
       {/* Load error — trước đây lỗi tải danh sách chỉ hiện qua toast rồi biến mất,
           để lại một trang trắng không giải thích được. */}
       {loadError && (
@@ -988,11 +1073,13 @@ useEffect(() => {
             </div>
           </div>
           <div className="text-xl font-black text-slate-900 font-mono tracking-tight">
-            {aggregateMetrics.activeBudget.toLocaleString('vi-VN')} <span className="text-xs font-medium text-slate-500">VNĐ</span>
+            {aggregateMetrics.activeBudget !== null
+              ? aggregateMetrics.activeBudget.toLocaleString('vi-VN')
+              : '—'} <span className="text-xs font-medium text-slate-500">VNĐ</span>
           </div>
           <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>{aggregateMetrics.activeCount} chiến dịch đang phân phối</span>
+            <span>{aggregateMetrics.activeCount ?? '—'} chiến dịch đang phân phối</span>
           </div>
         </div>
 
@@ -1005,7 +1092,9 @@ useEffect(() => {
             </div>
           </div>
           <div className="text-xl font-black text-slate-900 font-mono tracking-tight">
-            {aggregateMetrics.realizedSpend.toLocaleString('vi-VN')} <span className="text-xs font-medium text-slate-500">VNĐ</span>
+            {aggregateMetrics.realizedSpend !== null
+              ? aggregateMetrics.realizedSpend.toLocaleString('vi-VN')
+              : '—'} <span className="text-xs font-medium text-slate-500">VNĐ</span>
           </div>
           <div className="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
             <div 
@@ -1028,7 +1117,9 @@ useEffect(() => {
             </div>
           </div>
           <div className="text-xl font-black text-slate-900 font-mono tracking-tight">
-            {aggregateMetrics.totalClicks.toLocaleString('vi-VN')} <span className="text-xs font-medium text-slate-500">Clicks</span>
+            {aggregateMetrics.totalClicks !== null
+              ? aggregateMetrics.totalClicks.toLocaleString('vi-VN')
+              : '—'} <span className="text-xs font-medium text-slate-500">Clicks</span>
           </div>
           <div className="text-[11px] text-emerald-700 mt-1 flex items-center gap-1 font-semibold">
             <TrendingUp className="w-3.5 h-3.5" />
@@ -1061,6 +1152,17 @@ useEffect(() => {
         </div>
       </div>
 
+      {/* Hạn mức gói miễn phí: cho người dùng thấy "còn N/25 chiến dịch" TRƯỚC khi
+          bấm Tạo mới, thay vì chỉ biết sau khi thao tác đã thất bại. Chỉ là lớp
+          hiển thị — hạn mức thật thực thi ở server. */}
+      <div className="flex justify-end">
+        <QuotaBadge
+          workspaceId={Number(localStorage.getItem('active_workspace_id')) || null}
+          limitCodes={['campaigns', 'ai_jobs_per_day', 'contents']}
+          className="w-full sm:w-auto sm:min-w-[280px]"
+        />
+      </div>
+
       {/* 3. Filter & Search Toolbar (Meta Ads Control Bar) */}
       {/* `min-w-0` + `flex-wrap`: ở ~768px nội dung chỉ ~440px, ô tìm kiếm +
           select mục tiêu không co lại được nên tràn ngang. */}
@@ -1090,6 +1192,23 @@ useEffect(() => {
             {CAMPAIGN_OBJECTIVES.map(obj => (
               <option key={obj.id} value={obj.id}>{obj.title}</option>
             ))}
+          </select>
+
+          {/* Sắp xếp — allowlist khớp hệt với backend (`_CAMPAIGN_SORT_KEYS`).
+              Gửi khoá lạ thì server trả 422, nên chỉ liệt kê các giá trị hợp lệ. */}
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as CampaignSort)}
+            aria-label="Sắp xếp chiến dịch"
+            data-testid="campaign-sort"
+            className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-medium text-slate-700 outline-none hover:bg-white"
+          >
+            <option value="newest">Mới nhất</option>
+            <option value="oldest">Cũ nhất</option>
+            <option value="name_asc">Tên A → Z</option>
+            <option value="name_desc">Tên Z → A</option>
+            <option value="budget_desc">Ngân sách cao → thấp</option>
+            <option value="budget_asc">Ngân sách thấp → cao</option>
           </select>
         </div>
 
@@ -1545,6 +1664,19 @@ useEffect(() => {
                 </tbody>
               </table>
             </div>
+
+            {/* Bộ phân trang: chỉ hiện khi còn bản ghi. Danh sách rỗng thì màn hình
+                "Không tìm thấy chiến dịch" đã đủ; thêm thanh "Trang 1/1" chỉ gây
+                thắc mắc. */}
+            {!loading && filteredCampaigns.length > 0 && (
+              <Pagination
+                page={campaignPage}
+                onPageChange={setPage}
+                onPageSizeChange={handlePageSizeChange}
+                itemLabel="chiến dịch"
+                disabled={loading}
+              />
+            )}
           </div>
         </>
       ) : (

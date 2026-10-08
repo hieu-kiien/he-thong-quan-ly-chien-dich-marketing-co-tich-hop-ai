@@ -121,18 +121,22 @@ người yêu cầu, không sửa. Ghi chú này trong tài liệu là đủ.
 | # | Vấn đề | Mức độ | Cách sửa |
 |---|---|---|---|
 | 1 | Ba nút "chọn nhanh tài khoản" trên trang đăng nhập chứa sẵn `Manager@123`, `Marketer@123`, `Approver@123`, **luôn hiển thị** | Cao | Chỉ render khi `VITE_ENABLE_OFFLINE_DEMO=true`. Vì Vite bake biến môi trường vào bundle, chuỗi mật khẩu từng nằm trong JavaScript gửi tới mọi trình duyệt. Có test `test_seed_credentials_not_shipped.py` chặn gỡ bản vá |
+| 2 | **Phân trang** cho mọi endpoint danh sách (Bài 2 mục 4) | Cao | Hợp đồng `Page[T]` duy nhất (`page`/`page_size`; envelope `{items,total,page,page_size,total_pages,has_next,has_prev}`), trần `page_size=100`, thứ tự lọc → sắp xếp → **cắt trang**, có bộ điều khiển phân trang thật ở Campaigns / Hàng đợi duyệt / Tác vụ. Xem [`PAGINATION_AND_QUOTA.md`](./PAGINATION_AND_QUOTA.md) |
+| 3 | **Hạn mức gói miễn phí theo workspace** (Bài 3 mục 7; Thiết kế mục 4) | Trung bình | `app/services/quota.py`: AI job/24h, chiến dịch, nội dung, thành viên, lịch đăng, workspace/người dùng. Thực thi ở **server**, tính lúc **enqueue**, thân lỗi 429 máy-đọc-được, thẻ đếm ngược trong UI |
+| 4 | **`GET /ai/logs` không lọc tenant** khi bỏ trống `campaign_id` — một MANAGER đọc được nhật ký AI của mọi tenant | Cao | Lọc theo `AILog.user_id` (bảng `ai_logs` không có `workspace_id`; `user_id` là tenant duy nhất gắn được và là NOT NULL) |
+| 5 | **`GET /workspaces` nhánh ADMIN không có `ORDER BY`** — thứ tự do CSDL quyết định | Thấp, nhưng nguy hiểm khi phân trang | Thêm `ORDER BY id` cho cả hai nhánh; có test khẳng định ghép các trang ra đúng tập id |
 
 ### 4.2 Chưa làm — nên nói thẳng, không giấu
 
 | # | Khoảng cách | Ảnh hưởng rubric | Vì sao chưa làm | Đề xuất |
 |---|---|---|---|---|
-| 1 | **Phân trang** cho `/campaigns`, `/contents`, `/tasks` | Bài 2 mục 4 | Tốn công đụng cả contract API và UI | Thêm `limit`/`offset` + tổng số. Đây là việc nên làm nhất |
-| 2 | **Mutation testing** 100% | AC của đợt 23-09 | Cần thêm công cụ (`mutmut`) và thời gian chạy lớn | Chạy `mutmut` cho `compliance_service` và `contents.py` — hai module quyết định an toàn |
-| 3 | **Xuất Excel/PDF** kế hoạch | AC của đợt 24-09 | Cần thư viện tạo file và thiết kế định dạng | `openpyxl` cho Excel là rẻ nhất; PDF khó hơn |
-| 4 | **Diễn tập backup/restore** Postgres | Thiết kế mục 3 | Cần môi trường thật | Neon có backup theo thời gian; cần chứng minh khôi phục được |
-| 5 | **Đo tải đồng thời** | Thiết kế mục 7 | Cần môi trường và kịch bản | Chạy kịch bản N người ghi đồng thời, ghi lại P95 |
-| 6 | **Kiểm thử thiên lệch đầu ra AI** | Bài 3 mục 10; Thiết kế mục 5 | Cần bộ ca đánh giá có người chấm | Bộ ca tiếng Việt soạn thủ công, chấm theo tiêu chí giọng thương hiệu |
-| 7 | **Đo chất lượng văn phong** bằng mô hình thật | Bài 3 mục 4 | Harness hiện dùng stub tất định | Chạy 3 phiên bản trên một provider thật, ghi latency + chi phí |
+| 1 | **Mutation testing** 100% | AC của đợt 23-09 | Cần thêm công cụ (`mutmut`) và thời gian chạy lớn | Chạy `mutmut` cho `compliance_service` và `contents.py` — hai module quyết định an toàn |
+| 2 | **Xuất Excel/PDF** kế hoạch | AC của đợt 24-09 | Cần thư viện tạo file và thiết kế định dạng | `openpyxl` cho Excel là rẻ nhất; PDF khó hơn |
+| 3 | **Diễn tập backup/restore** Postgres | Thiết kế mục 3 | Cần môi trường thật | Neon có backup theo thời gian; cần chứng minh khôi phục được |
+| 4 | **Đo tải đồng thời** | Thiết kế mục 7 | Cần môi trường và kịch bản | Chạy kịch bản N người ghi đồng thời, ghi lại P95 |
+| 5 | **Kiểm thử thiên lệch đầu ra AI** | Bài 3 mục 10; Thiết kế mục 5 | Cần bộ ca đánh giá có người chấm | Bộ ca tiếng Việt soạn thủ công, chấm theo tiêu chí giọng thương hiệu |
+| 6 | **Đo chất lượng văn phong** bằng mô hình thật | Bài 3 mục 4 | Harness hiện dùng stub tất định | Chạy 3 phiên bản trên một provider thật, ghi latency + chi phí |
+| 7 | **Phân trang trong khung thông báo** (`NotificationCenter`) | Bài 2 mục 4, mức phụ | Đây là popover, không phải màn hình danh sách; endpoint đã phân trang nhưng UI vẫn lấy trang đầu | Chuyển sang `getAllPage` + nút "Xem thêm" khi `has_next` |
 
 ### 4.3 Nợ kỹ thuật nhỏ
 
@@ -160,9 +164,8 @@ Ngoài xung đột Claude ở mục 2, còn hai chỗ:
 
 | Ưu tiên | Việc | Lý do |
 |---|---|---|
-| 1 | Thêm phân trang cho 3 danh sách chính | Bắt một tiêu chí rubric đang để trống, và sửa được trong một lần làm gọn |
-| 2 | Chốt `DATABASE_URL` production + diễn tập restore | Rủi ro mất dữ liệu thật lớn hơn mọi thứ khác |
-| 3 | Chạy `mutmut` trên 2 module an toàn | Đáp ứng AC còn nợ, mà không cần làm cho cả dự án |
-| 4 | Đo tải đồng thời | Bổ sung con số cho Thiết kế mục 7 |
-| 5 | Xuất Excel kế hoạch | Đáp ứng AC của đợt 24-09 |
+| 1 | Chốt `DATABASE_URL` production + diễn tập restore | Rủi ro mất dữ liệu thật lớn hơn mọi thứ khác |
+| 2 | Chạy `mutmut` trên 2 module an toàn | Đáp ứng AC còn nợ, mà không cần làm cho cả dự án |
+| 3 | Đo tải đồng thời | Bổ sung con số cho Thiết kế mục 7 |
+| 4 | Xuất Excel kế hoạch | Đáp ứng AC của đợt 24-09 |
 | 6 | Bộ ca đánh giá thiên lệch AI | Cần thời gian chuẩn bị; nên làm sau khi 5 việc trên xong |

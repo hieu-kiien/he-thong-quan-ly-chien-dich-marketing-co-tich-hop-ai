@@ -257,10 +257,20 @@ def get_global_dashboard(
             Campaign.id.in_(allowed_ids),
             Campaign.status == "ACTIVE"
         ).count()
+        # Tổng ngân sách của các chiến dịch ĐANG CHẠY. Thẻ "Ngân sách đang chạy"
+        # ở màn hình Quản lý Chiến dịch cần đúng con số này. Trước khi có nó, UI
+        # phải tự cộng từ danh sách chiến dịch đã tải — mà sau khi danh sách đó
+        # được phân trang, phép cộng đó chỉ tính trang hiện tại và thẻ số liệu
+        # nói dối. Đây là lý do số phải do server tính trên tập ĐÃ LỌC.
+        active_budget = float(db.query(func.coalesce(func.sum(Campaign.budget), 0)).filter(
+            Campaign.id.in_(allowed_ids),
+            Campaign.status == "ACTIVE",
+        ).scalar() or 0)
     else:
         metrics = []
         campaigns_count = 0
         active_campaigns = 0
+        active_budget = 0.0
 
     # Chi phí theo từng chiến dịch. Bảng chiến dịch ở Dashboard và ở trang
     # Quản lý đều cần nhịp chi tiêu (đã chi / ngân sách); không có field này
@@ -331,7 +341,8 @@ def get_global_dashboard(
         },
         "campaigns_summary": {
             "total": campaigns_count,
-            "active": active_campaigns
+            "active": active_campaigns,
+            "active_budget": round(active_budget, 2),
         },
         # Chi phí thực đo theo từng chiến dịch (khoá là campaign_id dạng chuỗi vì
         # JSON object bắt buộc khoá chuỗi).

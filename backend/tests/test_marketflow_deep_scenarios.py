@@ -1227,11 +1227,25 @@ class TestDeepInputFuzzingAndInjectionResistance:
         assert resp.json()["items"] == []
 
     def test_sqli_content_status_quote_injection_neutralized(self, client):
-        """76. Tấn công nháy đơn trên status của /contents được xử lý an toàn dưới dạng chuỗi thuần túy."""
+        """76. Tấn công nháy đơn trên status của /contents được xử lý an toàn dưới dạng chuỗi thuần túy.
+
+        Endpoint nay kiểm tra `status` nằm trong allowlist trước khi đụng SQL, nên
+        payload sai bị từ chối bằng 422 thay vì trả 200-rỗng. Cả hai đều là kết
+        quả ĐÚNG, và cái quan trọng là đẳng cấp bảo mật: payload KHÔNG BAO GIỜ
+        chạm tới SQL và không bao giờ trả về bản ghi nào. Vì vậy phép kiểm tra ở
+        đây là thuộc tính an toàn, không phải mã trạng thái cụ thể — trước đây bám
+        cứng 200 sẽ biến một lớp phòng thủ thành điều kiện phải giữ.
+        """
         mkt_headers = get_marketer_headers(client)
-        resp = client.get("/api/v1/contents?status=%27%20OR%20%271%27=%271", headers=mkt_headers)
-        assert resp.status_code == 200
-        assert resp.json()["items"] == []
+        payload = "%27%20OR%20%271%27=%271"
+        resp = client.get(f"/api/v1/contents?status={payload}", headers=mkt_headers)
+
+        # Bất kỳ mã nào trong hai mã này đều không rò rỉ dữ liệu...
+        assert resp.status_code in (200, 422), f"Mã lạ: {resp.status_code}"
+        # ...và tuyệt đối không được trả về bản ghi nào.
+        assert resp.json().get("items", []) == [], "Payload SQLi rò rỉ dữ liệu!"
+        # Payload không được làm hỏng truy vấn: endpoint vẫn phục vụ yêu cầu hợp lệ.
+        assert client.get("/api/v1/contents", headers=mkt_headers).status_code == 200
 
     def test_xss_campaign_name_stored_and_rendered_safely(self, client):
         """77. Payload XSS trong tên chiến dịch được lưu trữ và phản hồi an toàn dưới dạng JSON (không thực thi HTML)."""

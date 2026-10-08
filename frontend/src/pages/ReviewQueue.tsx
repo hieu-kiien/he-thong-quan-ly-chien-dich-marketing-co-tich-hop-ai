@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
 import { CheckCircle2, XCircle, AlertTriangle, Clock, Check, ShieldCheck, Send, Sparkles, FileText, Loader2, History, Info, X, Tag, Eye, LayoutGrid, Edit2 } from 'lucide-react';
-import { MarketingContent } from '../types';
+import { MarketingContent, Page, QuotaErrorDetail } from '../types';
 
-import { contentApi, getApiErrorMessage } from '../services/api';
+import { contentApi, getApiErrorMessage, getQuotaError } from '../services/api';
 
 import { useToast } from '../components/Toast';
 
@@ -15,6 +15,10 @@ import { ExportActions } from '../components/ExportActions';
 
 import { useFocusTrap } from '../hooks/useFocusTrap';
 
+import { Pagination } from '../components/Pagination';
+
+import { QuotaErrorCard } from '../components/QuotaBadge';
+
 
 
 interface ReviewQueueProps {
@@ -22,6 +26,21 @@ interface ReviewQueueProps {
   userRole?: string;
 
 }
+
+
+
+/**
+ * Trạng thái của mỗi tab, ánh xạ sang tham số `status` nhiều giá trị của server.
+ *
+ * Nhờ có bảng này, việc "mỗi nội dung chỉ thuộc một tab" do SERVER bảo đảm: bài bị
+ * từ chối (REJECTED) thuộc nhóm nháp chứ không thuộc lịch sử. Trước đây bộ lọc nằm
+ * ở client nên bài REJECTED hiện ở cả hai tab và bộ đếm đếm nó hai lần.
+ */
+const TAB_STATUS = {
+  pending: 'IN_REVIEW',
+  drafts: 'AI_DRAFT,DRAFT,REJECTED',
+  history: 'APPROVED,PUBLISHED',
+} as const;
 
 
 
@@ -50,6 +69,14 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
   const [loading, setLoading] = useState<boolean>(true);
 
   const [activeTab, setActiveTab] = useState<'pending' | 'drafts' | 'history'>('pending');
+
+  // Phân trang theo tab: server lọc theo `TAB_STATUS` rồi cắt trang.
+  const [contentPage, setContentPage] = useState<Page<MarketingContent>>({
+    items: [], total: 0, page: 1, page_size: 20, total_pages: 0, has_next: false, has_prev: false,
+  });
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(20);
+  const [quotaError, setQuotaError] = useState<QuotaErrorDetail | null>(null);
 
   const [rejectId, setRejectId] = useState<number | null>(null);
 
@@ -318,12 +345,22 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
 
       setLoading(true);
 
-      const data = await contentApi.getAll();
+      // Lọc + cắt trang ở SERVER theo trạng thái của tab đang mở. Trước đây màn
+      // hình này tải toàn bộ nội dung rồi chia ở client; sau khi có phân trang thì
+      // cách đó chỉ lấy được trang đầu và những bài ở trang sau sẽ biến mất khỏi
+      // hàng đợi mà bộ đếm vẫn tưởng đủ.
+      const result = await contentApi.getAllPage(page, pageSize, {
+        status: TAB_STATUS[activeTab],
+        sort: 'newest',
+      });
 
-      setContents(data);
+      setContents(result.items);
+      setContentPage(result);
 
     } catch (e) {
 
+      const quotaErr = getQuotaError(e);
+      if (quotaErr) setQuotaError(quotaErr);
       console.error(e);
 
       toast.error(getApiErrorMessage(e), 'Lỗi khi tải danh sách nội dung');
@@ -334,12 +371,23 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
 
     }
 
-  }, [toast]);
+  }, [toast, page, pageSize, activeTab]);
 
   // Nạp dữ liệu lúc mount (phải sau khai báo loadContents — xem MyTasksPage).
   useEffect(() => {
     void loadContents();
   }, [loadContents]);
+
+  // Đổi tab thì về trang 1: trang 3 của tab "Chờ duyệt" không có nghĩa ở tab
+  // "Lịch sử" vốn có ít bản ghi hơn.
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab]);
+
+  const handlePageSizeChange = (nextSize: number) => {
+    setPageSize(nextSize);
+    setPage(1);
+  };
 
 
 
@@ -491,15 +539,16 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
 
 
 
-  const pendingList = contents.filter(c => c.status === 'IN_REVIEW');
+  // Nội dung đến từ server ĐÃ lọc theo trạng thái của tab và đã cắt trang, nên
+  // `contents` chính là danh sách của tab hiện tại — không chia ở client nữa.
+  const pendingList = contents;
 
-  const draftList = contents.filter(c => c.status === 'AI_DRAFT' || c.status === 'DRAFT' || c.status === 'REJECTED');
-
-  // Mỗi nội dung chỉ được xuất hiện ở MỘT tab. Trước đây REJECTED nằm trong cả
-  // draftList lẫn historyList, nên một bài bị từ chối vừa hiện ở tab "Cần xử
-  // lý" vừa hiện ở tab "Lịch sử", và bộ đếm cũng đếm nó hai lần. Bài bị từ chối
-  // cần marketer sửa và gửi lại nên thuộc tab nháp.
-  const historyList = contents.filter(c => c.status === 'APPROVED' || c.status === 'PUBLISHED');
+  // Mỗi nội dung chỉ được xuất hiện ở MỘT tab, và giờ điều đó do server đảm bảo
+  // qua `TAB_STATUS`: REJECTED thuộc nhóm nháp, không thuộc nhóm lịch sử. Trước đây
+  // REJECTED nằm trong CẢ draftList lẫn historyList nên một bài bị từ chối hiện ở
+  // hai tab và bộ đếm cũng đếm nó hai lần.
+  const draftList = contents;
+  const historyList = contents;
 
   const rejectModalItem = contents.find(c => c.id === rejectId) || null;
 
@@ -508,6 +557,11 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
   return (
 
     <div className="p-8 space-y-8 max-w-6xl mx-auto">
+
+      {/* Lỗi hạn mứng gói miễn phí — giữ thành khối thay vì toast thoáng qua, để
+          người dùng đọc kịp trần, số đã dùng và thời điểm hết hạn. */}
+
+      {quotaError && <QuotaErrorCard detail={quotaError} />}
 
       
 
@@ -1301,6 +1355,25 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                     </tbody>
 
                   </table>
+
+                )}
+
+                {/* Bộ phân trang — chỉ hiện khi tab đang mở còn bản ghi. */}
+                {!loading && pendingList.length > 0 && (
+
+                  <Pagination
+
+                    page={contentPage}
+
+                    onPageChange={setPage}
+
+                    onPageSizeChange={handlePageSizeChange}
+
+                    itemLabel="bài viết"
+
+                    disabled={loading}
+
+                  />
 
                 )}
 

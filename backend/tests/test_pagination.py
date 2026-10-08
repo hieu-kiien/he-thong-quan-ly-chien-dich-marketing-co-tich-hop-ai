@@ -363,3 +363,133 @@ def test_contents_scoped_by_campaign_keeps_total_consistent(
     body = scoped.json()
     for row in body["items"]:
         assert row["campaign_id"] == 1
+
+
+def test_contents_status_filter_accepts_multiple_values(client: TestClient, manager_headers):
+    """`status` nhận nhiều giá trị để hàng đợi duyệt lọc theo tab ở server.
+
+    Nếu tab lọc ở client thì mỗi trang chỉ chứa phần đã lọc của riêng trang đó và
+    `total` của envelope sai — đó là lý do tham số này tồn tại.
+    """
+    multi = client.get(
+        "/api/v1/contents", headers=manager_headers,
+        params={"status": "APPROVED,PUBLISHED", "page_size": 100},
+    )
+    assert multi.status_code == 200, multi.text
+    statuses = {row["status"] for row in multi.json()["items"]}
+    assert statuses <= {"APPROVED", "PUBLISHED"}, f"Lọc nhiều trạng thái sai: {statuses}"
+
+    # Một giá trị đơn vẫn cho kết quả y hệt `==` (không đổi hành vi cũ).
+    single = client.get("/api/v1/contents", headers=manager_headers, params={"status": "APPROVED", "page_size": 100})
+    assert single.status_code == 200
+    assert single.json()["total"] == len([r for r in multi.json()["items"] if r["status"] == "APPROVED"])
+
+    # `ALL` là ký hiệu "không lọc" của frontend, không phải trạng thái thật.
+    everything = client.get("/api/v1/contents", headers=manager_headers, params={"status": "ALL", "page_size": 100})
+    assert everything.status_code == 200
+    assert everything.json()["total"] >= multi.json()["total"]
+
+
+def test_contents_rejects_unknown_status_with_422(client: TestClient, manager_headers):
+    """Trạng thái gõ sai bị từ chối rõ ràng, không âm thầm trả danh sách rỗng."""
+    resp = client.get("/api/v1/contents", headers=manager_headers, params={"status": "KHONG_TON_TAI"})
+    assert resp.status_code == 422, f"Phải là 422, nhận {resp.status_code}"
+    assert "status không hợp lệ" in resp.json()["detail"]
+
+
+def test_campaigns_objective_filter_is_server_side(client: TestClient, manager_headers):
+    """Bộ lọc mục tiêu chạy ở server nên `total` khớp với danh sách hiển thị."""
+    resp = client.get(
+        "/api/v1/campaigns", headers=manager_headers,
+        params={"objective": "nhận diện", "page_size": 100},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    for row in body["items"]:
+        assert "nhận diện" in (row["objective"] or "").lower()
+    assert body["total"] == len(body["items"]) if body["page_size"] >= body["total"] else True
+
+
+def test_my_tasks_filters_compose_with_paging(
+    client: TestClient, db_session: Session, marketer_headers, workspace_alpha
+):
+    """Bộ lọc `campaign_id`/`search`/`due` của `/tasks/my-tasks` phục vụ phân trang server-side."""
+    from app.models.entities import Task
+
+    owner = db_session.query(User).filter(User.email == "marketer@gmail.com").first()
+    campaign = db_session.query(Campaign).filter(Campaign.workspace_id == workspace_alpha.id).first()
+    assert owner is not None and campaign is not None, "Seed phải có marketer và campaign"
+
+    db_session.add(Task(
+        campaign_id=campaign.id, workspace_id=workspace_alpha.id,
+        title="Bản nháp tìm kiếm đặc biệt", description="mô tả",
+        creator_id=owner.id, assignee_id=owner.id, status="TODO",
+        priority="MEDIUM", due_date="2026-05-01",
+    ))
+    db_session.commit()
+
+    by_search = client.get(
+        "/api/v1/tasks/my-tasks", headers=marketer_headers,
+        params={"search": "đặc biệt", "page_size": 50},
+    )
+    assert by_search.status_code == 200, by_search.text
+    titles = [t["title"] for t in by_search.json()["items"]]
+    assert "Bản nháp tìm kiếm đặc biệt" in titles
+
+    # `due=overdue` là nhánh hẹn quá + chưa xong; bài trên hạn 2026-05-01 nên phải vào.
+    overdue = client.get(
+        "/api/v1/tasks/my-tasks", headers=marketer_headers,
+        params={"due": "overdue", "page_size": 50},
+    )
+    assert overdue.status_code == 200, overdue.text
+    assert "Bản nháp tìm kiếm đặc biệt" in [t["title"] for t in overdue.json()["items"]]
+
+    # Lọc theo chiến dịch cũng phải hợp lệ (dùng cho bộ chọn trên UI).
+    by_campaign = client.get(
+        "/api/v1/tasks/my-tasks", headers=marketer_headers,
+        params={"campaign_id": campaign.id, "page_size": 50},
+    )
+    assert by_campaign.status_code == 200, by_campaign.text
+
+    # Giá trị `due` ngoài allowlist bị từ chối, không nối thẳng vào SQL.
+    bad = client.get("/api/v1/tasks/my-tasks", headers=marketer_headers, params={"due": "1=1"})
+    assert bad.status_code == 422
+
+
+def test_my_tasks_summary_is_workspace_wide_not_page_scoped(client: TestClient, marketer_headers):
+    """Endpoint summary phải đếm TOÀN BỘ tác vụ, không phải trang đầu.
+
+    Nếu nó đếm theo trang thì thẻ "Quá hạn (n)" trên trang 2 sẽ báo số của 20 dòng
+    đầu tiên — một con số sai mà người dùng không có tín hiệu nào để nghi ngờ.
+    """
+    resp = client.get("/api/v1/tasks/my-tasks/summary", headers=marketer_headers)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert set(body) == {"overdue", "today", "in_progress", "done", "total"}
+    assert all(isinstance(v, int) and v >= 0 for v in body.values())
+    assert body["total"] >= body["done"] + body["in_progress"]
+
+    # `total` ở đây phải khớp `total` của envelope danh sách (cùng phạm vi).
+    listed = client.get("/api/v1/tasks/my-tasks", headers=marketer_headers, params={"include_completed": True})
+    assert listed.status_code == 200
+    assert listed.json()["total"] == body["total"]
+
+
+def test_my_tasks_summary_requires_auth(client: TestClient):
+    assert client.get("/api/v1/tasks/my-tasks/summary").status_code == 401
+
+
+def test_dashboard_reports_workspace_wide_active_budget(client: TestClient, manager_headers):
+    """`campaigns_summary.active_budget` là tổng ngân sách của tenant, phục vụ thẻ số liệu.
+
+    Thẻ "Ngân sách đang chạy" phải là tổng toàn tenant. Trước khi có trường này,
+    UI buộc phải cộng trên danh sách chiến dịch đã tải — mà sau khi danh sách đó
+    được phân trang, phép cộng đó chỉ tính trang hiện tại và nói dối.
+    """
+    resp = client.get("/api/v1/analytics/dashboard", headers=manager_headers)
+    assert resp.status_code == 200, resp.text
+    summary = resp.json()["campaigns_summary"]
+    assert {"total", "active", "active_budget"} <= set(summary)
+    assert isinstance(summary["active_budget"], (int, float))
+    assert summary["active_budget"] >= 0
+    assert summary["active"] <= summary["total"]

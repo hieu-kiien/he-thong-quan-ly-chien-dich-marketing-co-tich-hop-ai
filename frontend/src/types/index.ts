@@ -575,5 +575,91 @@ export interface CommandCenterResponse {
   };
 }
 
+// ==============================================================================
+// PHÂN TRANG — hợp đồng `Page[T]` của backend (xem backend/app/core/pagination.py)
+// ==============================================================================
+/**
+ * Envelope phân trang DUY NHẤT của API cho mọi endpoint trả về danh sách.
+ *
+ * `total` là TỔNG số bản ghi SAU KHI LỌC, không phải số bản ghi của trang hiện
+ * tại — đây là điểm dễ hiểu sai nhất. `total_pages` = ceil(total / page_size) và
+ * bằng 0 khi không có bản ghi, nên UI hiện "0 kết quả" thay vì "trang 1/0".
+ */
+export interface Page<T> {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+
+/** Các khoá sắp xếp mà endpoint `/campaigns` chấp nhận (allowlist ở backend). */
+export type CampaignSort =
+  | 'newest'
+  | 'oldest'
+  | 'name_asc'
+  | 'name_desc'
+  | 'budget_asc'
+  | 'budget_desc'
+  | 'start_date';
+
+/** Các khoá sắp xếp mà endpoint `/contents` chấp nhận. */
+export type ContentSort =
+  | 'newest'
+  | 'oldest'
+  | 'name_asc'
+  | 'name_desc'
+  | 'status_asc'
+  | 'updated_desc';
+
+/** Trần cứng của `page_size` — server trả 422 nếu vượt quá. */
+export const PAGE_SIZE_MAX = 100;
+export const PAGE_SIZE_DEFAULT = 20;
+/** Các lựa chọn kích thước trang trong bộ chọn của UI. */
+export const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
+
+// ==============================================================================
+// HẠN MỨC GÓI MIỄN PHÍ
+// ==============================================================================
+export interface QuotaLimitItem {
+  limit_code: string;
+  label: string;
+  used: number;
+  limit: number;
+  remaining: number;
+  exceeded: boolean;
+  scope: 'workspace' | 'user';
+  window: string | null;
+  /** ISO timestamp; `null` với hạn mức tích luỹ (không tự đặt lại). */
+  resets_at: string | null;
+}
+
+export interface QuotaSnapshot {
+  workspace_id: number;
+  exempt: boolean;
+  limits: QuotaLimitItem[];
+}
+
+/**
+ * Thân lỗi 429 khi vượt hạn mứng. Backend trả đúng object này trong `detail`,
+ * nên UI có thể nói chính xác "còn N/50 AI job, hết hạn lúc HH:MM" thay vì
+ * hiện một thông báo chung chung.
+ */
+export interface QuotaErrorDetail {
+  error: 'quota_exceeded';
+  limit_code: string;
+  message: string;
+  used: number;
+  limit: number;
+  remaining: number;
+  requested: number;
+  scope: 'workspace' | 'user';
+  resets_at: string | null;
+  retry_after?: number;
+  retry_after_seconds?: number;
+}
+
 
 

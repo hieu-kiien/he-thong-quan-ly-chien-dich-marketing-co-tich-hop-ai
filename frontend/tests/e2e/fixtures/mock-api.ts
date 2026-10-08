@@ -294,6 +294,22 @@ export const INITIAL_AI_DOCTOR_REPORT = {
   ],
 };
 
+/**
+ * Tác vụ mẫu cho mock `/tasks/my-tasks` và `/campaigns/{id}/tasks`.
+ *
+ * Cần đủ nhiều bản ghi để test phân trang có dữ liệu để cắt — một tác vụ thì
+ * `total_pages` luôn bằng 1 và mọi nút trang đều bị vô hiệu hóa, tức test phân
+ * trang trở nên vô nghĩa.
+ */
+export const INITIAL_TASKS = [
+  { id: 1, campaign_id: 1, workspace_id: 1, title: 'Thiết kế banner 1200x628', description: 'Kích thước chuẩn Meta Ads', task_type: 'DESIGN', status: 'TODO', priority: 'HIGH', due_date: '2026-09-20', assignee_id: 2, creator_id: 2, created_at: '2026-08-01T10:00:00Z', updated_at: '2026-08-01T10:00:00Z' },
+  { id: 2, campaign_id: 1, workspace_id: 1, title: 'Viết kịch bản video TikTok 30s', description: 'Hook 3 giây đầu', task_type: 'VIDEO', status: 'IN_PROGRESS', priority: 'MEDIUM', due_date: '2026-09-25', assignee_id: 2, creator_id: 2, created_at: '2026-08-02T10:00:00Z', updated_at: '2026-08-02T10:00:00Z' },
+  { id: 3, campaign_id: 1, workspace_id: 1, title: 'Nghiên cứu đối thủ', description: 'Bảng so sánh giá', task_type: 'RESEARCH', status: 'IN_REVIEW', priority: 'LOW', due_date: '2026-09-28', assignee_id: 2, creator_id: 2, created_at: '2026-08-03T10:00:00Z', updated_at: '2026-08-03T10:00:00Z' },
+  { id: 4, campaign_id: 1, workspace_id: 1, title: 'Duyệt bài trước khi đăng', description: 'Kiểm tra tuân thủ', task_type: 'CONTENT', status: 'DONE', priority: 'MEDIUM', due_date: '2026-09-10', assignee_id: 2, creator_id: 2, created_at: '2026-08-04T10:00:00Z', updated_at: '2026-08-04T10:00:00Z' },
+  { id: 5, campaign_id: 2, workspace_id: 1, title: 'Chụp ảnh sản phẩm', description: 'Studio đơn giản', task_type: 'CONTENT', status: 'TODO', priority: 'URGENT', due_date: '2026-09-15', assignee_id: 2, creator_id: 2, created_at: '2026-08-05T10:00:00Z', updated_at: '2026-08-05T10:00:00Z' },
+  { id: 6, campaign_id: 2, workspace_id: 1, title: 'Chạy thử chiến dịch nhỏ', description: 'Ngân sách 500k', task_type: 'ADS', status: 'TODO', priority: 'LOW', due_date: '2026-09-30', assignee_id: 2, creator_id: 2, created_at: '2026-08-06T10:00:00Z', updated_at: '2026-08-06T10:00:00Z' },
+];
+
 export const INITIAL_BYOK_KEYS = [
   {
     id: 1,
@@ -433,6 +449,66 @@ export async function setupMockApiRoutes(page: Page, options: SetupMockOptions =
   let campaigns = options.customCampaigns ? structuredClone(options.customCampaigns) : structuredClone(INITIAL_CAMPAIGNS);
   let byokKeys = options.customByokKeys ? structuredClone(options.customByokKeys) : structuredClone(INITIAL_BYOK_KEYS);
 
+  /**
+   * Cắt trang một danh sách và bọc thành envelope `Page` — ĐÚNG hợp đồng của
+   * backend (`app/core/pagination.py`).
+   *
+   * Vì sao mock cũng phải phân trang: nếu mock trả mảng phẳng trong khi backend
+   * trả envelope, thì mọi test chạy với mock sẽ KHÔNG phát hiện được lỗi chỉ tồn
+   * tại trên backend (thiếu `total`, cắt trang sai, lọc sau khi đã cắt). Mock
+   * phải giống backend thì test mới đáng tin.
+   *
+   * `total` là số bản ghi SAU KHI LỌC — đó là điểm dễ sai nhất của phân trang.
+   */
+  const paginate = <T,>(list: T[], url: URL): any => {
+    const page = Math.max(1, Number(url.searchParams.get('page') || 1));
+    const rawSize = Number(url.searchParams.get('page_size') || 20);
+    // Trần cứng khớp PAGE_SIZE_MAX; backend trả 422 nếu vượt.
+    const pageSize = Math.min(Math.max(1, rawSize), 100);
+    const total = list.length;
+    const start = (page - 1) * pageSize;
+    return {
+      items: list.slice(start, start + pageSize),
+      total,
+      page,
+      page_size: pageSize,
+      total_pages: total === 0 ? 0 : Math.ceil(total / pageSize),
+      has_next: page * pageSize < total,
+      has_prev: page > 1,
+    };
+  };
+
+  /** Lọc theo `status` (có thể nhiều giá trị, cách nhau bởi dấu phẩy) + `search`. */
+  const applyFilters = <T extends Record<string, any>>(list: T[], url: URL, searchFields: string[]): T[] => {
+    const status = url.searchParams.get('status');
+    if (status && status !== 'ALL') {
+      const wanted = status.split(',').map(s => s.trim().toUpperCase()).filter(s => s && s !== 'ALL');
+      if (wanted.length) list = list.filter(row => wanted.includes(String(row.status).toUpperCase()));
+    }
+    const search = url.searchParams.get('search');
+    if (search) {
+      const needle = search.toLowerCase();
+      list = list.filter(row => searchFields.some(f => String(row[f] ?? '').toLowerCase().includes(needle)));
+    }
+    return list;
+  };
+
+  /** Sắp xếp theo khoá allowlist — sai thì bỏ qua thay vì ném. */
+  const applySort = <T extends Record<string, any>>(list: T[], url: URL): T[] => {
+    const sort = url.searchParams.get('sort') || 'newest';
+    const collator = new Intl.Collator('vi');
+    const copy = [...list];
+    switch (sort) {
+      case 'name_asc': return copy.sort((a, b) => collator.compare(String(a.name ?? ''), String(b.name ?? '')) || a.id - b.id);
+      case 'name_desc': return copy.sort((a, b) => collator.compare(String(b.name ?? ''), String(a.name ?? '')) || a.id - b.id);
+      case 'budget_asc': return copy.sort((a, b) => (Number(a.budget) || 0) - (Number(b.budget) || 0) || a.id - b.id);
+      case 'budget_desc': return copy.sort((a, b) => (Number(b.budget) || 0) - (Number(a.budget) || 0) || a.id - b.id);
+      case 'status_asc': return copy.sort((a, b) => collator.compare(String(a.status ?? ''), String(b.status ?? '')) || b.id - a.id);
+      case 'oldest': return copy.sort((a, b) => a.id - b.id);
+      default: return copy.sort((a, b) => b.id - a.id);
+    }
+  };
+
   await page.route('**/api/v1/**', async (route: Route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -480,7 +556,28 @@ export async function setupMockApiRoutes(page: Page, options: SetupMockOptions =
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(INITIAL_WORKSPACES),
+        body: JSON.stringify(paginate(INITIAL_WORKSPACES, url)),
+      });
+    }
+
+    // 2b. Hạn mức gói miễn phí — cùng hình dạng với GET /workspaces/{id}/quota.
+    if (/\/workspaces\/\d+\/quota$/.test(path) && method === 'GET') {
+      const wsId = Number(path.match(/\/workspaces\/(\d+)\/quota/)![1]);
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          workspace_id: wsId,
+          exempt: false,
+          limits: [
+            { limit_code: 'ai_jobs_per_day', label: 'AI job mỗi 24 giờ', used: 3, limit: 50, remaining: 47, exceeded: false, scope: 'workspace', window: '24h', resets_at: new Date(Date.now() + 3600_000).toISOString() },
+            { limit_code: 'campaigns', label: 'chiến dịch', used: campaigns.filter(c => c.workspace_id === wsId).length, limit: 25, remaining: 25, exceeded: false, scope: 'workspace', window: null, resets_at: null },
+            { limit_code: 'contents', label: 'bài nội dung', used: contents.filter(c => c.workspace_id === wsId).length, limit: 500, remaining: 500, exceeded: false, scope: 'workspace', window: null, resets_at: null },
+            { limit_code: 'workspace_members', label: 'thành viên', used: 2, limit: 10, remaining: 8, exceeded: false, scope: 'workspace', window: null, resets_at: null },
+            { limit_code: 'schedules', label: 'lịch đăng', used: 0, limit: 200, remaining: 200, exceeded: false, scope: 'workspace', window: null, resets_at: null },
+            { limit_code: 'workspaces_per_user', label: 'không gian làm việc', used: 1, limit: 5, remaining: 4, exceeded: false, scope: 'user', window: null, resets_at: null },
+          ],
+        }),
       });
     }
 
@@ -499,11 +596,13 @@ export async function setupMockApiRoutes(page: Page, options: SetupMockOptions =
     // 3. Campaigns
     if (path.endsWith('/campaigns') && method === 'GET') {
       const wsId = url.searchParams.get('workspace_id');
-      const filtered = wsId ? campaigns.filter(c => c.workspace_id === Number(wsId)) : campaigns;
+      let filtered = wsId ? campaigns.filter(c => c.workspace_id === Number(wsId)) : campaigns;
+      filtered = applyFilters(filtered, url, ['name', 'objective', 'audience']);
+      filtered = applySort(filtered, url);
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(filtered),
+        body: JSON.stringify(paginate(filtered, url)),
       });
     }
 
@@ -596,15 +695,34 @@ export async function setupMockApiRoutes(page: Page, options: SetupMockOptions =
     // 4. Contents
     if (path.endsWith('/contents') && method === 'GET') {
       const wsId = url.searchParams.get('workspace_id');
+      const campaignIdParam = url.searchParams.get('campaign_id');
       let result = contents;
       if (wsId) {
         const matchingCampaignIds = campaigns.filter(c => c.workspace_id === Number(wsId)).map(c => c.id);
         result = contents.filter(ct => matchingCampaignIds.includes(ct.campaign_id));
       }
+      if (campaignIdParam) {
+        result = result.filter(ct => ct.campaign_id === Number(campaignIdParam));
+      }
+      result = applyFilters(result, url, ['title', 'body']);
+      result = applySort(result, url);
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(result),
+        body: JSON.stringify(paginate(result, url)),
+      });
+    }
+
+    // 4b. Nội dung của một chiến dịch — cũng dùng envelope `Page`.
+    if (/\/campaigns\/\d+\/contents$/.test(path) && method === 'GET') {
+      const campaignId = Number(path.match(/\/campaigns\/(\d+)\/contents/)![1]);
+      let result = contents.filter(ct => ct.campaign_id === campaignId);
+      result = applyFilters(result, url, ['title', 'body']);
+      result = applySort(result, url);
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(paginate(result, url)),
       });
     }
 
@@ -693,7 +811,7 @@ export async function setupMockApiRoutes(page: Page, options: SetupMockOptions =
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify([
+        body: JSON.stringify(paginate([
           {
             id: 1,
             content_id: 3,
@@ -703,7 +821,37 @@ export async function setupMockApiRoutes(page: Page, options: SetupMockOptions =
             campaign_id: 1,
             title: '[Thư mời] Hội thảo Định hướng Chuyên gia AI & Cơ hội Việc làm Toàn cầu'
           }
-        ]),
+        ], url)),
+      });
+    }
+
+    // 4c. Tác vụ — danh sách dùng envelope `Page` như mọi endpoint khác.
+    if (/\/tasks\/my-tasks\/summary$/.test(path) && method === 'GET') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ overdue: 1, today: 1, in_progress: 1, done: 2, total: 5 }),
+      });
+    }
+
+    if (path.endsWith('/tasks/my-tasks') && method === 'GET') {
+      let result = INITIAL_TASKS as any[];
+      result = applyFilters(result, url, ['title', 'description']);
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(paginate(result, url)),
+      });
+    }
+
+    if (/\/campaigns\/\d+\/tasks$/.test(path) && method === 'GET') {
+      const campaignId = Number(path.match(/\/campaigns\/(\d+)\/tasks/)![1]);
+      let result = INITIAL_TASKS.filter(t => t.campaign_id === campaignId) as any[];
+      result = applyFilters(result, url, ['title', 'description']);
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(paginate(result, url)),
       });
     }
 
@@ -966,21 +1114,48 @@ export async function setupMockApiRoutes(page: Page, options: SetupMockOptions =
     }
     // 6. Analytics
     if (path.endsWith('/analytics/dashboard') && method === 'GET') {
+      // `campaigns_summary.active_budget` là TỔNG ngân sách chiến dịch đang chạy
+      // của tenant. Thẻ "Ngân sách đang chạy" ở màn hình Quản lý Chiến dịch đọc
+      // trường này thay vì tự cộng trên danh sách đã phân trang — nếu thiếu, thẻ
+      // sẽ hiện số sai mà test không bắt được.
+      const activeBudget = campaigns
+        .filter(c => c.status === 'ACTIVE')
+        .reduce((sum, c) => sum + (Number(c.budget) || 0), 0);
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ kpi: options.customKpis || INITIAL_KPIS }),
+        body: JSON.stringify({
+          kpi: options.customKpis || INITIAL_KPIS,
+          campaigns_summary: {
+            total: campaigns.length,
+            active: campaigns.filter(c => c.status === 'ACTIVE').length,
+            active_budget: activeBudget,
+          },
+        }),
       });
     }
 
     // 7. BYOK Settings
-    if ((path.endsWith('/settings/byok/keys') || path.endsWith('/settings/ai-keys/list') || path.endsWith('/settings/ai-keys')) && method === 'GET') {
+    // `/settings/ai-keys/list` là endpoint DANH SÁCH nên trả envelope `Page`;
+    // hai đường kia trả về đối tượng đơn. Gộp chung handler sẽ khiến mock trả
+    // sai hình dạng cho một trong hai và test chỉ đúng khi chạy mock.
+    if (path.endsWith('/settings/ai-keys/list') && method === 'GET') {
       const wsId = url.searchParams.get('workspace_id');
       const filtered = wsId ? byokKeys.filter(k => k.workspace_id === Number(wsId) || !k.workspace_id) : byokKeys;
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(filtered),
+        body: JSON.stringify(paginate(filtered, url)),
+      });
+    }
+
+    if ((path.endsWith('/settings/byok/keys') || path.endsWith('/settings/ai-keys')) && method === 'GET') {
+      const wsId = url.searchParams.get('workspace_id');
+      const filtered = wsId ? byokKeys.filter(k => k.workspace_id === Number(wsId) || !k.workspace_id) : byokKeys;
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(filtered[0] ?? null),
       });
     }
 
@@ -1080,7 +1255,7 @@ export async function setupMockApiRoutes(page: Page, options: SetupMockOptions =
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify([]),
+        body: JSON.stringify(paginate([], url)),
       });
     }
 
@@ -1114,8 +1289,12 @@ export async function setupMockApiRoutes(page: Page, options: SetupMockOptions =
     };
     warnOnce(path);
 
+    // Mặc định cho GET trả envelope `Page` rỗng thay vì `[]`: hầu hết endpoint GET
+    // còn lại là endpoint DANH SÁCH, và `toPage()` của frontend chấp nhận cả hai
+    // hình nên app vẫn chạy được — nhưng nếu trả mảng thì `total` luôn bằng số
+    // dòng của trang, đúng cái sai mà test phân trang cần phát hiện.
     const emptyBody = method === 'GET' || method === 'HEAD'
-      ? '[]'
+      ? JSON.stringify(paginate([], url))
       : JSON.stringify({ detail: 'Mock response (chua co handler)' });
     return route.fulfill({
       status: 200,
