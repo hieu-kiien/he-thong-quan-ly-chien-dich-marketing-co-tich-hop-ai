@@ -1,4 +1,4 @@
-import json
+﻿import json
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -34,14 +34,28 @@ class TestNotificationAuthAndValidation:
         assert res.status_code == 401, f"Expected 401, got {res.status_code}"
 
     def test_limit_query_parameter_validation(self, client: TestClient, marketer_headers):
-        """Query parameter 'limit' must enforce ge=1 and le=100."""
-        # limit < 1 should return 422
-        res_zero = client.get("/api/v1/notifications?limit=0", headers=marketer_headers)
-        assert res_zero.status_code == 422, f"Expected 422 for limit=0, got {res_zero.status_code}"
+        """Tham số phân trang phải có trần: page_size nằm ngoài 1..100 thì 422.
 
-        # limit > 100 should return 422
-        res_excess = client.get("/api/v1/notifications?limit=101", headers=marketer_headers)
-        assert res_excess.status_code == 422, f"Expected 422 for limit=101, got {res_excess.status_code}"
+        Trước đây test này kiểm tra tham số `limit`. Endpoint nay dùng hợp đồng
+        `page`/`page_size` chung của toàn hệ thống (app/core/pagination.py) nên
+        kiểm tra trên `page_size` — và đây là tham số quyết định có kéo về hàng
+        nghìn dòng hay không, nên trần của nó phải được siết.
+        """
+        # page_size < 1 should return 422
+        res_zero = client.get("/api/v1/notifications?page_size=0", headers=marketer_headers)
+        assert res_zero.status_code == 422, f"Expected 422 for page_size=0, got {res_zero.status_code}"
+
+        # page_size > 100 should return 422 (trần cứng, xem PAGE_SIZE_MAX)
+        res_excess = client.get("/api/v1/notifications?page_size=101", headers=marketer_headers)
+        assert res_excess.status_code == 422, f"Expected 422 for page_size=101, got {res_excess.status_code}"
+
+        # page < 1 should return 422
+        res_page_zero = client.get("/api/v1/notifications?page=0", headers=marketer_headers)
+        assert res_page_zero.status_code == 422, f"Expected 422 for page=0, got {res_page_zero.status_code}"
+
+        # page_size = 100 (đúng trần) vẫn hợp lệ
+        res_ok = client.get("/api/v1/notifications?page_size=100", headers=marketer_headers)
+        assert res_ok.status_code == 200
 
         # valid limit
         res_valid = client.get("/api/v1/notifications?limit=10", headers=marketer_headers)
@@ -77,7 +91,7 @@ class TestNotificationApiEndpoints:
 
         res = client.get(f"/api/v1/notifications?workspace_id={workspace_alpha.id}", headers=marketer_headers)
         assert res.status_code == 200
-        items = res.json()
+        items = res.json()["items"]
         assert len(items) >= 1
 
         match = next((item for item in items if item["id"] == n.id), None)
@@ -117,14 +131,14 @@ class TestNotificationApiEndpoints:
         # Query unread only
         res_unread = client.get(f"/api/v1/notifications?workspace_id={workspace_alpha.id}&unread_only=true", headers=marketer_headers)
         assert res_unread.status_code == 200
-        titles_unread = [item["title"] for item in res_unread.json()]
+        titles_unread = [item["title"] for item in res_unread.json()["items"]]
         assert "Chưa Đọc Duy Nhất" in titles_unread
         assert "Đã Đọc Rồi" not in titles_unread
 
         # Query all
         res_all = client.get(f"/api/v1/notifications?workspace_id={workspace_alpha.id}&unread_only=false", headers=marketer_headers)
         assert res_all.status_code == 200
-        titles_all = [item["title"] for item in res_all.json()]
+        titles_all = [item["title"] for item in res_all.json()["items"]]
         assert "Chưa Đọc Duy Nhất" in titles_all
         assert "Đã Đọc Rồi" in titles_all
 
@@ -198,7 +212,7 @@ class TestNotificationApiEndpoints:
         # Confirm unread list is now empty
         res_check = client.get(f"/api/v1/notifications?workspace_id={workspace_alpha.id}&unread_only=true", headers=marketer_headers)
         assert res_check.status_code == 200
-        assert len(res_check.json()) == 0
+        assert len(res_check.json()["items"]) == 0
 
         # Subsequent mark-all-read returns count 0
         res_again = client.post(f"/api/v1/notifications/mark-all-read?workspace_id={workspace_alpha.id}", headers=marketer_headers)
@@ -451,14 +465,14 @@ class TestAdversarialTenantIsolationAndEdgeCases:
         # Alpha queries Alpha
         res_a = client.get(f"/api/v1/notifications?workspace_id={workspace_alpha.id}", headers=marketer_headers)
         assert res_a.status_code == 200
-        titles_a = [n["title"] for n in res_a.json()]
+        titles_a = [n["title"] for n in res_a.json()["items"]]
         assert "Alpha Only Notification" in titles_a
         assert "Beta Only Notification" not in titles_a
 
         # Beta queries Beta
         res_b = client.get(f"/api/v1/notifications?workspace_id={workspace_beta.id}", headers=beta_marketer_headers)
         assert res_b.status_code == 200
-        titles_b = [n["title"] for n in res_b.json()]
+        titles_b = [n["title"] for n in res_b.json()["items"]]
         assert "Beta Only Notification" in titles_b
         assert "Alpha Only Notification" not in titles_b
 
@@ -480,7 +494,7 @@ class TestAdversarialTenantIsolationAndEdgeCases:
         # When Beta marketer specifies their own workspace_id:
         res_isolated = client.get(f"/api/v1/notifications?workspace_id={workspace_beta.id}", headers=beta_marketer_headers)
         assert res_isolated.status_code == 200
-        isolated_titles = [n["title"] for n in res_isolated.json()]
+        isolated_titles = [n["title"] for n in res_isolated.json()["items"]]
         assert "Alpha Broadcast Secret" not in isolated_titles, "Workspace Beta saw Alpha broadcast despite filtering by workspace_id!"
 
     def test_mark_all_read_with_workspace_scope_does_not_affect_other_workspaces(

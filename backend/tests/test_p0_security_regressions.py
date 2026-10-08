@@ -1,4 +1,4 @@
-"""
+﻿"""
 P0 SECURITY REGRESSION SUITE (Cam kết hồi quy - 5 exploit P0 + 6 hồi quy HIGH/MEDIUM)
 ====================================================================================
 
@@ -506,7 +506,7 @@ def test_p0_4_tenant_isolation_fails_closed(
     # --- 3. Danh sách campaign không được chứa bản ghi mồ côi ----------------
     resp = client.get("/api/v1/campaigns", headers=manager_headers)
     assert resp.status_code == 200, f"Danh sách campaign phải trả 200: {resp.text}"
-    assert orphan_campaign_id not in [c["id"] for c in resp.json()], (
+    assert orphan_campaign_id not in [c["id"] for c in resp.json()["items"]], (
         "P0-4 HỒI QUY: GET /campaigns của Workspace Alpha vẫn trả về chiến dịch "
         "workspace_id=NULL thuộc tenant khác."
     )
@@ -514,7 +514,7 @@ def test_p0_4_tenant_isolation_fails_closed(
     # --- 4. Danh sách nội dung không được chứa bản ghi mồ côi ----------------
     resp = client.get("/api/v1/contents", headers=manager_headers)
     assert resp.status_code == 200, f"Danh sách nội dung phải trả 200: {resp.text}"
-    assert orphan_content_id not in [c["id"] for c in resp.json()], (
+    assert orphan_content_id not in [c["id"] for c in resp.json()["items"]], (
         "P0-4 HỒI QUY: GET /contents của Workspace Alpha vẫn trả về nội dung "
         "workspace_id=NULL thuộc tenant khác."
     )
@@ -582,20 +582,20 @@ def test_p0_4b_creator_keeps_own_orphan_rows_in_listing(
 
     resp = client.get("/api/v1/contents", headers=beta_marketer_headers)
     assert resp.status_code == 200, f"Danh sách nội dung phải trả 200: {resp.text}"
-    assert content_id in [c["id"] for c in resp.json()], (
+    assert content_id in [c["id"] for c in resp.json()["items"]], (
         "P0-4 HỒI QUY: người tạo mất nội dung của chính mình khỏi danh sách. "
         "Bản vá phải fail-closed với tenant khác, KHÔNG được xoá dữ liệu của chủ sở hữu."
     )
 
     resp = client.get("/api/v1/campaigns", headers=beta_marketer_headers)
     assert resp.status_code == 200, f"Danh sách chiến dịch phải trả 200: {resp.text}"
-    assert campaign_id in [c["id"] for c in resp.json()], (
+    assert campaign_id in [c["id"] for c in resp.json()["items"]], (
         "P0-4 HỒI QUY: người tạo mất chiến dịch của chính mình khỏi danh sách."
     )
 
     # Và tenant khác vẫn phải không thấy (bảo vệ không được nới lỏng theo chiều ngược lại).
     resp = client.get("/api/v1/contents", headers=manager_headers)
-    assert content_id not in [c["id"] for c in resp.json()], (
+    assert content_id not in [c["id"] for c in resp.json()["items"]], (
         "P0-4 HỒI QUY: nhánh giữ dữ liệu chủ sở hữu đã bị nới thành công khai cho mọi tenant."
     )
 

@@ -174,7 +174,7 @@ def test_campaign_lifecycle_works_without_ai(
 
     listed = client.get("/api/v1/campaigns", headers=marketer_headers)
     assert listed.status_code == 200
-    assert any(c["id"] == campaign_id for c in listed.json())
+    assert any(c["id"] == campaign_id for c in listed.json()["items"])
 
     updated = client.put(f"/api/v1/campaigns/{campaign_id}", json={"budget": 7_500_000}, headers=marketer_headers)
     assert updated.status_code == 200, updated.text
@@ -329,7 +329,7 @@ def test_search_filter_and_sort_work_without_ai(client: TestClient, marketer_hea
     """Tìm kiếm/lọc là thao tác CSDL thuần, không được phụ thuộc AI."""
     resp = client.get("/api/v1/campaigns?search=Chiến", headers=marketer_headers)
     assert resp.status_code == 200, resp.text
-    assert isinstance(resp.json(), list)
+    assert isinstance(resp.json()["items"], list)
 
 
 def test_brand_kit_workspace_and_channel_work_without_ai(

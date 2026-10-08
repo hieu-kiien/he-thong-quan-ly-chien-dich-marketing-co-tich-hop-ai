@@ -1,4 +1,4 @@
-"""
+﻿"""
 Challenger 2 Test Suite: Milestone 4 (R4) - Boundary Stress, Anti-Tampering & Byte-Level Integrity
 Author: Challenger 2 (Empirical Adversarial Auditor)
 
@@ -591,7 +591,7 @@ class TestByteLevelIntegrityAndCsvExport:
         # 1. Chiến dịch ID 1 có sẵn contents từ seed
         resp_1 = client.get("/api/v1/campaigns/1/contents", headers=mgr_headers)
         assert resp_1.status_code == 200
-        contents_1 = resp_1.json()
+        contents_1 = resp_1.json()["items"]
         assert isinstance(contents_1, list)
         assert len(contents_1) >= 1
         first_item = contents_1[0]
@@ -606,7 +606,9 @@ class TestByteLevelIntegrityAndCsvExport:
         # 2. Chiến dịch ID 2 trống -> trả về HTTP 200 OK với danh sách [] (không báo 500 hay crash)
         resp_empty = client.get("/api/v1/campaigns/2/contents", headers=mgr_headers)
         assert resp_empty.status_code == 200
-        assert resp_empty.json() == []
+        assert resp_empty.json()["items"] == []
+        assert resp_empty.json()["total"] == 0
+        assert resp_empty.json()["total_pages"] == 0
 
         # 3. Chiến dịch không tồn tại (99999) -> trả về HTTP 404
         resp_404 = client.get("/api/v1/campaigns/99999/contents", headers=mgr_headers)

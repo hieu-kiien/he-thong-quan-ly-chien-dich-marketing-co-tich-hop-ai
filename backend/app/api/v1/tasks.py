@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, false
 
 from app.core.database import get_db
+from app.core.pagination import Page, PageParams, page_params, paginate_query
 from app.core.security import get_current_user
 from app.models.entities import Task, Campaign, User, Workspace, WorkspaceMember, CampaignMember, utc_now
 from app.schemas.schemas import TaskCreate, TaskUpdate, TaskResponse, TaskBase
@@ -108,16 +109,20 @@ def _get_task_and_check_access(task_id: int, user: User, db: Session, for_edit: 
 
 # --- CAMPAIGN TASKS ENDPOINTS ---
 
-@router.get("/campaigns/{campaign_id}/tasks", response_model=List[TaskResponse])
+@router.get("/campaigns/{campaign_id}/tasks", response_model=Page[TaskResponse])
 def get_campaign_tasks(
     campaign_id: int,
     status_filter: Optional[str] = Query(None, alias="status"),
     priority: Optional[str] = Query(None),
     assignee_id: Optional[int] = Query(None),
+    pagination: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Lấy danh sách tác vụ trong một chiến dịch (có lọc theo trạng thái, độ ưu tiên, người nhận)."""
+    """Tác vụ trong một chiến dịch (lọc theo trạng thái, độ ưu tiên, người nhận) + phân trang.
+
+    `_check_campaign_access` chốt quyền ở cấp chiến dịch TRƯỚC khi cắt trang.
+    """
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
@@ -133,8 +138,12 @@ def get_campaign_tasks(
     if assignee_id:
         query = query.filter(Task.assignee_id == assignee_id)
 
-    tasks = query.order_by(Task.due_date.asc().nullslast(), Task.created_at.desc()).all()
-    return tasks
+    # `nullslast()` giữ nguyên hành vi "việc chưa có hạn nằm cuối"; thêm `Task.id`
+    # làm khoá phá thế hoàn toàn để trang sau không lặp/mất dòng.
+    return paginate_query(
+        query.order_by(Task.due_date.asc().nullslast(), Task.created_at.desc(), Task.id.asc()),
+        pagination,
+    )
 
 
 @router.post("/campaigns/{campaign_id}/tasks", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
@@ -208,15 +217,20 @@ def create_campaign_task(
 
 # --- MY TASKS ENDPOINT ---
 
-@router.get("/tasks/my-tasks", response_model=List[TaskResponse])
+@router.get("/tasks/my-tasks", response_model=Page[TaskResponse])
 def get_my_tasks(
     status_filter: Optional[str] = Query(None, alias="status"),
     priority: Optional[str] = Query(None),
     include_completed: bool = Query(True),
+    pagination: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Lấy danh sách các tác vụ được giao cho người dùng hiện tại (My Work Today)."""
+    """Tác vụ được giao cho người dùng hiện tại (My Work Today) + phân trang.
+
+    Nhánh `query.filter(false())` khi user không thuộc workspace nào là fail-closed
+    có chủ đích: `total = 0` thay vì lộ bất kỳ tác vụ nào.
+    """
     query = db.query(Task).filter(Task.assignee_id == current_user.id)
 
     if current_user.role != "ADMIN":
@@ -234,8 +248,10 @@ def get_my_tasks(
     if priority:
         query = query.filter(Task.priority == priority)
 
-    tasks = query.order_by(Task.due_date.asc().nullslast(), Task.created_at.desc()).all()
-    return tasks
+    return paginate_query(
+        query.order_by(Task.due_date.asc().nullslast(), Task.created_at.desc(), Task.id.asc()),
+        pagination,
+    )
 
 
 # --- SINGLE TASK ENDPOINTS ---

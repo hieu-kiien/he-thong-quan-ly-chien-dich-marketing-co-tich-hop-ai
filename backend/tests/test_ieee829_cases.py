@@ -296,7 +296,7 @@ def test_tc_pos_07_filter_campaigns_by_channel_and_date(client):
     # Lọc theo trạng thái ACTIVE và khoảng ngày
     resp = client.get("/api/v1/campaigns?status=ACTIVE&start_date=2026-09-01&end_date=2026-09-30", headers=headers)
     assert resp.status_code == 200
-    data = resp.json()
+    data = resp.json()["items"]
     assert len(data) >= 1
     assert data[0]["status"] == "ACTIVE"
 

@@ -731,7 +731,7 @@ class TestSecurityPayloadsAndDbIntegrity:
             resp = client.get(f"/api/v1/campaigns?search={payload}", headers=headers)
             assert resp.status_code == 200, f"SQLi payload failed or crashed server: {payload}"
             # Xác minh kết quả không bị lộ toàn bộ bản ghi trái phép
-            data = resp.json()
+            data = resp.json()["items"]
             assert isinstance(data, list)
 
     def test_25_xss_and_sqli_in_workspace_and_brand_kit(self, client: TestClient, multi_workspace_env, db_session: Session):

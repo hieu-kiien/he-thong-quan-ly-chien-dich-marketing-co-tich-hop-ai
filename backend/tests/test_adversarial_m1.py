@@ -1,4 +1,4 @@
-"""
+﻿"""
 MarketFlow AI — Adversarial & Empirical Verification Test Suite (Milestone 1)
 Author: Challenger 1 (Backend & E2E Integration Challenger)
 Purpose: Adversarially challenge edge cases, tenant isolation, boundary conditions,
@@ -201,14 +201,14 @@ class TestAdversarialTenantIsolation:
 
         # 1. Agency Y lists campaigns in their own workspace Y: should NOT contain Agency X's campaign
         list_y = client.get(f"/api/v1/campaigns?workspace_id={ws_y['id']}", headers=auth_headers(token_y)).json()
-        campaign_ids_in_y = [c["id"] for c in list_y]
+        campaign_ids_in_y = [c["id"] for c in list_y["items"]]
         assert camp_x["id"] not in campaign_ids_in_y, "TENANT LEAK: Agency X campaign appeared in Agency Y campaign list!"
 
         # 2. Agency Y explicitly asks for campaigns in Workspace X (?workspace_id=ws_x['id'])
         # In strict multi-tenancy, Agency Y has NO MEMBERSHIP in Workspace X and must be blocked (403) or return empty list!
         resp_leak_query = client.get(f"/api/v1/campaigns?workspace_id={ws_x['id']}", headers=auth_headers(token_y))
         if resp_leak_query.status_code == 200:
-            leak_campaigns = resp_leak_query.json()
+            leak_campaigns = resp_leak_query.json()["items"]
             leaked_ids = [c["id"] for c in leak_campaigns if c["id"] == camp_x["id"]]
             if leaked_ids:
                 pytest.fail(f"CRITICAL TENANT ISOLATION BREACH: Agency Y Manager accessed Agency X campaigns via ?workspace_id={ws_x['id']}")

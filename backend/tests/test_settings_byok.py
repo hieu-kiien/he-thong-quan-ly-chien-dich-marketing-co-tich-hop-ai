@@ -1,4 +1,4 @@
-"""Unit & Integration Test Suite cho Enterprise Settings & BYOK Custom AI API Key (M6 - R6).
+﻿"""Unit & Integration Test Suite cho Enterprise Settings & BYOK Custom AI API Key (M6 - R6).
 Bao gồm 30 test cases: Mã hóa Fernet, Chống can thiệp Ciphertext, Masking, Pydantic Schemas,
 REST Endpoints, Multi-tier Key Resolver, và RBAC.
 """
@@ -334,7 +334,7 @@ def test_26_api_get_custom_ai_key_list(client: TestClient, manager_headers):
     """Truy vấn GET /settings/ai-keys/list trả về danh sách các key hợp lệ."""
     resp = client.get("/api/v1/settings/ai-keys/list", headers=manager_headers)
     assert resp.status_code == 200
-    items = resp.json()
+    items = resp.json()["items"]
     assert isinstance(items, list)
     for item in items:
         assert "masked_key" in item

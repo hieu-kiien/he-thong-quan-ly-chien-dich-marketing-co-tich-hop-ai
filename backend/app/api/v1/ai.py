@@ -1,15 +1,17 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.core.pagination import Page, PageParams, page_params, paginate_query
 from app.core.security import get_current_user, enforce_quota
 from app.models.entities import Campaign, MarketingChannel, Product, CampaignMetric, AILog, User, CampaignMember, BrandKit, Workspace, WorkspaceMember
 from app.schemas.schemas import (
     AIIdeaRequest, AIIdeaResponse,
     AIDraftRequest, AIDraftResponse,
     AISummaryRequest, AISummaryResponse,
-    OmnichannelRequest, OmnichannelResponse
+    OmnichannelRequest, OmnichannelResponse,
+    AILogResponse
 )
 from app.services.ai.ai_service import ai_service
 
@@ -542,28 +544,37 @@ def generate_omnichannel(
             return OmnichannelResponse.model_validate(filtered_fallback)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Lỗi dịch vụ AI: {str(e)}")
 
-@router.get("/logs")
+@router.get("/logs", response_model=Page[AILogResponse])
 def get_ai_logs(
     campaign_id: Optional[int] = None,
+    result_status: Optional[str] = Query(None, alias="status"),
+    pagination: PageParams = Depends(page_params),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    """Nhật ký lượt gọi AI, có phân trang.
+
+    Trước đây `limit(50)` được hardcode và response là mảng phẳng — client không
+    biết còn bao nhiêu log nên không thể lọc theo trạng thái hay xem trang sau.
+    """
     query = db.query(AILog)
     if campaign_id:
         if current_user.role not in ("ADMIN", "MANAGER"):
             check_campaign_access_for_ai(campaign_id, current_user, db)
         query = query.filter(AILog.campaign_id == campaign_id)
-    logs = query.order_by(AILog.id.desc()).limit(50).all()
-    return [
-        {
-            "id": l.id,
-            "task_type": l.task_type,
-            "model": l.model,
-            "prompt_version": l.prompt_version,
-            "result_status": l.result_status,
-            "latency_ms": l.latency_ms,
-            "error_code": l.error_code,
-            "created_at": l.created_at.isoformat() if l.created_at else None
-        }
-        for l in logs
-    ]
+    elif current_user.role != "ADMIN":
+        # Không truyền `campaign_id`: chỉ thấy log của CHÍNH MÌNH.
+        #
+        # Bảng `ai_logs` không có cột `workspace_id` — tenant duy nhất gắn được
+        # là `user_id` (người đã gọi). Trước đây nhánh này không lọc gì cả, nên
+        # một MANAGER bỏ trống tham số tuỳ chọn là đọc được nhật ký AI của mọi
+        # tenant. `user_id` là cột NOT NULL nên không có đường lọt nào qua đây.
+        query = query.filter(AILog.user_id == current_user.id)
+    if result_status:
+        query = query.filter(AILog.result_status == result_status)
+
+    return paginate_query(
+        query.order_by(AILog.id.desc()),
+        pagination,
+        serializer=lambda log: AILogResponse.model_validate(log),
+    )

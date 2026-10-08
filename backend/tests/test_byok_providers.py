@@ -1,4 +1,4 @@
-"""Comprehensive BYOK Multi-Provider Expansion Test Suite (Worker M4).
+﻿"""Comprehensive BYOK Multi-Provider Expansion Test Suite (Worker M4).
 
 Validates schema validation, multi-provider model validation (Gemini, OpenRouter, OpenAI,
 Anthropic, HuggingFace, Ollama), multi-tier key resolution, live connection test endpoint,
@@ -218,7 +218,7 @@ def test_save_and_retrieve_multi_provider_keys(client: TestClient, rbac_headers,
     # Verify both are listed
     res_list = client.get("/api/v1/settings/ai-keys/list", headers=headers)
     assert res_list.status_code == 200
-    providers_listed = [k["provider"] for k in res_list.json()]
+    providers_listed = [k["provider"] for k in res_list.json()["items"]]
     assert "openrouter" in providers_listed
     assert "openai" in providers_listed
 

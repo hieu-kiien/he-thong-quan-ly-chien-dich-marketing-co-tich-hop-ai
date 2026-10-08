@@ -153,7 +153,9 @@ def test_schedules_no_workspace_1_bypass(client: TestClient, rbac_headers):
     headers = rbac_headers["beta_marketer"]
     res = client.get("/api/v1/schedules/", headers=headers)
     assert res.status_code == 200
-    schedules = res.json()
+    # Endpoint list trả envelope `Page` (xem app/core/pagination.py); `items` mới là
+    # danh sách, `total` là tổng sau lọc.
+    schedules = res.json()["items"]
     for s in schedules:
         if s.get("campaign_id"):
             # Should never see Workspace 1 campaigns
@@ -187,7 +189,7 @@ def test_notifications_scoped_broadcast_isolation(client: TestClient, db_session
     headers_beta = rbac_headers["beta_marketer"]
     res_beta = client.get("/api/v1/notifications/", headers=headers_beta)
     assert res_beta.status_code == 200
-    beta_titles = [n["title"] for n in res_beta.json()]
+    beta_titles = [n["title"] for n in res_beta.json()["items"]]
     assert "Thông báo toàn hệ thống WS 2" in beta_titles
     assert "Thông báo toàn hệ thống WS 1" not in beta_titles, "Workspace 1 broadcast must not leak to Workspace 2 user!"
 
@@ -195,7 +197,7 @@ def test_notifications_scoped_broadcast_isolation(client: TestClient, db_session
     headers_alpha = rbac_headers["marketer"]
     res_alpha = client.get("/api/v1/notifications/", headers=headers_alpha)
     assert res_alpha.status_code == 200
-    alpha_titles = [n["title"] for n in res_alpha.json()]
+    alpha_titles = [n["title"] for n in res_alpha.json()["items"]]
     assert "Thông báo toàn hệ thống WS 1" in alpha_titles
     assert "Thông báo toàn hệ thống WS 2" not in alpha_titles, "Workspace 2 broadcast must not leak to Workspace 1 user!"
 

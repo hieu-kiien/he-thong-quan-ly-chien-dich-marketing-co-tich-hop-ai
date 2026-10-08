@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.config import settings
+from app.core.pagination import Page, PageParams, page_params, paginate_query
 from app.core.security import get_current_user
 from app.models.entities import User, CustomApiKey, Workspace, WorkspaceMember
 from app.schemas.schemas import (
@@ -368,9 +369,10 @@ def get_custom_ai_keys(
     )
 
 
-@router.get("/ai-keys/list", response_model=List[AIKeyResponse])
+@router.get("/ai-keys/list", response_model=Page[AIKeyResponse])
 def list_custom_ai_keys(
     workspace_id: Optional[int] = Query(None),
+    pagination: PageParams = Depends(page_params),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -398,16 +400,14 @@ def list_custom_ai_keys(
             ))
         )
 
-    records = query.order_by(CustomApiKey.updated_at.desc()).all()
-    results = []
-    for r in records:
+    def _to_response(r):
         try:
             plain = decrypt_api_key(r.encrypted_key)
             masked = mask_api_key(plain)
         except Exception:
             masked = "AIzaSy...****"
 
-        results.append(AIKeyResponse(
+        return AIKeyResponse(
             id=r.id,
             provider=r.provider,
             model=r.model,
@@ -419,8 +419,13 @@ def list_custom_ai_keys(
             created_at=r.created_at,
             updated_at=r.updated_at,
             status="ACTIVE" if r.is_active else "INACTIVE"
-        ))
-    return results
+        )
+
+    return paginate_query(
+        query.order_by(CustomApiKey.updated_at.desc(), CustomApiKey.id.desc()),
+        pagination,
+        serializer=_to_response,
+    )
 
 
 @router.delete("/ai-keys", status_code=status.HTTP_200_OK)

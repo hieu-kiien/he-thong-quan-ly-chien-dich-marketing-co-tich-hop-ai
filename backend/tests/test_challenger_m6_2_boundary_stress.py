@@ -1,4 +1,4 @@
-"""Adversarial Boundary, Tamper Resistance, and Whitelist Stress Test Suite for Milestone 6 (R6).
+﻿"""Adversarial Boundary, Tamper Resistance, and Whitelist Stress Test Suite for Milestone 6 (R6).
 Authored by Challenger 2 (Boundary Stress, Tamper Resistance & Prohibited Provider Challenger).
 
 Empirical Verification Matrix:
@@ -400,7 +400,7 @@ class TestChallenge5ZeroPlaintextExposure:
         """Verify GET /api/v1/settings/ai-keys/list never exposes plaintext keys across multiple records."""
         resp = client.get("/api/v1/settings/ai-keys/list", headers=manager_headers)
         assert resp.status_code == 200
-        items = resp.json()
+        items = resp.json()["items"]
         assert isinstance(items, list)
 
         for item in items:

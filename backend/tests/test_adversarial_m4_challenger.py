@@ -1,4 +1,4 @@
-"""Adversarial Empirical Stress-Testing Suite for Milestone M4.
+﻿"""Adversarial Empirical Stress-Testing Suite for Milestone M4.
 
 Designed by Challenger 1 to rigorously stress-test:
 1. Model & schema instantiation without workspace_id (must be None, never default 1).
@@ -323,7 +323,7 @@ def test_emp_12_marketer_ws2_cannot_list_ws1_campaigns(
     # 2. Unscoped campaign list
     res_all = client.get("/api/v1/campaigns/", headers=headers_beta)
     assert res_all.status_code == 200
-    returned_campaigns = res_all.json()
+    returned_campaigns = res_all.json()["items"]
     for c in returned_campaigns:
         assert c["workspace_id"] != workspace_alpha.id, "Unscoped campaigns must NEVER leak Workspace 1 campaigns to WS2 user!"
 
@@ -407,7 +407,7 @@ def test_emp_15_investigate_agency_manager_ws2_schedules_scoping(
     res = client.get("/api/v1/schedules", headers=headers_beta_mgr)
     assert res.status_code == 200
 
-    schedules = res.json()
+    schedules = res.json()["items"]
     schedule_content_ids = [s["content_id"] for s in schedules]
 
     # EMPIRICAL ORACLE:
@@ -444,7 +444,7 @@ def test_emp_16_broadcast_notification_isolation_ws1_to_ws2(
     headers_beta = rbac_headers["beta_marketer"]
     res_beta = client.get("/api/v1/notifications/", headers=headers_beta)
     assert res_beta.status_code == 200
-    beta_titles = [n["title"] for n in res_beta.json()]
+    beta_titles = [n["title"] for n in res_beta.json()["items"]]
 
     assert "Thông Báo Broadcast Nội Bộ Workspace 1 (Bảo Mật)" not in beta_titles, (
         "CRITICAL LEAK: Workspace 1 broadcast notification leaked to Workspace 2 user!"
@@ -469,7 +469,7 @@ def test_emp_17_broadcast_notification_isolation_ws2_to_ws1(
     headers_alpha = rbac_headers["marketer"]
     res_alpha = client.get("/api/v1/notifications/", headers=headers_alpha)
     assert res_alpha.status_code == 200
-    alpha_titles = [n["title"] for n in res_alpha.json()]
+    alpha_titles = [n["title"] for n in res_alpha.json()["items"]]
 
     assert "Thông Báo Broadcast Nội Bộ Workspace 2 (Bảo Mật)" not in alpha_titles, (
         "CRITICAL LEAK: Workspace 2 broadcast notification leaked to Workspace 1 user!"

@@ -43,6 +43,7 @@ from sqlalchemy.orm import Session
 from app.api.v1.campaigns import _accessible_workspace_ids, resolve_effective_workspace_id
 from app.api.v1.contents import assert_workspace_access
 from app.core.database import get_db
+from app.core.pagination import Page, PageParams, page_params, paginate_query
 from app.core.security import enforce_quota, get_current_user, quota_already_enforced
 from app.models.entities import AIJob, Campaign, User, Workspace, WorkspaceMember
 from app.schemas.schemas import (
@@ -196,12 +197,11 @@ class AIJobResponse(AIJobSummaryResponse):
     )
 
 
-class AIJobListResponse(BaseModel):
-    items: List[AIJobSummaryResponse]
-    total: int
-    page: int
-    page_size: int
-    has_next: bool
+# Endpoint danh sách dùng CHUNG envelope `Page` của toàn hệ thống
+# (xem app/core/pagination.py) thay vì một model riêng. `Page` bổ sung
+# `total_pages` + `has_prev` so với hình dạng cũ — bổ sung là thay đổi không
+# phá vỡ: client đọc `items`/`total`/`page`/`page_size`/`has_next` như trước.
+AIJobListResponse = Page[AIJobSummaryResponse]
 
 
 # ===========================================================================
@@ -433,8 +433,7 @@ def list_ai_jobs(
     kind: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    pagination: PageParams = Depends(page_params),
     workspace_id: Optional[int] = Query(None, alias="workspace_id"),
     x_workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id"),
 ):
@@ -493,19 +492,13 @@ def list_ai_jobs(
             )
         query = query.filter(AIJob.kind == normalized_kind)
 
-    total = query.count()
-    rows = (
-        query.order_by(AIJob.created_at.desc(), AIJob.id.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-        .all()
-    )
-    return AIJobListResponse(
-        items=[_to_summary(row) for row in rows],
-        total=total,
-        page=page,
-        page_size=page_size,
-        has_next=(page * page_size) < total,
+    # Lọc + sắp xếp xong mới cắt trang: `paginate_query` đặt `count()` sau tất cả
+    # điều kiện lọc nên `total` là tổng của tập đã giới hạn tenant, không phải
+    # số dòng của riêng trang này.
+    return paginate_query(
+        query.order_by(AIJob.created_at.desc(), AIJob.id.desc()),
+        pagination,
+        serializer=_to_summary,
     )
 
 

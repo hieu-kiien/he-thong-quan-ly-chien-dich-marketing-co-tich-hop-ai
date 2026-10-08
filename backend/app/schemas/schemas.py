@@ -1003,6 +1003,27 @@ AIKeySaveRequest = AIKeyCreate
 AIKeySaveResponse = AIKeyResponse
 
 
+# --- AI LOGS ---
+class AILogResponse(BaseModel):
+    """Một dòng nhật ký lượt gọi AI.
+
+    Trước đây endpoint `GET /ai/logs` dựng dict thủ công trong hàm và trả mảng
+    phẳng. Có model chính thức thì `response_model` lo được việc đó và OpenAPI
+    mô tả được đúng hình dạng trả về.
+    """
+
+    id: int
+    task_type: str
+    model: str
+    prompt_version: str
+    result_status: str
+    latency_ms: Optional[int] = None
+    error_code: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # --- NOTIFICATIONS ---
 class NotificationUpdate(BaseModel):
     read: Optional[bool] = Field(None, description="Trạng thái đã đọc")

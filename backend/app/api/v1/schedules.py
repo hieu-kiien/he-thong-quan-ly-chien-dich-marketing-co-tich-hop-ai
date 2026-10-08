@@ -5,6 +5,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.pagination import Page, PageParams, page_params, paginate_query
 from app.core.security import get_current_user, security_bearer
 from app.models.entities import MarketingSchedule, MarketingContent, User, Workspace, WorkspaceMember, Campaign, CampaignMember
 from app.schemas.schemas import ScheduleCreate, ScheduleUpdate, ScheduleResponse
@@ -13,12 +14,21 @@ from app.services.scheduler.worker import process_due_schedules
 
 router = APIRouter(tags=["Quản lý Lịch đăng"])
 
-@router.get("/schedules", response_model=List[ScheduleResponse])
+@router.get("/schedules", response_model=Page[ScheduleResponse])
 def get_schedules(
     workspace_id: Optional[int] = Query(None),
+    status_filter: Optional[str] = Query(None, alias="status"),
+    content_id: Optional[int] = Query(None),
+    pagination: PageParams = Depends(page_params),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    """Danh sách lịch đăng, có lọc + phân trang.
+
+    Lưu ý thứ tự: mọi nhánh lọc tenant (theo `workspace_id`, theo vai trò) được áp
+    TRƯỚC, `paginate_query` mới cắt trang — nên `total` và `offset` đều tính trên
+    tập đã giới hạn tenant, không phải trên toàn bảng `marketing_schedules`.
+    """
     query = db.query(MarketingSchedule).join(MarketingContent, MarketingSchedule.content_id == MarketingContent.id)
 
     if workspace_id is not None:
@@ -62,8 +72,16 @@ def get_schedules(
                 (MarketingContent.campaign_id.in_(allowed_campaigns.select()))
             )
 
-    schedules = query.order_by(MarketingSchedule.scheduled_at.asc()).all()
-    return [ScheduleResponse.model_validate(s) for s in schedules]
+    if status_filter:
+        query = query.filter(MarketingSchedule.status == status_filter)
+    if content_id:
+        query = query.filter(MarketingSchedule.content_id == content_id)
+
+    return paginate_query(
+        query.order_by(MarketingSchedule.scheduled_at.asc(), MarketingSchedule.id.asc()),
+        pagination,
+        serializer=lambda s: ScheduleResponse.model_validate(s),
+    )
 
 @router.post("/contents/{content_id}/schedule", response_model=ScheduleResponse, status_code=status.HTTP_201_CREATED)
 def schedule_content(

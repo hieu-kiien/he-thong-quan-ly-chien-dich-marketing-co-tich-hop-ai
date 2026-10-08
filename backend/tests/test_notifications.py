@@ -1,4 +1,4 @@
-import pytest
+﻿import pytest
 from app.models.entities import Notification, MarketingContent, Campaign, User, WorkspaceMember
 from app.api.v1.notifications import create_notification
 
@@ -65,7 +65,7 @@ def test_get_notifications_for_current_user(client, db_session, manager_headers,
     # Manager should see n1 and n3, but NOT n2
     res_mgr = client.get("/api/v1/notifications", headers=manager_headers)
     assert res_mgr.status_code == 200
-    mgr_titles = [n["title"] for n in res_mgr.json()]
+    mgr_titles = [n["title"] for n in res_mgr.json()["items"]]
     assert "Manager Private" in mgr_titles
     assert "Workspace Broadcast" in mgr_titles
     assert "Marketer Private" not in mgr_titles
@@ -73,7 +73,7 @@ def test_get_notifications_for_current_user(client, db_session, manager_headers,
     # Marketer should see n2 and n3, but NOT n1
     res_mkt = client.get("/api/v1/notifications", headers=marketer_headers)
     assert res_mkt.status_code == 200
-    mkt_titles = [n["title"] for n in res_mkt.json()]
+    mkt_titles = [n["title"] for n in res_mkt.json()["items"]]
     assert "Marketer Private" in mkt_titles
     assert "Workspace Broadcast" in mkt_titles
     assert "Manager Private" not in mkt_titles
@@ -106,7 +106,7 @@ def test_get_notifications_unread_filter(client, db_session, marketer_headers, w
     # Query with unread_only=True
     res = client.get("/api/v1/notifications?unread_only=true", headers=marketer_headers)
     assert res.status_code == 200
-    items = res.json()
+    items = res.json()["items"]
     titles = [i["title"] for i in items]
     assert "Unread Notice" in titles
     assert "Read Notice" not in titles
@@ -179,7 +179,7 @@ def test_post_mark_all_read(client, db_session, marketer_headers, workspace_alph
     # Now verify unread count is 0
     res_unread = client.get("/api/v1/notifications?unread_only=true", headers=marketer_headers)
     assert res_unread.status_code == 200
-    assert len(res_unread.json()) == 0
+    assert len(res_unread.json()["items"]) == 0
 
 
 def test_lifecycle_notifications_trigger(client, db_session, manager_headers, marketer_headers, workspace_alpha):
@@ -214,7 +214,7 @@ def test_lifecycle_notifications_trigger(client, db_session, manager_headers, ma
     # Check that Manager received notification
     res_notif_mgr = client.get("/api/v1/notifications", headers=manager_headers)
     assert res_notif_mgr.status_code == 200
-    mgr_notifs = res_notif_mgr.json()
+    mgr_notifs = res_notif_mgr.json()["items"]
     submit_notif = next((n for n in mgr_notifs if "Yêu cầu phê duyệt" in n["title"]), None)
     assert submit_notif is not None
     assert "Bài Viết Kiểm Thử Lifecycle" in submit_notif["message"]
@@ -227,7 +227,7 @@ def test_lifecycle_notifications_trigger(client, db_session, manager_headers, ma
     # Check that Marketer received approval notification
     res_notif_mkt = client.get("/api/v1/notifications", headers=marketer_headers)
     assert res_notif_mkt.status_code == 200
-    mkt_notifs = res_notif_mkt.json()
+    mkt_notifs = res_notif_mkt.json()["items"]
     appr_notif = next((n for n in mkt_notifs if "phê duyệt" in n["title"].lower()), None)
     assert appr_notif is not None
     assert "Bài Viết Kiểm Thử Lifecycle" in appr_notif["message"]
@@ -244,7 +244,7 @@ def test_lifecycle_notifications_trigger(client, db_session, manager_headers, ma
     # Check notification for reset to draft
     res_notif_reset = client.get("/api/v1/notifications", headers=manager_headers)
     assert res_notif_reset.status_code == 200
-    reset_notif = next((n for n in res_notif_reset.json() if "chỉnh sửa" in n["title"].lower()), None)
+    reset_notif = next((n for n in res_notif_reset.json()["items"] if "chỉnh sửa" in n["title"].lower()), None)
     assert reset_notif is not None
     assert "AI_DRAFT" in reset_notif["message"]
 
@@ -280,6 +280,6 @@ def test_reject_lifecycle_notification(client, db_session, manager_headers, mark
     # Verify Marketer received notification with rejection reason
     res_notifs = client.get("/api/v1/notifications", headers=marketer_headers)
     assert res_notifs.status_code == 200
-    rej_notif = next((n for n in res_notifs.json() if "từ chối" in n["title"].lower()), None)
+    rej_notif = next((n for n in res_notifs.json()["items"] if "từ chối" in n["title"].lower()), None)
     assert rej_notif is not None
     assert "Giọng văn chưa chuẩn phong cách thương hiệu" in rej_notif["message"]

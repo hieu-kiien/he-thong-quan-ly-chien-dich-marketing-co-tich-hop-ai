@@ -1,9 +1,10 @@
 import re
 import uuid
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.core.pagination import Page, PageParams, page_params, paginate_query
 from app.core.security import get_current_user
 from app.models.entities import User, Workspace, WorkspaceMember, BrandKit
 from app.schemas.schemas import (
@@ -61,26 +62,36 @@ def check_workspace_admin_permission(workspace: Workspace, user: User, db: Sessi
             detail="Chỉ Quản trị viên (AGENCY_MANAGER hoặc Owner) mới có quyền thực hiện thao tác này"
         )
 
-@router.get("", response_model=List[WorkspaceResponse])
+@router.get("", response_model=Page[WorkspaceResponse])
 def get_workspaces(
+    pagination: PageParams = Depends(page_params),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    """Workspace người dùng sở hữu hoặc là thành viên, có phân trang.
+
+    Sắp xếp theo `id` cho CẢ ADMIN lẫn user thường: trước đây nhánh ADMIN không
+    có `order_by` nên thứ tự do CSDL quyết định — với phân trang đó là nguồn lỗi
+    kinh điển (một dòng có thể xuất hiện ở cả trang 1 và trang 2).
+    """
     if current_user.role == "ADMIN":
-        workspaces = db.query(Workspace).filter(Workspace.status == "ACTIVE").all()
-        return [WorkspaceResponse.model_validate(ws) for ws in workspaces]
+        query = db.query(Workspace).filter(Workspace.status == "ACTIVE")
+    else:
+        # Lấy các workspace do user sở hữu hoặc user là thành viên
+        member_ws_ids = db.query(WorkspaceMember.workspace_id).filter(
+            WorkspaceMember.user_id == current_user.id
+        ).subquery()
 
-    # Lấy các workspace do user sở hữu hoặc user là thành viên
-    member_ws_ids = db.query(WorkspaceMember.workspace_id).filter(
-        WorkspaceMember.user_id == current_user.id
-    ).subquery()
+        query = db.query(Workspace).filter(
+            Workspace.status == "ACTIVE",
+            (Workspace.owner_id == current_user.id) | (Workspace.id.in_(member_ws_ids.select()))
+        )
 
-    workspaces = db.query(Workspace).filter(
-        Workspace.status == "ACTIVE",
-        (Workspace.owner_id == current_user.id) | (Workspace.id.in_(member_ws_ids.select()))
-    ).order_by(Workspace.id.asc()).all()
-
-    return [WorkspaceResponse.model_validate(ws) for ws in workspaces]
+    return paginate_query(
+        query.order_by(Workspace.id.asc()),
+        pagination,
+        serializer=lambda ws: WorkspaceResponse.model_validate(ws),
+    )
 
 @router.post("", response_model=WorkspaceResponse, status_code=status.HTTP_201_CREATED)
 def create_workspace(

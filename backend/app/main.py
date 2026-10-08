@@ -40,9 +40,52 @@ async def lifespan(application: FastAPI):
         on_shutdown()
 
 
+API_DESCRIPTION = """
+Hệ thống quản lý chiến dịch marketing có tích hợp AI (AIA331 - Đề tài 80300).
+
+## Phân trang (áp dụng cho MỌI endpoint trả về danh sách)
+
+Hợp đồng DUY NHẤT, mô tả bằng `Page[T]` (xem `app/core/pagination.py`).
+
+**Query**
+
+| Tham số | Mặc định | Ràng buộc |
+| --- | --- | --- |
+| `page` | `1` | `>= 1` |
+| `page_size` | `20` | `1 .. 100` |
+
+**Response**
+
+```json
+{
+  "items": [ ... ],
+  "total": 132,
+  "page": 1,
+  "page_size": 20,
+  "total_pages": 7,
+  "has_next": true,
+  "has_prev": false
+}
+```
+
+- `total` là tổng số bản ghi **sau khi lọc**, không phải số bản ghi của trang hiện tại.
+- `total_pages = ceil(total / page_size)`; bằng `0` khi không có bản ghi nào.
+- Lọc và sắp xếp (`search`, `status`, `sort`, ...) được áp **trước**, phân trang **sau**:
+  trang N luôn là N lát cắt của tập đã lọc và sắp xếp.
+- `page_size` vượt 100 trả `422` — tham số không trần là đường DoS, và instance
+  triển khai thật chỉ có 512 MB RAM.
+- Client cũ bỏ qua tham số phân trang vẫn nhận trang đầu tiên hợp lệ.
+
+## Hạn mức gói miễn phí (per-workspace)
+
+Khi vượt hạn mứng, API trả `429` với `detail` là object có `error: "quota_exceeded"`,
+`limit_code`, `limit`, `used`, `remaining`, `resets_at` để client hiển thị thông báo
+hành động được. Xem `app/services/quota.py` và `GET /workspaces/{id}/quota`.
+"""
+
 app = FastAPI(
     title=settings.APP_NAME,
-    description="Hệ thống quản lý chiến dịch marketing có tích hợp AI (AIA331 - Đề tài 80300)",
+    description=API_DESCRIPTION,
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",

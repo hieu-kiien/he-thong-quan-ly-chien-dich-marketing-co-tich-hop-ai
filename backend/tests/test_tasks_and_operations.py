@@ -1,4 +1,4 @@
-import pytest
+﻿import pytest
 from datetime import datetime, timedelta
 from app.models.entities import Task, Campaign, User, CampaignBudgetAllocation, CampaignKPITarget, MarketingChannel
 
@@ -33,13 +33,13 @@ def test_create_and_list_campaign_tasks(client, manager_headers, db_session):
     # 2. List tasks for campaign
     res_list = client.get("/api/v1/campaigns/1/tasks", headers=manager_headers)
     assert res_list.status_code == 200
-    tasks = res_list.json()
+    tasks = res_list.json()["items"]
     assert any(t["id"] == task_id for t in tasks)
 
     # 3. Filter by priority
     res_filter = client.get("/api/v1/campaigns/1/tasks?priority=HIGH", headers=manager_headers)
     assert res_filter.status_code == 200
-    assert all(t["priority"] == "HIGH" for t in res_filter.json())
+    assert all(t["priority"] == "HIGH" for t in res_filter.json()["items"])
 
 
 def test_my_tasks_endpoint(client, marketer_headers, manager_headers, db_session):
@@ -62,7 +62,7 @@ def test_my_tasks_endpoint(client, marketer_headers, manager_headers, db_session
     # Fetch marketer's own tasks
     res_my = client.get("/api/v1/tasks/my-tasks", headers=marketer_headers)
     assert res_my.status_code == 200
-    my_tasks = res_my.json()
+    my_tasks = res_my.json()["items"]
     assert any(t["id"] == created_id for t in my_tasks)
 
 

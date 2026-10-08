@@ -1,4 +1,4 @@
-"""
+﻿"""
 Test Suite: X-Workspace-Id header chọn workspace hiện hành cho endpoint list.
 
 Bối cảnh: frontend gửi `X-Workspace-Id` tự động từ workspace người dùng đang
@@ -98,8 +98,8 @@ def test_campaigns_list_follows_workspace_header(client, dual_workspace_user):
     assert alpha_resp.status_code == 200, alpha_resp.text
     assert beta_resp.status_code == 200, beta_resp.text
 
-    alpha_names = {c["name"] for c in alpha_resp.json()}
-    beta_names = {c["name"] for c in beta_resp.json()}
+    alpha_names = {c["name"] for c in alpha_resp.json()["items"]}
+    beta_names = {c["name"] for c in beta_resp.json()["items"]}
 
     assert "Campaign only in ALPHA" in alpha_names
     assert "Campaign only in ALPHA" not in beta_names, (
@@ -120,7 +120,7 @@ def test_contents_list_follows_workspace_header(client, dual_workspace_user):
     for ws in (alpha, beta):
         resp = client.get("/api/v1/contents", headers=_header(headers, ws.id))
         assert resp.status_code == 200, resp.text
-        for item in resp.json():
+        for item in resp.json()["items"]:
             assert item.get("workspace_id") in (None, ws.id), (
                 f"GET /contents?ws={ws.id} trả về nội dung của workspace "
                 f"{item.get('workspace_id')}"
@@ -138,7 +138,7 @@ def test_query_param_takes_precedence_over_header(client, dual_workspace_user):
         headers=_header(headers, beta.id),
     )
     assert resp.status_code == 200, resp.text
-    names = {c["name"] for c in resp.json()}
+    names = {c["name"] for c in resp.json()["items"]}
     assert "Campaign only in ALPHA" in names
     assert "Campaign only in BETA" not in names
 
@@ -214,6 +214,6 @@ def test_absent_header_still_returns_own_workspaces_only(client, dual_workspace_
     headers = _login(client, "multi_ws_user@gmail.com", "MultiWs@123")
     resp = client.get("/api/v1/campaigns", headers=headers)
     assert resp.status_code == 200, resp.text
-    names = {c["name"] for c in resp.json()}
+    names = {c["name"] for c in resp.json()["items"]}
     assert "Campaign only in ALPHA" in names
     assert "Campaign only in BETA" in names

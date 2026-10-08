@@ -227,7 +227,7 @@ class TestContentPreviewImageUnit:
         mgr_headers = get_manager_headers(client)
         resp = client.get("/api/v1/campaigns/1/contents", headers=mgr_headers)
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["items"]
         assert isinstance(data, list)
         assert len(data) >= 1
         # Seed content 1 có image_url
@@ -240,7 +240,7 @@ class TestContentPreviewImageUnit:
         mgr_headers = get_manager_headers(client)
         resp = client.get("/api/v1/campaigns/2/contents", headers=mgr_headers)
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["items"]
         assert isinstance(data, list)
         assert data == []
 

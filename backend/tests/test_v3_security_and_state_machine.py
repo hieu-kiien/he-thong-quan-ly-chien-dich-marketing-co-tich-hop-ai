@@ -52,7 +52,7 @@ class TestRecordLevelAuthorizationNFR01:
         mkt_headers = get_marketer_headers(client)
         resp = client.get("/api/v1/campaigns", headers=mkt_headers)
         assert resp.status_code == 200
-        campaign_ids = [c["id"] for c in resp.json()]
+        campaign_ids = [c["id"] for c in resp.json()["items"]]
         assert 1 in campaign_ids
         assert 2 not in campaign_ids
 
@@ -61,7 +61,7 @@ class TestRecordLevelAuthorizationNFR01:
         mgr_headers = get_manager_headers(client)
         resp = client.get("/api/v1/campaigns", headers=mgr_headers)
         assert resp.status_code == 200
-        campaign_ids = [c["id"] for c in resp.json()]
+        campaign_ids = [c["id"] for c in resp.json()["items"]]
         assert 1 in campaign_ids
         assert 2 in campaign_ids
 

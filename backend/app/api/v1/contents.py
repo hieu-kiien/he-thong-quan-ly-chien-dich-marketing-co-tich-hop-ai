@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.core.database import get_db
+from app.core.pagination import Page, PageParams, page_params, paginate_query
 from app.core.security import RoleChecker, get_current_user
 from app.models.entities import MarketingContent, Campaign, MarketingChannel, ContentReview, User, CampaignMember, Workspace, WorkspaceMember
 from app.schemas.schemas import (
@@ -18,6 +19,14 @@ from app.api.v1.campaigns import _apply_tenant_scope, get_workspace_filter
 router = APIRouter(prefix="/contents", tags=["Quản lý Nội dung Marketing"])
 
 logger = logging.getLogger(__name__)
+
+# Khoá sắp xếp được phép. `sort` do client gửi nên chỉ được map sang cột đã biết,
+# không bao giờ nối thẳng vào ORDER BY.
+_CONTENT_SORT_KEYS = (
+    "newest", "oldest", "name_asc", "name_desc", "status_asc", "updated_desc",
+)
+
+_SORT_DESCRIPTION = "Thứ tự sắp xếp: " + " | ".join(_CONTENT_SORT_KEYS) + " (mặc định newest)"
 
 def resolve_workspace_id_for_content(content: MarketingContent, db: Session) -> Optional[int]:
     """Suy ra tenant của một nội dung: ưu tiên `workspace_id` của chính nó, khi
@@ -158,12 +167,15 @@ def check_campaign_access_for_content(campaign_id: int, user: User, db: Session)
         detail="Not authorized to access this resource"
     )
 
-@router.get("", response_model=List[ContentResponse])
+@router.get("", response_model=Page[ContentResponse])
 def get_contents(
     workspace_id: Optional[int] = Depends(get_workspace_filter),
     campaign_id: Optional[int] = Query(None),
     status_filter: Optional[str] = Query(None, alias="status"),
     channel_id: Optional[int] = Query(None),
+    search: Optional[str] = Query(None, description="Tìm trong tiêu đề hoặc nội dung"),
+    sort: str = Query("newest", description=_SORT_DESCRIPTION),
+    pagination: PageParams = Depends(page_params),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -213,7 +225,35 @@ def get_contents(
         query = query.filter(MarketingContent.status == status_filter)
     if channel_id:
         query = query.filter(MarketingContent.channel_id == channel_id)
-    return [ContentResponse.model_validate(c) for c in query.order_by(MarketingContent.id.desc()).all()]
+    if search:
+        search_fmt = f"%{search}%"
+        query = query.filter(
+            (MarketingContent.title.ilike(search_fmt)) |
+            (MarketingContent.body.ilike(search_fmt))
+        )
+
+    sort_key = (sort or "newest").strip().lower()
+    order_by = {
+        "newest": (MarketingContent.created_at.desc(), MarketingContent.id.desc()),
+        "oldest": (MarketingContent.created_at.asc(), MarketingContent.id.asc()),
+        "name_asc": (MarketingContent.title.asc(), MarketingContent.id.asc()),
+        "name_desc": (MarketingContent.title.desc(), MarketingContent.id.desc()),
+        "status_asc": (MarketingContent.status.asc(), MarketingContent.id.desc()),
+        "updated_desc": (MarketingContent.updated_at.desc(), MarketingContent.id.desc()),
+    }.get(sort_key)
+    if order_by is None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Giá trị sort không hợp lệ. Chỉ nhận: {', '.join(_CONTENT_SORT_KEYS)}.",
+        )
+
+    # Lọc + sắp xếp xong mới cắt trang. `total` là tổng của tập ĐÃ giới hạn tenant
+    # (xem `_apply_tenant_scope` ở trên), không phải tổng toàn bảng.
+    return paginate_query(
+        query.order_by(*order_by),
+        pagination,
+        serializer=lambda c: ContentResponse.model_validate(c),
+    )
 
 @router.post("", response_model=ContentResponse, status_code=status.HTTP_201_CREATED)
 def create_content(

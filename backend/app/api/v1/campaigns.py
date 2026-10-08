@@ -3,12 +3,31 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Header
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, false, or_
 from app.core.database import get_db
+from app.core.pagination import Page, PageParams, page_params, paginate_query
 from app.core.security import RoleChecker, get_current_user
 from app.models.entities import Campaign, Product, User, CampaignMember, WorkspaceMember, Workspace, MarketingContent, CampaignBudgetAllocation, CampaignKPITarget, MarketingChannel
 from app.schemas.schemas import CampaignCreate, CampaignUpdate, CampaignResponse, ContentResponse, BudgetAllocationCreate, BudgetAllocationResponse, KPITargetCreate, KPITargetResponse
 
 
 router = APIRouter(prefix="/campaigns", tags=["Quản lý Chiến dịch"])
+
+# Khoá sắp xếp được phép (allowlist). `sort` là dữ liệu do client gửi nên không
+# bao giờ nối thẳng vào ORDER BY — chỉ map sang cột đã biết ở đây.
+_CAMPAIGN_SORT_KEYS = (
+    "newest", "oldest", "name_asc", "name_desc",
+    "budget_asc", "budget_desc", "start_date",
+)
+
+# Khoá sắp xếp của danh sách NỘI DUNG. Khác `/_CAMPAIGN_SORT_KEYS`: bảng
+# `marketing_contents` không có cột chi phí, nên sắp theo ngân sách là vô nghĩa
+# và đã từng làm endpoint `/campaigns/{id}/contents` ném 500.
+_CONTENT_SORT_KEYS = (
+    "newest", "oldest", "name_asc", "name_desc", "status_asc", "updated_desc",
+)
+
+_SORT_DESCRIPTION = (
+    "Thứ tự sắp xếp: " + " | ".join(_CAMPAIGN_SORT_KEYS) + " (mặc định newest)"
+)
 
 
 def _accessible_workspace_ids(user: User, db: Session) -> List[int]:
@@ -155,7 +174,7 @@ def get_workspace_filter(
     return target
 
 
-@router.get("", response_model=List[CampaignResponse])
+@router.get("", response_model=Page[CampaignResponse])
 def get_campaigns(
     workspace_id: Optional[int] = Depends(get_workspace_filter),
     status_filter: Optional[str] = Query(None, alias="status"),
@@ -163,6 +182,8 @@ def get_campaigns(
     start_date: Optional[str] = Query(None, alias="start_date"),
     end_date: Optional[str] = Query(None, alias="end_date"),
     search: Optional[str] = Query(None),
+    sort: str = Query("newest", description=_SORT_DESCRIPTION),
+    pagination: PageParams = Depends(page_params),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -201,7 +222,33 @@ def get_campaigns(
             (Campaign.objective.ilike(search_fmt)) |
             (Campaign.audience.ilike(search_fmt))
         )
-    return [CampaignResponse.model_validate(c) for c in query.order_by(Campaign.id.desc()).all()]
+
+    # Sắp xếp sau khi lọc, trước khi cắt trang. Mỗi nhánh đều kèm `Campaign.id`
+    # làm khoá phá thế hoàn toàn: trang 2 không được trả lặp/mất dòng khi hai
+    # chiến dịch trùng giá trị sắp xếp.
+    sort_key = (sort or "newest").strip().lower()
+    order_by = {
+        "newest": (Campaign.created_at.desc(), Campaign.id.desc()),
+        "oldest": (Campaign.created_at.asc(), Campaign.id.asc()),
+        "name_asc": (Campaign.name.asc(), Campaign.id.asc()),
+        "name_desc": (Campaign.name.desc(), Campaign.id.desc()),
+        "budget_asc": (Campaign.budget.asc(), Campaign.id.asc()),
+        "budget_desc": (Campaign.budget.desc(), Campaign.id.desc()),
+        "start_date": (Campaign.start_date.desc(), Campaign.id.desc()),
+    }.get(sort_key)
+    if order_by is None:
+        # Allowlist: khoá sắp xếp là dữ liệu do client gửi, không nối thẳng vào
+        # ORDER BY. Sai thì trả 422 chứ không phải 500 do SQL.
+        raise HTTPException(
+            status_code=422,
+            detail=f"Giá trị sort không hợp lệ. Chỉ nhận: {', '.join(_CAMPAIGN_SORT_KEYS)}.",
+        )
+
+    return paginate_query(
+        query.order_by(*order_by),
+        pagination,
+        serializer=lambda c: CampaignResponse.model_validate(c),
+    )
 
 @router.post("", response_model=CampaignResponse, status_code=status.HTTP_201_CREATED)
 def create_campaign(
@@ -367,13 +414,22 @@ def delete_campaign(
     db.commit()
     return None
 
-@router.get("/{campaign_id}/contents", response_model=List[ContentResponse])
+@router.get("/{campaign_id}/contents", response_model=Page[ContentResponse])
 def get_campaign_contents(
     campaign_id: int,
+    status_filter: Optional[str] = Query(None, alias="status"),
+    search: Optional[str] = Query(None),
+    sort: str = Query("newest", description=_SORT_DESCRIPTION),
+    pagination: PageParams = Depends(page_params),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Lấy danh sách toàn bộ nội dung của chiến dịch (phục vụ xem tổng quan và xuất file Excel/PDF)."""
+    """Nội dung của một chiến dịch, có lọc + phân trang.
+
+    Quyền truy cập được chốt ở CẤP CHIẾN DỊCH trước (`check_campaign_access`) rồi
+    mới cắt trang, nên phân trang không thể biến một lần gọi hợp lệ thành đường đọc
+    chéo tenant: `offset` chỉ dịch vị trong tập đã lọc, không mở rộng tập đó.
+    """
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
@@ -391,8 +447,35 @@ def get_campaign_contents(
         if campaign.owner_id != current_user.id:
             query = query.filter(MarketingContent.created_by == current_user.id)
 
-    contents = query.order_by(MarketingContent.id.desc()).all()
-    return [ContentResponse.model_validate(c) for c in contents]
+    if status_filter:
+        query = query.filter(MarketingContent.status == status_filter)
+    if search:
+        search_fmt = f"%{search}%"
+        query = query.filter(
+            (MarketingContent.title.ilike(search_fmt)) |
+            (MarketingContent.body.ilike(search_fmt))
+        )
+
+    sort_key = (sort or "newest").strip().lower()
+    order_by = {
+        "newest": (MarketingContent.created_at.desc(), MarketingContent.id.desc()),
+        "oldest": (MarketingContent.created_at.asc(), MarketingContent.id.asc()),
+        "name_asc": (MarketingContent.title.asc(), MarketingContent.id.asc()),
+        "name_desc": (MarketingContent.title.desc(), MarketingContent.id.desc()),
+        "status_asc": (MarketingContent.status.asc(), MarketingContent.id.desc()),
+        "updated_desc": (MarketingContent.updated_at.desc(), MarketingContent.id.desc()),
+    }.get(sort_key)
+    if order_by is None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Giá trị sort không hợp lệ. Chỉ nhận: {', '.join(_CONTENT_SORT_KEYS)}.",
+        )
+
+    return paginate_query(
+        query.order_by(*order_by),
+        pagination,
+        serializer=lambda c: ContentResponse.model_validate(c),
+    )
 
 
 # --- BUDGET ALLOCATION ENDPOINTS ---

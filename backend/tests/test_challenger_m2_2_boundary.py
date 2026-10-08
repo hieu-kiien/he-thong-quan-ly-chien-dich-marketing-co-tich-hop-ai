@@ -1,4 +1,4 @@
-"""
+﻿"""
 Empirical Boundary & Stress Adversarial Test Suite for Milestone 2: Deep 3-Channel AI Creative Engine (R2)
 Author: Challenger 2 (Boundary & Stress Challenger)
 Covers:
@@ -517,7 +517,7 @@ class TestDatabaseLoggingAndPersistence:
 
         resp = client.get("/api/v1/ai/logs", headers=manager_headers)
         assert resp.status_code == 200
-        logs = resp.json()
+        logs = resp.json()["items"]
         assert isinstance(logs, list)
         omni_logs = [l for l in logs if l.get("task_type") == "OMNICHANNEL"]
         assert len(omni_logs) > 0, "Endpoint GET /api/v1/ai/logs phải trả về các log có task_type='OMNICHANNEL'"

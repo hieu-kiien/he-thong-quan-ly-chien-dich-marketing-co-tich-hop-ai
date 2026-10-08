@@ -22,7 +22,7 @@ def test_list_workspaces_authenticated(client):
     headers = get_auth_headers(client, "manager@gmail.com", "Manager@123")
     resp = client.get("/api/v1/workspaces", headers=headers)
     assert resp.status_code == 200
-    workspaces = resp.json()
+    workspaces = resp.json()["items"]
     assert len(workspaces) >= 1
     assert any(w["id"] == 1 for w in workspaces)
 

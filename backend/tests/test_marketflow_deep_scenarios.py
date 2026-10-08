@@ -1,4 +1,4 @@
-import base64
+﻿import base64
 import json
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
@@ -1210,7 +1210,7 @@ class TestDeepInputFuzzingAndInjectionResistance:
         mkt_headers = get_marketer_headers(client)
         resp = client.get("/api/v1/campaigns?search=%27%20OR%20%271%27=%271", headers=mkt_headers)
         assert resp.status_code == 200
-        assert resp.json() == []
+        assert resp.json()["items"] == []
 
     def test_sqli_campaign_search_drop_table_neutralized(self, client, db_session):
         """74. Tấn công SQLi phá hủy bảng (?search='; DROP TABLE campaigns; --) không làm ảnh hưởng CSDL."""
@@ -1224,14 +1224,14 @@ class TestDeepInputFuzzingAndInjectionResistance:
         mkt_headers = get_marketer_headers(client)
         resp = client.get("/api/v1/campaigns?status=%27%20UNION%20SELECT%20*%20FROM%20users%20--", headers=mkt_headers)
         assert resp.status_code == 200
-        assert resp.json() == []
+        assert resp.json()["items"] == []
 
     def test_sqli_content_status_quote_injection_neutralized(self, client):
         """76. Tấn công nháy đơn trên status của /contents được xử lý an toàn dưới dạng chuỗi thuần túy."""
         mkt_headers = get_marketer_headers(client)
         resp = client.get("/api/v1/contents?status=%27%20OR%20%271%27=%271", headers=mkt_headers)
         assert resp.status_code == 200
-        assert resp.json() == []
+        assert resp.json()["items"] == []
 
     def test_xss_campaign_name_stored_and_rendered_safely(self, client):
         """77. Payload XSS trong tên chiến dịch được lưu trữ và phản hồi an toàn dưới dạng JSON (không thực thi HTML)."""
