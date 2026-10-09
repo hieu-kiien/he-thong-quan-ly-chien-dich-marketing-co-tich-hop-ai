@@ -12,6 +12,8 @@ from app.models.entities import AILog
 from app.services.ai.prompt_engine import prompt_engine
 from app.services.ai import providers as provider_registry
 from app.services.ai import anthropic_adapter
+from app.services.ai.circuit_breaker import CircuitOpenError
+from app.services.ai.circuit_breaker import breaker as circuit_breaker
 
 import logging
 
@@ -386,17 +388,26 @@ class AIService:
                 "temperature": 0.7,
             }
 
+        # Circuit breaker: đo độ khoẻ provider trước khi gọi. Khi provider đã chết,
+        # `allow()` ném ngay thay vì mất thêm vài phút retry rồi mới rơi xuống
+        # fallback, giữ chân slot AI trong hàng đợi.
+        circuit_breaker.allow(eff_provider)
+
         last_error = None
         for attempt in range(self.max_retries + 1):
+            # Chỉ thử breaker ở lần đầu: nếu provider đang HALF_OPEN thì lần thử dò
+            # đó đã được cho qua ở `allow()`; các lần retry nội bộ không cần hỏi lại.
+            attempt_started = time.monotonic()
             try:
                 with httpx.Client(timeout=self.timeout) as client:
                     resp = client.post(url, headers=headers, json=payload)
                     if resp.status_code == 200:
                         data = resp.json()
                         if spec.protocol == provider_registry.PROTOCOL_ANTHROPIC:
-                            return anthropic_adapter.extract_text(data)
-                        content = (data["choices"][0].get("message") or {}).get("content")
-                        if content is None or str(content).strip() == "":
+                            text = anthropic_adapter.extract_text(data)
+                        else:
+                            text = (data["choices"][0].get("message") or {}).get("content")
+                        if text is None or str(text).strip() == "":
                             # Reasoning model có thể hết token cho reasoning_content và
                             # trả content rỗng. Phải coi là lỗi để thử lại, tuyệt đối
                             # không trả None ra ngoài (sẽ rơi xuống fallback giả lặng lẽ).
@@ -404,8 +415,12 @@ class AIService:
                                 "AI Provider trả về nội dung rỗng "
                                 "(có thể hết token cho reasoning)"
                             )
-                        return content
+                        circuit_breaker.record_success(eff_provider, time.monotonic() - attempt_started)
+                        return text
                     elif resp.status_code == 429:
+                        # Hết hạn mức: provider còn sống nhưng đang quá tải. Không tính
+                        # vào ngưỡng ngắt breaker, chỉ nghỉ và thử lại.
+                        last_error = "AI Provider đang quá tải (HTTP 429)."
                         time.sleep(1.0 * (attempt + 1))
                         continue
                     else:
@@ -413,8 +428,12 @@ class AIService:
                         raise RuntimeError(f"AI Provider trả về lỗi HTTP {resp.status_code}: {clean_err}")
             except httpx.TimeoutException:
                 last_error = "TIMEOUT"
+                circuit_breaker.record_failure(eff_provider, "TIMEOUT")
+            except CircuitOpenError:
+                raise
             except Exception as e:
                 last_error = _sanitize_ai_error(str(e), active_key=key_to_use)
+                circuit_breaker.record_failure(eff_provider, last_error)
 
         raise RuntimeError(last_error or "Không thể kết nối AI Provider")
 

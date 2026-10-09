@@ -32,13 +32,26 @@ def _resolve_client_ip(request: Request) -> str:
     if not is_trusted_proxy(peer):
         return peer
 
-    forwarded = request.headers.get("x-forwarded-for")
-    if not forwarded:
-        # Cloudflare dùng CF-Connecting-IP cho IP thật của client.
-        return request.headers.get("cf-connecting-ip") or peer
+    # Cloudflare dùng CF-Connecting-IP cho IP thật của client. Phải ưu tiên
+    # header này TRƯỚC X-Forwarded-For.
+    #
+    # Lý do (sự cố thật khi triển khai qua Cloudflare Tunnel): nginx chỉ forward
+    # X-Forwarded-For và X-Real-IP, KHÔNG forward CF-Connecting-IP. Trong chuỗi
+    # X-Forwarded-For do cloudflared tạo, phần đầu là IP điểm vào của Cloudflare
+    # (một IP chia sẻ cho mọi khách), nên lấy phần đầu khiến MỌI người dùng rơi
+    # vào cùng một bucket rate limit: người này gõ sai mật khẩu vài lần thì mọi
+    # người khác cũng bị khoá. X-Forwarded-For chỉ nên là phương án dự phòng cho
+    # cấu hình không có Cloudflare.
+    cf_ip = (request.headers.get("cf-connecting-ip") or "").strip()
+    if cf_ip:
+        return cf_ip
 
-    # Chuỗi XFF là "client, proxy1, proxy2, ...". Phần tử đầu là client thật.
-    return forwarded.split(",")[0].strip() or peer
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        # Chuỗi XFF là "client, proxy1, proxy2, ...". Phần đầu tiên là client thật.
+        return forwarded.split(",")[0].strip() or peer
+
+    return request.headers.get("x-real-ip") or peer
 
 
 def generate_workspace_slug(name: str, user_id: int) -> str:
