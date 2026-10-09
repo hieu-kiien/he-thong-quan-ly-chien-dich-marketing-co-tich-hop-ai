@@ -182,6 +182,10 @@ PROVIDERS: Tuple[AIProviderSpec, ...] = (
         # Endpoint OpenAI-compatible của opencode zen, lấy từ cấu hình để có
         # thể trỏ sang endpoint opencode khác.
         base_url_from_settings=True,
+        # OpenCode Zen t?n mi?n phí `space-bunny-free` ch?y KHÔNG c?n khoá.
+        # Khai báo sai là bắt buộc key s? khi?n `ai_service` r? xu?ng fallback gia
+        # ngay c? khi endpoint th?t s? g?i du?c. Key (n?u có) v?n dùng du?c.
+        requires_api_key=False,
         env_key_names=("OPENCODE_API_KEY",),
         aliases=("oc", "zen"),
         extra_headers={"HTTP-Referer": "http://localhost:5173", "X-Title": "MarketFlow AI"},

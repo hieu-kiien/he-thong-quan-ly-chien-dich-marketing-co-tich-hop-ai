@@ -56,8 +56,22 @@ def test_ollama_and_huggingface_do_not_require_api_key():
     assert provider_registry.require_provider("huggingface").requires_api_key is False
 
     # Ngược lại thì vẫn bắt buộc có khoá.
-    for slug in ("gemini", "openai", "anthropic", "openrouter", "opencode"):
+    for slug in ("gemini", "openai", "anthropic", "openrouter"):
         assert provider_registry.require_provider(slug).requires_api_key is True
+
+
+def test_opencode_zen_free_tier_does_not_require_api_key():
+    """OpenCode Zen t?ng mi?n phí ch?y KHÔNG c?n khoá (thi?ng d?ng 2026-10).
+
+    Tr??c day khai báo provider nay la `requires_api_key=True`. H? qu?:
+    `ai_service` r? xu?ng fallback gia TR??C khi c? g?i endpoint, nen trien khai
+    that im lang phuc vu noi dung mau. D? ch?ng endpoint tren VPS voi
+    `POST https://opencode.ai/zen/v1/chat/completions` tra HTTP 200 ma khong
+    can header Authorization.
+    """
+    assert provider_registry.require_provider("opencode").requires_api_key is False
+    # Van phai g?i key neu nguoi dung co (khoa khong lam hong tier mien phi).
+    assert "OPENCODE_API_KEY" in provider_registry.require_provider("opencode").env_key_names
 
 
 def test_registry_slugs_match_config_whitelist_exactly():
