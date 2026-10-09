@@ -143,9 +143,57 @@ và `cloudflare/wrangler.jsonc` đã xoá khỏi repo để không bị tái t�
 
 ### Việc còn lại
 
-- `marketflow-api` đang chạy bằng `User=root`; cần chuyển sang user không đặc quyền.
-- Xoá `/opt/marketflow/.env` trùng thừa (app đọc bản trong `backend/`).
-- Bản sao lưu nằm cùng đĩa với ứng dụng nên không cứu được lỗi phần cứng; cần
-  đẩy lên Cloudflare R2 hoặc tương tự.
-- Bộ giới hạn đăng nhập gắn với IP do Cloudflare gửi trong `X-Forwarded-For`, nên
-  mọi người dùng đều dùng chung một "IP" và dễ khoá nhầm lẫn nhau.
+- Xoá `/opt/marketflow/.env` trùng thừa (app đọc bản trong `backend/`) — **đã xoá**.
+- App chạy bằng `User=root` — **đã chuyển** sang user `marketflow`, không đặc quyền.
+- Bản sao lưu cùng đĩa — **đã thêm** lớp offsite, xem mục cuối.
+- Rate limit gộp mọi người vào một IP — **đã sửa** dùng `CF-Connecting-IP`.
+
+## Sao lưu và cảnh báo (2026-10-09, đã chạy thật)
+
+Phần trên là kế hoạch. Toàn bộ mục việc còn lại đã được xử lý.
+
+### Trên VPS
+
+- Sao lưu PostgreSQL 03:00 hằng ngày qua `/etc/cron.d/marketflow-backup`,
+  script `/usr/local/bin/marketflow-backup`, giữ 7 bản mới nhất.
+- App chạy bằng user hệ thống `marketflow`; file `settings.env` đặt ở
+  `/opt/marketflow/backend/` và chỉ user `marketflow` đọc được.
+- Mỗi lần kéo bản mới, người dùng kiểm tra `pull.log` ở
+  `%USERPROFILE%\marketflow-backups\`; monitor ghi ra `monitor.log` cùng chỗ.
+- Bộ giới hạn đăng nhập dùng `CF-Connecting-IP` (IP thật) do nginx chuyển tiếp,
+  thay vì phần đầu `X-Forwarded-For` chứa IP điểm vào của Cloudflare.
+
+### Ngoài VPS — bản sao lưu thật sự an toàn
+
+Trước đây bản sao lưu chỉ nằm trên cùng đĩa VPS nên **không cứu được lỗi phần
+cứng**. Nay có thêm lớp thứ hai: **máy tính của người vận hành kéo bản về** qua
+`marketflow-pull-backup.ps1` (lịch Windows `MarketFlow-Offsite-Backup`, 04:00 và
+09:00 hằng ngày, giữ 7 phiên bản). Vì VPS không biết địa chỉ máy cá nhân (NAT,
+Windows không có sshd), nên chiều khả thi là **máy cá nhân chủ động kéo**.
+
+Các script (đặt ở `%USERPROFILE%`):
+
+| Script | Vai trò |
+|---|---|
+| `marketflow-pull-backup.ps1` | Yêu cầu VPS tạo bản mới, kéo về, giữ 7 bản |
+| `marketflow-monitor.ps1` | Kiểm tra domain + nội bộ VPS, ghi log, báo hỏng |
+| `marketflow-verify-offsite.ps1` | Phục hồi bản local vào DB tạm trên VPS, so sánh |
+| `marketflow-offsite-verify.sh` | Script tập trung chạy trên VPS |
+| `marketflow-register-backup.ps1` | Đăng ký Task Scheduler |
+
+### Đã kiểm chứng bằng thực thi, không phải giả định
+
+- **Sao lưu trong VPS**: phục hồi vào DB tạm, 20 bảng và 1 user khớp bản gốc.
+- **Sao lưu offsite**: kéo từ VPS về máy cá nhân, giải nén (2332 dòng, 20
+  `CREATE TABLE`), đẩy lên VPS và phục hồi vào DB tạm — kết quả
+  `goc=20 · khoi-phuc=20 · users goc=1 · khoi-phuc=1`. Đã chạy lại hai lần cho
+  chắc, không chỉ một lần may mắn.
+- **Cảnh báo**: `health OK: healthy`, trang chủ 200, VPS nội bộ 200 — kiểm tra
+  cả tầng Cloudflare lẫn tầng VPS để biết lỗi nằm ở đâu.
+
+### Rủi ro còn lại
+
+- Máy cá nhân phải **bật** vào lúc 04:00 hoặc 09:00 mới kéo được; Task có
+  `StartWhenAvailable` nên nếu tắt máy sẽ tự bù trong vòng 2 ngày.
+- Bản local lưu dạng `.sql.gz` trên ổ `C:`. Hỏng ổ `C:` thì mất cả hai lớp.
+  Nếu muốn an toàn tuyệt đối, cần đẩy lên Cloudflare R2 hoặc ổ di động.
