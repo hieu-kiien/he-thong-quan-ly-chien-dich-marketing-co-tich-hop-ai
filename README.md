@@ -8,17 +8,19 @@
 
 | Tầng | Chạy ở đâu | Vai trò |
 |---|---|---|
-| Frontend (static) | Cloudflare Worker — `marketing.kienhieu.id.vn` | Phục vụ file tĩnh, proxy `/api/*`, cron đánh thức scheduler |
-| Backend FastAPI | Render — `marketflow-api-9onk.onrender.com` | Toàn bộ nghiệp vụ và dữ liệu |
-| Database | Postgres (`DATABASE_URL`, gán tay trong Render Dashboard) | Mọi trạng thái nghiệp vụ |
+| Tên miền & TLS | Cloudflare — `marketing.kienhieu.id.vn` | DNS, HTTPS, đẩy traffic qua Tunnel |
+| Frontend (static) + nginx | VPS `/var/www/marketflow` | Phục vụ file tĩnh, proxy `/api/*` |
+| Backend FastAPI | VPS systemd (`marketflow-api`) | Toàn bộ nghiệp vụ, 2 Uvicorn worker |
+| Database | PostgreSQL 16 trên cùng VPS | Mọi trạng thái nghiệp vụ, nghe loopback |
 
-Worker **không** chạy backend và **không** giữ dữ liệu. Nhóm endpoint AI là ngoại
-lệ duy nhất: frontend gọi thẳng Render vì Cloudflare giới hạn ~100 giây trong khi
-lời gọi AI thật đo được 237 giây (`524` nếu đi qua Worker). Chi tiết ở
-[cloudflare/README.md](cloudflare/README.md).
+Toàn bộ ứng dụng nằm trên **một** máy. Cloudflare không còn chạy mã ứng dụng —
+Worker và Pages đã bị gỡ ngày 2026-10-09, cùng Render và Neon. Không còn đường gọi AI
+riêng: mọi request đi cùng một origin, nên không còn giới hạn ~100 giây của Cloudflare
+lẫn việc lộ URL backend trong JavaScript. Lời gọi AI dài đã chuyển sang hàng đợi
+PostgreSQL trả job ID ngay. Chi tiết ở [docs/DEPLOYMENT-VPS.md](docs/DEPLOYMENT-VPS.md).
 
-SQLite chỉ dùng ở local và CI. Production không dùng SQLite vì Render Free tier
-không có persistent disk.
+SQLite chỉ dùng ở local và CI. Production dùng PostgreSQL; sao lưu chạy 03:00 hằng
+ngày và đã được thử khôi phục thật.
 
 ## Dự án giúp ai làm việc gì?
 
@@ -67,9 +69,8 @@ liệu nằm trong [docs/DEPLOYMENT-VPS.md](docs/DEPLOYMENT-VPS.md).
 
 Seed data dành cho local/demo. Không dùng database, mật khẩu mặc định hoặc secret của môi trường thật cho demo công khai hay production. Không ghi credential vào tài liệu hoặc commit.
 
-Trên Render, đặt `SCHEDULER_ENABLED=false` cho backend và để cron của Worker
-đánh thức scheduler mỗi 5 phút. Trên VPS, scheduler chạy trong tiến trình API
-với `SCHEDULER_ENABLED=true`.
+Trên production, scheduler chạy trong tiến trình API với `SCHEDULER_ENABLED=true`.
+Không còn cron của Worker: Worker đã bị gỡ.
 
 ## Kiểm tra chất lượng
 
@@ -107,7 +108,7 @@ Ngoài `.env.example`, ba biến sau ảnh hưởng trực tiếp tới an toàn
 
 | Biến | Mặc định | Vì sao quan trọng |
 | --- | --- | --- |
-| `SCHEDULER_ENABLED` | `true` | Đặt `false` khi chạy trên Render. Scheduler trong tiến trình backend ghi thẳng vào database ngoài HTTP path, nên lịch đăng do Cron Trigger của Worker điều phối (mỗi 5 phút). Bật cả hai cùng lúc sẽ chạy trùng job. |
+| `SCHEDULER_ENABLED` | `true` | Scheduler trong tiến trình backend ghi thẳng vào database ngoài HTTP path, nên lịch đăng do Cron Trigger của Worker điều phối (mỗi 5 phút). Bật cả hai cùng lúc sẽ chạy trùng job. |
 | `SCHEDULER_SECRET` | *(rỗng)* | Dùng Worker gọi `POST /api/v1/schedules/trigger-worker`. Rỗng thì đường gọi bằng secret tắt, endpoint chỉ nhận Bearer token. **Trên Cloudflare đây là secret bắt buộc** (`secrets.required` trong `cloudflare/wrangler.jsonc`): Cron 5 phút/lần sẽ bỏ qua và ghi cảnh báo nếu thiếu. Đặt bằng `wrangler secret put SCHEDULER_SECRET`. |
 | `BYOK_PBKDF2_SALT` | *(tự sinh)* | Salt của khoá vault. Để trống thì ứng dụng tự sinh salt ngẫu nhiên và lưu ở `backend/.vault_salt` (không commit). Chỉ đặt khi hạ tầng cấp secret riêng. |
 
@@ -178,7 +179,7 @@ tự do với vai trò đặc quyền (`MANAGER`, `AGENCY_MANAGER`, `CLIENT_APPR
 
 1. PUBLISHED hiện là trạng thái của hệ thống. Chưa có bằng chứng rằng content đã được gửi và xác nhận từ một nền tảng bên ngoài.
 2. Chỉ số AI/backend trong CI là kết quả của môi trường và workload đã ghi; chúng không chứng minh campaign tạo thêm doanh thu hoặc người dùng tiết kiệm thời gian.
-3. Cloudflare Worker chỉ phục vụ static và proxy; không có cơ chế sao lưu nào ở tầng đó. Toàn bộ dữ liệu nằm ở Postgres phía Render, và ứng dụng dùng `create_all()` chứ không có migration — thêm cột mới ở production cần `ALTER TABLE` thủ công. Cần có quy trình backup/restore được diễn tập trước khi dùng như dịch vụ agency production.
+3. Toàn bộ dữ liệu nằm trong PostgreSQL trên một VPS. Sao lưu chạy 03:00 hằng ngày và đã được thử khôi phục vào database tạm (20 bảng, 1 user, khớp bản gốc) — nhưng **bản sao vẫn nằm trên cùng đĩa với ứng dụng**, nên cứu được lỗi phần mềm chứ không cứu được hỏng phần cứng. Ứng dụng dùng `create_all()` chứ không có migration — thêm cột mới ở production cần `ALTER TABLE` thủ công. VPS là một điểm lỗi duy nhất.
 4. Mọi chỉ số trên giao diện đều đọc từ `CampaignMetric` trong database. Nếu chưa nhập chỉ số thì giao diện hiển thị "chưa có dữ liệu" chứ không tự sinh số ước tính — đây là chủ ý, không phải thiếu sót. Chạy `python backend/seed/seed_data.py` để nạp dữ liệu mẫu. Dữ liệu mẫu được đánh dấu bằng `CampaignMetric.source = 'seed'` và giao diện hiện cảnh báo.
 5. Điểm `compliance_score` của nội dung đa kênh đến từ bộ quét quy tắc từ khoá, không phải chấm điểm của AI; không có Brand Kit thì hiển thị "chưa chấm". Xem [đạo đức AI & giám sát](docs/AI_ETHICS_AND_HUMAN_OVERSIGHT.md).
 6. Bảng so sánh prompt v1/v2/v3 chạy trên stub tất định — đo mức đáp ứng đặc tả, không đo chất lượng văn phong của mô hình thật. Xem [so sánh prompt](docs/PROMPT_VARIANT_COMPARISON.md).

@@ -35,13 +35,16 @@ def _resolve_client_ip(request: Request) -> str:
     # Cloudflare dùng CF-Connecting-IP cho IP thật của client. Phải ưu tiên
     # header này TRƯỚC X-Forwarded-For.
     #
-    # Lý do (sự cố thật khi triển khai qua Cloudflare Tunnel): nginx chỉ forward
-    # X-Forwarded-For và X-Real-IP, KHÔNG forward CF-Connecting-IP. Trong chuỗi
-    # X-Forwarded-For do cloudflared tạo, phần đầu là IP điểm vào của Cloudflare
-    # (một IP chia sẻ cho mọi khách), nên lấy phần đầu khiến MỌI người dùng rơi
-    # vào cùng một bucket rate limit: người này gõ sai mật khẩu vài lần thì mọi
-    # người khác cũng bị khoá. X-Forwarded-For chỉ nên là phương án dự phòng cho
-    # cấu hình không có Cloudflare.
+    # Lý do (sự cố thật khi triển khai qua Cloudflare Tunnel, đã đo trên VPS):
+    # X-Forwarded-For KHÔNG ổn định — cùng một client quan sát được cả IP thật lẫn
+    # IP điểm vào dùng chung của Cloudflare (`2001:470:...`) tuỳ lúc. Đọc phần đầu
+    # chuỗi XFF vì vậy gộp nhiều người dùng vào một bucket rate limit: một người gõ
+    # sai mật khẩu vài lần thì mọi người khác cũng bị khoá. CF-Connecting-IP luôn là
+    # IP client thật, đã kiểm chứng qua tunnel (171.229.242.250 khớp IP thật).
+    #
+    # Lưu ý triển khai: nginx phải forward header này (proxy_set_header
+    # CF-Connecting-IP $http_cf_connecting_ip) — nếu không, header không tới app.
+    # X-Forwarded-For chỉ là phương án dự phòng cho hạ tầng không có Cloudflare.
     cf_ip = (request.headers.get("cf-connecting-ip") or "").strip()
     if cf_ip:
         return cf_ip

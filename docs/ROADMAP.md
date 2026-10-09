@@ -1,9 +1,9 @@
 # Lộ trình dài hạn MarketFlow AI
 
 **Loại tài liệu:** Đề xuất định hướng; chưa phải cam kết lịch phát hành.
-**Trạng thái mã nguồn:** mô tả theo trạng thái hiện tại trên `main` (FastAPI trên Render
-+ Cloudflare Worker làm static/proxy). Xem `git log -1` trên commit sửa tài liệu này
-để biết baseline chính xác.
+**Trạng thái mã nguồn:** mô tả theo trạng thái hiện tại trên `main` (FastAPI + PostgreSQL
++ nginx trên một VPS; Cloudflare chỉ giữ DNS/CDN/Tunnel). Xem `git log -1` trên commit
+sửa tài liệu này để biết baseline chính xác.
 **Nguồn định hướng:** [Nghiên cứu đối thủ](https://chatgpt.com/share/6abb25a6-2328-83ec-8402-0038059a95a2), [đánh giá dự án và vấn đề người dùng](https://chatgpt.com/share/6aba47a2-feb0-83ec-a47f-16757fd55d17), cùng mã nguồn và CI hiện tại.
 
 > **Ghi chú lịch sử.** Các mục cũ trong bản trước nói "Worker tuần tự hoá write và
@@ -11,6 +11,10 @@
 > thực". Cả hai **không còn đúng**: tài khoản không có Workers Paid plan nên
 > containers không deploy được (Cloudflare trả 401), và kiến trúc hiện tại là
 > Postgres trên Render. Các mục đó đã được sửa ở bên dưới.
+>
+> **Cập nhật 2026-10-09:** hạ tầng đã gộp về một VPS; Render, Neon và Cloudflare
+> Worker đã bị gỡ. Bảng hạ tầng ở bên dưới được cập nhật theo hiện trạng; phần còn
+> lại của ROADMAP là kế hoạch sản phẩm và không phụ thuộc hạ tầng cũ.
 
 ## 1. Tóm tắt quyết định
 
@@ -47,7 +51,9 @@ Các trạng thái được dùng trong tài liệu này:
 | Nhiều nhà cung cấp AI | Đã hiện thực; có kiểm thử (mock, không gọi mạng) | Registry tại `providers.py`; adapter Anthropic; Ollama/HuggingFace không bắt buộc khoá. |
 | So sánh 3 phiên bản prompt | Đã hiện thực; chỉ đo đặc tả trên stub | [PROMPT_VARIANT_COMPARISON.md](PROMPT_VARIANT_COMPARISON.md). |
 | Cơ chế đạo đức & giám sát | Đã hiện thực; có tài liệu và test ràng buộc tài liệu | [AI_ETHICS_AND_HUMAN_OVERSIGHT.md](AI_ETHICS_AND_HUMAN_OVERSIGHT.md). |
-| Lưu trữ triển khai | Postgres trên Render | Cloudflare Worker chỉ phục vụ static và proxy `/api/*`; không giữ dữ liệu. Xem [ARCHITECTURE.md](ARCHITECTURE.md) mục 1. |
+| Lưu trữ triển khai | PostgreSQL trên VPS, Cloudflare chỉ DNS/Tunnel | Mọi ứng dụng trên một máy; không còn mã Worker. Xem [DEPLOYMENT-VPS.md](DEPLOYMENT-VPS.md). |
+| Circuit breaker AI | Đã hiện thực; có kiểm thử | `backend/app/services/ai/circuit_breaker.py`; 3 lỗi liên tiếp thì ngắt, 60s sau thử lại. |
+| IP thật cho rate limit | Đã hiện thực; đã đo qua tunnel | `CF-Connecting-IP` được nginx forward và app ưu tiên trước `X-Forwarded-For`. |
 
 CI xanh chứng minh các gate đã chạy đạt ở commit tương ứng; điều đó không thay thế thử nghiệm usability, pilot, hay xác nhận độ bền lưu trữ dưới tải thật. Báo cáo AI hiện là benchmark có tập mẫu hữu hạn, không phải cam kết tổng quát về chất lượng mọi đầu ra.
 
