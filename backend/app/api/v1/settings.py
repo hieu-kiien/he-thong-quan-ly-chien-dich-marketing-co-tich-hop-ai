@@ -17,6 +17,7 @@ from app.schemas.schemas import (
 )
 from app.core.crypto import encrypt_api_key, decrypt_api_key, mask_api_key
 from app.services.ai import providers as provider_registry
+from app.services.email_service import email_service
 
 router = APIRouter(prefix="/settings", tags=["Cài đặt Doanh nghiệp & Custom AI Key (BYOK)"])
 
@@ -561,3 +562,20 @@ def toggle_custom_ai_key_active(
         updated_at=key_record.updated_at,
         status="ACTIVE" if key_record.is_active else "INACTIVE"
     )
+
+@router.get("/email-status")
+def get_email_status(current_user: User = Depends(get_current_user)):
+    """Cho biet hệ thống có gửi được email thật không.
+
+    Mục đích: tránh tình trạng UI nói "đã gửi email" trong khi thật ra không có
+    provider nào được cấu hình. Endpoint nói rõ trạng thái thật để frontend hiển
+    thị "chưa cấu hình email" thay vì hứa hẹn.
+
+    KHÔNG trả về API key hay mật khẩu SMTP — chỉ trả trạng thái và lý do.
+    """
+    return {
+        "enabled": email_service.is_enabled,
+        "provider": email_service.provider,
+        "from_address": email_service.from_address,
+        "reason": email_service._config_problem(),
+    }

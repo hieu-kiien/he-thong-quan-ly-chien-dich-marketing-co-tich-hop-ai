@@ -102,6 +102,24 @@ class Settings(BaseSettings):
     # Trần token đầu ra cho adapter Anthropic. Chỉ có tác dụng khi
     # AI_PROVIDER=anthropic; xem app/services/ai/anthropic_adapter.py.
     ANTHROPIC_MAX_TOKENS: int = 8192
+
+    # --- Email (tùy chọn) ---
+    # Email KHÔNG phải phần bắt buộc: không cấu hình được gửi thì mọi luồng
+    # nghiệp vụ vẫn chạy, chỉ việc gửi thông báo là không diễn ra. Mặc định
+    # `none` để không có ai vô tình gửi email khóa học/demo ra ngoài.
+    EMAIL_PROVIDER: str = "none"  # none | resend | smtp
+    EMAIL_FROM_ADDRESS: str = ""
+    EMAIL_FROM_NAME: str = "MarketFlow AI"
+    # Resend (khuyến nghị): lấy API key tại resend.com/api-keys
+    RESEND_API_KEY: str = ""
+    # SMTP thông thường. Gmail cần dùng "mật khẩu ứng dụng", không phải
+    # mật khẩu đăng nhập thường.
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_USE_TLS: bool = True
+
     # Ghi đè base URL của provider chạy cục bộ.
     #
     # Cố ý dùng tiền tố `MARKETFLOW_`. Biến `ANTHROPIC_BASE_URL` /

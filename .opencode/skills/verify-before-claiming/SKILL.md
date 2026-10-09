@@ -97,6 +97,19 @@ báo như thể đã xong. Sửa lại rồi mới báo là chuỗi hai lần "�
 Khi thêm cấu hình tạm để đo (location probe, log_format, header thử), **xoá và xác
 nhận đã xoá** trong cùng lượt. Đừng để lại cấu hình đo trong production.
 
+### 7. Biết trước cái bẫy của công cụ mình đang dùng
+
+Lỗi này đã xảy ra thật khi thêm endpoint email: `Set-Content -Encoding UTF8` của
+PowerShell 5.1 ghi thêm **BOM** (3 byte `EF BB BF`) vào đầu file. Python từ chối
+parse với `SyntaxError: invalid non-printable character U+FEFF`. File nhìn bình
+thường, chỉ có test đọc bằng `ast.parse` mới lộ ra.
+
+Tương tự, `"$file.FullName"` trong chuỗi nháy kép là **chữ literal**, không truy
+cập được property — phải viết `$($file.FullName)` hoặc gán vào biến trước.
+
+Không dùng cách đã từng làm hỏng file. Kiểm tra bằng `py_compile` (và cả test đọc
+`ast`) trước khi commit.
+
 ## Trước khi commit hoặc deploy
 
 - [ ] Mọi lệnh trong script đã chạy hết, không bị `set -e` cắt im lặng?
