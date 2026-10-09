@@ -1,0 +1,23 @@
+[Unit]
+Description=MarketFlow FastAPI service
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=marketflow
+Group=marketflow
+WorkingDirectory=/opt/marketflow/backend
+EnvironmentFile=/etc/marketflow/api.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/marketflow/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

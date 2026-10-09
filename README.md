@@ -57,13 +57,19 @@ Tại thư mục gốc:
 
     docker compose up -d --build
 
-Giao diện local: http://localhost
+Giao diện local: http://localhost:3000
+
+### Triển khai native trên VPS
+
+VPS production chạy PostgreSQL, FastAPI, Nginx và Cloudflare Tunnel dưới các
+dịch vụ hệ thống. Kế hoạch cấu hình, giới hạn tài nguyên và quy trình chuyển dữ
+liệu nằm trong [docs/DEPLOYMENT-VPS.md](docs/DEPLOYMENT-VPS.md).
 
 Seed data dành cho local/demo. Không dùng database, mật khẩu mặc định hoặc secret của môi trường thật cho demo công khai hay production. Không ghi credential vào tài liệu hoặc commit.
 
-Trên production, nhớ đặt `SCHEDULER_ENABLED=false` cho backend (xem mục *Biến môi
-trường đáng chú ý* bên dưới) và để cron của Worker đánh thức scheduler mỗi 5 phút —
-nếu không, lịch đăng sẽ không bao giờ chạy.
+Trên Render, đặt `SCHEDULER_ENABLED=false` cho backend và để cron của Worker
+đánh thức scheduler mỗi 5 phút. Trên VPS, scheduler chạy trong tiến trình API
+với `SCHEDULER_ENABLED=true`.
 
 ## Kiểm tra chất lượng
 
