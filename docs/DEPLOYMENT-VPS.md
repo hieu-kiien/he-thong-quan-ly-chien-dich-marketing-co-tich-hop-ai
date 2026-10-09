@@ -229,11 +229,77 @@ Cloudflare gửi tới, dùng để kiểm chứng IP thật khi nghi ngờ rate
 
 ### Việc còn dở
 
-- **TLS 1.3**: TLS kết thúc tại Cloudflare edge chứ không tại VPS (nginx chỉ
-  nghe loopback). Mức tối thiểu đang là 1.2; cần đặt thành 1.3 trong Cloudflare
-  Dashboard → SSL/TLS → Edge Certificates. Không cần sửa gì trên máy chủ.
+- **TLS 1.3 đã có sẵn**, không phải việc còn dở. TLS kết thúc tại Cloudflare
+  edge chứ không tại VPS (nginx chỉ nghe loopback). Kiểm chứng bằng
+  `openssl s_client -tls1_3`: bắt tay ra `TLSv1.3, TLS_AES_256_GCM_SHA384`.
+  Dashboard đặt mức tối thiểu là 1.2 — nên giữ nguyên, nâng lên 1.3 chỉ chặn
+  client cũ mà không được lợi ích gì thêm vì bản 1.3 đã được chọn thật.
 - **`marketflow-api.service` trong repo vẫn là bản mẫu đã lệch**: thực tế chạy
   `--workers 2 --timeout-keep-alive 75`, env ở `/opt/marketflow/backend/.env`,
   không dùng `--proxy-headers`. Chưa đồng bộ vì chưa cần dựng lại máy chủ; nếu
   giữ repo làm nguồn dựng lại thì phải sửa cùng đợt.
-- Chưa đo Lighthouse / Core Web Vitals; đo sau khi có trang có dữ liệu thật.
+- **Resend**: code xong (`EMAIL_PROVIDER=resend`, `RESEND_API_KEY`,
+  `EMAIL_FROM_ADDRESS`), đang đặt `none`. Cần người vận hành tạo key ở
+  resend.com và xác thực domain gửi, rồi dán biến vào `/opt/marketflow/backend/.env`
+  trên VPS và khởi động lại `marketflow-api`.
+
+## Đo Lighthouse / Core Web Vitals (2026-10-10)
+
+Đo bằng Chrome DevTools MCP trên trang chủ, desktop, không bóp CPU/mạng. Hệ
+thống chưa có dữ liệu CrUX thật nên con số dưới đây là **lab**, đo từ máy vận
+hành ở Việt Nam.
+
+### Điểm
+
+| Chỉ số | Giá trị | Ngưỡng | Kết luận |
+| --- | --- | --- | --- |
+| LCP | 1.769 ms | < 2.5 s | Tốt |
+| CLS | 0,00 | < 0,1 | Tốt |
+| TTFB | 210 ms | < 800 ms | Tốt |
+| Lighthouse a11y | 96 | — | Tốt |
+| Lighthouse best-practices | 77 | — | Cần xem |
+| Lighthouse SEO | 82 | — | Cần xem |
+
+LCP gồm TTFB 210 ms + độ trễ render 1.559 ms. Độ trễ render chiếm 88 % và là
+chi phí tất yếu của SPA: phải tải và chạy xong React mới vẽ được chữ đầu tiên.
+Cách giảm là bớt JS phải chạy trước khi vẽ, không phải sửa nginx.
+
+### Phát hiện, xếp theo mức đáng sửa
+
+1. **`/robots.txt`, `/sitemap.xml`, `/favicon.ico` trả về trang HTML.** Nginx
+   `location /` đẩy mọi đường dẫn thiếu về `index.html`, nên bot xin
+   `robots.txt` nhận nguyên trang HTML (trạng thái 200,
+   `content-type: text/html`) — Lighthouse báo *robots.txt is not valid, 21
+   errors*. Mọi URL vô nghĩa cũng trả 200 HTML thay vì 404, làm bẩn dữ liệu
+   crawl. Cách sửa: đặt `robots.txt` thật vào `frontend/public/` và cho nginx
+   trả 404 cho `.txt`/`.xml`/`.ico` thay vì fallback về SPA.
+2. **Không có `meta description`.** Trang chủ chỉ có `<title>`. Thêm một thẻ
+   mô tả khoảng 150 ký tự là xong việc này.
+3. **Nhiều API bị gọi trùng trên một lần tải trang**: `/campaigns` 4 lần,
+   `/analytics/dashboard` 5 lần, `/contents` 5 lần. Các component tự fetch
+   không dùng cache chung nên cứ vào trang là dội lại hết. Trên VPS 2 vCPU việc
+   này cộng thêm tải thật; phía UI cũng phải hiện skeleton lâu hơn. Cách sửa:
+   một query cache dùng chung (React Query với `staleTime`, hoặc context giữ
+   kết quả) để các component đọc lại thay vì tự gọi.
+4. **Google Fonts chặn render và là bên thứ ba.** `<link>` tới
+   `fonts.googleapis.com` nằm trong `<head>` nên chặn vẽ đầu tiên; sau đó còn
+   3 file woff2 từ `fonts.gstatic.com`. Trang chỉ cần tiếng Việt và latin — tự
+   host hai subset đó rồi `preload` sẽ bỏ được cả lối tắt DNS/TLS sang bên thứ
+   ba, và cache 30 ngày qua `assets/` luôn. Tách subset xong còn bỏ được
+   cyrillic-ext chưa ai dùng.
+5. **Cloudflare đang trả gzip chứ không phải brotli.** Request từ Chrome có
+   `accept-encoding: br` nhưng phản hồi vẫn `content-encoding: gzip` vì nginx
+   đã nén từ đầu và Cloudflare chỉ chuyển tiếp bản đã nén. Nếu bỏ gzip ở nginx,
+   Cloudflare sẽ nén lại bằng brotli (nhỏ hơn gzip khoảng 15–20 %) và VPS đỡ
+   tốn CPU nén. Cần đo trước khi đổi để chắc Cloudflare thật sự nén lại response
+   đi qua tunnel — **chưa làm**, chỉ ghi lại lựa chọn này. Gzip ở nginx vẫn giữ
+   nguyên trong repo cho tới khi có quyết định.
+6. **Dữ liệu mẫu nằm trong bundle production.** Các hằng `MOCK_CAMPAIGNS`,
+   `MOCK_CHANNEL_ATTRIBUTION` trong `frontend/src/services/mockData.ts` nằm
+   trong `index-*.js` phục vụ mọi lượt vào trang. Nếu chỉ là dự phòng khi API
+   lỗi/offline, nên tách sang import động để first-load khỏi tải.
+7. Nặng nhỏ còn lại: `LegacyJavaScript` 10,6 kB code hỗ trợ trình duyệt cũ;
+   favicon vẫn là `/vite.svg` mặc định của Vite.
+
+Lỗi `errors-in-console` mà Lighthouse bắt được là `chrome-extension://invalid/`
+— lỗi của extension trong máy vận hành, không phải của trang.
