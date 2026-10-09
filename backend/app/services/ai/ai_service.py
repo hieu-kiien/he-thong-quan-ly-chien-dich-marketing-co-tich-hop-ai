@@ -364,6 +364,13 @@ class AIService:
             url = f"{base_url}/chat/completions"
             headers = {
                 "Content-Type": "application/json",
+                # Bắt buộc: httpx mặc định gửi User-Agent kiểu "python-httpx/x.y.z".
+                # Cloudflare chặn User-Agent tự động với lỗi 403 "error code: 1010",
+                # khiến provider thật (OpenCode Zen, OpenAI, OpenRouter...) trả lỗi
+                # và request rơi xuống fallback giả. Phải luôn gửi UA nhận diện.
+                "User-Agent": getattr(
+                    settings, "AI_HTTP_USER_AGENT", "marketflow-backend/1.0 (+https://marketing.kienhieu.id.vn)"
+                ),
             }
             if key_to_use:
                 # Provider không cần khoá (Ollama) sẽ không nhận header này:
@@ -388,7 +395,16 @@ class AIService:
                         data = resp.json()
                         if spec.protocol == provider_registry.PROTOCOL_ANTHROPIC:
                             return anthropic_adapter.extract_text(data)
-                        return data["choices"][0]["message"]["content"]
+                        content = (data["choices"][0].get("message") or {}).get("content")
+                        if content is None or str(content).strip() == "":
+                            # Reasoning model có thể hết token cho reasoning_content và
+                            # trả content rỗng. Phải coi là lỗi để thử lại, tuyệt đối
+                            # không trả None ra ngoài (sẽ rơi xuống fallback giả lặng lẽ).
+                            raise RuntimeError(
+                                "AI Provider trả về nội dung rỗng "
+                                "(có thể hết token cho reasoning)"
+                            )
+                        return content
                     elif resp.status_code == 429:
                         time.sleep(1.0 * (attempt + 1))
                         continue
