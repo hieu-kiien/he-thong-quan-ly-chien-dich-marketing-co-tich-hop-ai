@@ -16,7 +16,7 @@ gian chờ mô hình chiếm ưu thế hơn CPU của VPS.
 
 - PostgreSQL 16.15 chỉ nghe trên loopback; không mở cổng 5432 ra Internet.
 - FastAPI chạy dưới tài khoản hệ thống `marketflow`, nghe tại `127.0.0.1:8000`
-  và chỉ có một Uvicorn worker.
+  (2 Uvicorn worker trên máy thật, xem mục trạng thái bên dưới).
 - Nginx phục vụ frontend tĩnh và proxy `/api/` tới FastAPI; Nginx chỉ nghe trên
   `127.0.0.1:8080`.
 - Cloudflare Tunnel được quản lý trong Cloudflare Dashboard và trỏ
@@ -24,9 +24,11 @@ gian chờ mô hình chiếm ưu thế hơn CPU của VPS.
   API dùng chung hostname, nên không cần cấu hình CORS cho API hostname riêng.
 - Frontend được build thành file tĩnh. Node không cần chạy sau khi build.
 
-File API service mẫu ở `deploy/vps/`. Nó giả định source ở `/opt/marketflow`,
-frontend đã build ở `/srv/marketflow/frontend`, và env production ở
-`/etc/marketflow/api.env` với quyền chỉ root đọc.
+File trong `deploy/vps/` là **bản chép nguyên từ máy chủ thật**, không phải bản
+mẫu giả định đường dẫn. Nó dùng source `/opt/marketflow`, giao diện đã build ở
+`/var/www/marketflow`, env production `/opt/marketflow/backend/.env` (quyền 600,
+chỉ user `marketflow` đọc) và nginx nghe `127.0.0.1:8080`. Dựng lại VPS từ repo
+sao chép trực tiếp các file này là có đúng cấu hình đang chạy.
 
 ## Giới hạn tài nguyên
 
@@ -197,3 +199,41 @@ Các script (đặt ở `%USERPROFILE%`):
   `StartWhenAvailable` nên nếu tắt máy sẽ tự bù trong vòng 2 ngày.
 - Bản local lưu dạng `.sql.gz` trên ổ `C:`. Hỏng ổ `C:` thì mất cả hai lớp.
   Nếu muốn an toàn tuyệt đối, cần đẩy lên Cloudflare R2 hoặc ổ di động.
+
+## Đồng bộ nginx và nén (2026-10-10)
+
+### Lỗi 404 ở `/assets/` — nguyên nhân thật
+
+Mọi file dưới `/assets/` trả 404 khiến trang mở không ra giao diện. Nghi vấn đầu
+tiên là `try_files`, nhưng nginx không phải thủ phạm: thư mục assets đang chế độ
+không cho user `www-data` đọc. Sửa bằng `chmod 755` cho cả `/var/www/marketflow`
+và `/var/www/marketflow/assets`.
+
+Bài học được ghi vào repo: file nginx trong git trước đó chỉ là bản mẫu chưa
+từng chạy — giả định `/srv/marketflow/frontend`, timeout 120s, thiếu cả
+`CF-Connecting-IP`. Dựng lại VPS từ bản đó sẽ tái xuất hiện lỗi vừa sửa. File
+trong `deploy/vps/` nay là bản chép nguyên từ máy chủ, các điểm khác biệt so với
+bản mẫu cũ đều có lý do:
+
+| Khác biệt | Vì sao |
+| --- | --- |
+| `upstream` + `keepalive 8` | Tái dùng kết nối tới FastAPI, đỡ TCP handshake mỗi request |
+| `proxy_read_timeout 600s` | Tác vụ AI chạy 80–240 giây; bản mẫu 120s sẽ cắt ngang job |
+| `CF-Connecting-IP` / `CF-IPCountry` | App và giới hạn đăng nhập cần IP thật, không phải IP Cloudflare |
+| `expires 30d` + `try_files` trong `/assets/` | Cache file có hash trong tên; 404 đúng khi file thật sự không có |
+| `gzip` cho `text/*`, JSON, SVG | JS ~138 KB + CSS ~95 KB nén còn ~70 KB tổng |
+| `location /health` | Health độc lập, không lẫn với route `/api/` |
+
+Thêm `deploy/vps/nginx-mf-probe.conf` — vhost `127.0.0.1:8099` in ra header
+Cloudflare gửi tới, dùng để kiểm chứng IP thật khi nghi ngờ rate limit.
+
+### Việc còn dở
+
+- **TLS 1.3**: TLS kết thúc tại Cloudflare edge chứ không tại VPS (nginx chỉ
+  nghe loopback). Mức tối thiểu đang là 1.2; cần đặt thành 1.3 trong Cloudflare
+  Dashboard → SSL/TLS → Edge Certificates. Không cần sửa gì trên máy chủ.
+- **`marketflow-api.service` trong repo vẫn là bản mẫu đã lệch**: thực tế chạy
+  `--workers 2 --timeout-keep-alive 75`, env ở `/opt/marketflow/backend/.env`,
+  không dùng `--proxy-headers`. Chưa đồng bộ vì chưa cần dựng lại máy chủ; nếu
+  giữ repo làm nguồn dựng lại thì phải sửa cùng đợt.
+- Chưa đo Lighthouse / Core Web Vitals; đo sau khi có trang có dữ liệu thật.
