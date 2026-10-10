@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Sparkles, ArrowRight, ShieldCheck, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react';
 import { getApiErrorMessage, isOfflineDemoEnabled } from '../services/api';
+import { startHalloweenScene } from '../features/halloween-login';
+import '../features/halloween-login/halloween.css';
 
 interface LoginPageProps {
   onNavigateToRegister: () => void;
@@ -13,6 +14,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToRegister }) =>
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const teardown = startHalloweenScene();
+    return teardown;
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,12 +38,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToRegister }) =>
     }
   };
 
-  const handleQuickLogin = (quickEmail: string, quickPass: string) => {
-    setEmail(quickEmail);
-    setPassword(quickPass);
-    setError(null);
-  };
-
   // Khoi nhanh chon tai khoan seed KHONG duoc render o moi truong.
   //
   // Ly do: Vite bake bien moi truong vao bundle tai `npm run build`. Neu khoi nay
@@ -47,146 +47,153 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToRegister }) =>
   const showQuickLogin = isOfflineDemoEnabled();
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4 relative overflow-hidden font-sans text-slate-100">
-      {/* Background Glow */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-gradient-to-tr from-indigo-600/20 via-violet-600/20 to-pink-500/10 blur-[120px] pointer-events-none rounded-full" />
-
-      <div className="w-full max-w-md relative z-10">
-        {/* Brand Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-500 via-indigo-600 to-violet-600 shadow-xl shadow-indigo-500/20 mb-4 border border-indigo-400/30">
-            <Sparkles className="w-7 h-7 text-white" />
-          </div>
-          <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
-            MarketFlow AI
-          </h1>
-          <p className="text-sm text-slate-400 mt-2">
-            Nền tảng Điều phối Tiếp thị Tinh gọn & Quản trị Đa Workspace
-          </p>
+    <div className="halloween-login-root">
+      {/* Cảnh nền full màn hình */}
+      <div className="landscape-scene page-landscape" aria-hidden="true">
+        <img className="scene-land scene-day" src="/halloween/images/background-day.svg" alt="" />
+        <img className="scene-land scene-night" src="/halloween/images/background-night.svg" alt="" />
+        <div className="sky-flight" aria-hidden="true">
+          {[1, 2, 3, 4, 5, 6].map((n) => (
+            <span key={n} className={`sky-bat bat-${n}`}>
+              <span className="flyer-facing">
+                <span data-svg="images/bat.svg" aria-hidden="true" />
+              </span>
+            </span>
+          ))}
+          <span className="sky-witch">
+            <span className="flyer-facing">
+              <img src="/halloween/images/witch.svg" alt="" width={3600} height={3400} draggable={false} />
+            </span>
+          </span>
         </div>
+      </div>
 
-        {/* Card */}
-        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-2xl shadow-black/50">
-          <h2 className="text-xl font-bold text-white mb-2">Đăng nhập tài khoản</h2>
-          <p className="text-xs text-slate-400 mb-6">
-            Nhập thông tin xác thực để truy cập không gian làm việc của bạn
-          </p>
-
-          {error && (
-            <div className="mb-5 p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-start gap-2.5 text-rose-400 text-sm">
-              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-rose-400" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="login-email" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                Email doanh nghiệp
-              </label>
-              <div className="relative">
-                <Mail className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                <input
-                  id="login-email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  inputMode="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@agency.com"
-                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl pl-11 pr-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
-                  required
-                />
+      <div className="login-shell">
+        <div className="halloween-vines" id="halloween-vines" aria-hidden="true" />
+        <main className="login-card" aria-labelledby="login-title">
+          <section className="scene-panel" aria-labelledby="welcome-title">
+            <div className="landscape-scene" aria-hidden="true">
+              <div className="scene-sky-objects">
+                <div className="scene-sun" />
+                <div className="scene-moon" />
+              </div>
+              <img className="scene-land scene-day" src="/halloween/images/panel-day.svg" alt="" />
+              <img className="scene-land scene-night" src="/halloween/images/panel-night.svg" alt="" />
+              <div className="sky-flight" aria-hidden="true">
+                {[1, 2, 3].map((n) => (
+                  <span key={n} className={`sky-bat bat-${n}`}>
+                    <span className="flyer-facing">
+                      <span data-svg="images/bat.svg" aria-hidden="true" />
+                    </span>
+                  </span>
+                ))}
               </div>
             </div>
+            <div className="summit-stage" aria-hidden="true" />
+            <button className="theme-toggle" id="theme-toggle" type="button" aria-pressed="false" aria-label="Bật đêm Halloween">
+              <span className="theme-toggle-thumb" aria-hidden="true" />
+              <span data-svg="images/icon-sun.svg" aria-hidden="true" />
+              <span data-svg="images/icon-moon.svg" aria-hidden="true" />
+            </button>
+            <div className="scene-copy">
+              <h2 id="welcome-title">Không gian của bạn</h2>
+              <p>
+                Đăng nhập để điều phối chiến dịch marketing, phê duyệt nội dung AI và theo dõi hiệu quả
+                từ một nơi duy nhất.
+              </p>
+            </div>
+          </section>
 
-            <div>
-              <label htmlFor="login-password" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                Mật khẩu
-              </label>
-              <div className="relative">
-                <Lock className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+          <section className="form-panel">
+            <form className="login-form" id="login-form" onSubmit={handleSubmit}>
+              <h1 id="login-title">Đăng nhập</h1>
+              <div className="field">
+                <label className="sr-only" htmlFor="email">
+                  Email
+                </label>
                 <input
-                  id="login-password"
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="Email"
+                  autoComplete="username"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+                <div className="email-owl" id="email-owl" aria-hidden="true">
+                  <span data-svg="images/owl.svg" aria-hidden="true" />
+                </div>
+              </div>
+              <div className="field password">
+                <label className="sr-only" htmlFor="password">
+                  Mật khẩu
+                </label>
+                <input
+                  id="password"
                   name="password"
                   type="password"
+                  placeholder="Mật khẩu"
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl pl-11 pr-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
                   required
                 />
+                <button className="eye" id="show-password" type="button" aria-label="Hiện mật khẩu" aria-pressed="false" aria-controls="password">
+                  <img src="/halloween/images/icon-eye.svg" alt="" width={18} height={18} />
+                </button>
               </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full mt-2 py-3 px-4 bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Đang xác thực...</span>
-                </>
-              ) : (
-                <>
-                  <span>Đăng nhập hệ thống</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
+              {error && (
+                <p className="status status-error" id="status" role="alert">
+                  {error}
+                </p>
               )}
-            </button>
-          </form>
 
-          {/* Quick-chips for testing. Chi bat o moi co du lieu mau (xem showQuickLogin). */}
-          {showQuickLogin && (
-          <div className="mt-6 pt-5 border-t border-slate-800/80">
-            <p className="text-xs font-medium text-slate-400 mb-3 flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              Chọn nhanh tài khoản kiểm thử chuẩn:
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('manager@gmail.com', 'Manager@123')}
-                className="py-1.5 px-2 bg-slate-800/70 hover:bg-slate-800 hover:border-indigo-500/50 border border-slate-700/60 rounded-lg text-xs font-medium text-slate-200 transition-all text-center"
-              >
-                Manager
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('marketer@gmail.com', 'Marketer@123')}
-                className="py-1.5 px-2 bg-slate-800/70 hover:bg-slate-800 hover:border-indigo-500/50 border border-slate-700/60 rounded-lg text-xs font-medium text-slate-200 transition-all text-center"
-              >
-                Marketer
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('approver@gmail.com', 'Approver@123')}
-                className="py-1.5 px-2 bg-slate-800/70 hover:bg-slate-800 hover:border-indigo-500/50 border border-slate-700/60 rounded-lg text-xs font-medium text-slate-200 transition-all text-center"
-              >
-                Approver
-              </button>
-            </div>
-          </div>
-          )}
-        </div>
+              {/* Trạng thái chờ: giữ nguyên vùng aria-live để người dùng biết đang xử lý. */}
+              <p className={error ? 'sr-only' : 'status'} role="status" aria-live="polite">
+                {isLoading ? 'Đang xác thực...' : ''}
+              </p>
 
-        {/* Footer switch to register */}
-        <div className="text-center mt-6">
-          <p className="text-sm text-slate-400">
-            Chưa có tài khoản?{' '}
-            <button
-              type="button"
-              onClick={onNavigateToRegister}
-              className="text-indigo-400 hover:text-indigo-300 font-semibold transition-colors underline-offset-4 hover:underline"
-            >
-              Đăng ký tài khoản mới
-            </button>
-          </p>
-        </div>
+              <button className="submit" type="submit" disabled={isLoading}>
+                <span>{isLoading ? 'Đang xác thực...' : 'Đăng nhập'}</span>{' '}
+                <img src="/halloween/images/icon-arrow.svg" alt="" width={17} height={17} />
+              </button>
+              <p className="signup-row">
+                <span>Bạn chưa có tài khoản?</span>{' '}
+                <button className="text-action" type="button" onClick={onNavigateToRegister}>
+                  Đăng ký
+                </button>
+              </p>
+
+              {showQuickLogin && (
+                <div className="quick-login">
+                  <p>Chọn nhanh tài khoản kiểm thử:</p>
+                  <div className="quick-login-grid">
+                    <button type="button" onClick={() => { setEmail('manager@gmail.com'); setPassword('Manager@123'); }}>
+                      Manager
+                    </button>
+                    <button type="button" onClick={() => { setEmail('marketer@gmail.com'); setPassword('Marketer@123'); }}>
+                      Marketer
+                    </button>
+                    <button type="button" onClick={() => { setEmail('approver@gmail.com'); setPassword('Approver@123'); }}>
+                      Approver
+                    </button>
+                  </div>
+                </div>
+              )}
+            </form>
+          </section>
+        </main>
+      </div>
+
+      <canvas id="halloween-spider" aria-hidden="true" />
+      <div className="flash-beam" id="flash-beam" aria-hidden="true" />
+      <div className="password-reveal" id="password-reveal" aria-hidden="true">
+        <span id="reveal-text" />
+      </div>
+      <div className="flashlight" id="flashlight" aria-hidden="true">
+        <img src="/halloween/images/flashlight.svg" alt="" width={33} height={33} />
       </div>
     </div>
   );

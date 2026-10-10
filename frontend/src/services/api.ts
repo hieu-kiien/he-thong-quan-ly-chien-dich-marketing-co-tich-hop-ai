@@ -286,9 +286,12 @@ export const getApiErrorMessage = (error: any): string => {
   if (quota) return quota.message;
   if (!error?.response) {
     if (error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')) {
-      return 'Máy chủ backend (Render) đang khởi động lại (cold start) hoặc phản hồi quá thời gian chờ (60s). Vui lòng thử lại sau giây lát.';
+      return 'Máy chủ backend không phản hồi trong thời gian chờ (60s). Vui lòng thử lại sau giây lát.';
     }
-    return 'Không thể kết nối đến máy chủ backend. Máy chủ (Render) có thể đang ngủ đông hoặc khởi động lại. Vui lòng thử lại sau 30-50 giây.';
+    return 'Không thể kết nối đến máy chủ backend. Máy chủ có thể đang khởi động lại. Vui lòng thử lại sau 30-50 giây.';
+  }
+  if (error?.response?.status >= 500) {
+    return 'Máy chủ backend đang gặp sự cố (lỗi 5xx). Vui lòng thử lại sau ít phút.';
   }
   if (error?.response?.data?.detail) {
     const detail = error.response.data.detail;

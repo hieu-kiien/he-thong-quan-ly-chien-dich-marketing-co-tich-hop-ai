@@ -72,24 +72,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [endSession, toast]);
 
   const login = useCallback(async (email: string, password: string): Promise<void> => {
-    setIsLoading(true);
-    try {
-      const res = await authApi.login(email, password);
-      setUser(res.user);
-    } finally {
-      setIsLoading(false);
-    }
+    // CỐ Ý KHÔNG bật `isLoading` của context.
+    //
+    // `isLoading` là cờ "đang xác minh phiên lúc mở app" — App.tsx dùng nó để
+    // giữ màn hình chờ và THÁO LoginPage khỏi cây React. Nếu `login()` cũng bật
+    // cờ này, thì ngay lúc bấm đăng nhập LoginPage bị unmount: chữ đã gõ biến
+    // mất, thông báo lỗi không kịp hiện, và cảnh ở `useEffect` phải dựng lại.
+    // Trang đăng nhập/đăng ký tự theo dõi trạng thái chờ bằng state cục bộ rồi.
+    const res = await authApi.login(email, password);
+    setUser(res.user);
   }, []);
 
   const register = useCallback(
     async (data: { email: string; password: string; full_name: string; role?: string }): Promise<void> => {
-      setIsLoading(true);
-      try {
-        await authApi.register(data);
-        await authApi.login(data.email, data.password).then((res) => setUser(res.user));
-      } finally {
-        setIsLoading(false);
-      }
+      // Không bật cờ `isLoading` dùng chung — xem chú thích ở `login()`.
+      await authApi.register(data);
+      const res = await authApi.login(data.email, data.password);
+      setUser(res.user);
     },
     []
   );

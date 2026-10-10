@@ -116,13 +116,13 @@ test.describe('LIVE E2E: quy trinh nghiep vu tren backend that', () => {
 
     // Chua dang nhap: phai thay form LoginPage that.
     await managerPage.goto('/');
-    await expect(managerPage.locator('#login-email')).toBeVisible();
-    await expect(managerPage.getByRole('heading', { name: 'MarketFlow AI' })).toBeVisible();
+    await expect(managerPage.locator('#email')).toBeVisible();
+    await expect(managerPage.getByRole('heading', { name: 'Đăng nhập', exact: true })).toBeVisible();
 
     await performLiveLogin(managerPage, 'manager');
 
     // Khong con form dang nhap => da vao trong app.
-    await expect(managerPage.locator('#login-email')).toHaveCount(0);
+    await expect(managerPage.locator('#email')).toHaveCount(0);
 
     // Dashboard la tab mac dinh, so lieu do tu GET /analytics/dashboard that.
     await expect(managerPage.getByRole('heading', { name: 'Command Center Điều Phối' })).toBeVisible();
@@ -265,7 +265,7 @@ test.describe('LIVE E2E: quy trinh nghiep vu tren backend that', () => {
 
     // `exact: true` de khong nham voi nut "Đăng xuất tài khoản" cua Navbar.
     await managerPage.getByRole('button', { name: 'Đăng xuất', exact: true }).click();
-    await expect(managerPage.locator('#login-email')).toBeVisible({ timeout: 30_000 });
+    await expect(managerPage.locator('#email')).toBeVisible({ timeout: 30_000 });
 
     // Token va user da bi xoa khoi localStorage.
     expect(await managerPage.evaluate(() => window.localStorage.getItem('access_token'))).toBeNull();
@@ -273,7 +273,7 @@ test.describe('LIVE E2E: quy trinh nghiep vu tren backend that', () => {
 
     // Vao lai trang: van bi chan o trang dang nhap, khong loi ra app shell da dang nhap.
     await managerPage.goto('/');
-    await expect(managerPage.locator('#login-email')).toBeVisible();
+    await expect(managerPage.locator('#email')).toBeVisible();
     await expect(managerPage.getByTestId('sidebar-tab-campaigns')).toHaveCount(0);
   });
 });

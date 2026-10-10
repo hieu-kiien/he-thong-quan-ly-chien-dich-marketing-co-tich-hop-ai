@@ -118,9 +118,9 @@ export async function performLiveLogin(page: Page, role: LiveRole): Promise<void
   }
 
   await page.goto('/');
-  await page.locator('#login-email').waitFor({ state: 'visible', timeout: 20_000 });
-  await page.locator('#login-email').fill(user.email);
-  await page.locator('#login-password').fill(user.password);
+  await page.locator('#email').waitFor({ state: 'visible', timeout: 20_000 });
+  await page.locator('#email').fill(user.email);
+  await page.locator('#password').fill(user.password);
   await page.locator('button[type="submit"]').click();
 
   // Thanh dieu huong chi render sau khi `isAuthenticated` = true, tuc la sau khi

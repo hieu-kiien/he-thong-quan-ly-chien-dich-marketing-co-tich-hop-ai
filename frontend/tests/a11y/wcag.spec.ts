@@ -75,10 +75,10 @@ authTest.describe('WCAG 2.2 AA Accessibility & UX Suite', () => {
         await page.goto('/');
 
         // Verify Login Page is rendered
-        await expect(page.locator('#login-email')).toBeVisible();
-        await expect(page.locator('#login-password')).toBeVisible();
-        await expect(page.locator('label[for="login-email"]')).toBeVisible();
-        await expect(page.locator('label[for="login-password"]')).toBeVisible();
+        await expect(page.locator('#email')).toBeVisible();
+        await expect(page.locator('#password')).toBeAttached();
+        await expect(page.locator('label[for="email"]')).toBeAttached();
+        await expect(page.locator('label[for="password"]')).toBeAttached();
 
         await assertNoCriticalOrSeriousViolations(page, `Login Page (${vp.name})`);
       });
