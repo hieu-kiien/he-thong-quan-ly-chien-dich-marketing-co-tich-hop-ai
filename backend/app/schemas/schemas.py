@@ -849,7 +849,7 @@ class OmnichannelResponse(BaseModel):
     )
     warnings: List[str] = Field(default_factory=list)
     assumptions: List[str] = Field(default_factory=list)
-    model_used: str = "gemini-2.5-flash"
+    model_used: str = "gemini-3.8-flash"
     prompt_version: str = "v3"
     model_provider: Optional[str] = "gemini"
 
@@ -878,7 +878,7 @@ class AIKeyTestRequest(BaseModel):
         description="Nhà cung cấp AI ('gemini', 'openrouter', 'openai', 'anthropic', 'huggingface', 'ollama', 'opencode')",
     )
     api_key: str = Field(..., description="API Key cần kiểm tra")
-    model: Optional[str] = Field("gemini-2.5-flash", description="Model AI cần kiểm tra")
+    model: Optional[str] = Field("gemini-3.8-flash", description="Model AI cần kiểm tra")
 
     @field_validator("api_key")
     @classmethod
@@ -934,8 +934,24 @@ class AIKeyTestResponse(BaseModel):
     latency_ms: int
     message: str
     provider: Optional[str] = "gemini"
-    model: Optional[str] = "gemini-2.5-flash"
+    model: Optional[str] = "gemini-3.8-flash"
     error: Optional[str] = None
+
+
+class AIModelListResponse(BaseModel):
+    """Danh sách model cho UI chọn.
+
+    `source` phân biệt nguồn thật (`live` = gọi được `/models` của nhà cung cấp)
+    với nguồn dự phòng (`registry` = danh sách kiểm chứng trong code). UI nên
+    hiển thị rõ nguồn dự phòng để người dùng biết danh sách chưa chắc đầy đủ.
+    """
+
+    provider: str
+    models: List[str]
+    source: str = "registry"
+    default_model: Optional[str] = None
+    free_tier: bool = False
+    free_note: Optional[str] = None
 
 
 class AIKeyCreate(BaseModel):
@@ -947,7 +963,7 @@ class AIKeyCreate(BaseModel):
         description="Nhà cung cấp AI ('gemini', 'openrouter', 'openai', 'anthropic', 'huggingface', 'ollama', 'opencode')",
     )
     api_key: str = Field(..., description="API Key cần lưu trữ an toàn")
-    model: Optional[str] = Field("gemini-2.5-flash", description="Model AI lựa chọn")
+    model: Optional[str] = Field("gemini-3.8-flash", description="Model AI lựa chọn")
     workspace_id: Optional[int] = Field(None, description="ID Workspace nếu lưu khóa cho Workspace")
     is_active: Optional[bool] = Field(True, description="Trạng thái kích hoạt khóa")
 
@@ -986,7 +1002,7 @@ AISettingsUpdate = AIKeyCreate
 class AIKeyResponse(BaseModel):
     id: Optional[int] = None
     provider: str = "gemini"
-    model: str = "gemini-2.5-flash"
+    model: str = "gemini-3.8-flash"
     masked_key: str = Field(..., description="Khóa API đã được che mặt nạ bảo mật")
     is_active: bool = True
     workspace_id: Optional[int] = None

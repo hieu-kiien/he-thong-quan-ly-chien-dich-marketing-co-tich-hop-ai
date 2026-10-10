@@ -13,7 +13,7 @@ from app.core.security import get_current_user
 from app.models.entities import User, CustomApiKey, Workspace, WorkspaceMember
 from app.schemas.schemas import (
     AIKeyTestRequest, AIKeyTestResponse,
-    AIKeyCreate, AIKeyResponse
+    AIKeyCreate, AIKeyResponse, AIModelListResponse
 )
 from app.core.crypto import encrypt_api_key, decrypt_api_key, mask_api_key
 from app.services.ai import providers as provider_registry
@@ -164,6 +164,123 @@ def test_ai_connection(
             model=req.model,
             error=sanitized_exc
         )
+
+
+def _list_models_live(slug: str, api_key: str) -> List[str]:
+    """GET `{base_url}/models` kiểu OpenAI và trả về danh sách id.
+
+    Đây chính là cách 9Router không bao giờ hardcode tên model: hỏi nhà cung cấp
+    rồi để người dùng chọn. Áp dụng được cho mọi provider nói giao thức OpenAI —
+    gồm cả cổng OpenAI-compatible của Gemini và endpoint tự đặt của OpenCode Zen.
+
+    Trả về list rỗng khi provider không hỗ trợ hoặc lỗi; NGƯỜI GỌI phải dự phòng
+    bằng `candidate_models_for` để UI không bao giờ trống.
+    """
+    spec = provider_registry.get_provider(slug)
+    if spec is None or not spec.supports_model_listing:
+        return []
+
+    base_url = spec.resolve_base_url(settings.AI_BASE_URL)
+    url = f"{base_url}/models"
+    headers = dict(spec.extra_headers)
+    if spec.protocol == provider_registry.PROTOCOL_ANTHROPIC:
+        from app.services.ai.anthropic_adapter import build_headers as _anthropic_headers
+
+        headers = _anthropic_headers(api_key)
+    elif api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    try:
+        with httpx.Client(timeout=8.0) as client:
+            resp = client.get(url, headers=headers)
+        if resp.status_code != 200:
+            logger.info(
+                "[AI Model Catalog] %s không trả được danh sách model (HTTP %d)",
+                slug, resp.status_code,
+            )
+            return []
+        payload = resp.json()
+    except Exception as exc:  # noqa: BLE001 - mọi lỗi đều chỉ làm mất catalog động
+        logger.info("[AI Model Catalog] %s lỗi khi liệt kê model: %s", slug, exc.__class__.__name__)
+        return []
+
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, list):
+        return []
+    models: List[str] = []
+    for item in data:
+        if isinstance(item, dict):
+            model_id = str(item.get("id") or "").strip()
+        elif isinstance(item, str):
+            model_id = item.strip()
+        else:
+            model_id = ""
+        # `:free` của OpenRouter sắp theo sau; bỏ mã nhúng/embeddings khỏi UI
+        # chat. Không lọc theo prefix vì slug tự do (opencode zen) sẽ mất oan.
+        if model_id and model_id not in models:
+            models.append(model_id)
+    return models
+
+
+@router.get("/ai-models", response_model=AIModelListResponse)
+def list_ai_models(
+    provider: str = Query(..., description="Slug nhà cung cấp, ví dụ gemini"),
+    api_key: Optional[str] = Query(None, description="Khoá tạm để thử; bỏ trống thì dùng khoá hệ thống"),
+    current_user: User = Depends(get_current_user),
+):
+    """Liệt kê model của nhà cung cấp cho UI chọn, KHÔNG đoán tên cứng.
+
+    Nguồn `live` = gọi được `/models` của provider. Nguồn `registry` = dự phòng
+    từ danh sách đã kiểm chứng trong `providers.py`. Dù đường nào cũng không
+    được rò khoá ra ngoài qua thông báo lỗi.
+    """
+    slug = (provider or "").lower().strip()
+    spec = provider_registry.get_provider(slug)
+    if spec is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Nhà cung cấp '{provider}' không được hỗ trợ. "
+                f"Chỉ hỗ trợ: {', '.join(provider_registry.SUPPORTED_PROVIDER_SLUGS)}."
+            ),
+        )
+
+    provided_key = (api_key or "").strip()
+    # Không có khoá trong request thì lấy từ biến môi trường hệ thống. Không
+    # tìm thấy ở cả hai chỗ vẫn không chặn: Ollama/HuggingFace/OpenCode Zen
+    # miễn phí không cần khoá.
+    resolved_key = provided_key
+    if not resolved_key:
+        import os
+
+        for env_name in spec.env_key_names:
+            resolved_key = os.environ.get(env_name, "").strip()
+            if resolved_key:
+                break
+
+    live_models = _list_models_live(slug, resolved_key)
+    if live_models:
+        # Model mặc định luôn nằm đầu gợi ý để người dùng không phải cuộn tìm.
+        default_model = provider_registry.default_model_for(slug)
+        ordered = [default_model] + [m for m in live_models if m != default_model]
+        return AIModelListResponse(
+            provider=slug,
+            models=ordered,
+            source="live",
+            default_model=default_model,
+            free_tier=spec.free_tier,
+            free_note=spec.free_note,
+        )
+
+    candidates = provider_registry.candidate_models_for(slug)
+    return AIModelListResponse(
+        provider=slug,
+        models=candidates,
+        source="registry",
+        default_model=provider_registry.default_model_for(slug),
+        free_tier=spec.free_tier,
+        free_note=spec.free_note,
+    )
 
 
 @router.post("/ai-keys", response_model=AIKeyResponse, status_code=status.HTTP_200_OK)

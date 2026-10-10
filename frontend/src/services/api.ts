@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Campaign, MarketingContent, KPISummary, AIIdeaResponse, AIDraftResponse, AISummaryResponse, OmnichannelRequest, OmnichannelResponse, User, Product, MarketingSchedule, ContentComplianceCheck, Workspace, BrandKit, ComplianceCheckRequest, ComplianceCheckResponse, ComplianceViolation, ChannelAttribution, AIDoctorReport, CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse, AppNotification, Task, TaskCreate, TaskUpdate, BudgetAllocation, KPITarget, CommandCenterResponse, Page, QuotaSnapshot, QuotaErrorDetail, CampaignSort, ContentSort } from '../types';
+import { Campaign, MarketingContent, KPISummary, AIIdeaResponse, AIDraftResponse, AISummaryResponse, OmnichannelRequest, OmnichannelResponse, User, Product, MarketingSchedule, ContentComplianceCheck, Workspace, BrandKit, ComplianceCheckRequest, ComplianceCheckResponse, ComplianceViolation, ChannelAttribution, AIDoctorReport, CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse, AppNotification, Task, TaskCreate, TaskUpdate, BudgetAllocation, KPITarget, CommandCenterResponse, Page, QuotaSnapshot, QuotaErrorDetail, CampaignSort, ContentSort, AIModelListResponse } from '../types';
 import { MarketingChannel, getChannelRegistry } from '../utils/channels';
 import type {
   AIJobAccepted,
@@ -1685,6 +1685,19 @@ const res = await apiClient.post('/settings/test-ai-connection', data);
       console.warn('[OFFLINE DEMO] Không thể kiểm tra kết nối AI khi backend offline.');
       throw new Error('Không thể kiểm tra kết nối AI: máy chủ backend không phản hồi. Vui lòng thử lại.');
     }
+  },
+
+  /**
+   * Lấy danh sách model từ nhà cung cấp (GET /settings/ai-models).
+   *
+   * Backend tự gọi `{base_url}/models` kiểu OpenAI; nếu provider không cho liệt
+   * kê (hoặc lỗi mạng) thì trả danh sách dự phòng kèm `source: "registry"`.
+   * Nhờ vậy UI không cần hardcode tên model và không bị lỗi thời khi nhà cung
+   * cấp ra mô hình mới.
+   */
+  listModels: async (provider: string): Promise<AIModelListResponse> => {
+    const res = await apiClient.get('/settings/ai-models', { params: { provider } });
+    return res.data;
   },
 
   getKeys: async (workspaceId?: number): Promise<CustomApiKey> => {

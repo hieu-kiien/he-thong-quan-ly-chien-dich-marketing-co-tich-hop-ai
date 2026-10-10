@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# Trang đăng nhập là nội dung công khai duy nhất; các tab trong app là vùng
+# riêng tư cần đăng nhập nên không có gì để bot thu thập.
+Disallow: /api/
+
+Sitemap: https://marketing.kienhieu.id.vn/sitemap.xml

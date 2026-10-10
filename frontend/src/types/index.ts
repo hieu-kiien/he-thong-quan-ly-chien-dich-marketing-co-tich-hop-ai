@@ -423,6 +423,22 @@ export interface AIKeyTestResponse {
   error?: string | null;
 }
 
+/**
+ * Danh sách model do backend `/settings/ai-models` trả về.
+ *
+ * `source: "live"` = gọi được `/models` của nhà cung cấp; `"registry"` = dự
+ * phòng từ danh sách kiểm chứng trong code. UI cần phân biệt hai nguồn này để
+ * người dùng biết danh sách dự phòng chưa chắc đã đầy đủ model mới nhất.
+ */
+export interface AIModelListResponse {
+  provider: string;
+  models: string[];
+  source: 'live' | 'registry';
+  default_model?: string | null;
+  free_tier?: boolean;
+  free_note?: string | null;
+}
+
 export interface AIKeySaveRequest {
   provider?: string;
   api_key: string;

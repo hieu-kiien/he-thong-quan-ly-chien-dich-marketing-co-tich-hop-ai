@@ -20,6 +20,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToRegister }) =>
     return teardown;
   }, []);
 
+  const handleQuickLogin = (quickEmail: string, quickPass: string) => {
+    setEmail(quickEmail);
+    setPassword(quickPass);
+    setError(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
@@ -159,29 +165,30 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToRegister }) =>
                 <span>{isLoading ? 'Đang xác thực...' : 'Đăng nhập'}</span>{' '}
                 <img src="/halloween/images/icon-arrow.svg" alt="" width={17} height={17} />
               </button>
-              <p className="signup-row">
-                <span>Bạn chưa có tài khoản?</span>{' '}
-                <button className="text-action" type="button" onClick={onNavigateToRegister}>
-                  Đăng ký
-                </button>
-              </p>
-
+              {/* Quick-chips for testing. Chi bat o moi co du lieu mau (xem showQuickLogin). */}
               {showQuickLogin && (
                 <div className="quick-login">
                   <p>Chọn nhanh tài khoản kiểm thử:</p>
                   <div className="quick-login-grid">
-                    <button type="button" onClick={() => { setEmail('manager@gmail.com'); setPassword('Manager@123'); }}>
+                    <button type="button" onClick={() => handleQuickLogin('manager@gmail.com', 'Manager@123')}>
                       Manager
                     </button>
-                    <button type="button" onClick={() => { setEmail('marketer@gmail.com'); setPassword('Marketer@123'); }}>
+                    <button type="button" onClick={() => handleQuickLogin('marketer@gmail.com', 'Marketer@123')}>
                       Marketer
                     </button>
-                    <button type="button" onClick={() => { setEmail('approver@gmail.com'); setPassword('Approver@123'); }}>
+                    <button type="button" onClick={() => handleQuickLogin('approver@gmail.com', 'Approver@123')}>
                       Approver
                     </button>
                   </div>
                 </div>
               )}
+
+              <p className="signup-row">
+                <span>Chưa có tài khoản?</span>{' '}
+                <button className="text-action" type="button" onClick={onNavigateToRegister}>
+                  Đăng ký
+                </button>
+              </p>
             </form>
           </section>
         </main>

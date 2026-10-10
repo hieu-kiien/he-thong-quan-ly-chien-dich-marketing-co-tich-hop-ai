@@ -83,6 +83,21 @@ class AIProviderSpec:
     # Path ping dùng cho endpoint "Test API Connection".
     ping_path: str = "/models"
     min_model_len: int = 2
+    # --- Phần "tàng free + catalog", học từ cách 9Router gom nhà cung cấp ---
+    #
+    # `free_tier` đánh dấu provider chạy được KHÔNG cần khoá hoặc có tầng miễn
+    # phí khả dụng. UI dùng để gắn nhãn cho người dùng chọn, khác với bản mẫu
+    # cứng trong code: tầng free của bên thứ ba thay đổi theo thời gian (iFlow
+    # và Qwen Code đã ngừng free năm 2026), nên nhãn này chỉ là gợi ý.
+    free_tier: bool = False
+    free_note: str = ""
+    # Liệt kê model động được không. 9Router không hề hardcode tên model: nó
+    # GET `{base_url}/models` rồi để người dùng chọn. Ta làm theo: endpoint
+    # `/settings/ai-models` gọi đúng đường này cho mọi provider OpenAI-compatible.
+    supports_model_listing: bool = True
+    # Gợi ý dự phòng khi `/models` không trả được (provider chặn, mạng lỗi).
+    # Luôn là model hiện hành tại thời điểm cập nhật file này.
+    candidate_models: Tuple[str, ...] = ()
 
     def resolve_base_url(self, settings_base_url: Optional[str] = None) -> str:
         """Trả về base_url hiệu lực, đã bỏ dấu '/' cuối.
@@ -102,49 +117,64 @@ class AIProviderSpec:
 
 
 #: Danh sách provider. Thứ tự quyết định thứ tự hiển thị trong UI.
+#
+# CẬP NHẬT MODEL MẶC ĐỊNH (2026-10): bản trước đó ghim `gemini-2.5-flash`,
+# `gpt-4o`, `claude-3-5-haiku-latest` — đã lỗi thời một thế hệ. Tên model mới
+# kiểm chứng trên trang chính thức của từng hãng (ai.google.dev/docs/models,
+# developers.openai.com/api/docs/models, docs.anthropic.com + Bedrock model
+# card). Không đoán: đây là ID đã thấy bằng chứng.
 PROVIDERS: Tuple[AIProviderSpec, ...] = (
     AIProviderSpec(
         slug="gemini",
         display_name="Google Gemini",
         protocol=PROTOCOL_OPENAI,
-        default_model="gemini-2.5-flash",
+        default_model="gemini-3.8-flash",
         model_rule=MODEL_RULE_GEMINI,
         base_url="https://generativelanguage.googleapis.com/v1beta/openai",
         env_key_names=("GEMINI_API_KEY",),
         aliases=("google",),
         extra_headers={"HTTP-Referer": "http://localhost:5173", "X-Title": "MarketFlow AI"},
+        candidate_models=("gemini-3.8-flash", "gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.1-pro-preview", "gemini-2.5-flash"),
         ping_path="",  # ping dùng URL riêng, xem _ping_request_for()
     ),
     AIProviderSpec(
         slug="openrouter",
         display_name="OpenRouter",
         protocol=PROTOCOL_OPENAI,
-        default_model="meta-llama/llama-3.3-70b-instruct",
+        default_model="anthropic/claude-sonnet-4-6",
         model_rule=MODEL_RULE_OPENROUTER,
         base_url="https://openrouter.ai/api/v1",
         env_key_names=("OPENROUTER_API_KEY",),
         extra_headers={"HTTP-Referer": "https://marketflow.ai", "X-Title": "MarketFlow AI"},
+        # Có model `:free` nên đây là cửa ngõ rẻ nhất để thử nhiều hãng một chỗ.
+        free_tier=True,
+        free_note="Có hàng loạt model đuôi :free, cần key miễn phí",
     ),
     AIProviderSpec(
         slug="openai",
         display_name="OpenAI",
         protocol=PROTOCOL_OPENAI,
-        default_model="gpt-4o",
+        default_model="gpt-6.1-sol",
         model_rule=MODEL_RULE_OPENAI,
         base_url="https://api.openai.com/v1",
         env_key_names=("OPENAI_API_KEY",),
         aliases=("gpt",),
+        candidate_models=("gpt-6.1-sol", "gpt-6-luna", "gpt-5.5", "gpt-5.4"),
     ),
     AIProviderSpec(
         slug="anthropic",
         display_name="Anthropic (Claude)",
         protocol=PROTOCOL_ANTHROPIC,
-        default_model="claude-3-5-haiku-latest",
+        default_model="claude-sonnet-4-6",
         model_rule=MODEL_RULE_ANTHROPIC,
         base_url="https://api.anthropic.com/v1",
         env_key_names=("ANTHROPIC_API_KEY",),
         base_url_env="MARKETFLOW_ANTHROPIC_BASE_URL",
         aliases=("claude",),
+        # Anthropic không còn endpoint liệt kê model công khai, nên UI chỉ đề
+        # xuất từ danh sách dự phòng bên dưới, không gọi /models.
+        supports_model_listing=False,
+        candidate_models=("claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"),
     ),
     AIProviderSpec(
         slug="huggingface",
@@ -159,6 +189,8 @@ PROVIDERS: Tuple[AIProviderSpec, ...] = (
         env_key_names=("HUGGINGFACE_API_KEY", "HF_TOKEN", "HF_API_TOKEN"),
         base_url_env="MARKETFLOW_HF_BASE_URL",
         aliases=("hf", "hugging_face", "huggingface-inference"),
+        free_tier=True,
+        free_note="Router miễn phí cho model công khai",
     ),
     AIProviderSpec(
         slug="ollama",
@@ -172,6 +204,8 @@ PROVIDERS: Tuple[AIProviderSpec, ...] = (
         env_key_names=("OLLAMA_API_KEY",),  # thường rỗng, Ollama không cần khoá
         base_url_env="MARKETFLOW_OLLAMA_BASE_URL",
         aliases=("local", "llama"),
+        free_tier=True,
+        free_note="Chạy hoàn toàn trên máy mình, không tốn tiền",
     ),
     AIProviderSpec(
         slug="opencode",
@@ -189,6 +223,8 @@ PROVIDERS: Tuple[AIProviderSpec, ...] = (
         env_key_names=("OPENCODE_API_KEY",),
         aliases=("oc", "zen"),
         extra_headers={"HTTP-Referer": "http://localhost:5173", "X-Title": "MarketFlow AI"},
+        free_tier=True,
+        free_note="Tầng free không cần khoá; danh sách model tự đổi theo thời gian",
     ),
 )
 
@@ -245,6 +281,24 @@ def default_model_for(slug: Optional[str]) -> str:
     """Model mặc định của provider; rơi về Gemini khi slug lạ (giữ hành vi cũ)."""
     spec = get_provider(slug)
     return spec.default_model if spec else _BY_SLUG["gemini"].default_model
+
+
+def candidate_models_for(slug: Optional[str]) -> List[str]:
+    """Gợi ý model khi không liệt kê động được.
+
+    Luôn bắt đầu bằng model mặc định, sau đó tới các model đã kiểm chứng cùng
+    thế hệ — UI dùng để người dùng chọn nhanh, không phải để thay thế việc gọi
+    `GET {base_url}/models` khi provider hỗ trợ.
+    """
+    spec = get_provider(slug)
+    if not spec:
+        return []
+    ordered = [spec.default_model, *spec.candidate_models]
+    seen: List[str] = []
+    for model in ordered:
+        if model and model not in seen:
+            seen.append(model)
+    return seen
 
 
 def display_name_for(slug: Optional[str]) -> str:

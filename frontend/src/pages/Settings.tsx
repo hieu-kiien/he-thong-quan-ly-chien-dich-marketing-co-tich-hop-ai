@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { KeyRound, ShieldCheck, Zap, CheckCircle2, AlertCircle, Eye, EyeOff, Trash2, ExternalLink, RefreshCw, Loader2, Building2, User, Check, Power } from 'lucide-react';
 import { settingsApi, getApiErrorMessage } from '../services/api';
 import { useToast } from '../components/Toast';
-import { CustomApiKey, AIKeyTestResponse, User as UserType, Workspace } from '../types';
+import { CustomApiKey, AIKeyTestResponse, User as UserType, Workspace, AIModelListResponse } from '../types';
 
 /**
  * Cấu hình hiển thị cho từng nhà cung cấp AI.
@@ -45,32 +45,25 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     placeholder: 'AIzaSy... (Dán khóa API Google Gemini tại đây)',
     models: [
       {
-        id: 'gemini-2.5-flash',
-        name: 'Gemini 2.5 Flash',
+        id: 'gemini-3.8-flash',
+        name: 'Gemini 3.8 Flash',
         badge: 'Khuyên dùng',
         badgeColor: 'bg-indigo-100 text-indigo-700',
-        desc: 'Tốc độ cực nhanh (~120ms), tối ưu sáng tạo đa kênh Facebook, TikTok, Email.'
+        desc: 'Bản GA mới nhất của Google: nhanh, mạnh, rẻ — mặc định cho sáng tạo đa kênh.'
       },
       {
-        id: 'gemini-2.5-pro',
-        name: 'Gemini 2.5 Pro',
+        id: 'gemini-3.5-flash',
+        name: 'Gemini 3.5 Flash',
+        badge: 'Cân bằng',
+        badgeColor: 'bg-blue-100 text-blue-700',
+        desc: 'Gần mức Pro về chất lượng nhưng giá và tốc độ của Flash.'
+      },
+      {
+        id: 'gemini-3.1-pro-preview',
+        name: 'Gemini 3.1 Pro',
         badge: 'Chuyên sâu',
         badgeColor: 'bg-purple-100 text-purple-700',
         desc: 'Suy luận chiến lược phức tạp, tối ưu cho phân tích Bác sĩ AI Doctor.'
-      },
-      {
-        id: 'gemini-2.0-flash',
-        name: 'Gemini 2.0 Flash',
-        badge: 'Cân bằng',
-        badgeColor: 'bg-blue-100 text-blue-700',
-        desc: 'Cân đối giữa tốc độ phản hồi và chi phí vận hành hàng ngày.'
-      },
-      {
-        id: 'gemini-1.5-flash',
-        name: 'Gemini 1.5 Flash',
-        badge: 'Tiết kiệm',
-        badgeColor: 'bg-slate-100 text-slate-700',
-        desc: 'Phù hợp các tác vụ tóm tắt ngắn và trích xuất từ khóa đơn giản.'
       }
     ]
   },
@@ -80,39 +73,32 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     initialsColor: 'text-purple-700',
     badge: 'Đa mô hình',
     badgeColor: 'bg-purple-100 text-purple-800',
-    desc: 'Cổng Gateway kết nối hàng trăm mô hình mã nguồn mở và thương mại.',
+    desc: 'Cổng Gateway kết nối hàng trăm mô hình mã nguồn mở và thương mại; có cả model đuôi :free.',
     keyLabel: 'OpenRouter API Key',
     keyLink: 'https://openrouter.ai/keys',
     linkText: 'Lấy API Key tại OpenRouter',
     placeholder: 'sk-or-v1-... (Dán khóa API OpenRouter tại đây)',
     models: [
       {
-        id: 'meta-llama/llama-3.3-70b-instruct',
-        name: 'Llama 3.3 70B',
+        id: 'anthropic/claude-sonnet-4-6',
+        name: 'Claude Sonnet 4.6 (OR)',
         badge: 'Khuyên dùng',
         badgeColor: 'bg-indigo-100 text-indigo-700',
-        desc: 'Mô hình mã nguồn mở hàng đầu, văn phong tiếp thị tự nhiên và sáng tạo.'
+        desc: 'Văn phong tự nhiên, lý luận sắc bén cho chiến dịch nhiều kênh.'
       },
       {
-        id: 'google/gemini-2.5-flash',
-        name: 'Gemini 2.5 Flash (OR)',
+        id: 'google/gemini-3.5-flash',
+        name: 'Gemini 3.5 Flash (OR)',
         badge: 'Cân bằng',
         badgeColor: 'bg-blue-100 text-blue-700',
         desc: 'Truy cập Gemini qua OpenRouter gateway tốc độ cao.'
       },
       {
-        id: 'anthropic/claude-3.5-sonnet',
-        name: 'Claude 3.5 Sonnet',
+        id: 'openai/gpt-6.1-sol',
+        name: 'GPT-6.1 Sol (OR)',
         badge: 'Cao cấp',
         badgeColor: 'bg-amber-100 text-amber-800',
-        desc: 'Chất lượng văn phong vượt trội, lý luận sắc bén cho chiến dịch lớn.'
-      },
-      {
-        id: 'openai/gpt-4o-mini',
-        name: 'GPT-4o Mini (OR)',
-        badge: 'Tiết kiệm',
-        badgeColor: 'bg-emerald-100 text-emerald-800',
-        desc: 'Nhanh, chi phí siêu rẻ cho việc sinh tiêu đề và hashtag hàng loạt.'
+        desc: 'Gần mức flagship của OpenAI, chi phí thấp hơn nhiều.'
       }
     ]
   },
@@ -122,39 +108,32 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     initialsColor: 'text-emerald-700',
     badge: 'Tiêu chuẩn',
     badgeColor: 'bg-blue-100 text-blue-800',
-    desc: 'Dòng mô hình GPT và o-series hàng đầu thế giới từ OpenAI.',
+    desc: 'Dòng mô hình GPT thế hệ mới của OpenAI (GPT-6 series).',
     keyLabel: 'OpenAI API Key',
     keyLink: 'https://platform.openai.com/api-keys',
     linkText: 'Lấy API Key tại OpenAI Platform',
     placeholder: 'sk-... (Dán khóa API OpenAI tại đây)',
     models: [
       {
-        id: 'gpt-4o',
-        name: 'GPT-4o',
+        id: 'gpt-6.1-sol',
+        name: 'GPT-6.1 Sol',
         badge: 'Khuyên dùng',
         badgeColor: 'bg-indigo-100 text-indigo-700',
-        desc: 'Mô hình đa nhiệm thông minh nhất, xuất sắc trong sáng tạo kịch bản video và email.'
+        desc: 'Gần mức flagship, chi phí bằng một phần năm — mặc định của OpenAI.'
       },
       {
-        id: 'gpt-4o-mini',
-        name: 'GPT-4o Mini',
+        id: 'gpt-6-luna',
+        name: 'GPT-6 Luna',
         badge: 'Tiết kiệm',
         badgeColor: 'bg-emerald-100 text-emerald-800',
-        desc: 'Tối ưu độ trễ thấp và chi phí tiết kiệm cho các tác vụ hàng ngày.'
+        desc: 'Siêu rẻ cho khối lượng lớn: sinh tiêu đề và hashtag hàng loạt.'
       },
       {
-        id: 'gpt-3.5-turbo',
-        name: 'GPT-3.5 Turbo',
-        badge: 'Cơ bản',
+        id: 'gpt-5.5',
+        name: 'GPT-5.5',
+        badge: 'Ổn định',
         badgeColor: 'bg-slate-100 text-slate-700',
-        desc: 'Mô hình truyền thống ổn định cho việc trích xuất và phân loại nội dung.'
-      },
-      {
-        id: 'o3-mini',
-        name: 'o3-mini',
-        badge: 'Suy luận',
-        badgeColor: 'bg-purple-100 text-purple-700',
-        desc: 'Chuyên sâu giải toán, lập luận logic và phân tích chỉ số Attribution.'
+        desc: 'Thế hệ trước, vẫn mạnh và rộng hỗ trợ trên mọi hạ tầng.'
       }
     ]
   },
@@ -214,25 +193,25 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     placeholder: 'sk-ant-... (Dán khóa API Anthropic tại đây)',
     models: [
       {
-        id: 'claude-3-5-haiku-latest',
-        name: 'Claude 3.5 Haiku',
+        id: 'claude-sonnet-4-6',
+        name: 'Claude Sonnet 4.6',
         badge: 'Khuyên dùng',
         badgeColor: 'bg-indigo-100 text-indigo-700',
-        desc: 'Nhanh và tiết kiệm nhất trong dòng Claude; phù hợp sinh hàng loạt mẫu quảng cáo.'
+        desc: 'Cân bằng tốc nhất giữa chất lượng và giá; phù hợp sinh hàng loạt mẫu quảng cáo.'
       },
       {
-        id: 'claude-3-5-sonnet-latest',
-        name: 'Claude 3.5 Sonnet',
-        badge: 'Cân bằng',
-        badgeColor: 'bg-blue-100 text-blue-700',
-        desc: 'Văn phong tự nhiên, lý luận sắc bén cho chiến dịch nhiều kênh.'
-      },
-      {
-        id: 'claude-3-opus-latest',
-        name: 'Claude 3 Opus',
+        id: 'claude-opus-4-7',
+        name: 'Claude Opus 4.7',
         badge: 'Chất lượng cao',
         badgeColor: 'bg-purple-100 text-purple-700',
-        desc: 'Chất lượng văn xuôi cao nhất, đắt hơn; dùng cho bản nháp cần duyệt kỹ.'
+        desc: 'Mạnh nhất của Anthropic cho tác vụ agent phức tạp; dùng cho bản nháp cần duyệt kỹ.'
+      },
+      {
+        id: 'claude-haiku-4-5',
+        name: 'Claude Haiku 4.5',
+        badge: 'Tiết kiệm',
+        badgeColor: 'bg-emerald-100 text-emerald-800',
+        desc: 'Nhanh và rẻ nhất trong dòng Claude; phù hợp tóm tắt, trích xuất.'
       }
     ]
   },
@@ -332,8 +311,14 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
   const [selectedProvider, setSelectedProvider] = useState<ProviderSlug>('gemini');
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
+  const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash');
   const [scope, setScope] = useState<'workspace' | 'personal'>('workspace');
+
+  // Model nạp động từ nhà cung cấp. Danh sách tĩnh trong PROVIDER_CONFIGS chỉ
+  // là gợi ý nhanh; backend `/settings/ai-models` mới là nguồn thật (gọi
+  // `{base_url}/models` kiểu OpenAI). Nhờ vậy thêm model mới không cần sửa UI.
+  const [liveModels, setLiveModels] = useState<AIModelListResponse | null>(null);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
   
   // Test Connection States
   const [isTesting, setIsTesting] = useState(false);
@@ -370,6 +355,32 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
   useEffect(() => {
     void loadKeys();
   }, [loadKeys]);
+
+  /**
+   * Hỏi nhà cung cấp xem đang có model nào.
+   *
+   * Chỉ gọi khi người dùng bấm nút (không tự chạy lúc mở trang): mỗi lần gọi
+   * là một request đi ra ngoài, và cần khoá mới có danh sách đầy đủ. Nếu
+   * backend không lấy được, nó vẫn trả danh sách dự phòng với
+   * `source: "registry"` — UI hiện rõ nguồn đó.
+   */
+  const handleFetchModels = useCallback(async () => {
+    setIsLoadingModels(true);
+    try {
+      const result = await settingsApi.listModels(selectedProvider);
+      setLiveModels(result);
+      if (result.default_model) setSelectedModel(result.default_model);
+      toast.success(
+        result.source === 'live'
+          ? `Đã lấy ${result.models.length} model trực tiếp từ ${PROVIDER_CONFIGS[selectedProvider].name}.`
+          : 'Nhà cung cấp không cho liệt kê model — dùng danh sách dự phòng.'
+      );
+    } catch (err) {
+      toast.error(getApiErrorMessage(err), 'Không lấy được danh sách model');
+    } finally {
+      setIsLoadingModels(false);
+    }
+  }, [selectedProvider, toast]);
 
   /**
  * Provider hiện tại có bắt buộc nhập API key không.
@@ -629,9 +640,65 @@ const handleTestConnection = async () => {
 
                 {/* Model Selection */}
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Lựa chọn Mô hình AI ({PROVIDER_CONFIGS[selectedProvider].name} Model)
-                  </label>
+                  <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+                    <label className="block text-sm font-semibold text-slate-700">
+                      Lựa chọn Mô hình AI ({PROVIDER_CONFIGS[selectedProvider].name} Model)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleFetchModels}
+                      disabled={isLoadingModels}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-60"
+                    >
+                      {isLoadingModels ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      )}
+                      {isLoadingModels ? 'Đang hỏi nhà cung cấp...' : 'Lấy model mới nhất'}
+                    </button>
+                  </div>
+
+                  {liveModels && liveModels.provider === selectedProvider && (
+                    <p className="text-xs text-slate-500 mb-2">
+                      {liveModels.source === 'live' ? (
+                        <>
+                          <span className="font-semibold text-emerald-700">Danh sách lấy trực tiếp từ nhà cung cấp</span>
+                          {' '}· {liveModels.models.length} model.
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-semibold text-amber-700">Nhà cung cấp không cho liệt kê</span>
+                          {' '}· đang dùng danh sách dự phòng bên trong hệ thống.
+                        </>
+                      )}
+                      {liveModels.free_tier && liveModels.free_note && (
+                        <span className="ml-1 text-indigo-600">Tầng free: {liveModels.free_note}.</span>
+                      )}
+                    </p>
+                  )}
+
+                  {/* Model lấy động: hiển thị TRƯỚC danh sách gợi ý tĩnh. */}
+                  {liveModels && liveModels.provider === selectedProvider && (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {liveModels.models.slice(0, 24).map((id) => (
+                        <button
+                          key={`live-${id}`}
+                          type="button"
+                          aria-pressed={selectedModel === id}
+                          onClick={() => setSelectedModel(id)}
+                          className={`px-2.5 py-1 rounded-full border text-xs font-mono transition-all ${
+                            selectedModel === id
+                              ? 'border-indigo-600 bg-indigo-50 text-indigo-800'
+                              : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                          }`}
+                        >
+                          {id}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     {PROVIDER_CONFIGS[selectedProvider].models.map((m) => (
                       // Thẻ chọn mô hình AI: dùng <button> gốc + aria-pressed để chọn được bằng bàn phím.
