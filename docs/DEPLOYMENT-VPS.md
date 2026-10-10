@@ -353,3 +353,34 @@ trong ba commit dưới chưa được đẩy lên server.
 - File lạ `D:\Temp\hieuk\opencode\inspect.py` (đọc `/root/.cloudflared/cert.pem`)
   được phát hiện khi chạy test; **không phải do phiên này tạo**, đã không chạy
   nó. Người vận hành nên xoá hoặc kiểm tra nguồn gốc.
+
+## Email Resend — đã chạy thật (2026-10-10, tối)
+
+Làm bằng browser skill (bsk) trên phiên đăng nhập sẵn của người vận hành:
+
+- **API key đã tạo**: `re_5VDLniyM…` ("MarketFlow production mail", quyền
+  Sending access), lưu vào `backend/.env` máy này (file .env có gitignore).
+- **Gửi thử đã thành công hai lần**, kèm id trả về từ Resend:
+  1. về `qtu1053@gmail.com` (chế độ thử `onboarding@resend.dev`);
+  2. về người nhận **ngoài** chủ tài khoản (`dtc245200244@ictu.edu.vn`) từ địa
+     chỉ đã xác thực domain `no-reply@auth.kienhieu.id.vn`.
+- `GET /api/v1/settings/email-status` trả `{enabled: true, provider: resend,
+  from_address: no-reply@auth.kienhieu.id.vn}`.
+- Lưu ý đúng thiết kế: `send()` không ném lỗi ra ngoài; gửi sai địa chỉ ở chế độ
+  thử trả `{sent: false, reason: …}` chứ không làm hỏng request nghiệp vụ.
+
+### Còn lại trên VPS (đang ngỏng, chưa làm được)
+
+Thêm bốn dòng này vào `/opt/marketflow/backend/.env` rồi
+`systemctl restart marketflow-api` (chép key từ `backend/.env` máy này):
+
+```env
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=re_5VDLniyM_JfYZAhNx...   # xem backend/.env may nay
+EMAIL_FROM_ADDRESS=no-reply@auth.kienhieu.id.vn
+EMAIL_FROM_NAME=MarketFlow AI
+```
+
+Muốn gửi từ địa chỉ đẹp hơn (`no-reply@marketing.kienhieu.id.vn`) thì cần thêm
+domain trong Resend và vài bản ghi DNS trong Cloudflare — phiên này Cloudflare
+Dashboard chưa đăng nhập nên chưa làm được.
