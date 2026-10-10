@@ -303,3 +303,53 @@ Cách giảm là bớt JS phải chạy trước khi vẽ, không phải sửa n
 
 Lỗi `errors-in-console` mà Lighthouse bắt được là `chrome-extension://invalid/`
 — lỗi của extension trong máy vận hành, không phải của trang.
+
+## Phiên 2026-10-10 (buổi chiều)
+
+### Sự cố cần biết: VPS ngỏng lúc ~12:35
+
+Domain trả Cloudflare **error 1033** (mất kết nối tới cloudflared), SSH cổng
+30513 timeout dù ping còn trả lời. Monitor cuối cùng thấy healthy lúc
+12:02:49. **Chưa xử lý được vì không vào được máy chủ từ xa** — cần người
+vận hành kiểm tra trực tiếp: VPS còn sống không, `systemctl status
+cloudflared-tunnel`, mạng ra ngoài của VPS có bị chặn/rớt không. Các sửa đổi
+trong ba commit dưới chưa được đẩy lên server.
+
+### Đã sửa trong các commit này
+
+1. **Trang đăng nhập mới** (bản Halloween của người vận hành, port sang React):
+   cảnh ngày/đêm, dây leo SVG, đèn pin chiếu từng ký tự mật khẩu, sói 60 khung,
+   nhện canvas. Ảnh sói PNG 1,42 MB → WebP 0,47 MB. Toàn bộ hiệu ứng tách thành
+   module `frontend/src/features/halloween-login/` có cleanup: rời trang là gỡ
+   sạch listener và class trên `<body>`.
+2. **Sửa lỗi login mất chữ đã gõ** (lỗi có sẵn, không do port): `login()` và
+   `register()` trong AuthContext bật cùng cờ `isLoading` mà App.tsx dùng để
+   tháo LoginPage khỏi cây React. Giữa lúc đăng nhập trang bị unmount: chữ đã
+   gõ biến mất, lỗi không kịp hiện, cảnh phải dựng lại. Cờ chung đã bỏ, trang
+   đăng nhập tự theo dõi trạng thái chờ.
+3. **Nhà cung cấp AI lỗi thời — đã nâng cấp theo mô hình của 9Router** (khảo
+   sát `github.com/decolua/9router`): bài học cốt lõi là *không hardcode tên
+   model*. Ta làm theo bằng endpoint `GET /api/v1/settings/ai-models` gọi
+   `{base_url}/models` của nhà cung cấp; nếu không liệt kê được (Anthropic,
+   lỗi mạng, thiếu khoá) thì dùng danh sách dự phòng đã kiểm chứng trong
+   `providers.py`. Thử thật: OpenCode Zen trả `source=live` với model
+   `space-bunny-free, big-pickle, mimo-v2.6-flash-free…`. Model mặc định cập
+   nhật theo trang chính thức: `gemini-3.8-flash`, `gpt-6.1-sol`,
+   `claude-sonnet-4-6`, `anthropic/claude-sonnet-4-6` cho OpenRouter. Registry
+   có thêm `free_tier`/`free_note` để UI gợi ý tầng miễn phí.
+4. **SEO (Lighthouse phàn nàn từ phiên trước)**: thêm meta description + og
+   tags, favicon thật thay `/vite.svg`, `robots.txt` và `sitemap.xml` thật.
+   nginx đổi `.txt/.xml/.ico` thiếu sang **404** thay vì rơi vào fallback SPA
+   (trước đó bot xin `robots.txt` nhận trang HTML — Lighthouse báo 21 lỗi).
+   `/api/` và `/assets/` chuyển sang `^~` để location regex không ăn nhầm.
+
+### Còn dở
+
+- **Resend** vẫn chờ người vận hành dán API key.
+- **Gộp chuỗi fallback (combos kiểu 9Router)**: hiện mới có Smart Fallback
+  trong app, chưa có chuỗi do người dùng đặt tên. Việc tiếp theo hợp lý.
+- Ba việc "đáng làm" trong mục dự án (API gọi trùng, Google Fonts tự host,
+  dữ liệu mẫu trong bundle) vẫn chưa ai làm.
+- File lạ `D:\Temp\hieuk\opencode\inspect.py` (đọc `/root/.cloudflared/cert.pem`)
+  được phát hiện khi chạy test; **không phải do phiên này tạo**, đã không chạy
+  nó. Người vận hành nên xoá hoặc kiểm tra nguồn gốc.
