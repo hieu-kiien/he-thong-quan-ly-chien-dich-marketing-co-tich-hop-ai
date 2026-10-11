@@ -360,14 +360,35 @@ Làm bằng browser skill (bsk) trên phiên đăng nhập sẵn của người 
 
 - **API key đã tạo**: `re_5VDLniyM…` ("MarketFlow production mail", quyền
   Sending access), lưu vào `backend/.env` máy này (file .env có gitignore).
-- **Gửi thử đã thành công hai lần**, kèm id trả về từ Resend:
+- **Domain riêng**: `marketing.kienhieu.id.vn` đã thêm và **Verified** trong
+  Resend. Bản ghi DNS do tôi tự thêm trong Cloudflare Dashboard: TXT DKIM,
+  CNAME `rsend.marketing` + `send.marketing` → `*.forge.rmta.net`.
+- **Gửi thử đã thành công ba lần**, kèm id trả về từ Resend:
   1. về `qtu1053@gmail.com` (chế độ thử `onboarding@resend.dev`);
   2. về người nhận **ngoài** chủ tài khoản (`dtc245200244@ictu.edu.vn`) từ địa
-     chỉ đã xác thực domain `no-reply@auth.kienhieu.id.vn`.
-- `GET /api/v1/settings/email-status` trả `{enabled: true, provider: resend,
-  from_address: no-reply@auth.kienhieu.id.vn}`.
+     chỉ đã xác thực `no-reply@auth.kienhieu.id.vn`;
+  3. về `dtc245200244@ictu.edu.vn` từ địa chỉ mới
+     `no-reply@marketing.kienhieu.id.vn`.
+- `GET /api/v1/settings/email-status` trả
+  `{enabled: true, provider: resend, from_address: no-reply@marketing.kienhieu.id.vn}`.
 - Lưu ý đúng thiết kế: `send()` không ném lỗi ra ngoài; gửi sai địa chỉ ở chế độ
   thử trả `{sent: false, reason: …}` chứ không làm hỏng request nghiệp vụ.
+
+### Hai cái bẫy đã mắc, ghi lại để lần sau khỏi lặp
+
+1. **Bản ghi DNS trong Cloudflare phải để "DNS only", tuyệt đối không Proxied.**
+   Lần đầu tôi thêm 2 CNAME `rsend/send` bị mặc định **Proxied** (mây cam) →
+   DNS không phân giải được kiểu CNAME → Resend báo Failed mãi. Mở panel Edit →
+   tắt công tắc "Proxy status" → Save. Cách nhận biết đúng: `Resolve-DnsName`
+   phải trả về NameHost, và cả 1.1.1.1 lẫn 8.8.8.8 đều phải thấy.
+2. **Sau khi Resend đã đánh dấu Failed, bấm Verify lại có thể không chạy thật.**
+   Cách chắc ăn: xoá domain, thêm lại, rồi Verify — lần làm lại này qua luôn.
+3. Tiện thể: `D:\Temp\hieuk\opencode`đã có sẵn 2 domain `auth.*` của cùng chủ —
+   thêm domain mới trên gói free bị chặn ở mốc 3 domain; phải xoá domain hỏng
+   (`gtoil.vn`, Failed) mới có chỗ trống.
+4. Key Resend quyền **Sending access không đọc được** bản ghi DNS qua API. Muốn
+   lấy đầy đủ giá trị CNAME phải tạo key **Full access** tạm, đọc xong **xoá
+   ngay** (đã làm đúng vậy).
 
 ### Còn lại trên VPS (đang ngỏng, chưa làm được)
 
@@ -377,10 +398,6 @@ Thêm bốn dòng này vào `/opt/marketflow/backend/.env` rồi
 ```env
 EMAIL_PROVIDER=resend
 RESEND_API_KEY=re_5VDLniyM_JfYZAhNx...   # xem backend/.env may nay
-EMAIL_FROM_ADDRESS=no-reply@auth.kienhieu.id.vn
+EMAIL_FROM_ADDRESS=no-reply@marketing.kienhieu.id.vn
 EMAIL_FROM_NAME=MarketFlow AI
 ```
-
-Muốn gửi từ địa chỉ đẹp hơn (`no-reply@marketing.kienhieu.id.vn`) thì cần thêm
-domain trong Resend và vài bản ghi DNS trong Cloudflare — phiên này Cloudflare
-Dashboard chưa đăng nhập nên chưa làm được.
