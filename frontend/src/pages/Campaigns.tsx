@@ -10,6 +10,7 @@ import {
   OmnichannelResponse,
   BrandKit,
   BudgetAllocation,
+  BudgetSummary,
   ComplianceCheckResponse,
   Page,
   CampaignSort,
@@ -170,6 +171,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
   const [drawerDoctorReport, setDrawerDoctorReport] = useState<AIDoctorReport | null>(null);
   const [drawerAttributions, setDrawerAttributions] = useState<ChannelAttribution[]>([]);
   const [drawerBudgetAllocations, setDrawerBudgetAllocations] = useState<BudgetAllocation[]>([]);
+  const [drawerBudgetSummary, setDrawerBudgetSummary] = useState<BudgetSummary | null>(null);
   const [drawerKpi, setDrawerKpi] = useState<KPISummary | null>(null);
   const [drawerBudgetLoading, setDrawerBudgetLoading] = useState<boolean>(false);
   const [budgetConfirmOpen, setBudgetConfirmOpen] = useState<boolean>(false);
@@ -518,13 +520,15 @@ export const Campaigns: React.FC<CampaignsProps> = ({
     setDrawerBudgetLoading(true);
     (async () => {
       try {
-        const [allocs, kpi] = await Promise.all([
+        const [allocs, kpi, summary] = await Promise.all([
           budgetApi.getBudgetAllocations(campaignId).catch(() => [] as BudgetAllocation[]),
-          campaignApi.getKpi(campaignId).catch(() => null as KPISummary | null)
+          campaignApi.getKpi(campaignId).catch(() => null as KPISummary | null),
+          budgetApi.getBudgetSummary(campaignId).catch(() => null as BudgetSummary | null)
         ]);
         if (cancelled) return;
         setDrawerBudgetAllocations(allocs);
         setDrawerKpi(kpi);
+        setDrawerBudgetSummary(summary);
       } catch (e) {
         console.warn('Không tải được phân bổ ngân sách / KPI', e);
       } finally {
@@ -2061,6 +2065,32 @@ useEffect(() => {
                       <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">
                         Phân bổ Ngân sách theo Kênh
                       </h4>
+                      {drawerBudgetSummary && (
+                        <div className="mb-3 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1">
+                          <div className="flex justify-between">
+                            <span className="text-slate-500 font-semibold">Tổng ngân sách</span>
+                            <span className="font-mono font-bold text-slate-800">{formatNumber(drawerBudgetSummary.total_budget)} đ</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500 font-semibold">Đã phân bổ ({drawerBudgetSummary.allocated_pct}%)</span>
+                            <span className="font-mono text-slate-700">{formatNumber(drawerBudgetSummary.total_allocated)} đ</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500 font-semibold">Đã chi thực tế ({drawerBudgetSummary.spent_pct}%)</span>
+                            <span className="font-mono text-rose-600 font-bold">{formatNumber(drawerBudgetSummary.total_spent)} đ</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500 font-semibold">Còn lại</span>
+                            <span className="font-mono text-emerald-600 font-bold">{formatNumber(drawerBudgetSummary.remaining_amount)} đ</span>
+                          </div>
+                          <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden mt-1">
+                            <div
+                              className={`h-2 rounded-full ${drawerBudgetSummary.spent_pct > 100 ? 'bg-rose-600' : drawerBudgetSummary.spent_pct > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                              style={{ width: `${Math.min(100, drawerBudgetSummary.spent_pct)}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      )}
                       {drawerBudgetLoading ? (
                         <div className="py-6 text-center text-slate-500 text-xs flex items-center justify-center gap-2">
                           <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
@@ -2095,6 +2125,11 @@ useEffect(() => {
                                 </div>
                                 <div className="text-[10px] text-slate-500 mt-0.5">
                                   Kênh: <code>{code}</code>
+                                  {(() => {
+                                    const chSpent = drawerBudgetSummary?.channels.find(c => c.channel_id === alloc.channel_id)?.spent_amount;
+                                    if (chSpent === undefined || chSpent === null) return null;
+                                    return <> · Đã chi: <span className="font-mono text-rose-600">{formatNumber(chSpent)} đ</span></>;
+                                  })()}
                                 </div>
                               </div>
                             );

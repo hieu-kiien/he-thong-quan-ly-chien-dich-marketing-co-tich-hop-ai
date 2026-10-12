@@ -54,8 +54,24 @@ Verification:
 - FE tsc --noEmit + eslint --max-warnings=0 + vite build → pass
 - `detect_changes --scope all`: 26 symbols, risk critical (expected — campaign CRUD core; covered by tests above)
 
-## Next — Phase 3+ (not started)
-- Workstream B: Budget API (allocation validation, spent tracking)
-- Workstream C: KPI targets CRUD + real metrics
-- Checkpoint: KPI test that API list does NOT return ARCHIVED is implicitly covered; add E2E wizard ACTIVE case later in integration run
+## Phase 3 — Workstream B: Budget (done)
+Backend:
+- `PUT /campaigns/{id}/budget-allocations`: reject duplicate channel (400, thay vì IntegrityError 500) + reject total planned > campaign.budget (400, thông báo tiếng Việt)
+- New `GET /campaigns/{id}/budget-summary` → `BudgetSummaryResponse`: total_budget / total_allocated / total_spent (SUM `CampaignMetric.cost`) / unallocated / remaining / allocated_pct / spent_pct / per-channel planned+spent; zero-budget safe (0% thay vì chia 0); tenant-scoped qua `check_campaign_access`
+
+Frontend:
+- `BudgetSummary` type + `budgetApi.getBudgetSummary`
+- Campaigns drawer "Phân bổ Ngân sách theo Kênh": hiển thị tổng quan (ngân sách/phân bổ/đã chi/còn lại + thanh spent_pct màu theo ngưỡng 80/100%) và "Đã chi" từng kênh
+
+Tests `test_budget_workstream.py` (7): over-budget 400, duplicate channel 400, within-budget 200, spent tracking delta, zero-budget no-division, cross-tenant 403/404, unauth 401
+
+Verification:
+- pytest budget + tasks + lifecycle + quota → 48 passed
+- FE tsc + eslint + build → pass
+- `detect_changes --scope all`: 34 symbols, risk medium
+
+## Next — Phase 4+ (not started)
+- Workstream C: KPI targets CRUD + real metrics (validate metric_name allowlist, unit)
+- Workstream D: Tasks/Notifications
+- Workstream E: Auth (logout revocation, change password)
 

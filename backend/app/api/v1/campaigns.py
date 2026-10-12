@@ -7,8 +7,8 @@ from app.core.pagination import Page, PageParams, page_params, paginate_query
 from app.core.security import RoleChecker, get_current_user
 from app.services import quota
 from app.services import campaign_lifecycle
-from app.models.entities import Campaign, Product, User, CampaignMember, WorkspaceMember, Workspace, MarketingContent, CampaignBudgetAllocation, CampaignKPITarget, MarketingChannel, Task
-from app.schemas.schemas import CampaignCreate, CampaignUpdate, CampaignResponse, ContentResponse, BudgetAllocationCreate, BudgetAllocationResponse, KPITargetCreate, KPITargetResponse
+from app.models.entities import Campaign, Product, User, CampaignMember, WorkspaceMember, Workspace, MarketingContent, CampaignBudgetAllocation, CampaignKPITarget, MarketingChannel, Task, CampaignMetric
+from app.schemas.schemas import CampaignCreate, CampaignUpdate, CampaignResponse, ContentResponse, BudgetAllocationCreate, BudgetAllocationResponse, BudgetSummaryResponse, BudgetChannelSummary, KPITargetCreate, KPITargetResponse
 
 
 router = APIRouter(prefix="/campaigns", tags=["Quản lý Chiến dịch"])
@@ -603,6 +603,27 @@ def update_campaign_budget_allocations(
                 detail=f"Các kênh tiếp thị không tồn tại: {list(missing)}"
             )
 
+    # Mỗi kênh chỉ được phân bổ 1 lần (DB có unique constraint — bắt sớm để
+    # trả 400 thay vì 500 IntegrityError).
+    if len(set(channel_ids)) != len(channel_ids):
+        dupes = sorted({cid for cid in channel_ids if channel_ids.count(cid) > 1})
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Kênh bị phân bổ trùng lặp: {dupes}",
+        )
+
+    # Tổng phân bổ không được vượt ngân sách chiến dịch.
+    total_planned = sum(float(a.planned_amount) for a in allocations_in)
+    total_budget = float(campaign.budget or 0)
+    if total_planned > total_budget + 1e-6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Tổng phân bổ {total_planned:,.0f} vượt ngân sách "
+                f"{total_budget:,.0f}. Hãy giảm phân bổ hoặc tăng ngân sách chiến dịch."
+            ),
+        )
+
     # Xóa phân bổ cũ và tạo mới
     db.query(CampaignBudgetAllocation).filter(CampaignBudgetAllocation.campaign_id == campaign_id).delete()
 
@@ -621,6 +642,78 @@ def update_campaign_budget_allocations(
         db.refresh(item)
 
     return created_allocations
+
+
+@router.get("/{campaign_id}/budget-summary", response_model=BudgetSummaryResponse)
+def get_campaign_budget_summary(
+    campaign_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Tổng quan ngân sách: phân bổ kế hoạch vs chi phí thực tế (từ CampaignMetric).
+
+    Trước đây không có endpoint này; UI chỉ có planned và tự bịa phần "đã chi".
+    """
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
+    check_campaign_access(campaign, current_user, db)
+
+    allocations = db.query(CampaignBudgetAllocation).filter(
+        CampaignBudgetAllocation.campaign_id == campaign_id
+    ).all()
+
+    # Chi phí thực tế theo kênh (SUM cost từ metrics đã ghi nhận).
+    spent_rows = (
+        db.query(
+            CampaignMetric.channel_id,
+            CampaignMetric.cost,
+        )
+        .filter(CampaignMetric.campaign_id == campaign_id)
+        .all()
+    )
+    spent_by_channel: dict = {}
+    for ch_id, cost in spent_rows:
+        spent_by_channel[ch_id] = spent_by_channel.get(ch_id, 0.0) + float(cost or 0.0)
+
+    channel_names = {
+        c.id: c.name
+        for c in db.query(MarketingChannel).filter(
+            MarketingChannel.id.in_(
+                {a.channel_id for a in allocations} | set(spent_by_channel)
+            )
+        ).all()
+    } if (allocations or spent_by_channel) else {}
+
+    # Gộp: kênh có phân bổ hoặc có chi phí (kênh chỉ chi mà chưa phân bổ vẫn hiện).
+    all_channel_ids = sorted({a.channel_id for a in allocations} | set(spent_by_channel))
+    planned_by_channel = {a.channel_id: float(a.planned_amount or 0.0) for a in allocations}
+
+    channels = [
+        BudgetChannelSummary(
+            channel_id=ch_id,
+            channel_name=channel_names.get(ch_id),
+            planned_amount=planned_by_channel.get(ch_id, 0.0),
+            spent_amount=spent_by_channel.get(ch_id, 0.0),
+        )
+        for ch_id in all_channel_ids
+    ]
+
+    total_budget = float(campaign.budget or 0.0)
+    total_allocated = sum(c.planned_amount for c in channels)
+    total_spent = sum(c.spent_amount for c in channels)
+
+    return BudgetSummaryResponse(
+        campaign_id=campaign_id,
+        total_budget=round(total_budget, 2),
+        total_allocated=round(total_allocated, 2),
+        total_spent=round(total_spent, 2),
+        unallocated_amount=round(max(0.0, total_budget - total_allocated), 2),
+        remaining_amount=round(total_budget - total_spent, 2),
+        allocated_pct=round(100.0 * total_allocated / total_budget, 2) if total_budget > 0 else 0.0,
+        spent_pct=round(100.0 * total_spent / total_budget, 2) if total_budget > 0 else 0.0,
+        channels=channels,
+    )
 
 
 # --- KPI TARGETS ENDPOINTS ---

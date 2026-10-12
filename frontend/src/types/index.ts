@@ -562,6 +562,23 @@ export interface BudgetAllocation {
   };
 }
 
+export interface BudgetSummary {
+  campaign_id: number;
+  total_budget: number;
+  total_allocated: number;
+  total_spent: number;
+  unallocated_amount: number;
+  remaining_amount: number;
+  allocated_pct: number;
+  spent_pct: number;
+  channels: {
+    channel_id: number;
+    channel_name: string | null;
+    planned_amount: number;
+    spent_amount: number;
+  }[];
+}
+
 export interface KPITarget {
   id?: number;
   campaign_id?: number;

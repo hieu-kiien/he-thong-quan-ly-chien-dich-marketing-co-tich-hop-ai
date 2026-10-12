@@ -269,6 +269,27 @@ class BudgetAllocationResponse(BudgetAllocationBase):
     channel: Optional[ChannelResponse] = None
     model_config = ConfigDict(from_attributes=True)
 
+
+class BudgetChannelSummary(BaseModel):
+    """Phân bổ kế hoạch vs chi phí thực tế của một kênh."""
+    channel_id: int
+    channel_name: Optional[str] = None
+    planned_amount: float = 0.0
+    spent_amount: float = 0.0
+
+
+class BudgetSummaryResponse(BaseModel):
+    """Tổng quan ngân sách 1 chiến dịch: kế hoạch phân bổ, đã chi (từ metrics), còn lại."""
+    campaign_id: int
+    total_budget: float
+    total_allocated: float
+    total_spent: float
+    unallocated_amount: float
+    remaining_amount: float
+    allocated_pct: float
+    spent_pct: float
+    channels: List[BudgetChannelSummary] = []
+
 # --- KPI TARGET ---
 class KPITargetBase(BaseModel):
     metric_name: str = Field(..., min_length=1, max_length=100)
