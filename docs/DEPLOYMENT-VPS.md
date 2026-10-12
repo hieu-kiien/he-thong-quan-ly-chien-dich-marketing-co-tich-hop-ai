@@ -345,7 +345,7 @@ trong ba commit dưới chưa được đẩy lên server.
 
 ### Còn dở
 
-- **Resend** vẫn chờ người vận hành dán API key.
+- **Resend trên VPS đã hoàn tất** (2026-10-11, xem mục cuối tài liệu).
 - **Gộp chuỗi fallback (combos kiểu 9Router)**: hiện mới có Smart Fallback
   trong app, chưa có chuỗi do người dùng đặt tên. Việc tiếp theo hợp lý.
 - Ba việc "đáng làm" trong mục dự án (API gọi trùng, Google Fonts tự host,
@@ -390,14 +390,60 @@ Làm bằng browser skill (bsk) trên phiên đăng nhập sẵn của người 
    lấy đầy đủ giá trị CNAME phải tạo key **Full access** tạm, đọc xong **xoá
    ngay** (đã làm đúng vậy).
 
-### Còn lại trên VPS (đang ngỏng, chưa làm được)
+### Còn lại trên VPS — đã hoàn tất (2026-10-11)
 
-Thêm bốn dòng này vào `/opt/marketflow/backend/.env` rồi
-`systemctl restart marketflow-api` (chép key từ `backend/.env` máy này):
+Bốn dòng env đã ghi vào `/opt/marketflow/backend/.env` (lưu ý: bản cũ trên VPS
+đang có `EMAIL_PROVIDER="none"` — giá trị placeholder, không phải thiếu key) rồi
+`systemctl restart marketflow-api`. Từ chối `none` sang `resend` + thêm
+`RESEND_API_KEY` và `EMAIL_FROM_NAME`.
 
-```env
-EMAIL_PROVIDER=resend
-RESEND_API_KEY=re_5VDLniyM_JfYZAhNx...   # xem backend/.env may nay
-EMAIL_FROM_ADDRESS=no-reply@marketing.kienhieu.id.vn
-EMAIL_FROM_NAME=MarketFlow AI
-```
+## Sự cố VPS chết và khôi phục (2026-10-11)
+
+### Diễn biến
+
+1. ~12:02 UTC VPS tắt đột ngột (panel CloudCode ghi `STOPPED`). Domain timeout,
+   SSH reset, tunnel báo error 1033.
+2. Panel `my.cloudcode.io.vn` lỗi HTTP 500; panel mới **`vps.cloud.codes`**
+   (`cloudcode.io.vn/my` cũng trỏ tới hệ thống này) vẫn chạy. Người vận hành
+   bấm **Start** trên trang `vps.cloud.codes/servers/639a6009`.
+3. VPS lên (uptime 4 phút) nhưng **domain vẫn chết**.
+
+### Hai nguyên nhân và cách sửa
+
+1. **Bản ghi DNS tunnel phải Proxied (mây cam).** Sau khi VPS chạy lại,
+   `marketing.kienhieu.id.vn` (CNAME → `<tunnel-uuid>.cfargotunnel.com`) đang ở
+   chế độ **DNS only**. Resolver đuổi theo CNAME và chỉ nhận được
+   `fd10:aec2:5dae::` — IPv6 unique-local, không giao thông được → timeout cả
+   từ trong VPS lẫn ngoài. Bật **Proxy status** trong DNS dashboard là xong
+   ngay (trả IP edge `104.21.x/172.67.x`, front 200).
+   - **Khác với record Resend** ở trên: record mail (TXT/CNAME rsend, send)
+     phải **DNS only**; record **tunnel hostname** phải **Proxied**. Hai kiểu
+     record, hai quy tắc ngược nhau — đừng lẫn.
+2. **Quyền thư mục `/var/www/marketflow`.** scp từ Windows tạo thư mục con
+   `drwx------` (umask 077) → nginx (www-data) không đọc được → asset trả
+   fallback SPA (HTML 2023 byte) hoặc 404 dù file có trên đĩa. Fix:
+   `find /var/www/marketflow -type d -exec chmod 755 {} +` và
+   `find /var/www/marketflow -type f -exec chmod 644 {} +`.
+   Cloudflare còn cache briefly cái 404 cũ — request có query `?v=2` xác nhận
+   file phục vụ đúng, cache tự hết sau vài phút.
+
+### Việc deploy dở dang trong lúc VPS chết đã hoàn tất
+
+- Kéo 7 commit mới nhất (`ca713fd`) vào `/opt/marketflow`.
+- nginx đổi sang `deploy/vps/nginx-marketflow.conf` (gzip, CF-Connecting-IP,
+  timeout 600s, `/api/`+`/assets/` `^~`, `.txt/.xml/.ico` thiếu → 404).
+- Frontend build lại local với `VITE_AI_API_URL=` **trống** (bỏ URL Render đã
+  chết trong `frontend/.env`) và `VITE_API_URL=/api/v1`; upload `dist/` lên
+  `/var/www/marketflow`.
+- Host key SSH của `vn-hn.cloudcode.io.vn:30513` thay đổi sau khi máy được
+  Start lại (có thể provider chuyển VM sang node khác) — đã ghi nhận key mới.
+
+### Panel VPS
+
+| Link | Ghi chú |
+| --- | --- |
+| `https://cloudcode.io.vn/my` | Danh sách server |
+| `https://vps.cloud.codes/servers/639a6009` | Server NAT-GO-300PAG (Start/Restart/Kill) |
+
+Lưu ý: browser bsk (automation) gặp `ERR_SSL_UNRECOGNIZED_NAME_ALERT` khi mở
+`vps.cloud.codes` — thao tác Start phải làm tay trên browser người vận hành.
