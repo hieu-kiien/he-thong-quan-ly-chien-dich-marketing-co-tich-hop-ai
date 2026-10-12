@@ -287,13 +287,12 @@ Cách giảm là bớt JS phải chạy trước khi vẽ, không phải sửa n
    host hai subset đó rồi `preload` sẽ bỏ được cả lối tắt DNS/TLS sang bên thứ
    ba, và cache 30 ngày qua `assets/` luôn. Tách subset xong còn bỏ được
    cyrillic-ext chưa ai dùng.
-5. **Cloudflare đang trả gzip chứ không phải brotli.** Request từ Chrome có
-   `accept-encoding: br` nhưng phản hồi vẫn `content-encoding: gzip` vì nginx
-   đã nén từ đầu và Cloudflare chỉ chuyển tiếp bản đã nén. Nếu bỏ gzip ở nginx,
-   Cloudflare sẽ nén lại bằng brotli (nhỏ hơn gzip khoảng 15–20 %) và VPS đỡ
-   tốn CPU nén. Cần đo trước khi đổi để chắc Cloudflare thật sự nén lại response
-   đi qua tunnel — **chưa làm**, chỉ ghi lại lựa chọn này. Gzip ở nginx vẫn giữ
-   nguyên trong repo cho tới khi có quyết định.
+5. ~~**Cloudflare đang trả gzip chứ không phải brotli.**~~ **Đã làm** (phiên
+   2026-10-12 chiều): cài `libnginx-mod-http-brotli-filter` trên VPS và bật
+   `brotli on` trong nginx. Request `accept-encoding: br` giờ trả
+   `content-encoding: br` (xác minh qua CF: HTML 2237 B identity → 904 B
+   brotli). Gzip giữ nguyên làm fallback cho client không ho tro br. Xem
+   bảng audit ở cuối tài liệu.
 6. **Dữ liệu mẫu nằm trong bundle production.** Các hằng `MOCK_CAMPAIGNS`,
    `MOCK_CHANNEL_ATTRIBUTION` trong `frontend/src/services/mockData.ts` nằm
    trong `index-*.js` phục vụ mọi lượt vào trang. Nếu chỉ là dự phòng khi API
@@ -485,3 +484,61 @@ Lưu ý: browser bsk (automation) gặp `ERR_SSL_UNRECOGNIZED_NAME_ALERT` khi m�
    `import()` khi vào nhánh Offline Demo — `api.ts` (35 điểm) và
    `AIDoctorWidget`. Bundle chính không còn fixture (đã xác minh bằng
    grep trên `dist/assets/index-*.js`).
+
+## Phiên 2026-10-12 (chiều) — sửa CI xanh + tối ưu tài nguyên VPS
+
+### CI xanh sau ≥10 commit đỏ liên tiếp
+
+Lý do 4 job gate fail, đã sửa ở commit `706ae5f`:
+
+1. **Gate 7 Cloudflare Worker** — `wrangler.jsonc` bị xóa chủ đích
+   (`500cacf`) → job luôn "No config file detected". Gỡ job + bỏ khỏi
+   `needs` của `docker-verify`.
+2. **Gate 1 chain AI** — timeout hop dùng `min(timeout, per_hop)` với
+   default 10s → hop nhận 7s < 15s (cần cho test). Sửa công thức thành
+   `max(15, min(timeout, per_hop))` và nâng default `AI_TIMEOUT_SECONDS`
+   10 → 60 khớp `.env.example`.
+3. **Gate 3 smoke E2E** — selector `text=MarketFlow AI` không còn trên
+   login (brand chỉ trong Sidebar sau đăng nhập). Đổi sang `#login-title`.
+4. **Gate 4 WCAG** — selector "Đăng ký tài khoản mới" đổi thành
+   `button.text-action:has-text("Đăng ký")`.
+
+Kết quả: run `38231477928` **success** (toàn bộ pipeline, gồm Docker).
+
+### Tối ưu tài nguyên VPS (audit thật + sửa)
+
+Audit trước khi sửa (2 GB RAM, 2 vCPU, DB 32 MB):
+
+| Hạng mục | Trước | Sau | Ghi chú |
+| --- | --- | --- | --- |
+| nginx brotli | chưa cài | `libnginx-mod-http-brotli-filter` + `brotli on` | HTML 2237 B → 904 B (−60%); CF trả `Content-Encoding: br` |
+| Font `/fonts/` | `no-cache` (bị location `/` nuốt) | `max-age=2592000` (30 ngày) | thêm `location ^~ /fonts/` |
+| Postgres `shared_buffers` | 384 MB | 128 MB | DB chỉ 32 MB; giải phóng RAM cho page cache |
+| Postgres `work_mem` | 8 MB | 4 MB | truy vấn nhỏ, 4 MB đủ |
+| Postgres `max_connections` | 40 | 30 | 2 uvicorn worker + pool nội bộ |
+| fwupd | active (~46 MB) | inactive | không cần trên VPS |
+
+- Script tune: `deploy/vps/tune-postgres.sh` (backup conf, sed, reload/
+  restart postgres). Lưu ý: `shared_buffers`/`max_connections` cần
+  **restart** postgres, `reload` không đủ.
+- nginx conf thật trên VPS đã đồng bộ từ `deploy/vps/nginx-marketflow.conf`.
+- Verify production `https://marketing.kienhieu.id.vn`:
+  - HTML: `Content-Encoding: br` (CF) + gzip fallback OK.
+  - Font: `Cache-Control: public, max-age=2592000`, `cf-cache-status: MISS`.
+  - API `/api/v1/health`: `{"status":"healthy"}`.
+  - RAM sau tune: 620 Mi used / 1.3 Gi available (trước: 637 Mi / 1.3 Gi).
+- Scheduler/AI job worker **an toàn với 2 uvicorn worker** (đã audit):
+  schedule dùng conditional UPDATE `PLANNED→EXECUTED`, job queue dùng
+  `SELECT … FOR UPDATE SKIP LOCKED`.
+
+### Nợ kỹ thuật còn lại (chưa làm ở phiên này)
+
+- `metrics.py`: mỗi handler đăng ký 2–4 path (alias cũ + mới). Frontend
+  chỉ dùng path mới; path cũ chỉ test dùng. Giữ lại để không break test,
+  cần migration nếu gỡ.
+- Biến config placeholder (`OLLAMA_BASE_URL` / `ANTHROPIC_BASE_URL` /
+  `HF_BASE_URL`): cố ý giữ để chặn env hệ thống lọt vào settings (xem
+  comment trong `config.py`), không phải biến chết.
+- Chưa có công cụ migration (dùng `create_all()`); chưa bật mutation
+  testing; email Resend đã Verified nhưng chưa nối luồng publish tự động.
+
