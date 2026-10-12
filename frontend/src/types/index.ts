@@ -43,6 +43,8 @@ export interface Campaign {
   end_date: string;
   budget: number;
   status: 'DRAFT' | 'PLANNED' | 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'ARCHIVED';
+  /** % hoàn thành theo task; null khi chưa có task (backend không bịa số). */
+  progress_pct?: number | null;
   key_message?: string;
   primary_cta?: string;
   target_kpi_name?: string;

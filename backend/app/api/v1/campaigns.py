@@ -6,7 +6,8 @@ from app.core.database import get_db
 from app.core.pagination import Page, PageParams, page_params, paginate_query
 from app.core.security import RoleChecker, get_current_user
 from app.services import quota
-from app.models.entities import Campaign, Product, User, CampaignMember, WorkspaceMember, Workspace, MarketingContent, CampaignBudgetAllocation, CampaignKPITarget, MarketingChannel
+from app.services import campaign_lifecycle
+from app.models.entities import Campaign, Product, User, CampaignMember, WorkspaceMember, Workspace, MarketingContent, CampaignBudgetAllocation, CampaignKPITarget, MarketingChannel, Task
 from app.schemas.schemas import CampaignCreate, CampaignUpdate, CampaignResponse, ContentResponse, BudgetAllocationCreate, BudgetAllocationResponse, KPITargetCreate, KPITargetResponse
 
 
@@ -175,6 +176,46 @@ def get_workspace_filter(
     return target
 
 
+def _with_progress(db: Session, campaign: Campaign) -> CampaignResponse:
+    """Kèm progress_pct tính từ task; None khi chưa có task."""
+    resp = CampaignResponse.model_validate(campaign)
+    counts = db.query(Task.status).filter(Task.campaign_id == campaign.id).all()
+    done = sum(1 for (s,) in counts if (s or "").upper() in ("DONE", "COMPLETED"))
+    resp.progress_pct = campaign_lifecycle.compute_progress_pct(done, len(counts))
+    return resp
+
+
+def _bulk_task_progress(db: Session, campaign_ids: list[int]) -> dict[int, dict]:
+    if not campaign_ids:
+        return {}
+    rows = (
+        db.query(Task.campaign_id, Task.status)
+        .filter(Task.campaign_id.in_(campaign_ids))
+        .all()
+    )
+    out: dict[int, dict] = {cid: {"done": 0, "total": 0} for cid in campaign_ids}
+    for cid, tstatus in rows:
+        out[cid]["total"] += 1
+        if (tstatus or "").upper() in ("DONE", "COMPLETED"):
+            out[cid]["done"] += 1
+    return out
+
+
+def _serialize_campaign_list(
+    db: Session, campaigns: list[Campaign]
+) -> list[CampaignResponse]:
+    progress = _bulk_task_progress(db, [c.id for c in campaigns])
+    result: list[CampaignResponse] = []
+    for c in campaigns:
+        resp = CampaignResponse.model_validate(c)
+        counts = progress.get(c.id, {"done": 0, "total": 0})
+        resp.progress_pct = campaign_lifecycle.compute_progress_pct(
+            counts["done"], counts["total"]
+        )
+        result.append(resp)
+    return result
+
+
 @router.get("", response_model=Page[CampaignResponse])
 def get_campaigns(
     workspace_id: Optional[int] = Depends(get_workspace_filter),
@@ -193,10 +234,13 @@ def get_campaigns(
 ):
     query = db.query(Campaign)
 
-    # Tenant scope (fail-closed): mọi role trừ ADMIN chỉ thấy campaign thuộc workspace
-    # họ thực sự có quyền, cộng campaign legacy workspace_id IS NULL do chính họ sở hữu.
-    if current_user.role != "ADMIN":
-        query = _apply_tenant_scope(query, Campaign, current_user, db, Campaign.owner_id)
+    # Soft-delete: ẩn ARCHIVED khỏi list mặc định. Client lọc status=ARCHIVED
+    # khi cần xem thùng rác thì giữ nguyên (không áp hidden filter).
+    want_archived = status_filter is not None and campaign_lifecycle.normalize_status(status_filter) == "ARCHIVED"
+    if not want_archived:
+        query = query.filter(
+            Campaign.status.notin_(list(campaign_lifecycle.HIDDEN_FROM_DEFAULT_LIST))
+        )
 
     # Phân quyền record-level: Marketer chỉ xem được chiến dịch của mình hoặc mình là thành viên
     if current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER"):
@@ -254,10 +298,13 @@ def get_campaigns(
             detail=f"Giá trị sort không hợp lệ. Chỉ nhận: {', '.join(_CAMPAIGN_SORT_KEYS)}.",
         )
 
-    return paginate_query(
-        query.order_by(*order_by),
-        pagination,
-        serializer=lambda c: CampaignResponse.model_validate(c),
+    page = paginate_query(query.order_by(*order_by), pagination)
+    # Bulk progress (không N+1): một query task cho cả trang.
+    return Page.build(
+        items=_serialize_campaign_list(db, page.items),
+        total=page.total,
+        page=page.page,
+        page_size=page.page_size,
     )
 
 @router.post("", response_model=CampaignResponse, status_code=status.HTTP_201_CREATED)
@@ -339,7 +386,7 @@ def create_campaign(
         start_date=req.start_date,
         end_date=req.end_date,
         budget=req.budget,
-        status="DRAFT"
+        status=campaign_lifecycle.assert_create_status(req.status),
     )
     db.add(campaign)
     db.commit()
@@ -350,7 +397,7 @@ def create_campaign(
     db.add(member)
     db.commit()
 
-    return CampaignResponse.model_validate(campaign)
+    return _with_progress(db, campaign)
 
 
 @router.get("/{campaign_id}", response_model=CampaignResponse)
@@ -363,7 +410,7 @@ def get_campaign(
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
     check_campaign_access(campaign, current_user, db)
-    return CampaignResponse.model_validate(campaign)
+    return _with_progress(db, campaign)
 
 @router.put("/{campaign_id}", response_model=CampaignResponse)
 def update_campaign(
@@ -389,7 +436,6 @@ def update_campaign(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Không được cập nhật trường '{field}'.",
             )
-        setattr(campaign, field, value)
 
     # Sửa `status` hoặc `budget` là hành động quản trị, không phải thao tác
     # nội dung. Trước đây endpoint này chỉ kiểm tra "có quyền đọc campaign" nên
@@ -404,13 +450,21 @@ def update_campaign(
                 detail="Chỉ chủ sở hữu hoặc quản lý mới được thay đổi trạng thái/ngân sách chiến dịch",
             )
 
+    if "status" in update_data:
+        update_data["status"] = campaign_lifecycle.assert_transition(
+            campaign.status, update_data["status"]
+        )
+
+    for field, value in update_data.items():
+        setattr(campaign, field, value)
+
     # Validate lại ngày nếu có cập nhật
     if campaign.end_date < campaign.start_date:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Ngày kết thúc không được trước ngày bắt đầu")
 
     db.commit()
     db.refresh(campaign)
-    return CampaignResponse.model_validate(campaign)
+    return _with_progress(db, campaign)
 
 @router.delete("/{campaign_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_campaign(
@@ -419,15 +473,21 @@ def delete_campaign(
     user_payload=Depends(RoleChecker(allowed_roles=["MANAGER", "AGENCY_MANAGER"])), # Chỉ quản lý/agency manager mới được xóa!
     db: Session = Depends(get_db)
 ):
+    """Soft-delete: chuyển sang ARCHIVED, giữ nguyên metrics/tasks/history.
+
+    Hard-delete cascade từng làm mất lịch sử KPI. ARCHIVED ẩn khỏi list mặc
+    định; manager/ADMIN vẫn GET được theo id nếu cần đối soát.
+    """
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
-    
+
     # Xác thực quyền truy cập đối tượng và cô lập Tenant Isolation
     check_campaign_access(campaign, current_user, db)
-    
-    db.delete(campaign)
-    db.commit()
+
+    if campaign.status != "ARCHIVED":
+        campaign.status = "ARCHIVED"
+        db.commit()
     return None
 
 @router.get("/{campaign_id}/contents", response_model=Page[ContentResponse])

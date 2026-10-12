@@ -717,6 +717,7 @@ export const campaignApi = {
     start_date: string;
     end_date: string;
     budget: number;
+    status?: Campaign['status'];
   }): Promise<Campaign> => {
     try {
       const res = await apiClient.post('/campaigns', data);
@@ -731,7 +732,7 @@ export const campaignApi = {
         id: Date.now(),
         owner_id: 1,
         ...data,
-        status: 'ACTIVE',
+        status: (data.status as Campaign['status']) || 'DRAFT',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };

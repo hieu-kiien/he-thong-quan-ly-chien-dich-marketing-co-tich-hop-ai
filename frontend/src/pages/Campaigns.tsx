@@ -718,7 +718,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
     setIsSubmitting(true);
     let newCamp: Campaign | null = null;
     try {
-      // 1. Create Campaign
+      // 1. Create Campaign — gửi thẳng trạng thái wizard chọn (ACTIVE/PLANNED/DRAFT).
+      // Trước đây luôn create DRAFT rồi chỉ update khi launchStatus==='DRAFT'
+      // (ngược logic) → user chọn ACTIVE nhưng campaign vẫn DRAFT.
       newCamp = await campaignApi.create({
         name: wizardData.name.trim(),
         product_id: Number(wizardData.product_id),
@@ -726,14 +728,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
         audience: wizardData.audience.trim(),
         start_date: wizardData.start_date,
         end_date: wizardData.end_date,
-        budget: Number(wizardData.budget)
+        budget: Number(wizardData.budget),
+        status: wizardData.launchStatus
       });
-
-      // Update status if DRAFT was chosen
-      if (wizardData.launchStatus === 'DRAFT') {
-        await campaignApi.update(newCamp.id, { status: 'DRAFT' });
-        newCamp.status = 'DRAFT';
-      }
 
       // 2. Persist Generated Creatives if available (Starting at AI_DRAFT per state machine)
       if (generatedCreatives) {

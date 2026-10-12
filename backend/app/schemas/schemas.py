@@ -217,7 +217,14 @@ class CampaignBase(BaseModel):
         return self
 
 class CampaignCreate(CampaignBase):
-    pass
+    # Trạng thái khởi tạo: wizard có thể gửi ACTIVE/PLANNED ngay (không bắt
+    # buộc create DRAFT rồi update — đường cũ làm user chọn ACTIVE nhưng
+    # campaign vẫn lưu DRAFT).
+    status: Optional[str] = Field(
+        "DRAFT",
+        pattern="^(DRAFT|PLANNED|ACTIVE)$",
+        description="Trạng thái khởi tạo. Không nhận PAUSED/COMPLETED/ARCHIVED.",
+    )
 
 class CampaignUpdate(BaseModel):
     name: Optional[str] = None
@@ -282,6 +289,8 @@ class CampaignResponse(CampaignBase):
     status: str
     created_at: datetime
     updated_at: datetime
+    # % hoàn thành theo task (None khi chưa có task — không bịa số).
+    progress_pct: Optional[int] = None
     owner: Optional[UserResponse] = None
     product: Optional[ProductResponse] = None
     budget_allocations: Optional[List[BudgetAllocationResponse]] = None

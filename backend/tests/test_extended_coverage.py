@@ -875,19 +875,33 @@ class TestSQLiteForeignKeyIntegrity:
         assert r2.status_code == 404
         assert r2.status_code != 500
 
-    def test_cascade_delete_campaign_removes_dependent_records_cleanly(self, client, db_session):
-        """Xóa chiến dịch (Manager) kích hoạt xóa cascade toàn bộ contents, metrics, schedules và members liên quan mà không vi phạm ràng buộc."""
+    def test_soft_delete_campaign_archives_and_keeps_history(self, client, db_session):
+        """Xóa chiến dịch (Manager) = soft-delete ARCHIVED: giữ metrics/tasks, ẩn khỏi list mặc định."""
         mgr_headers = get_manager_headers(client)
 
         # Xác nhận chiến dịch 1 đang có contents và metrics
         assert db_session.query(MarketingContent).filter(MarketingContent.campaign_id == 1).count() > 0
         assert db_session.query(CampaignMetric).filter(CampaignMetric.campaign_id == 1).count() > 0
 
-        # Manager thực hiện xóa
+        # Manager thực hiện xóa (soft)
         del_resp = client.delete("/api/v1/campaigns/1", headers=mgr_headers)
         assert del_resp.status_code == 204
 
-        # Kiểm tra sạch sẽ, không còn bản ghi mồ côi
-        assert db_session.query(Campaign).filter(Campaign.id == 1).first() is None
-        assert db_session.query(MarketingContent).filter(MarketingContent.campaign_id == 1).count() == 0
-        assert db_session.query(CampaignMetric).filter(CampaignMetric.campaign_id == 1).count() == 0
+        # Campaign vẫn tồn tại ở trạng thái ARCHIVED; history không mất
+        camp = db_session.query(Campaign).filter(Campaign.id == 1).first()
+        assert camp is not None
+        assert camp.status == "ARCHIVED"
+        assert db_session.query(MarketingContent).filter(MarketingContent.campaign_id == 1).count() > 0
+        assert db_session.query(CampaignMetric).filter(CampaignMetric.campaign_id == 1).count() > 0
+
+        # List mặc định ẩn ARCHIVED
+        list_resp = client.get("/api/v1/campaigns", headers=mgr_headers)
+        assert list_resp.status_code == 200
+        ids = [c["id"] for c in list_resp.json()["items"]]
+        assert 1 not in ids
+
+        # Lọc status=ARCHIVED vẫn thấy (thùng rác)
+        arch = client.get("/api/v1/campaigns?status=ARCHIVED", headers=mgr_headers)
+        assert arch.status_code == 200
+        arch_ids = [c["id"] for c in arch.json()["items"]]
+        assert 1 in arch_ids

@@ -785,7 +785,7 @@ class TestSecurityPayloadsAndDbIntegrity:
         assert camp_count > 0
 
     def test_27_db_cascade_deletion_cleans_contents_metrics_reviews(self, client: TestClient, multi_workspace_env, db_session: Session):
-        """Thử nghiệm độ bền CSDL: Cascade delete campaign có xóa sạch contents, metrics, review logs, schedules liên quan không."""
+        """Xóa campaign = soft-delete ARCHIVED: giữ contents/metrics/reviews/schedules (không orphan, không mất history)."""
         db = db_session
         mgr_headers = multi_workspace_env["headers"]["mgr_a"]
         mkt_headers = multi_workspace_env["headers"]["mkt_a"]
@@ -838,13 +838,25 @@ class TestSecurityPayloadsAndDbIntegrity:
         del_resp = client.delete(f"/api/v1/campaigns/{cid}", headers=manager_delete_headers)
         assert del_resp.status_code == 204, f"Delete failed: {del_resp.status_code}"
 
-        # 7. Kiểm chứng thực tế: Toàn bộ dữ liệu con bị xóa sạch sẽ, KHÔNG CÒN BẢN GHI RÁC (Zero Orphan Rows)
-        assert db.query(Campaign).filter(Campaign.id == cid).first() is None
-        assert db.query(MarketingContent).filter(MarketingContent.campaign_id == cid).count() == 0
-        assert db.query(ContentReview).filter(ContentReview.content_id == cnt1.id).count() == 0
-        assert db.query(MarketingSchedule).filter(MarketingSchedule.content_id == cnt1.id).count() == 0
-        assert db.query(CampaignMetric).filter(CampaignMetric.campaign_id == cid).count() == 0
-        assert db.query(CampaignMember).filter(CampaignMember.campaign_id == cid).count() == 0
+        # 7. Kiểm chứng: campaign chuyển ARCHIVED; TOÀN BỘ dữ liệu con được GIỮ NGUYÊN
+        # (soft-delete để không mất metrics/audit history; không có bản ghi mồ côi vì
+        # campaign row vẫn tồn tại).
+        camp = db.query(Campaign).filter(Campaign.id == cid).first()
+        assert camp is not None
+        assert camp.status == "ARCHIVED"
+        assert db.query(MarketingContent).filter(MarketingContent.campaign_id == cid).count() == 2
+        assert db.query(ContentReview).filter(ContentReview.content_id == cnt1.id).count() == 1
+        assert db.query(MarketingSchedule).filter(MarketingSchedule.content_id == cnt1.id).count() == 1
+        assert db.query(CampaignMetric).filter(CampaignMetric.campaign_id == cid).count() == 2
+        assert db.query(CampaignMember).filter(CampaignMember.campaign_id == cid).count() == 1
+
+        # List mặc định ẩn ARCHIVED (thùng rác vẫn truy cập được qua status=ARCHIVED)
+        listed = client.get("/api/v1/campaigns", headers=mgr_headers)
+        assert listed.status_code == 200
+        assert cid not in [c["id"] for c in listed.json()["items"]]
+        archived = client.get("/api/v1/campaigns?status=ARCHIVED", headers=mgr_headers)
+        assert archived.status_code == 200
+        assert cid in [c["id"] for c in archived.json()["items"]]
 
     def test_28_db_foreign_key_violation_and_check_constraints_blocked(self, client: TestClient, multi_workspace_env):
         """Xác minh các vi phạm khóa ngoại (Foreign Key) và Check Constraint bị chặn sạch sẽ không gây sập DB."""
