@@ -88,8 +88,9 @@ authTest.describe('WCAG 2.2 AA Accessibility & UX Suite', () => {
         await setupMockApiRoutes(page);
         await page.goto('/');
 
-        // Switch to Register page
-        const switchToRegisterBtn = page.locator('button:has-text("Đăng ký tài khoản mới")');
+        // Switch to Register page — nút trên LoginPage Halloween ghi "Đăng ký"
+        // (signup-row), không còn "Đăng ký tài khoản mới" của bản cũ.
+        const switchToRegisterBtn = page.locator('button.text-action:has-text("Đăng ký")');
         await expect(switchToRegisterBtn).toBeVisible();
         await switchToRegisterBtn.click();
 

@@ -921,11 +921,19 @@ class AIService:
                 any_attempted = True
                 # Chia đều ngân sách thời gian còn lại cho các hop sắp tới; với
                 # chuỗi >1 bước, mỗi bước tối đa 1 lần retry nội bộ (failover đã
-                # là retry cấp cao hơn).
+                # là retry cấp cao hơn). Mỗi hop nhận ít nhất 15s (đúng comment
+                # ở trên) — nếu AI_TIMEOUT_SECONDS tổng quá nhỏ (mặc định dev
+                # 10s) thì vẫn nâng lên 15s/hop thay vì ép xuống ~7s; production
+                # dùng 420s nên không ảnh hưởng.
                 hops_left = n_hops - idx
-                remaining = max(15.0, deadline - time.time())
-                timeout_override = int(min(float(self.timeout), remaining / hops_left)) if n_hops > 1 else None
-                retries_override = min(self.max_retries, 1) if n_hops > 1 else None
+                remaining = max(0.0, deadline - time.time())
+                if n_hops > 1:
+                    per_hop = remaining / hops_left if hops_left else remaining
+                    timeout_override = int(max(15.0, min(float(self.timeout), per_hop)))
+                    retries_override = min(self.max_retries, 1)
+                else:
+                    timeout_override = None
+                    retries_override = None
                 try:
                     raw_response = self._call_provider_with_retry(
                         system_prompt, user_prompt,

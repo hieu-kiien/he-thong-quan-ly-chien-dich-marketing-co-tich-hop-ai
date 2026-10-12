@@ -452,57 +452,12 @@ jobs:
         run: npm audit --audit-level=high || echo "::warning::npm audit found advisories"
 
   # =========================================================================
-  # Gate 7: Cloudflare Worker Typecheck & Config Consistency
-  #
-  # Worker nằm ngoài backend + frontend nên trước đây không gate nào typecheck nó.
-  # Lỗi trong đường Cron chỉ lộ ra lúc deploy — và lỗi so khớp cron là loại
-  # im lặng: handler thoát ngay mà không có dấu vết.
+  # Gate 7 đã GỠ (2026-10-12): Cloudflare Worker không còn trong hạ tầng.
+  # wrangler.jsonc bị xóa có chủ đích ở commit 500cacf khi chuyển toàn bộ
+  # ứng dụng về một VPS (Cloudflare chỉ còn DNS/Tunnel). Job typecheck Worker
+  # vì thế always-fail ("No config file detected") và làm đỏ toàn pipeline.
+  # Nếu sau này khôi phục Worker, thêm lại job kèm wrangler.jsonc.
   # =========================================================================
-  cloudflare-worker-verify:
-    name: "Cloudflare Worker Typecheck & Config Consistency"
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # Node 22, KHÔNG phải 20: wrangler từ bản mới yêu cầu >= v22 và sẽ báo
-      # "Wrangler requires at least Node.js v22.0.0" rồi exit 1. Bước
-      # `wrangler types` bên dưới vì vậy không chạy được trên Node 20.
-      - name: Set up Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: cloudflare/package-lock.json
-
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
-        working-directory: cloudflare
-
-      # Worker nằm ngoài backend + frontend nên trước đây KHÔNG có gate nào
-      # typecheck nó — lỗi TS trong đường Cron chỉ lộ ra lúc deploy.
-      # `worker-configuration.d.ts` là file sinh tự động (không commit) và là nơi
-      # wrangler khai báo các global type của runtime: DurableObjectNamespace,
-      # R2Bucket, Fetcher, ScheduledController, ExecutionContext. Thiếu bước này
-      # thì `tsc` báo "Cannot find name 'R2Bucket'" v.v dù code hoàn toàn đúng.
-      - name: Generate Worker types (wrangler types)
-        run: npx wrangler types
-        working-directory: cloudflare
-
-      - name: Type-check Worker
-        run: npx tsc --noEmit
-        working-directory: cloudflare
-
-      # Kiểm tra wrangler.jsonc parse được, `SCHEDULER_SECRET` có trong
-      # secrets.required, và biểu thức cron mà Worker so khớp có thật sự nằm
-      # trong triggers.crons. `controller.cron` là biểu thức cron chứ không phải
-      # tên tự đặt; nếu lệch thì scheduled() thoát ngay và lịch đăng trên
-      # Cloudflare không bao giờ chạy — lỗi im lặng, chỉ lộ lúc deploy.
-      - name: Verify wrangler config & cron consistency
-        run: npm run check:config
-        working-directory: cloudflare
 
   # =========================================================================
   # Docker Verification Gate (Requires all gates above to pass)
@@ -517,7 +472,6 @@ jobs:
       - wcag-accessibility-audit
       - performance-load-verify
       - secret-and-dependency-scan
-      - cloudflare-worker-verify
     timeout-minutes: 15
 
     env:
