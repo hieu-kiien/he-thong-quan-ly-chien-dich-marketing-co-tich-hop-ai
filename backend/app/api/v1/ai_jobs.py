@@ -151,6 +151,13 @@ class AIJobCreateRequest(BaseModel):
         None, description="ID chiến dịch (bắt buộc với kind=summary)"
     )
     prompt_version: Optional[str] = None
+    chain_id: Optional[int] = Field(
+        None,
+        description=(
+            "Chuỗi fallback (AIModelChain) sẽ dùng cho lượt gọi này; bỏ trống "
+            "thì dùng chuỗi mặc định của workspace/user nếu có."
+        ),
+    )
 
     def payload_for_queue(self) -> Dict[str, Any]:
         """Trả về payload đã chuẩn hoá để lưu vào hàng đợi (bỏ mọi field None).

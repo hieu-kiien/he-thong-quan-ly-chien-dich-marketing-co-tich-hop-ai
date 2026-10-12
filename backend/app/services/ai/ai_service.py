@@ -2,7 +2,7 @@ import time
 import json
 import hashlib
 import re
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 import httpx
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
@@ -300,6 +300,117 @@ class AIService:
             "source_id": None
         }
 
+    @staticmethod
+    def _parse_chain_hops(hops_json: Optional[str]) -> List[Dict[str, str]]:
+        """Đọc hops_json của AIModelChain -> [{"provider": ..., "model": ...}].
+
+        Một entry hỏng (thiếu provider/model, JSON lỗi) bị bỏ qua từng cái chứ
+        không làm sập cả chuỗi: người dùng sửa được record trong khi đang chạy.
+        """
+        try:
+            raw = json.loads(hops_json or "[]")
+        except Exception:
+            return []
+        if not isinstance(raw, list):
+            return []
+        hops: List[Dict[str, str]] = []
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            provider = str(item.get("provider") or "").lower().strip()
+            model = str(item.get("model") or "").strip()
+            if not provider:
+                continue
+            if not model:
+                # Record cũ có thể thiếu model: điền mặc định của provider thay
+                # vì bỏ hop im lặng (người dùng đã chủ động thêm bước này).
+                model = provider_registry.default_model_for(provider)
+            hops.append({"provider": provider, "model": model})
+        return hops
+
+    @staticmethod
+    def _chain_visible_to_user(chain, user_id: int, db: Session) -> bool:
+        """Chuỗi chỉ được dùng khi user sở hữu nó hoặc thuộc workspace của nó
+        (owner/member), hoặc là ADMIN — cùng ranh giới tenant với check_chain_access."""
+        if chain.user_id == user_id:
+            return True
+        if chain.workspace_id is None:
+            return False
+        try:
+            from app.models.entities import User, Workspace, WorkspaceMember
+            user = db.query(User).filter(User.id == user_id).first()
+            if user is not None and user.role == "ADMIN":
+                return True
+            ws = db.query(Workspace).filter(Workspace.id == chain.workspace_id).first()
+            if ws is not None and ws.owner_id == user_id:
+                return True
+            member = db.query(WorkspaceMember).filter(
+                WorkspaceMember.workspace_id == chain.workspace_id,
+                WorkspaceMember.user_id == user_id
+            ).first()
+            return member is not None
+        except Exception:
+            # Không tra được quyền thì coi như KHÔNG thấy — thà rơi về model đơn
+            # còn hơn âm thầm dùng chuỗi của tenant khác.
+            return False
+
+    def _resolve_chain_hops(
+        self,
+        db: Session,
+        user_id: int,
+        workspace_id: Optional[int],
+        context: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Chọn chuỗi fallback sẽ áp dụng cho lượt gọi này.
+
+        Trả về {"id", "name", "hops": [{provider, model}, ...]} hoặc None
+        (không có chuỗi -> giữ nguyên đường gọi một model như cũ).
+
+        Thứ tự chọn: `context["model_chain_id"]` (request truyền chain_id) ->
+        chuỗi mặc định của workspace -> chuỗi mặc định cá nhân. Fixture mode
+        (`self._api_key is not None`) luôn trả None để bảo toàn 499 test unit
+        hiện có.
+        """
+        if self._api_key is not None:
+            return None
+        from app.models.entities import AIModelChain
+
+        chain = None
+        explicit_id = context.get("model_chain_id")
+        if explicit_id:
+            try:
+                chain = db.query(AIModelChain).filter(AIModelChain.id == int(explicit_id)).first()
+            except (TypeError, ValueError):
+                chain = None
+            if chain is not None and not chain.is_active:
+                logger.warning("[AI Chain] chain_id=%s đang tắt — bỏ qua, gọi model đơn.", explicit_id)
+                chain = None
+            if chain is not None and not self._chain_visible_to_user(chain, user_id, db):
+                logger.warning("[AI Chain] chain_id=%s không thuộc phạm vi user %s — bỏ qua, gọi model đơn.", explicit_id, user_id)
+                chain = None
+        else:
+            if workspace_id is not None:
+                chain = db.query(AIModelChain).filter(
+                    AIModelChain.workspace_id == workspace_id,
+                    AIModelChain.is_default.is_(True),
+                    AIModelChain.is_active.is_(True)
+                ).order_by(AIModelChain.updated_at.desc()).first()
+            if chain is None:
+                chain = db.query(AIModelChain).filter(
+                    AIModelChain.user_id == user_id,
+                    AIModelChain.workspace_id.is_(None),
+                    AIModelChain.is_default.is_(True),
+                    AIModelChain.is_active.is_(True)
+                ).order_by(AIModelChain.updated_at.desc()).first()
+
+        if chain is None:
+            return None
+        hops = self._parse_chain_hops(chain.hops_json)
+        if not hops:
+            logger.warning("[AI Chain] chuỗi %s (%s) không có hop hợp lệ — dùng model đơn.", chain.id, chain.name)
+            return None
+        return {"id": chain.id, "name": chain.name, "hops": hops}
+
     def _detect_provider(self, key_to_use: Optional[str], model_to_use: Optional[str]) -> str:
         """Suy đoán provider khi caller không truyền tên.
 
@@ -327,10 +438,17 @@ class AIService:
         user_prompt: str,
         active_key: Optional[str] = None,
         active_model: Optional[str] = None,
-        provider: Optional[str] = None
+        provider: Optional[str] = None,
+        timeout_override: Optional[int] = None,
+        retries_override: Optional[int] = None
     ) -> str:
+        # `timeout_override`/`retries_override` chỉ dùng cho chuỗi fallback:
+        # mỗi hop nhận ngân sách thời gian/retry riêng thay vì mutation lên
+        # singleton (gọi đồng thời từ nhiều thread sẽ đua trạng thái chung).
         key_to_use = active_key if active_key is not None else self.api_key
         model_to_use = active_model if active_model is not None else self.model
+        effective_timeout = timeout_override if timeout_override is not None else self.timeout
+        effective_retries = retries_override if retries_override is not None else self.max_retries
 
         # Determine effective provider
         eff_provider = (provider or "").lower().strip()
@@ -394,12 +512,12 @@ class AIService:
         circuit_breaker.allow(eff_provider)
 
         last_error = None
-        for attempt in range(self.max_retries + 1):
+        for attempt in range(effective_retries + 1):
             # Chỉ thử breaker ở lần đầu: nếu provider đang HALF_OPEN thì lần thử dò
             # đó đã được cho qua ở `allow()`; các lần retry nội bộ không cần hỏi lại.
             attempt_started = time.monotonic()
             try:
-                with httpx.Client(timeout=self.timeout) as client:
+                with httpx.Client(timeout=effective_timeout) as client:
                     resp = client.post(url, headers=headers, json=payload)
                     if resp.status_code == 200:
                         data = resp.json()
@@ -686,6 +804,17 @@ class AIService:
         provider_requires_key = True
 
         active_provider = "gemini"
+        # Chuỗi fallback (kiểu 9Router): None = không có chuỗi -> gọi một model như cũ.
+        chain_hops: Optional[Dict[str, Any]] = None
+        target_ws_id = context.get("workspace_id")
+        if target_ws_id is None and campaign_id is not None:
+            try:
+                from app.models.entities import Campaign
+                camp = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+                if camp and camp.workspace_id:
+                    target_ws_id = camp.workspace_id
+            except Exception:
+                pass
         if self._api_key is not None:
             # 1. Test fixture override (Bảo tồn 100% zero regression cho 499 existing unit tests)
             active_key = self._api_key
@@ -693,15 +822,11 @@ class AIService:
             key_tier = "FIXTURE"
         else:
             # 2. Multi-tier resolution: Workspace > User > System > Fallback
-            target_ws_id = context.get("workspace_id")
-            if target_ws_id is None and campaign_id is not None:
-                try:
-                    from app.models.entities import Campaign
-                    camp = db.query(Campaign).filter(Campaign.id == campaign_id).first()
-                    if camp and camp.workspace_id:
-                        target_ws_id = camp.workspace_id
-                except Exception:
-                    pass
+            # Chọn chuỗi TRƯỚC lượt gọi đơn; nếu có chuỗi thì nhánh "no key ->
+            # template" bên dưới phải nhường cho vòng lặp thử hop.
+            chain_hops = self._resolve_chain_hops(
+                db=db, user_id=user_id, workspace_id=target_ws_id, context=context
+            )
 
             # Mặc định lấy provider từ cấu hình, không phải "gemini". Trước đây hardcode
             # "gemini" nên khi .env đặt AI_PROVIDER=opencode (hay openrouter),
@@ -732,13 +857,168 @@ class AIService:
         # `provider_requires_key=False` bỏ qua nhánh này có chủ đích: Ollama và
         # HuggingFace không cần khoá, coi hư việt là rỗng thành lỗi cấu hình sẽ
         # khiến tính năng demo offline không bao giờ chạy được.
-        elif provider_requires_key and (not active_key or active_key.strip() == "") and self.fallback_enabled:
+        # `chain_hops is None` bảo đảm khi CÓ chuỗi thì không rơi template ngay:
+        # hop khác trong chuỗi có thể vẫn có khoá (đúng tinh thần failover).
+        elif chain_hops is None and provider_requires_key and (not active_key or active_key.strip() == "") and self.fallback_enabled:
             logger.warning("[AI Service - Fallback Engine] No API key configured. Activating deterministic Smart Fallback for task %s.", task_code)
             output_data = self._generate_fallback(task_type, context)
             latency_ms = int((time.time() - start_time) * 1000)
             model_used = f"{active_model} (Fallback Mock)"
             is_fallback = True
             model_provider = "template-fallback-engine"
+        elif chain_hops:
+            # ---- Chuỗi fallback (kiểu 9Router) ----
+            # Thử lần lượt từng hop; hop nào chạy được (có key + HTTP 200 +
+            # schema hợp lệ) thì nhận. Hop lỗi (thiếu key, timeout, HTTP lỗi,
+            # sai schema, breaker mở) chuyển bước kế. Hết chuỗi mới rơi về
+            # template Smart Fallback như cũ. Mọi lý do bỏ qua từng bước được
+            # ghi vào warnings/log để người đọc biết vì sao nội dung không đến
+            # từ model đầu tiên.
+            hops = chain_hops["hops"]
+            chain_name = chain_hops.get("name") or f"#{chain_hops.get('id')}"
+            n_hops = len(hops)
+            hop_errors: List[str] = []
+            last_schema_err: Optional[Exception] = None
+            last_runtime_err: Optional[str] = None
+            last_label = active_model
+            any_attempted = False
+            # Ngân sách chung của cả chuỗi = timeout cấu hình; mỗi hop nhận phần
+            # còn lại chia đều (tối thiểu 15s) để một hop treo không nuốt hết hạn mức.
+            deadline = time.time() + float(self.timeout)
+            success = False
+
+            for idx, hop in enumerate(hops):
+                if time.time() >= deadline:
+                    hop_errors.append("hết ngân sách thời gian của chuỗi")
+                    break
+                hop_provider = hop["provider"]
+                label = f"{hop_provider}:{hop['model']}"
+                last_label = label
+
+                resolved_hop = self.resolve_api_key(
+                    db=db, workspace_id=target_ws_id, user_id=user_id, provider=hop_provider
+                )
+                hop_key = resolved_hop.get("api_key")
+                hop_tier = resolved_hop.get("tier", "FALLBACK")
+                hop_requires_key = resolved_hop.get("requires_api_key", True)
+                # Model người dùng đặt trong chuỗi luôn thắng model mặc định của
+                # key/hệ thống: đó chính là lý do họ thêm bước này vào chuỗi.
+                hop_model = hop["model"] or resolved_hop.get("model") or self.model
+
+                if hop_requires_key and (not hop_key or not str(hop_key).strip()):
+                    hop_errors.append(f"{label}: thiếu API key")
+                    continue
+                if hop_key and ("TestResolverKey" in hop_key or "MockVerification" in hop_key):
+                    # Cùng nhánh mock với lượt gọi đơn (test suite).
+                    output_data = self._generate_fallback(task_type, context)
+                    latency_ms = int((time.time() - start_time) * 1000) or 15
+                    model_used = hop_model
+                    is_fallback = False
+                    model_provider = f"{hop_provider}-{hop_tier.lower()}"
+                    success = True
+                    break
+
+                any_attempted = True
+                # Chia đều ngân sách thời gian còn lại cho các hop sắp tới; với
+                # chuỗi >1 bước, mỗi bước tối đa 1 lần retry nội bộ (failover đã
+                # là retry cấp cao hơn).
+                hops_left = n_hops - idx
+                remaining = max(15.0, deadline - time.time())
+                timeout_override = int(min(float(self.timeout), remaining / hops_left)) if n_hops > 1 else None
+                retries_override = min(self.max_retries, 1) if n_hops > 1 else None
+                try:
+                    raw_response = self._call_provider_with_retry(
+                        system_prompt, user_prompt,
+                        active_key=hop_key, active_model=hop_model,
+                        provider=hop_provider,
+                        timeout_override=timeout_override,
+                        retries_override=retries_override
+                    )
+                    output_data = self._clean_json_response(raw_response)
+                    # BUG-BE-08: cùng bộ kiểm chứng schema như lượt gọi đơn.
+                    self._validate_task_output(task_code, output_data, prompt_version)
+                    latency_ms = int((time.time() - start_time) * 1000)
+                    model_used = hop_model
+                    is_fallback = False
+                    if hop_tier in ("WORKSPACE", "USER"):
+                        model_provider = f"{hop_provider}-{hop_tier.lower()}"
+                    elif hop_model and "gemini" in str(hop_model).lower():
+                        model_provider = f"{hop_provider}-pro"
+                    else:
+                        model_provider = hop_provider
+                    if hop_errors:
+                        output_data.setdefault("warnings", []).append(
+                            f"Chuỗi “{chain_name}”: đã bỏ qua {'; '.join(hop_errors)} — dùng {label}."
+                        )
+                    logger.info(
+                        "[AI Service - Live LLM] Chain '%s' executed task %s via hop %s (%d/%d) in %d ms; skipped: %s",
+                        chain_name, task_code, label, idx + 1, n_hops, latency_ms,
+                        "; ".join(hop_errors) or "none"
+                    )
+                    success = True
+                    break
+                except (json.JSONDecodeError, ValidationError) as schema_err:
+                    # Schema sai cũng là lý do failover: hop kế tiếp xử lý prompt
+                    # này (thường bằng model/provider khác) có thể đúng.
+                    result_status = "SCHEMA_ERROR"
+                    error_code = "ERR_INVALID_SCHEMA" if isinstance(schema_err, ValidationError) else "ERR_INVALID_JSON"
+                    last_schema_err = schema_err
+                    hop_errors.append(f"{label}: sai cấu trúc ({error_code})")
+                    logger.warning("[AI Chain] hop %s sai schema (%s), chuyển hop kế.", label, error_code)
+                except Exception as hop_err:
+                    raw_err = str(hop_err)
+                    err_str = _sanitize_ai_error(raw_err, active_key=hop_key)
+                    if "TIMEOUT" in raw_err:
+                        result_status = "TIMEOUT"
+                        error_code = "ERR_AI_TIMEOUT"
+                    else:
+                        result_status = "PROVIDER_ERROR"
+                        error_code = "ERR_PROVIDER"
+                    last_runtime_err = err_str
+                    hop_errors.append(f"{label}: {err_str}")
+                    logger.warning("[AI Chain] hop %s lỗi (%s), chuyển hop kế.", label, err_str)
+
+            if not success:
+                err_summary = "; ".join(hop_errors) if hop_errors else "không có hop hợp lệ"
+                if self.fallback_enabled:
+                    logger.warning(
+                        "[AI Service - Fallback Engine] Chain '%s' failed after %d hop(s) (%s). Activating Smart Fallback for task %s.",
+                        chain_name, n_hops, err_summary, task_code
+                    )
+                    output_data = self._generate_fallback(task_type, context)
+                    output_data.setdefault("warnings", []).append(
+                        f"Chuỗi “{chain_name}” đã thử {n_hops} bước ({err_summary}); đã kích hoạt Smart Fallback."
+                    )
+                    latency_ms = int((time.time() - start_time) * 1000)
+                    is_fallback = True
+                    model_provider = "template-fallback-engine"
+                    if any_attempted:
+                        model_used = f"{last_label} (Chain Failover Fallback)"
+                    else:
+                        # Không bước nào gọi được (thiếu hết khoá) — cùng nhãn
+                        # với nhánh "no API key" của lượt gọi đơn, và đồng bộ
+                        # trạng thái SUCCESS: thiếu khoá là cấu hình, không phải
+                        # lỗi provider.
+                        model_used = f"{active_model} (Fallback Mock)"
+                        result_status = "SUCCESS"
+                        error_code = None
+                else:
+                    latency_ms = int((time.time() - start_time) * 1000)
+                    if not any_attempted:
+                        result_status = "PROVIDER_ERROR"
+                        error_code = "ERR_NO_API_KEY"
+                        last_runtime_err = last_runtime_err or (
+                            f"Chuỗi “{chain_name}” không hop nào có API key."
+                        )
+                    self._log_call(
+                        db, user_id, campaign_id, task_code, last_label,
+                        prompt_version, input_hash, None, result_status, error_code, latency_ms
+                    )
+                    if result_status == "SCHEMA_ERROR" and last_schema_err is not None:
+                        raise last_schema_err
+                    raise RuntimeError(
+                        last_runtime_err or f"Chuỗi “{chain_name}” đã hết hop mà không có kết quả."
+                    )
         else:
             try:
                 raw_response = self._call_provider_with_retry(

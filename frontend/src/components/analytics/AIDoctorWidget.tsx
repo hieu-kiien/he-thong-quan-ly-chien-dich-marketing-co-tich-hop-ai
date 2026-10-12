@@ -3,7 +3,28 @@ import { Stethoscope, Sparkles, AlertTriangle, Zap, TrendingUp, RefreshCw, Arrow
 import { AIDoctorReport, AIDoctorRecommendation } from '../../types';
 import { campaignApi } from '../../services/api';
 import { useToast } from '../Toast';
-import { MOCK_AI_DOCTOR_REPORT } from '../../services/mockData';
+
+// Kịch bản mẫu của Bác sĩ AI — import động như api.ts: chỉ tải khi backend
+// không trả được báo cáo, không cộng hàng nghìn dòng fixture vào bundle
+// chính của production.
+type DoctorMockReport = typeof import('../../services/mockData').MOCK_AI_DOCTOR_REPORT;
+let doctorMockPromise: Promise<DoctorMockReport> | null = null;
+const loadDoctorMock = (): Promise<DoctorMockReport> => {
+  if (!doctorMockPromise) {
+    doctorMockPromise = import('../../services/mockData').then(m => m.MOCK_AI_DOCTOR_REPORT);
+  }
+  return doctorMockPromise;
+};
+
+// Giá trị giữ chỗ trong lúc tải chunk mẫu (score 0 → badge "Nguy Kịch" chỉ
+// hiển thị vài chục mili giây, sau đó được thay bằng báo cáo mẫu thật).
+const PLACEHOLDER_REPORT: AIDoctorReport = {
+  health_score: 0,
+  health_status: 'CRITICAL',
+  diagnosis_summary: 'Đang tải kịch bản mẫu…',
+  key_bottlenecks: [],
+  recommendations: [],
+} as AIDoctorReport;
 
 export interface AIDoctorWidgetProps {
   campaignId?: number;
@@ -33,7 +54,7 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
     } else if (campaignId) {
       loadDiagnosis(campaignId);
     } else {
-      setReport(MOCK_AI_DOCTOR_REPORT);
+      void loadDoctorMock().then(setReport);
       setIsFallback(true);
     }
   }, [campaignId, initialReport]);
@@ -45,7 +66,8 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
       setReport(data);
       setIsFallback(false);
     } catch (e) {
-      setReport({ ...MOCK_AI_DOCTOR_REPORT, campaign_id: cid });
+      const mock = await loadDoctorMock();
+      setReport({ ...mock, campaign_id: cid });
       setIsFallback(true);
     } finally {
       setLoading(false);
@@ -67,7 +89,7 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
     }
   };
 
-  const currentReport = report || MOCK_AI_DOCTOR_REPORT;
+  const currentReport = report || PLACEHOLDER_REPORT;
   const score = currentReport.health_score;
 
   // Determine if Demo Mode should be flagged (sparse/insufficient data or heuristic fallback)

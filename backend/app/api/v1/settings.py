@@ -10,10 +10,11 @@ from app.core.database import get_db
 from app.core.config import settings
 from app.core.pagination import Page, PageParams, page_params, paginate_query
 from app.core.security import get_current_user
-from app.models.entities import User, CustomApiKey, Workspace, WorkspaceMember
+from app.models.entities import User, CustomApiKey, Workspace, WorkspaceMember, AIModelChain
 from app.schemas.schemas import (
     AIKeyTestRequest, AIKeyTestResponse,
-    AIKeyCreate, AIKeyResponse, AIModelListResponse
+    AIKeyCreate, AIKeyResponse, AIModelListResponse,
+    AIChainCreate, AIChainHop, AIChainResponse
 )
 from app.core.crypto import encrypt_api_key, decrypt_api_key, mask_api_key
 from app.services.ai import providers as provider_registry
@@ -23,8 +24,10 @@ router = APIRouter(prefix="/settings", tags=["Cài đặt Doanh nghiệp & Custo
 
 
 import re
+import json
 import logging
 from urllib.parse import quote
+from sqlalchemy import or_
 
 logger = logging.getLogger(__name__)
 
@@ -696,3 +699,235 @@ def get_email_status(current_user: User = Depends(get_current_user)):
         "from_address": email_service.from_address,
         "reason": email_service._config_problem(),
     }
+
+
+# ===========================================================================
+# Chuỗi fallback Model (kiểu 9Router) — FEAT-BE-26
+# ===========================================================================
+
+def _chain_to_response(chain: AIModelChain) -> AIChainResponse:
+    """Đọc hops_json -> AIChainResponse. Dùng model_construct khi đọc để một
+    hop hỏng (provider đã bỏ support) không làm sập cả endpoint danh sách."""
+    try:
+        raw = json.loads(chain.hops_json or "[]")
+    except Exception:
+        raw = []
+    hops = []
+    if isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, dict) and item.get("provider") and item.get("model"):
+                hops.append(AIChainHop.model_construct(
+                    provider=str(item["provider"]), model=str(item["model"])
+                ))
+    return AIChainResponse(
+        id=chain.id,
+        name=chain.name,
+        hops=hops,
+        scope="workspace" if chain.workspace_id else "personal",
+        workspace_id=chain.workspace_id,
+        user_id=chain.user_id,
+        is_active=chain.is_active,
+        is_default=chain.is_default,
+        created_at=chain.created_at,
+        updated_at=chain.updated_at,
+    )
+
+
+def check_chain_access(chain: AIModelChain, current_user: User, db: Session):
+    """Quyền thao tác trên chuỗi — cùng triết lý với check_ai_key_access:
+    ADMIN toàn quyền; người tạo chuỗi thao tác được chuỗi của mình;
+    chuỗi workspace: owner hoặc thành viên (MANAGER/AGENCY_MANAGER)."""
+    if current_user.role == "ADMIN":
+        return
+    if chain.user_id == current_user.id:
+        return
+    if chain.workspace_id is not None:
+        if current_user.role in ("MANAGER", "AGENCY_MANAGER"):
+            ws = db.query(Workspace).filter(Workspace.id == chain.workspace_id).first()
+            if ws and ws.owner_id == current_user.id:
+                return
+            is_member = db.query(WorkspaceMember).filter(
+                WorkspaceMember.workspace_id == chain.workspace_id,
+                WorkspaceMember.user_id == current_user.id
+            ).first()
+            if is_member and is_member.role in ("MANAGER", "AGENCY_MANAGER"):
+                return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Không có quyền thao tác trên chuỗi model này."
+    )
+
+
+def _check_workspace_scope(workspace_id: Optional[int], current_user: User, db: Session):
+    """Xác minh quyền tạo chuỗi trong workspace (None = chuỗi cá nhân, bỏ qua)."""
+    if workspace_id is None:
+        return
+    if current_user.role == "ADMIN":
+        return
+    ws = db.query(Workspace).filter(Workspace.id == workspace_id).first()
+    is_ws_owner = ws is not None and ws.owner_id == current_user.id
+    is_ws_member = db.query(WorkspaceMember).filter(
+        WorkspaceMember.workspace_id == workspace_id,
+        WorkspaceMember.user_id == current_user.id
+    ).first() is not None
+    if not (is_ws_owner or is_ws_member):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Không có quyền thao tác trên Workspace này."
+        )
+
+
+def _clear_default_chain(db: Session, workspace_id: Optional[int], owner_user_id: int, except_id: Optional[int] = None):
+    """Bỏ cờ is_default của các chuỗi khác cùng scope — mỗi scope đúng 1 chuỗi mặc định."""
+    q = db.query(AIModelChain).filter(AIModelChain.is_default.is_(True))
+    if workspace_id is not None:
+        q = q.filter(AIModelChain.workspace_id == workspace_id)
+    else:
+        q = q.filter(AIModelChain.workspace_id.is_(None), AIModelChain.user_id == owner_user_id)
+    if except_id is not None:
+        q = q.filter(AIModelChain.id != except_id)
+    for other in q.all():
+        other.is_default = False
+
+
+def _find_duplicate_chain_name(db: Session, name: str, workspace_id: Optional[int], user_id: int) -> bool:
+    q = db.query(AIModelChain).filter(AIModelChain.name == name)
+    if workspace_id is not None:
+        q = q.filter(AIModelChain.workspace_id == workspace_id)
+    else:
+        q = q.filter(AIModelChain.workspace_id.is_(None), AIModelChain.user_id == user_id)
+    return q.first() is not None
+
+
+@router.get("/ai-chains", response_model=List[AIChainResponse])
+def list_ai_model_chains(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Danh sách chuỗi mà người dùng hiện tại nhìn thấy (cá nhân + workspace tham gia)."""
+    q = db.query(AIModelChain)
+    if current_user.role != "ADMIN":
+        ws_ids = [w.id for w in db.query(Workspace).filter(Workspace.owner_id == current_user.id).all()]
+        ws_ids += [m.workspace_id for m in db.query(WorkspaceMember).filter(WorkspaceMember.user_id == current_user.id).all()]
+        ws_ids = sorted({wid for wid in ws_ids if wid is not None})
+        q = q.filter(or_(
+            AIModelChain.user_id == current_user.id,
+            AIModelChain.workspace_id.in_(ws_ids if ws_ids else [-1]),
+        ))
+    chains = q.order_by(AIModelChain.is_default.desc(), AIModelChain.name.asc()).all()
+    return [_chain_to_response(c) for c in chains]
+
+
+@router.post("/ai-chains", response_model=AIChainResponse, status_code=status.HTTP_201_CREATED)
+def create_ai_model_chain(
+    req: AIChainCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Tạo chuỗi fallback mới. `hops` đã được schema kiểm chứng provider/model."""
+    _check_workspace_scope(req.workspace_id, current_user, db)
+    if _find_duplicate_chain_name(db, req.name, req.workspace_id, current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Đã tồn tại chuỗi tên “{req.name}” trong cùng scope."
+        )
+    if req.is_default:
+        _clear_default_chain(db, req.workspace_id, current_user.id)
+    chain = AIModelChain(
+        workspace_id=req.workspace_id,
+        user_id=current_user.id,
+        name=req.name,
+        hops_json=json.dumps([h.model_dump() for h in req.hops], ensure_ascii=False),
+        is_active=req.is_active,
+        is_default=req.is_default,
+    )
+    db.add(chain)
+    db.commit()
+    db.refresh(chain)
+    return _chain_to_response(chain)
+
+
+@router.put("/ai-chains/{chain_id}", response_model=AIChainResponse)
+def update_ai_model_chain(
+    chain_id: int,
+    req: AIChainCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Sửa chuỗi: tên, danh sách hop, trạng thái. Scope (cá nhân/workspace) giữ nguyên."""
+    chain = db.query(AIModelChain).filter(AIModelChain.id == chain_id).first()
+    if not chain:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy chuỗi model.")
+    check_chain_access(chain, current_user, db)
+    if _find_duplicate_chain_name(db, req.name, chain.workspace_id, chain.user_id) and chain.name != req.name:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Đã tồn tại chuỗi tên “{req.name}” trong cùng scope."
+        )
+    if req.is_default:
+        _clear_default_chain(db, chain.workspace_id, chain.user_id, except_id=chain.id)
+    chain.name = req.name
+    chain.hops_json = json.dumps([h.model_dump() for h in req.hops], ensure_ascii=False)
+    chain.is_active = req.is_active
+    chain.is_default = req.is_default
+    db.commit()
+    db.refresh(chain)
+    return _chain_to_response(chain)
+
+
+@router.patch("/ai-chains/{chain_id}/toggle", response_model=AIChainResponse)
+def toggle_ai_model_chain(
+    chain_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Bật/tắt chuỗi. Tắt chuỗi đang là mặc định thì mặc định tự nhả (None)."""
+    chain = db.query(AIModelChain).filter(AIModelChain.id == chain_id).first()
+    if not chain:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy chuỗi model.")
+    check_chain_access(chain, current_user, db)
+    chain.is_active = not chain.is_active
+    if not chain.is_active and chain.is_default:
+        chain.is_default = False
+    db.commit()
+    db.refresh(chain)
+    return _chain_to_response(chain)
+
+
+@router.patch("/ai-chains/{chain_id}/default", response_model=AIChainResponse)
+def set_default_ai_model_chain(
+    chain_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Đặt chuỗi làm mặc định cho scope của nó (chỉ khi đang active)."""
+    chain = db.query(AIModelChain).filter(AIModelChain.id == chain_id).first()
+    if not chain:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy chuỗi model.")
+    check_chain_access(chain, current_user, db)
+    if not chain.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Chuỗi đang tắt — hãy bật trước khi đặt làm mặc định."
+        )
+    _clear_default_chain(db, chain.workspace_id, chain.user_id, except_id=chain.id)
+    chain.is_default = True
+    db.commit()
+    db.refresh(chain)
+    return _chain_to_response(chain)
+
+
+@router.delete("/ai-chains/{chain_id}", status_code=status.HTTP_200_OK)
+def delete_ai_model_chain(
+    chain_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Xóa chuỗi. Request đang giữ chain_id của chuỗi đã xóa sẽ tự rơi về model đơn."""
+    chain = db.query(AIModelChain).filter(AIModelChain.id == chain_id).first()
+    if not chain:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy chuỗi model.")
+    check_chain_access(chain, current_user, db)
+    db.delete(chain)
+    db.commit()
+    return {"status": "DELETED", "message": f"Đã xóa chuỗi “{chain.name}”."}

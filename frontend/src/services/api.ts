@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Campaign, MarketingContent, KPISummary, AIIdeaResponse, AIDraftResponse, AISummaryResponse, OmnichannelRequest, OmnichannelResponse, User, Product, MarketingSchedule, ContentComplianceCheck, Workspace, BrandKit, ComplianceCheckRequest, ComplianceCheckResponse, ComplianceViolation, ChannelAttribution, AIDoctorReport, CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse, AppNotification, Task, TaskCreate, TaskUpdate, BudgetAllocation, KPITarget, CommandCenterResponse, Page, QuotaSnapshot, QuotaErrorDetail, CampaignSort, ContentSort, AIModelListResponse } from '../types';
+import { Campaign, MarketingContent, KPISummary, AIIdeaResponse, AIDraftResponse, AISummaryResponse, OmnichannelRequest, OmnichannelResponse, User, Product, MarketingSchedule, ContentComplianceCheck, Workspace, BrandKit, ComplianceCheckRequest, ComplianceCheckResponse, ComplianceViolation, ChannelAttribution, AIDoctorReport, CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse, AIChain, AIChainSaveRequest, AppNotification, Task, TaskCreate, TaskUpdate, BudgetAllocation, KPITarget, CommandCenterResponse, Page, QuotaSnapshot, QuotaErrorDetail, CampaignSort, ContentSort, AIModelListResponse } from '../types';
 import { MarketingChannel, getChannelRegistry } from '../utils/channels';
 import type {
   AIJobAccepted,
@@ -8,19 +8,6 @@ import type {
   AIJobSnapshot,
   AIJobTransport,
 } from './aiJobPoller';
-
-import { 
-  MOCK_PRODUCTS, 
-  MOCK_CAMPAIGNS, 
-  MOCK_CONTENTS, 
-  MOCK_SCHEDULES, 
-  MOCK_DASHBOARD_KPI,
-  MOCK_WORKSPACES,
-  MOCK_BRAND_KITS,
-  MOCK_CHANNEL_ATTRIBUTIONS,
-  MOCK_AI_DOCTOR_REPORT,
-  MOCK_CUSTOM_API_KEYS
-} from './mockData';
 
 const API_BASE_URL = ((import.meta as any).env?.VITE_API_URL ||
   ((import.meta as any).env?.PROD ? '/api/v1' : 'http://127.0.0.1:8000/api/v1'));
@@ -126,6 +113,19 @@ function setStoredList<T>(key: string, data: T[]): void {
   }
 }
 
+// Dữ liệu mẫu chỉ cần khi chế độ Offline Demo chạy (cờ
+// VITE_ENABLE_OFFLINE_DEMO=true + backend không phản hồi). Tách sang import
+// động để hàng nghìn dòng fixture không nằm trong bundle chính của production
+// — Vite tách thành chunk riêng, chỉ tải khi thật sự vào nhánh offline.
+type MockDataModule = typeof import('./mockData');
+let mockDataModule: Promise<MockDataModule> | null = null;
+const loadMockData = (): Promise<MockDataModule> => {
+  if (!mockDataModule) {
+    mockDataModule = import('./mockData');
+  }
+  return mockDataModule;
+};
+
 // =========================================================================
 // CƠ CHẾ CHỈ BÁO MÁY CHỦ THỨC DẬY (SERVER AWAKENING INDICATOR FOR RENDER)
 // =========================================================================
@@ -168,6 +168,81 @@ const broadcastAwakening = (status: ServerAwakeningStatus) => {
     window.dispatchEvent(new CustomEvent('server-awakening', { detail: status }));
   }
 };
+
+/**
+ * Gộp các GET trùng lặp ĐANG CHẠY song song trên cùng một trang.
+ *
+ * Mỗi lần vào Dashboard, vài component cùng mount và cùng gọi `/campaigns`,
+ * `/analytics/dashboard`, `/contents` — đo được 4–5 lần mỗi endpoint trong một
+ * lần tải trang: backend xử lý 4–5 lần y hệt, UI chờ skeleton lâu hơn, VPS
+ * 2 vCPU tốn thêm tải. Khi một GET đã in-flight, lời gọi y hệt nhận chính
+ * Promise cũ thay vì gửi thêm request mới. KHÔNG cache sau khi xong: gọi lại
+ * sau đó vẫn là network thật (nút "tải lại" giữ nguyên nghĩa). Chỉ áp dụng
+ * cho GET — POST/PUT/DELETE có hiệu ứng phụ nên không bao giờ được gộp.
+ *
+ * Key gồm Authorization + X-Workspace-Id vì hai header đó đổi kết quả trả
+ * về; interceptor này chạy SAU interceptor auth (axios chạy request handler
+ * theo thứ tự ngược: handler đăng ký trước chạy sau), nên headers đã đầy đủ.
+ */
+const inflightGets = new Map<string, Promise<unknown>>();
+
+apiClient.interceptors.request.use((config) => {
+  const method = (config.method || 'get').toLowerCase();
+  if (method !== 'get') return config;
+
+  const headers = config.headers as {
+    get?: (name: string) => string | null | undefined;
+    Authorization?: string;
+    'X-Workspace-Id'?: string;
+  } | undefined;
+  const readHeader = (name: string): string => {
+    const v = typeof headers?.get === 'function' ? headers.get(name) : (headers as any)?.[name];
+    return typeof v === 'string' ? v : '';
+  };
+  const key = [
+    config.baseURL ?? '',
+    config.url ?? '',
+    JSON.stringify(config.params ?? {}),
+    readHeader('Authorization'),
+    readHeader('X-Workspace-Id'),
+  ].join('|');
+
+  const existing = inflightGets.get(key);
+  if (existing) {
+    // Adapter giả lập: không gửi request mới, trả thẳng kết quả (hoặc lỗi)
+    // của lời gọi đầu tiên — caller thứ hai nhận đúng nhánh resolve/reject.
+    config.adapter = () => existing as Promise<any>;
+    return config;
+  }
+
+  let settle: { resolve: (value: unknown) => void; reject: (reason: unknown) => void } = {
+    resolve: () => undefined,
+    reject: () => undefined,
+  };
+  const shared = new Promise<unknown>((resolve, reject) => {
+    settle = { resolve, reject };
+  });
+  // nuốt "unhandled rejection" khi không có caller thứ hai nào gắn then vào
+  // shared (caller đầu tự xử lý lỗi qua pipeline của chính nó).
+  shared.catch(() => undefined);
+  inflightGets.set(key, shared);
+
+  const originalAdapter = config.adapter ?? apiClient.defaults.adapter;
+  config.adapter = async (cfg: any) => {
+    try {
+      const run = axios.getAdapter(originalAdapter ?? apiClient.defaults.adapter);
+      const response = await run(cfg);
+      settle.resolve(response);
+      return response;
+    } catch (err) {
+      settle.reject(err);
+      throw err;
+    } finally {
+      inflightGets.delete(key);
+    }
+  };
+  return config;
+});
 
 // Gắn Bearer token tự động, workspace hiện hành & theo dõi cold start Render
 apiClient.interceptors.request.use((config) => {
@@ -415,6 +490,7 @@ export const workspaceApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: workspaceApi.getAll');
+      const { MOCK_WORKSPACES } = await loadMockData();
       return toPage<Workspace>(getStoredList<Workspace>('mf_workspaces', MOCK_WORKSPACES), page, pageSize);
     }
   },
@@ -427,6 +503,7 @@ export const workspaceApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: workspaceApi.getAll');
+      const { MOCK_WORKSPACES } = await loadMockData();
       return getStoredList<Workspace>('mf_workspaces', MOCK_WORKSPACES);
     }
   },
@@ -438,6 +515,7 @@ export const workspaceApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: workspaceApi.create');
+      const { MOCK_WORKSPACES } = await loadMockData();
       const list = getStoredList<Workspace>('mf_workspaces', MOCK_WORKSPACES);
       const newWs: Workspace = {
         id: Date.now(),
@@ -459,6 +537,7 @@ export const workspaceApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: workspaceApi.getById');
+      const { MOCK_WORKSPACES } = await loadMockData();
       const list = getStoredList<Workspace>('mf_workspaces', MOCK_WORKSPACES);
       const found = list.find(w => w.id === id);
       if (found) return found;
@@ -473,6 +552,7 @@ export const workspaceApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: workspaceApi.update');
+      const { MOCK_WORKSPACES } = await loadMockData();
       const list = getStoredList<Workspace>('mf_workspaces', MOCK_WORKSPACES);
       const idx = list.findIndex(w => w.id === id);
       if (idx !== -1) {
@@ -498,6 +578,7 @@ export const brandKitApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: brandKitApi.getByWorkspace');
+      const { MOCK_BRAND_KITS } = await loadMockData();
       const stored = MOCK_BRAND_KITS[workspaceId] || {
         id: workspaceId,
         workspace_id: workspaceId,
@@ -517,6 +598,7 @@ export const brandKitApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: brandKitApi.update');
+      const { MOCK_BRAND_KITS } = await loadMockData();
       const current = MOCK_BRAND_KITS[workspaceId] || {
         id: workspaceId,
         workspace_id: workspaceId,
@@ -555,6 +637,7 @@ export const campaignApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.getAllPage');
+      const { MOCK_CAMPAIGNS } = await loadMockData();
       let list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
       if (filters?.workspaceId) {
         list = list.filter(c => !c.workspace_id || c.workspace_id === filters.workspaceId);
@@ -596,6 +679,7 @@ export const campaignApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.getAll');
+      const { MOCK_CAMPAIGNS } = await loadMockData();
       let list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
       if (workspaceId) {
         list = list.filter(c => !c.workspace_id || c.workspace_id === workspaceId);
@@ -618,6 +702,7 @@ export const campaignApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.getById');
+      const { MOCK_CAMPAIGNS } = await loadMockData();
       const list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
       const found = list.find(c => c.id === id);
       if (found) return found;
@@ -640,6 +725,7 @@ export const campaignApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.create');
+      const { MOCK_CAMPAIGNS } = await loadMockData();
       const list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
       const newCamp: Campaign = {
         id: Date.now(),
@@ -661,6 +747,7 @@ export const campaignApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.update');
+      const { MOCK_CAMPAIGNS } = await loadMockData();
       const list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
       const updated = list.map(c => c.id === id ? { ...c, ...data, updated_at: new Date().toISOString() } : c);
       setStoredList('mf_campaigns', updated);
@@ -681,6 +768,7 @@ export const campaignApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.getKpi');
+      const { MOCK_DASHBOARD_KPI } = await loadMockData();
       return MOCK_DASHBOARD_KPI;
     }
   },
@@ -692,6 +780,7 @@ export const campaignApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.getAIDoctor');
+      const { MOCK_AI_DOCTOR_REPORT } = await loadMockData();
       return {
         ...MOCK_AI_DOCTOR_REPORT,
         campaign_id: campaignId
@@ -706,6 +795,7 @@ export const campaignApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.getAttribution');
+      const { MOCK_CHANNEL_ATTRIBUTIONS } = await loadMockData();
       return MOCK_CHANNEL_ATTRIBUTIONS;
     }
   },
@@ -729,6 +819,7 @@ export const campaignApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.getContentsPage');
+      const { MOCK_CONTENTS } = await loadMockData();
       let list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS)
         .filter(c => c.campaign_id === campaignId);
       if (filters?.status && filters.status !== 'ALL') {
@@ -760,6 +851,7 @@ export const campaignApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.getContents');
+      const { MOCK_CONTENTS } = await loadMockData();
       const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       return list.filter(c => c.campaign_id === campaignId);
     }
@@ -771,6 +863,7 @@ export const campaignApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.delete');
+      const { MOCK_CAMPAIGNS } = await loadMockData();
       const list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
       setStoredList('mf_campaigns', list.filter(c => c.id !== id));
     }
@@ -800,6 +893,7 @@ export const productApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: productApi.getAll');
+      const { MOCK_PRODUCTS } = await loadMockData();
       return MOCK_PRODUCTS;
     }
   }
@@ -807,9 +901,10 @@ export const productApi = {
 
 /** Lọc danh sách nội dung trong kho mock offline — dùng chung cho cả hai bản
  *  (`getAllPage` có phân trang và `getAll` trả mảng) để hai đường không lệch nhau. */
-const _filterMockContents = (filters?: {
+const _filterMockContents = async (filters?: {
   campaignId?: number; status?: string; channelId?: number; search?: string; workspaceId?: number;
-}): MarketingContent[] => {
+}): Promise<MarketingContent[]> => {
+  const { MOCK_CONTENTS } = await loadMockData();
   let list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
   if (filters?.workspaceId) list = list.filter(c => !c.workspace_id || c.workspace_id === filters.workspaceId);
   if (filters?.campaignId) list = list.filter(c => c.campaign_id === filters.campaignId);
@@ -843,7 +938,7 @@ export const contentApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: contentApi.getAllPage');
-      const list = _filterMockContents(filters);
+      const list = await _filterMockContents(filters);
       const total = list.length;
       const start = (page - 1) * pageSize;
       return {
@@ -874,7 +969,7 @@ export const contentApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: contentApi.getAll');
-      return _filterMockContents({ campaignId, status, workspaceId });
+      return await _filterMockContents({ campaignId, status, workspaceId });
     }
   },
 
@@ -886,6 +981,7 @@ export const contentApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: contentApi.create');
+      const { MOCK_CONTENTS } = await loadMockData();
       const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       const newContent: MarketingContent = {
         id: Date.now(),
@@ -915,6 +1011,7 @@ export const contentApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: contentApi.update');
+      const { MOCK_CONTENTS } = await loadMockData();
       const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       const updated = list.map(c => c.id === id ? { ...c, ...data, updated_at: new Date().toISOString() } : c);
       setStoredList('mf_contents', updated);
@@ -957,6 +1054,7 @@ export const contentApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: contentApi.submitForReview');
+      const { MOCK_CONTENTS } = await loadMockData();
       const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       const updated = list.map(c => c.id === id ? { ...c, status: 'IN_REVIEW' as const } : c);
       setStoredList('mf_contents', updated);
@@ -971,6 +1069,7 @@ export const contentApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: contentApi.approve');
+      const { MOCK_CONTENTS } = await loadMockData();
       const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       const updated = list.map(c => c.id === id ? { ...c, status: 'APPROVED' as const } : c);
       setStoredList('mf_contents', updated);
@@ -985,6 +1084,7 @@ export const contentApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: contentApi.reject');
+      const { MOCK_CONTENTS } = await loadMockData();
       const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       const updated = list.map(c => c.id === id ? { ...c, status: 'REJECTED' as const, rejection_reason: reason } : c);
       setStoredList('mf_contents', updated);
@@ -999,6 +1099,7 @@ export const contentApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: contentApi.publish');
+      const { MOCK_CONTENTS } = await loadMockData();
       const list = getStoredList<MarketingContent>('mf_contents', MOCK_CONTENTS);
       const updated = list.map(c => c.id === id ? { ...c, status: 'PUBLISHED' as const } : c);
       setStoredList('mf_contents', updated);
@@ -1452,6 +1553,7 @@ export const analyticsApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: analyticsApi.getDashboard');
+      const { MOCK_DASHBOARD_KPI, MOCK_CHANNEL_ATTRIBUTIONS } = await loadMockData();
       return {
         kpi: MOCK_DASHBOARD_KPI,
         channel_attributions: MOCK_CHANNEL_ATTRIBUTIONS
@@ -1522,6 +1624,7 @@ export const scheduleApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: scheduleApi.getAllPage');
+      const { MOCK_SCHEDULES } = await loadMockData();
       let list = getStoredList<MarketingSchedule>('mf_schedules', MOCK_SCHEDULES);
       if (filters?.status) list = list.filter(s => s.status === filters.status);
       if (filters?.content_id) list = list.filter(s => s.content_id === filters.content_id);
@@ -1547,6 +1650,7 @@ export const scheduleApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: scheduleApi.getAll');
+      const { MOCK_SCHEDULES } = await loadMockData();
       return getStoredList<MarketingSchedule>('mf_schedules', MOCK_SCHEDULES);
     }
   },
@@ -1562,6 +1666,7 @@ export const scheduleApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: scheduleApi.create');
+      const { MOCK_SCHEDULES } = await loadMockData();
       const list = getStoredList<MarketingSchedule>('mf_schedules', MOCK_SCHEDULES);
       const newSched: MarketingSchedule = {
         id: Date.now(),
@@ -1709,6 +1814,7 @@ const res = await apiClient.post('/settings/test-ai-connection', data);
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: settingsApi.getKeys');
+      const { MOCK_CUSTOM_API_KEYS } = await loadMockData();
       const list = getStoredList<CustomApiKey>('custom_api_keys', MOCK_CUSTOM_API_KEYS);
       const found = workspaceId 
         ? list.find(k => k.workspace_id === workspaceId)
@@ -1733,6 +1839,7 @@ const res = await apiClient.post('/settings/test-ai-connection', data);
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: settingsApi.getKeysList');
+      const { MOCK_CUSTOM_API_KEYS } = await loadMockData();
       const list = getStoredList<CustomApiKey>('custom_api_keys', MOCK_CUSTOM_API_KEYS);
       if (workspaceId) {
         return list.filter(k => k.workspace_id === workspaceId);
@@ -1749,6 +1856,7 @@ const res = await apiClient.post('/settings/test-ai-connection', data);
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: settingsApi.saveKey');
+      const { MOCK_CUSTOM_API_KEYS } = await loadMockData();
       const cleanKey = data.api_key.trim();
       const masked = cleanKey.length >= 10 
         ? `${cleanKey.slice(0, 6)}...${cleanKey.slice(-4)}`
@@ -1783,6 +1891,7 @@ const res = await apiClient.post('/settings/test-ai-connection', data);
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: settingsApi.deleteKey');
+      const { MOCK_CUSTOM_API_KEYS } = await loadMockData();
       const list = getStoredList<CustomApiKey>('custom_api_keys', MOCK_CUSTOM_API_KEYS);
       const filtered = workspaceId ? list.filter(k => k.workspace_id !== workspaceId) : [];
       setStoredList('custom_api_keys', filtered);
@@ -1798,6 +1907,7 @@ const res = await apiClient.post('/settings/test-ai-connection', data);
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: settingsApi.deleteKeyById');
+      const { MOCK_CUSTOM_API_KEYS } = await loadMockData();
       const list = getStoredList<CustomApiKey>('custom_api_keys', MOCK_CUSTOM_API_KEYS);
       const filtered = list.filter(k => k.id !== keyId);
       setStoredList('custom_api_keys', filtered);
@@ -1813,6 +1923,7 @@ const res = await apiClient.post('/settings/test-ai-connection', data);
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: settingsApi.toggleKey');
+      const { MOCK_CUSTOM_API_KEYS } = await loadMockData();
       const list = getStoredList<CustomApiKey>('custom_api_keys', MOCK_CUSTOM_API_KEYS);
       const item = list.find(k => k.id === keyId);
       if (item) {
@@ -1823,6 +1934,40 @@ const res = await apiClient.post('/settings/test-ai-connection', data);
       }
       throw e;
     }
+  },
+
+  // =========================================================================
+  // Chuỗi fallback Model (AIModelChain, kiểu 9Router)
+  // =========================================================================
+
+  listChains: async (): Promise<AIChain[]> => {
+    const res = await apiClient.get('/settings/ai-chains');
+    return res.data;
+  },
+
+  createChain: async (data: AIChainSaveRequest): Promise<AIChain> => {
+    const res = await apiClient.post('/settings/ai-chains', data);
+    return res.data;
+  },
+
+  updateChain: async (chainId: number, data: AIChainSaveRequest): Promise<AIChain> => {
+    const res = await apiClient.put(`/settings/ai-chains/${chainId}`, data);
+    return res.data;
+  },
+
+  toggleChain: async (chainId: number): Promise<AIChain> => {
+    const res = await apiClient.patch(`/settings/ai-chains/${chainId}/toggle`);
+    return res.data;
+  },
+
+  setDefaultChain: async (chainId: number): Promise<AIChain> => {
+    const res = await apiClient.patch(`/settings/ai-chains/${chainId}/default`);
+    return res.data;
+  },
+
+  deleteChain: async (chainId: number): Promise<{ status: string; message: string }> => {
+    const res = await apiClient.delete(`/settings/ai-chains/${chainId}`);
+    return res.data;
   }
 };
 

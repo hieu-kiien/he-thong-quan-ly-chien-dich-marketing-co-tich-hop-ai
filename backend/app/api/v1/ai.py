@@ -135,6 +135,9 @@ def generate_ideas(
         "channel_name": channel.name if channel else req.channel_code,
         "tone": req.tone
     }
+    if req.chain_id is not None:
+        # Chuỗi fallback tường minh (xem AIService._resolve_chain_hops).
+        context["model_chain_id"] = req.chain_id
 
     try:
         result = ai_service.execute_task(
@@ -211,6 +214,8 @@ def generate_draft(
         "channel_rules": channel.format_rules if channel else "Viết hấp dẫn, súc tích",
         "selected_idea": req.selected_idea
     }
+    if req.chain_id is not None:
+        context["model_chain_id"] = req.chain_id
 
     try:
         result = ai_service.execute_task(
@@ -290,6 +295,8 @@ def generate_summary(
         "total_revenue": f"{total_revenue:,.0f}",
         "roi": roi
     }
+    if req.chain_id is not None:
+        context["model_chain_id"] = req.chain_id
 
     try:
         result = ai_service.execute_task(
@@ -483,6 +490,8 @@ def generate_omnichannel(
         "banned_keywords": ", ".join(banned_keywords) if banned_keywords else "Không có",
         "requested_channels": ", ".join(requested_channels)
     }
+    if req.chain_id is not None:
+        context["model_chain_id"] = req.chain_id
 
     def filter_channels(data: dict) -> dict:
         res = dict(data)

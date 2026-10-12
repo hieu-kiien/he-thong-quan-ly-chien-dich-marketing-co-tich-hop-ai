@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { KeyRound, ShieldCheck, Zap, CheckCircle2, AlertCircle, Eye, EyeOff, Trash2, ExternalLink, RefreshCw, Loader2, Building2, User, Check, Power } from 'lucide-react';
+import { KeyRound, ShieldCheck, Zap, CheckCircle2, AlertCircle, Eye, EyeOff, Trash2, ExternalLink, RefreshCw, Loader2, Building2, User, Check, Power, Route, Plus, Star, ArrowDown, X } from 'lucide-react';
 import { settingsApi, getApiErrorMessage } from '../services/api';
 import { useToast } from '../components/Toast';
-import { CustomApiKey, AIKeyTestResponse, User as UserType, Workspace, AIModelListResponse } from '../types';
+import { CustomApiKey, AIKeyTestResponse, User as UserType, Workspace, AIModelListResponse, AIChain, AIChainHop } from '../types';
 
 /**
  * Cấu hình hiển thị cho từng nhà cung cấp AI.
@@ -303,7 +303,7 @@ interface SettingsProps {
 
 export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspace }) => {
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState<'byok' | 'profile' | 'workspace'>('byok');
+  const [activeTab, setActiveTab] = useState<'byok' | 'chains' | 'profile' | 'workspace'>('byok');
 
   // BYOK Form States
   // Khớp SUPPORTED_AI_PROVIDERS của backend (xem backend/app/services/ai/providers.py).
@@ -355,6 +355,97 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
   useEffect(() => {
     void loadKeys();
   }, [loadKeys]);
+
+  // =========================================================================
+  // Chuỗi fallback Model (kiểu 9Router)
+  // =========================================================================
+  const [chains, setChains] = useState<AIChain[]>([]);
+  const [isLoadingChains, setIsLoadingChains] = useState(false);
+  const [chainsError, setChainsError] = useState<string | null>(null);
+  const [isSavingChain, setIsSavingChain] = useState(false);
+  const [chainName, setChainName] = useState('');
+  const [chainHops, setChainHops] = useState<AIChainHop[]>([{ provider: 'gemini', model: '' }]);
+
+  const loadChains = useCallback(async () => {
+    setIsLoadingChains(true);
+    setChainsError(null);
+    try {
+      setChains(await settingsApi.listChains());
+    } catch (err) {
+      setChainsError(getApiErrorMessage(err));
+    } finally {
+      setIsLoadingChains(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadChains();
+  }, [loadChains]);
+
+  const handleCreateChain = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = chainName.trim();
+    if (!name) {
+      toast.error('Nhập tên chuỗi trước khi lưu.');
+      return;
+    }
+    // Model để trống là hợp lệ (backend điền model mặc định của provider).
+    const hops = chainHops
+      .map(h => ({ provider: h.provider, model: h.model.trim() }))
+      .filter(h => h.provider);
+    if (hops.length === 0) {
+      toast.error('Chuỗi cần ít nhất một bước (provider).');
+      return;
+    }
+    setIsSavingChain(true);
+    try {
+      await settingsApi.createChain({
+        name,
+        hops,
+        workspace_id: currentWorkspace?.id ?? null,
+      });
+      toast.success(`Đã tạo chuỗi “${name}”.`);
+      setChainName('');
+      setChainHops([{ provider: 'gemini', model: '' }]);
+      await loadChains();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err));
+    } finally {
+      setIsSavingChain(false);
+    }
+  }, [chainName, chainHops, currentWorkspace?.id, loadChains, toast]);
+
+  const handleToggleChain = useCallback(async (chain: AIChain) => {
+    try {
+      await settingsApi.toggleChain(chain.id);
+      await loadChains();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err));
+    }
+  }, [loadChains, toast]);
+
+  const handleSetDefaultChain = useCallback(async (chain: AIChain) => {
+    try {
+      await settingsApi.setDefaultChain(chain.id);
+      toast.success(`“${chain.name}” đã là chuỗi mặc định.`);
+      await loadChains();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err));
+    }
+  }, [loadChains, toast]);
+
+  const handleDeleteChain = useCallback(async (chain: AIChain) => {
+    if (!window.confirm(`Xóa chuỗi “${chain.name}”? Các request đang dùng chuỗi này sẽ tự rơi về model đơn.`)) {
+      return;
+    }
+    try {
+      await settingsApi.deleteChain(chain.id);
+      toast.success(`Đã xóa chuỗi “${chain.name}”.`);
+      await loadChains();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err));
+    }
+  }, [loadChains, toast]);
 
   /**
    * Hỏi nhà cung cấp xem đang có model nào.
@@ -524,6 +615,17 @@ const handleTestConnection = async () => {
         >
           <KeyRound className="w-4 h-4" />
           Khóa AI Doanh nghiệp (BYOK Vault)
+        </button>
+        <button
+          onClick={() => setActiveTab('chains')}
+          className={`flex items-center gap-2 px-5 py-3 font-medium text-sm border-b-2 transition-all ${
+            activeTab === 'chains'
+              ? 'border-indigo-600 text-indigo-600 font-semibold'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+          }`}
+        >
+          <Route className="w-4 h-4" />
+          Chuỗi AI (Fallback)
         </button>
         <button
           onClick={() => setActiveTab('profile')}
@@ -1130,6 +1232,217 @@ const handleTestConnection = async () => {
               Mỗi Workspace sở hữu Brand Kit, Chiến dịch, Hàng đợi Duyệt bài và Khóa AI BYOK tách biệt hoàn toàn. 
               Các thành viên chỉ có thể truy xuất dữ liệu thuộc Workspace được phân quyền.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Chuỗi AI (Fallback kiểu 9Router) */}
+      {activeTab === 'chains' && (
+        <div className="space-y-6">
+          {/* Giải thích cơ chế */}
+          <div className="bg-slate-900 text-slate-200 p-5 rounded-2xl border border-slate-800 text-xs space-y-2">
+            <div className="flex items-center gap-2 text-indigo-400 font-semibold text-sm">
+              <Route className="w-4 h-4 text-indigo-400" />
+              Chuỗi Fallback Model (kiểu 9Router)
+            </div>
+            <p className="text-slate-300 leading-relaxed">
+              Một chuỗi là danh sách có thứ tự các bước <strong>(nhà cung cấp, model)</strong>. Khi gọi AI,
+              hệ thống thử lần lượt từng bước: bước nào lỗi (hết hạn mức, sai cấu trúc, sự cố mạng) thì chuyển
+              bước kế tiếp. Chỉ khi <strong>hết chuỗi</strong> mới rơi về nội dung Smart Fallback mẫu.
+              Chuỗi đặt làm <strong>mặc định</strong> được dùng tự động cho mọi request trong phạm vi của nó
+              (workspace hoặc cá nhân) khi không truyền chuỗi tường minh.
+            </p>
+          </div>
+
+          {/* Form tạo chuỗi */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-100">
+              <h2 className="text-lg font-bold text-slate-900">Tạo chuỗi mới</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Chọn thứ tự nhà cung cấp — model để trống sẽ dùng model mặc định của nhà cung cấp đó.
+              </p>
+            </div>
+            <form onSubmit={handleCreateChain} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Tên chuỗi</label>
+                <input
+                  type="text"
+                  value={chainName}
+                  onChange={e => setChainName(e.target.value)}
+                  maxLength={100}
+                  placeholder="VD: Chuỗi Vip (Gemini -> OpenAI -> OpenRouter)"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="block text-sm font-semibold text-slate-700">Các bước (thứ tự ưu tiên)</label>
+                {chainHops.map((hop, idx) => (
+                  <div key={idx} className="flex items-center gap-2 flex-wrap">
+                    <span className="w-7 h-7 shrink-0 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center">
+                      {idx + 1}
+                    </span>
+                    <select
+                      value={hop.provider}
+                      onChange={e => {
+                        const next = [...chainHops];
+                        next[idx] = { ...hop, provider: e.target.value };
+                        setChainHops(next);
+                      }}
+                      className="px-3 py-2 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      {Object.entries(PROVIDER_CONFIGS).map(([slug, cfg]) => (
+                        <option key={slug} value={slug}>{cfg.name}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      value={hop.model}
+                      onChange={e => {
+                        const next = [...chainHops];
+                        next[idx] = { ...hop, model: e.target.value };
+                        setChainHops(next);
+                      }}
+                      placeholder={`Model (để trống = mặc định của ${hop.provider})`}
+                      className="flex-1 min-w-[220px] px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    {chainHops.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setChainHops(chainHops.filter((_, i) => i !== idx))}
+                        className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Bỏ bước này"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setChainHops([...chainHops, { provider: 'openai', model: '' }])}
+                  disabled={chainHops.length >= 10}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Thêm bước (tối đa 10)
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSavingChain}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              >
+                {isSavingChain ? <Loader2 className="w-4 h-4 animate-spin" /> : <Route className="w-4 h-4" />}
+                Lưu chuỗi
+              </button>
+            </form>
+          </div>
+
+          {/* Danh sách chuỗi */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Danh sách chuỗi</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Chuỗi mặc định (ngôi sao) được dùng tự động khi request không chọn chuỗi.
+                </p>
+              </div>
+              <button
+                onClick={() => void loadChains()}
+                className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                title="Tải lại"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoadingChains ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+
+            {chainsError && (
+              <div className="mx-6 mt-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {chainsError}
+              </div>
+            )}
+
+            {isLoadingChains && chains.length === 0 ? (
+              <div className="p-10 text-center text-slate-400 text-sm flex flex-col items-center gap-2">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Đang tải danh sách chuỗi...
+              </div>
+            ) : !isLoadingChains && chains.length === 0 && !chainsError ? (
+              <div className="p-10 text-center text-slate-400 text-sm">
+                Chưa có chuỗi nào. Tạo chuỗi đầu tiên ở phía trên để bắt đầu failover đa nhà cung cấp.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {chains.map(chain => (
+                  <div key={chain.id} className="p-5 flex items-start gap-4 flex-wrap">
+                    <div className="flex-1 min-w-[260px] space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-slate-900">{chain.name}</span>
+                        {chain.is_default && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wide">
+                            <Star className="w-3 h-3 fill-current" />
+                            Mặc định
+                          </span>
+                        )}
+                        {!chain.is_active && (
+                          <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-bold uppercase tracking-wide">
+                            Đang tắt
+                          </span>
+                        )}
+                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-bold uppercase tracking-wide">
+                          {chain.scope === 'workspace' ? 'Workspace' : 'Cá nhân'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {chain.hops.map((hop, idx) => (
+                          <React.Fragment key={`${chain.id}-hop-${idx}`}>
+                            {idx > 0 && <ArrowDown className="w-3.5 h-3.5 text-slate-300 rotate-[-90deg]" />}
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700">
+                              <span className="font-bold text-slate-400">{idx + 1}.</span>
+                              {hop.provider}
+                              <span className="text-slate-400">/</span>
+                              <code className="text-[11px]">{hop.model}</code>
+                            </span>
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {!chain.is_default && chain.is_active && (
+                        <button
+                          onClick={() => void handleSetDefaultChain(chain)}
+                          className="p-2 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                          title="Đặt làm chuỗi mặc định"
+                        >
+                          <Star className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => void handleToggleChain(chain)}
+                        className={`p-2 rounded-lg transition-colors ${
+                          chain.is_active
+                            ? 'text-emerald-600 hover:bg-emerald-50'
+                            : 'text-slate-400 hover:bg-slate-50'
+                        }`}
+                        title={chain.is_active ? 'Tắt chuỗi' : 'Bật chuỗi'}
+                      >
+                        <Power className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => void handleDeleteChain(chain)}
+                        className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Xóa chuỗi"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

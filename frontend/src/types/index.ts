@@ -462,6 +462,37 @@ export interface AIKeySaveResponse {
   updated_at?: string;
 }
 
+/**
+ * Chuỗi fallback model (kiểu 9Router): danh sách có thứ tự các bước
+ * (provider, model). Khi gọi AI, bước nào lỗi thì chuyển bước kế; hết chuỗi
+ * mới rơi về Smart Fallback template.
+ */
+export interface AIChainHop {
+  provider: string;
+  model: string;
+}
+
+export interface AIChain {
+  id: number;
+  name: string;
+  hops: AIChainHop[];
+  scope: 'workspace' | 'personal' | string;
+  workspace_id?: number | null;
+  user_id?: number | null;
+  is_active: boolean;
+  is_default: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AIChainSaveRequest {
+  name: string;
+  hops: AIChainHop[];
+  workspace_id?: number | null;
+  is_active?: boolean;
+  is_default?: boolean;
+}
+
 export interface AppNotification {
   id: string;
   title: string;

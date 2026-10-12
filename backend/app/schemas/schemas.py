@@ -594,6 +594,9 @@ class AIIdeaRequest(BaseModel):
     channel_code: str = "facebook"
     tone: str = "trẻ trung, năng động"
     prompt_version: str = "v3"
+    # Chuỗi fallback tùy chọn (xem AIChainCreate). None = dùng chuỗi mặc định
+    # của workspace/user nếu có, không thì gọi một model như cũ.
+    chain_id: Optional[int] = None
 
 class AIIdeaItem(BaseModel):
     id: int
@@ -619,6 +622,7 @@ class AIDraftRequest(BaseModel):
     channel_code: str = "facebook"
     selected_idea: str
     prompt_version: str = "v3"
+    chain_id: Optional[int] = None
 
 class AIDraftResponse(BaseModel):
     task_type: str = "DRAFT"
@@ -635,6 +639,7 @@ class AIDraftResponse(BaseModel):
 class AISummaryRequest(BaseModel):
     campaign_id: int
     prompt_version: str = "v3"
+    chain_id: Optional[int] = None
 
 class AISummaryResponse(BaseModel):
     task_type: str = "SUMMARY"
@@ -795,6 +800,7 @@ class OmnichannelRequest(BaseModel):
     product_usp: Optional[str] = None
     tone: Optional[str] = None
     prompt_version: str = "v3"
+    chain_id: Optional[int] = None
 
     @field_validator("brief")
     @classmethod
@@ -1017,6 +1023,51 @@ class AIKeyResponse(BaseModel):
 
 AIKeySaveRequest = AIKeyCreate
 AIKeySaveResponse = AIKeyResponse
+
+
+# --- AI MODEL CHAINS (chuỗi fallback kiểu 9Router) ---
+class AIChainHop(BaseModel):
+    """Một bước trong chuỗi: provider + model. Cùng bộ kiểm chứng với AIKeyCreate.
+
+    `model` để trống vẫn hợp lệ: validator điền model mặc định của provider
+    (validate_model_for), nên UI chỉ bắt buộc chọn nhà cung cấp.
+    """
+
+    provider: str = Field(..., pattern=PROVIDER_PATTERN, description="Nhà cung cấp AI")
+    model: Optional[str] = Field(None, max_length=200, description="Model tại bước này; bỏ trống = model mặc định của provider")
+
+    @field_validator("provider", mode="before")
+    @classmethod
+    def validate_provider(cls, v: Any) -> str:
+        return normalize_provider_slug(v)
+
+    @model_validator(mode="after")
+    def validate_provider_and_model(self) -> "AIChainHop":
+        self.model = validate_model_for(self.provider, self.model)
+        return self
+
+
+class AIChainCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100, description="Tên chuỗi, ví dụ 'Chuỗi Vip'")
+    hops: List[AIChainHop] = Field(..., min_length=1, max_length=10, description="Danh sách model theo thứ tự failover")
+    workspace_id: Optional[int] = Field(None, description="Không truyền = chuỗi cá nhân")
+    is_active: bool = True
+    is_default: bool = Field(False, description="Dùng tự động khi request không truyền chain_id")
+
+
+class AIChainResponse(BaseModel):
+    id: int
+    name: str
+    hops: List[AIChainHop]
+    scope: str = Field("personal", description="'workspace' | 'personal'")
+    workspace_id: Optional[int] = None
+    user_id: Optional[int] = None
+    is_active: bool = True
+    is_default: bool = False
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 # --- AI LOGS ---

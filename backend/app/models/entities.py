@@ -422,6 +422,45 @@ class CustomApiKey(Base):
     workspace = relationship("Workspace", back_populates="custom_api_keys")
 
 
+class AIModelChain(Base):
+    """Chuỗi model fallback do người dùng đặt tên (kiểu 9Router).
+
+    Một chuỗi là danh sách có thứ tự các bước `(provider, model)`. Khi gọi AI,
+    `AIService.execute_task` thử từng bước: bước nào lỗi (timeout, HTTP lỗi,
+    sai schema, breaker mở, thiếu API key) thì chuyển bước kế tiếp. Khi hết
+    chuỗi mới rơi về Smart Fallback (template) như cũ.
+
+    Không có bảng mới thì không cần migration: `Base.metadata.create_all` tự
+    tạo bảng khi khởi động (xem `app/core/database.py:init_db`).
+    """
+
+    __tablename__ = "ai_model_chains"
+
+    id = Column(Integer, primary_key=True, index=True)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    # JSON mảng có thứ tự: [{"provider": "openai", "model": "gpt-6.1-sol"}, ...]
+    hops_json = Column(Text, nullable=False, default="[]")
+    is_active = Column(Boolean, nullable=False, default=True)
+    # Chuỗi mặc định được dùng tự động khi request không truyền chain_id.
+    is_default = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+    __table_args__ = (
+        # UNIQUE theo (workspace_id, name) KHÔNG khép các hàng workspace_id NULL
+        # (chuẩn SQL), nên tên trùng cho chuỗi cá nhân không bị ràng buộc ở DB —
+        # tầng API kiểm tra trùng. Cùng lý do với uq_ai_job_user_idempotency.
+        CheckConstraint("user_id IS NOT NULL OR workspace_id IS NOT NULL", name="chk_chain_owner"),
+        Index("idx_ai_chains_workspace", "workspace_id", "name"),
+        Index("idx_ai_chains_user", "user_id", "is_default"),
+    )
+
+    user = relationship("User")
+    workspace = relationship("Workspace")
+
+
 class AIJob(Base):
     """Hàng đợi công việc AI bất đồng bộ, LƯU TRONG CHÍNH CSDL (không broker ngoài).
 
