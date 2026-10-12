@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Campaign, MarketingContent, KPISummary, AIIdeaResponse, AIDraftResponse, AISummaryResponse, OmnichannelRequest, OmnichannelResponse, User, Product, MarketingSchedule, ContentComplianceCheck, Workspace, BrandKit, ComplianceCheckRequest, ComplianceCheckResponse, ComplianceViolation, ChannelAttribution, AIDoctorReport, CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse, AIChain, AIChainSaveRequest, AppNotification, Task, TaskCreate, TaskUpdate, BudgetAllocation, BudgetSummary, KPITarget, CommandCenterResponse, Page, QuotaSnapshot, QuotaErrorDetail, CampaignSort, ContentSort, AIModelListResponse } from '../types';
+import { Campaign, MarketingContent, KPISummary, AIIdeaResponse, AIDraftResponse, AISummaryResponse, OmnichannelRequest, OmnichannelResponse, User, Product, MarketingSchedule, ContentComplianceCheck, Workspace, BrandKit, ComplianceCheckRequest, ComplianceCheckResponse, ComplianceViolation, ChannelAttribution, AIDoctorReport, CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse, AIChain, AIChainSaveRequest, AppNotification, Task, TaskCreate, TaskUpdate, BudgetAllocation, BudgetSummary, KPITarget, KpiProgress, CommandCenterResponse, Page, QuotaSnapshot, QuotaErrorDetail, CampaignSort, ContentSort, AIModelListResponse } from '../types';
 import { MarketingChannel, getChannelRegistry } from '../utils/channels';
 import type {
   AIJobAccepted,
@@ -2316,6 +2316,17 @@ export const kpiApi = {
       if (e?.response) throw e;
       if (!isOfflineDemoEnabled()) throw e;
       return data.map((d, i) => ({ id: i + 1, campaign_id: campaignId, ...d }));
+    }
+  },
+
+  getKpiProgress: async (campaignId: number): Promise<KpiProgress | null> => {
+    try {
+      const res = await apiClient.get(`/campaigns/${campaignId}/kpi-progress`);
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      return null;
     }
   }
 };

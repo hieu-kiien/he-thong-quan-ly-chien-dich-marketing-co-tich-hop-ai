@@ -587,6 +587,24 @@ export interface KPITarget {
   unit: string;
 }
 
+export interface KpiProgressTarget {
+  target_id?: number | null;
+  metric_name: string;
+  unit?: string | null;
+  target_value: number;
+  actual_value: number | null;
+  achieved_pct: number | null;
+  measurable: boolean;
+}
+
+export interface KpiProgress {
+  campaign_id: number;
+  targets: KpiProgressTarget[];
+  overall_achieved_pct: number | null;
+  measurable_count: number;
+  total_count: number;
+}
+
 export interface CommandCenterAttentionItem {
   id: string;
   type: 'OVERDUE_TASK' | 'PENDING_APPROVAL' | 'BUDGET_OVERRUN' | 'CAMPAIGN_DEADLINE' | string;

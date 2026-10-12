@@ -8,11 +8,12 @@ import {
   Save, 
   Edit3 
 } from 'lucide-react';
-import { Campaign, KPISummary } from '../../types';
+import { Campaign, KPISummary, KpiProgress } from '../../types';
 
 interface OverviewTabProps {
   campaign: Campaign | null;
   campaignKpi: KPISummary | null;
+  kpiProgress?: KpiProgress | null;
   isEditingBrief: boolean;
   setIsEditingBrief: (val: boolean) => void;
   briefKeyMessage: string;
@@ -35,6 +36,7 @@ interface OverviewTabProps {
 export const OverviewTab: React.FC<OverviewTabProps> = ({
   campaign,
   campaignKpi,
+  kpiProgress,
   isEditingBrief,
   setIsEditingBrief,
   briefKeyMessage,
@@ -252,6 +254,36 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               </span>
             </div>
           </div>
+
+          {/* Đích KPI đã khai báo — target vs thực tế (GET /kpi-progress) */}
+          {kpiProgress && kpiProgress.targets.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Chỉ tiêu KPI đã khai ({kpiProgress.measurable_count}/{kpiProgress.total_count} đo được)
+                {kpiProgress.overall_achieved_pct !== null && (
+                  <span className="ml-1.5 text-indigo-600">· Đạt TB {kpiProgress.overall_achieved_pct}%</span>
+                )}
+              </div>
+              {kpiProgress.targets.map((t) => (
+                <div key={t.target_id ?? t.metric_name} className="p-2.5 bg-white rounded-xl border border-slate-100 text-xs space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-slate-700">{t.metric_name}</span>
+                    {t.achieved_pct !== null ? (
+                      <span className={`font-extrabold ${t.achieved_pct >= 100 ? 'text-emerald-600' : t.achieved_pct >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>
+                        {t.achieved_pct}%
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 font-semibold">Chưa đo được</span>
+                    )}
+                  </div>
+                  <div className="flex justify-between text-[10px] text-slate-500">
+                    <span>Mục tiêu: <b className="text-slate-700">{t.target_value.toLocaleString('vi-VN')} {t.unit || ''}</b></span>
+                    <span>Thực tế: <b className="text-slate-700">{t.actual_value !== null ? t.actual_value.toLocaleString('vi-VN') : '—'} {t.actual_value !== null ? (t.unit || '') : ''}</b></span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

@@ -304,6 +304,27 @@ class KPITargetResponse(KPITargetBase):
     campaign_id: int
     model_config = ConfigDict(from_attributes=True)
 
+
+class KpiProgressTarget(BaseModel):
+    """Một chỉ tiêu KPI so với giá trị thực tế đã đo lường."""
+    target_id: Optional[int] = None
+    metric_name: str
+    unit: Optional[str] = None
+    target_value: float
+    actual_value: Optional[float] = None
+    achieved_pct: Optional[float] = None
+    # Không khớp được actual với metric đã đo (metric lạ / thiếu dữ liệu).
+    measurable: bool = True
+
+
+class KpiProgressResponse(BaseModel):
+    """Tiến độ KPI: targets vs actual từ CampaignMetric (không bịa số)."""
+    campaign_id: int
+    targets: List[KpiProgressTarget] = []
+    overall_achieved_pct: Optional[float] = None
+    measurable_count: int = 0
+    total_count: int = 0
+
 class CampaignResponse(CampaignBase):
     id: int
     owner_id: int

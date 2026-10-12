@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Sparkles, ShieldCheck, BarChart3, ArrowRight, CheckCircle2, XCircle, ZoomIn, ZoomOut, Calendar, Target, Users, Layers, FileText, Check, Copy, Stethoscope, RefreshCw, ThumbsUp, MessageSquare, Share2, Mail, Video, ExternalLink, Eye, CalendarCheck, ShieldAlert, Wand2, X, PieChart, ListTodo } from 'lucide-react';
-import { Campaign, MarketingContent, KPISummary, AIIdeaItem, AIIdeaResponse, AIDraftResponse, ContentComplianceCheck, Task, TaskStatus, TaskPriority, TaskType } from '../types';
-import { campaignApi, contentApi, scheduleApi, taskApi, budgetApi, evaluateMarketingCompliance, getApiErrorMessage } from '../services/api';
+import { Campaign, MarketingContent, KPISummary, KpiProgress, AIIdeaItem, AIIdeaResponse, AIDraftResponse, ContentComplianceCheck, Task, TaskStatus, TaskPriority, TaskType } from '../types';
+import { campaignApi, contentApi, scheduleApi, taskApi, budgetApi, kpiApi, evaluateMarketingCompliance, getApiErrorMessage } from '../services/api';
 import { AIJobError, describeAIJobFailure, describeAIResultOrigin } from '../services/aiJobPoller';
 import { useAIJob } from '../hooks/useAIJob';
 import { AIJobProgress } from './AIJobProgress';
@@ -48,6 +48,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 
   // KPI & Doctor states
   const [campaignKpi, setCampaignKpi] = useState<KPISummary | null>(null);
+  const [kpiProgress, setKpiProgress] = useState<KpiProgress | null>(null);
   const [submittingId, setSubmittingId] = useState<number | null>(null);
   const [approvingId, setApprovingId] = useState<number | null>(null);
 
@@ -153,6 +154,10 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
       campaignApi.getKpi(campaign.id)
         .then(res => setCampaignKpi(res))
         .catch(() => setCampaignKpi(null));
+
+      kpiApi.getKpiProgress(campaign.id)
+        .then(res => setKpiProgress(res))
+        .catch(() => setKpiProgress(null));
 
       setBriefKeyMessage(campaign.key_message || '');
       setBriefPrimaryCta(campaign.primary_cta || '');
@@ -790,6 +795,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         <OverviewTab
           campaign={campaign}
           campaignKpi={campaignKpi}
+          kpiProgress={kpiProgress}
           isEditingBrief={isEditingBrief}
           setIsEditingBrief={setIsEditingBrief}
           briefKeyMessage={briefKeyMessage}

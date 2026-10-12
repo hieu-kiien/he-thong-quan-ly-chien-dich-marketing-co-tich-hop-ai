@@ -8,7 +8,7 @@ from app.core.security import RoleChecker, get_current_user
 from app.services import quota
 from app.services import campaign_lifecycle
 from app.models.entities import Campaign, Product, User, CampaignMember, WorkspaceMember, Workspace, MarketingContent, CampaignBudgetAllocation, CampaignKPITarget, MarketingChannel, Task, CampaignMetric
-from app.schemas.schemas import CampaignCreate, CampaignUpdate, CampaignResponse, ContentResponse, BudgetAllocationCreate, BudgetAllocationResponse, BudgetSummaryResponse, BudgetChannelSummary, KPITargetCreate, KPITargetResponse
+from app.schemas.schemas import CampaignCreate, CampaignUpdate, CampaignResponse, ContentResponse, BudgetAllocationCreate, BudgetAllocationResponse, BudgetSummaryResponse, BudgetChannelSummary, KPITargetCreate, KPITargetResponse, KpiProgressResponse, KpiProgressTarget
 
 
 router = APIRouter(prefix="/campaigns", tags=["Quản lý Chiến dịch"])
@@ -752,6 +752,15 @@ def update_campaign_kpi_targets(
     if current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER") and campaign.owner_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền cập nhật KPI mục tiêu")
 
+    # metric_name unique theo DB (uq_campaign_metric_target) — bắt sớm để 400 thay vì 500.
+    names = [t.metric_name.strip().lower() for t in targets_in]
+    if len(set(names)) != len(names):
+        dupes = sorted({n for n in names if names.count(n) > 1})
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Chỉ tiêu KPI trùng lặp: {dupes}",
+        )
+
     db.query(CampaignKPITarget).filter(CampaignKPITarget.campaign_id == campaign_id).delete()
 
     created_targets = []
@@ -770,5 +779,109 @@ def update_campaign_kpi_targets(
         db.refresh(item)
 
     return created_targets
+
+
+def _kpi_actual_value(metric_name: str, agg: dict) -> Optional[float]:
+    """Map tên chỉ tiêu KPI → giá trị thực tế từ tổng hợp CampaignMetric.
+
+    Trả None khi không map được (metric lạ) → caller hiển thị "chưa đo lường".
+    """
+    name = metric_name.strip().lower()
+    views = agg["views"]
+    clicks = agg["clicks"]
+    conv = agg["conversions"]
+    cost = agg["cost"]
+    rev = agg["revenue"]
+
+    if name in ("ctr",):
+        return round(100.0 * clicks / views, 2) if views > 0 else None
+    if name in ("cvr", "conversion_rate"):
+        return round(100.0 * conv / clicks, 2) if clicks > 0 else None
+    if name in ("cpc",):
+        return round(cost / clicks, 2) if clicks > 0 else None
+    if name in ("cpa", "cpl", "cost_per_lead"):
+        return round(cost / conv, 2) if conv > 0 else None
+    if name in ("roas",):
+        return round(rev / cost, 2) if cost > 0 else None
+    if name in ("roi",):
+        return round(100.0 * (rev - cost) / cost, 2) if cost > 0 else None
+    if name in ("revenue", "doanh thu"):
+        return round(rev, 2)
+    if name in ("cost", "spend", "chi phí"):
+        return round(cost, 2)
+    if name in ("conversions", "leads", "conversion"):
+        return float(conv)
+    if name in ("clicks",):
+        return float(clicks)
+    if name in ("views", "impressions", "impression"):
+        return float(views)
+    return None
+
+
+@router.get("/{campaign_id}/kpi-progress", response_model=KpiProgressResponse)
+def get_campaign_kpi_progress(
+    campaign_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """So sánh KPI mục tiêu với thực tế đã đo (SUM CampaignMetric).
+
+    Trước đây UI chỉ có target hoặc chỉ có actual, không chỗ nào ghép cặp
+    để biết "đạt bao nhiêu %".
+    """
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
+    check_campaign_access(campaign, current_user, db)
+
+    targets = db.query(CampaignKPITarget).filter(
+        CampaignKPITarget.campaign_id == campaign_id
+    ).all()
+
+    from sqlalchemy import func as sa_func
+    row = db.query(
+        sa_func.coalesce(sa_func.sum(CampaignMetric.views), 0),
+        sa_func.coalesce(sa_func.sum(CampaignMetric.clicks), 0),
+        sa_func.coalesce(sa_func.sum(CampaignMetric.conversions), 0),
+        sa_func.coalesce(sa_func.sum(CampaignMetric.cost), 0),
+        sa_func.coalesce(sa_func.sum(CampaignMetric.revenue), 0),
+    ).filter(CampaignMetric.campaign_id == campaign_id).one()
+    agg = {
+        "views": int(row[0]),
+        "clicks": int(row[1]),
+        "conversions": int(row[2]),
+        "cost": float(row[3]),
+        "revenue": float(row[4]),
+    }
+
+    out_targets: List[KpiProgressTarget] = []
+    achievable: List[float] = []
+    for t in targets:
+        actual = _kpi_actual_value(t.metric_name, agg)
+        target_val = float(t.target_value)
+        if actual is None or target_val <= 0:
+            achieved = None
+            measurable = False
+        else:
+            achieved = round(100.0 * actual / target_val, 2)
+            measurable = True
+            achievable.append(achieved)
+        out_targets.append(KpiProgressTarget(
+            target_id=t.id,
+            metric_name=t.metric_name,
+            unit=t.unit,
+            target_value=target_val,
+            actual_value=actual,
+            achieved_pct=achieved,
+            measurable=measurable,
+        ))
+
+    return KpiProgressResponse(
+        campaign_id=campaign_id,
+        targets=out_targets,
+        overall_achieved_pct=round(sum(achievable) / len(achievable), 2) if achievable else None,
+        measurable_count=len(achievable),
+        total_count=len(out_targets),
+    )
 
 

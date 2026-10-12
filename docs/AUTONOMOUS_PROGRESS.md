@@ -70,8 +70,23 @@ Verification:
 - FE tsc + eslint + build → pass
 - `detect_changes --scope all`: 34 symbols, risk medium
 
-## Next — Phase 4+ (not started)
-- Workstream C: KPI targets CRUD + real metrics (validate metric_name allowlist, unit)
+## Phase 4 — Workstream C: KPI (done)
+Backend:
+- `PUT /kpi-targets`: reject duplicate metric_name (case-insensitive) → 400 thay vì IntegrityError 500
+- New `GET /campaigns/{id}/kpi-progress` → `KpiProgressResponse`: map metric_name → actual từ SUM CampaignMetric (CTR/CVR/CPC/CPA/ROAS/ROI/revenue/cost/conversions/clicks/views); metric lạ → `measurable=false, actual=None` (không bịa); `overall_achieved_pct` = avg các metric đo được; zero-metrics an toàn
+
+Frontend:
+- `KpiProgress` type + `kpiApi.getKpiProgress`
+- WorkflowCanvas nạp kpiProgress song song KPI summary; OverviewTab hiển thị danh sách target vs actual (màu theo ngưỡng 50/100%, "Chưa đo được" khi không map)
+
+Tests `test_kpi_workstream.py` (7): duplicate 400, unique 200, achieved_pct tính đúng (baseline-aware), no-metrics zero-division, cross-tenant, unauth, ROAS/revenue mapping
+
+Verification:
+- pytest kpi + tasks + lifecycle + budget → 32 passed
+- FE tsc + eslint --max-warnings=0 + build → pass
+- `detect_changes --scope all`: 25 symbols, risk medium
+
+## Next — Phase 5+ (not started)
 - Workstream D: Tasks/Notifications
 - Workstream E: Auth (logout revocation, change password)
 
