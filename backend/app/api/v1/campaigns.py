@@ -250,6 +250,13 @@ def get_campaigns(
             (Campaign.id.in_(member_campaign_ids))
         )
 
+    # Tenant scope fail-closed: chỉ MANAGER/AGENCY_MANAGER có filter workspace_id
+    # tường minh là chưa đủ — thiếu filter thì MỌI dòng (kể cả workspace_id NULL
+    # hay workspace tenant khác) đều lọt vào trang trả về. `_apply_tenant_scope`
+    # chốt lại tập được phép xem ở tầng query bất kể client có gửi filter hay không.
+    if current_user.role != "ADMIN":
+        query = _apply_tenant_scope(query, Campaign, current_user, db, Campaign.owner_id)
+
     # `workspace_id` tới đây đã được phân giải + kiểm tra quyền trong dependency
     # `get_workspace_filter` (đọc cả query param lẫn header X-Workspace-Id).
     if workspace_id is not None:

@@ -17,7 +17,13 @@ from app.core.security import (
     enforce_quota,
 )
 from app.models.entities import User, Workspace, WorkspaceMember, BrandKit
-from app.schemas.schemas import LoginRequest, TokenResponse, UserResponse, UserRegister
+from app.schemas.schemas import (
+    LoginRequest,
+    PasswordChangeRequest,
+    TokenResponse,
+    UserResponse,
+    UserRegister,
+)
 
 router = APIRouter(prefix="/auth", tags=["Xác thực & Phân quyền"])
 
@@ -199,7 +205,10 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     # và bất kỳ XSS nào cũng đọc được ngay. Vai trò được đọc lại từ DB ở
     # `get_current_user` (xem app/core/security.py), nên bỏ khỏi token không ảnh
     # hưởng phân quyền — thay vào đó loại bỏ nguy cơ token "cũ" mang vai trò cũ.
-    access_token = create_access_token(data={"sub": str(user.id)})
+    #
+    # `ver` = phiên bản token hiện tại của user: dùng để thu hồi phiên khi
+    # logout / đổi mật khẩu (xem assert_token_version_current).
+    access_token = create_access_token(data={"sub": str(user.id), "ver": int(user.token_version or 0)})
 
     return TokenResponse(
         access_token=access_token,
@@ -210,4 +219,52 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
     return UserResponse.model_validate(current_user)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Thu hồi phiên hiện tại (và mọi token khác đã cấp cho user này).
+
+    JWT không thể bị server "hạ" đơn lẻ, nên revocation thực hiện bằng cách tăng
+    `token_version`: mọi token phát hành trước đó không còn khớp → 401 fail-closed.
+    """
+    current_user.token_version = int(current_user.token_version or 0) + 1
+    db.commit()
+
+
+@router.post("/change-password", status_code=status.HTTP_200_OK)
+def change_password(
+    payload: PasswordChangeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Đổi mật khẩu: xác minh mật khẩu hiện tại, ghi đè hash mới, thu hồi phiên cũ."""
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mật khẩu hiện tại không chính xác",
+        )
+    if payload.new_password == payload.current_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mật khẩu mới phải khác mật khẩu hiện tại",
+        )
+
+    current_user.password_hash = hash_password(payload.new_password)
+    # Đổi mật khẩu = thu hồi mọi phiên đang mở (kể cả token đang dùng request này).
+    current_user.token_version = int(current_user.token_version or 0) + 1
+    db.commit()
+
+    # Cấp token mới cho phiên đang đổi để người dùng không bị đá ra giữa chừng.
+    new_token = create_access_token(
+        data={"sub": str(current_user.id), "ver": int(current_user.token_version or 0)}
+    )
+    return TokenResponse(
+        access_token=new_token,
+        token_type="bearer",
+        user=UserResponse.model_validate(current_user),
+    )
 

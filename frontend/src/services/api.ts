@@ -474,9 +474,28 @@ export const authApi = {
     }
   },
   logout: () => {
+    // Thu hồi phiên phía server (tăng token_version → token cũ bị 401).
+    // Best-effort: không await để logout UI không bị chặn khi backend chậm/chết —
+    // token vẫn bị thu hồi nếu request kịp gửi đi, và localStorage luôn được dọn.
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      apiClient.post('/auth/logout').catch(() => { /* đã dọn phiên ở client */ });
+    }
     localStorage.removeItem('access_token');
     localStorage.removeItem('current_user');
     localStorage.removeItem('active_workspace_id');
+  },
+  changePassword: async (currentPassword: string, newPassword: string): Promise<{ access_token: string }> => {
+    const res = await apiClient.post('/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+    // Backend thu hồi mọi token cũ và cấp token mới cho phiên đang đổi.
+    localStorage.setItem('access_token', res.data.access_token);
+    if (res.data.user) {
+      localStorage.setItem('current_user', JSON.stringify(res.data.user));
+    }
+    return res.data;
   }
 };
 

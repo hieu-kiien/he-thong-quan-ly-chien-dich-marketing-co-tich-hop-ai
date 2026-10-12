@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { KeyRound, ShieldCheck, Zap, CheckCircle2, AlertCircle, Eye, EyeOff, Trash2, ExternalLink, RefreshCw, Loader2, Building2, User, Check, Power, Route, Plus, Star, ArrowDown, X } from 'lucide-react';
-import { settingsApi, getApiErrorMessage } from '../services/api';
+import { settingsApi, authApi, getApiErrorMessage } from '../services/api';
 import { useToast } from '../components/Toast';
 import { CustomApiKey, AIKeyTestResponse, User as UserType, Workspace, AIModelListResponse, AIChain, AIChainHop } from '../types';
 
@@ -365,6 +365,38 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
   const [isSavingChain, setIsSavingChain] = useState(false);
   const [chainName, setChainName] = useState('');
   const [chainHops, setChainHops] = useState<AIChainHop[]>([{ provider: 'gemini', model: '' }]);
+
+  // Đổi mật khẩu (Workstream E)
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  const handlePasswordSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(null);
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Mật khẩu nhập lại không khớp.');
+      return;
+    }
+    if (newPassword === currentPassword) {
+      setPasswordError('Mật khẩu mới phải khác mật khẩu hiện tại.');
+      return;
+    }
+    setIsChangingPassword(true);
+    try {
+      await authApi.changePassword(currentPassword, newPassword);
+      toast.success('Đổi mật khẩu thành công. Mọi phiên khác đã bị thu hồi.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      setPasswordError(getApiErrorMessage(err));
+    } finally {
+      setIsChangingPassword(false);
+    }
+  }, [currentPassword, newPassword, confirmPassword, toast]);
 
   const loadChains = useCallback(async () => {
     setIsLoadingChains(true);
@@ -1198,12 +1230,69 @@ const handleTestConnection = async () => {
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
               <span className="text-slate-500 text-xs block mb-1">Quyền hạn Quản trị</span>
               <span className="font-semibold text-slate-800">
-                {currentUser?.role === 'MANAGER' || currentUser?.role === 'AGENCY_MANAGER' 
-                  ? 'Toàn quyền Phê duyệt & Cấu hình BYOK' 
+                {currentUser?.role === 'MANAGER' || currentUser?.role === 'AGENCY_MANAGER'
+                  ? 'Toàn quyền Phê duyệt & Cấu hình BYOK'
                   : 'Sáng tạo Nội dung & Yêu cầu duyệt'}
               </span>
             </div>
           </div>
+
+          {/* Đổi mật khẩu — thu hồi mọi phiên đang mở ở các thiết bị khác */}
+          <form
+            onSubmit={handlePasswordSubmit}
+            className="pt-6 border-t border-slate-100 space-y-4"
+          >
+            <div>
+              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                Đổi mật khẩu
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Sau khi đổi, mọi phiên đăng nhập khác sẽ bị thu hồi và phải đăng nhập lại.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Mật khẩu hiện tại"
+                className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                required
+              />
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Mật khẩu mới (tối thiểu 6 ký tự)"
+                className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                required
+                minLength={6}
+              />
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Nhập lại mật khẩu mới"
+                className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                required
+              />
+            </div>
+            {passwordError && (
+              <p className="text-xs text-red-600">{passwordError}</p>
+            )}
+            <button
+              type="submit"
+              disabled={isChangingPassword}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {isChangingPassword && <Loader2 className="w-4 h-4 animate-spin" />}
+              Cập nhật mật khẩu
+            </button>
+          </form>
         </div>
       )}
 

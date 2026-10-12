@@ -90,3 +90,18 @@ Verification:
 - Workstream D: Tasks/Notifications
 - Workstream E: Auth (logout revocation, change password)
 
+
+## Phase 5 — Workstream D: Tasks/Notifications (done)
+Backend:
+- `POST /campaigns/{id}/tasks`: g?i notification cho assignee (target_tab=`tasks`, lo?i `task`) khi giao vi?c cho ngu?i khác; b? qua khi t? giao cho mình
+- `PATCH /tasks/{id}`: g?i notification cho assignee m?i khi d?i ngu?i (reassign)
+- Notification failure không làm h?ng vi?c t?o/c?p nh?t task (log warning + rollback)
+
+Tests `test_notifications.py` (12): create-notify assignee, self-assign no-notify, reassign-notify
+
+Verification:
+- pytest tasks + notifications + lifecycle + budget + kpi ? 30+ passed
+- `detect_changes --scope all`: risk medium
+
+## Next — Phase 6+
+- Workstream E: Auth (logout revocation, change password)

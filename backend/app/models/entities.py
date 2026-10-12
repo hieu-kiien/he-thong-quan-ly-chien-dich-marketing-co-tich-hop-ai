@@ -27,6 +27,10 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(String(50), nullable=False, default="MARKETER") # 'MANAGER', 'MARKETER', 'AGENCY_MANAGER', 'CLIENT_APPROVER', 'ADMIN'
     status = Column(String(50), nullable=False, default="ACTIVE") # 'ACTIVE', 'DISABLED'
+    # Phiên đăng nhập: tăng số này (logout / đổi mật khẩu) để thu hồi MỌI token
+    # đã phát hành trước đó. JWT không thể "hạ" từ phía server nên đây là cách
+    # revocation duy nhất không cần lưu黑名单 token từng cái.
+    token_version = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(DateTime, default=utc_now, nullable=False)
 
     __table_args__ = (

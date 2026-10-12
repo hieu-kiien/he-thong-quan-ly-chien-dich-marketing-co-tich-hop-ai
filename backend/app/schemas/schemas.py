@@ -44,6 +44,13 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user: UserResponse
 
+
+class PasswordChangeRequest(BaseModel):
+    """Đổi mật khẩu: xác minh mật khẩu hiện tại trước khi ghi đè."""
+
+    current_password: str = Field(..., min_length=1, max_length=128)
+    new_password: str = Field(..., min_length=6, max_length=128)
+
 # --- WORKSPACE & MEMBERSHIP ---
 class WorkspaceBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=255, description="Tên không gian làm việc hoặc thương hiệu khách hàng")

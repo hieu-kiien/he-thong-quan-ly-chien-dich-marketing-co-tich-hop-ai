@@ -105,6 +105,25 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     encoded_jwt = jwt.encode(to_encode, secret_key, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
+
+def assert_token_version_current(payload: dict, user: "User") -> None:
+    """Thu hồi phiên: token phát hành trước lần logout/đổi mật khẩu cuối bị từ chối.
+
+    Token cũ thiếu claim `ver` được coi là phiên 0 — khớp với token_version mặc
+    định của mọi user. Khi logout/đổi mật khẩu tăng token_version, toàn bộ token
+    cũ (kể cả không mang `ver`) không còn khớp → 401 fail-closed.
+    """
+    try:
+        claim = int(payload.get("ver", 0))
+    except (TypeError, ValueError):
+        claim = -1  # claim hỏng không bao giờ khớp phiên thật
+    if claim != (user.token_version or 0):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Phiên đăng nhập đã bị thu hồi. Vui lòng đăng nhập lại.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
 def decode_access_token(token: str) -> dict:
     try:
         secret_key = get_jwt_secret_key()
@@ -216,6 +235,9 @@ class RoleChecker:
                     detail="User account is not active (inactive or suspended) (Tài khoản đã bị vô hiệu hóa)",
                 )
 
+            # 4b. Thu hồi phiên (logout / đổi mật khẩu từ thiết bị khác).
+            assert_token_version_current(payload, user)
+
             # 5. So sánh vai trò thực tế trong Database với allowed_roles (không tin payload role)
             if user.role not in self.allowed_roles:
                 raise HTTPException(
@@ -278,6 +300,9 @@ def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is not active (inactive or suspended) (Tài khoản đã bị vô hiệu hóa)"
         )
+
+    # Thu hồi phiên: token cấp trước logout/đổi mật khẩu phải bị từ chối.
+    assert_token_version_current(payload, user)
 
     return user
 

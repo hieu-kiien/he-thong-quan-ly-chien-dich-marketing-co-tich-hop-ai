@@ -250,6 +250,12 @@ def ensure_sqlite_schema_compatibility(db_engine=engine):
                 if "is_active" not in key_cols:
                     conn.exec_driver_sql("ALTER TABLE custom_api_keys ADD COLUMN is_active BOOLEAN DEFAULT 1")
 
+            # 2b. Thu hồi phiên đăng nhập: cột users.token_version.
+            res_users = conn.exec_driver_sql("PRAGMA table_info(users)")
+            user_cols = [row[1] for row in res_users.fetchall()]
+            if user_cols and "token_version" not in user_cols:
+                conn.exec_driver_sql("ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0")
+
             # 3. Bổ sung các cột Brief & Target cho campaigns (Idempotent Migration)
             res_camp = conn.exec_driver_sql("PRAGMA table_info(campaigns)")
             camp_cols = [row[1] for row in res_camp.fetchall()]
@@ -370,6 +376,10 @@ def ensure_postgres_schema_compatibility(db_engine=engine) -> None:
         return
     checks = (
         ("campaign_metrics", "source", "VARCHAR(20)"),
+        # Revocation phiên đăng nhập: token cũ phải bị từ chối ngay khi cột này
+        # được thêm (mọi token phát hành trước đây coi như phiên 0 đã hết hiệu lực
+        # sau lần logout/đổi mật khẩu đầu tiên).
+        ("users", "token_version", "INTEGER NOT NULL DEFAULT 0"),
     )
     # `exec_driver_sql` NHẬN SQL THÔ, không bind tham số. Dùng `:t`/`:c` ở đây
     # sẽ được gửi thẳng xuống Postgres như chữ thường -> SyntaxError -> bị nuốt
