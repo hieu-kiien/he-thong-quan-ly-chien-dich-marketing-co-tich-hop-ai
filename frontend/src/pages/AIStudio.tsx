@@ -1063,7 +1063,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
       omniContentsForExport.push({
 
-        id: omniCreatedStatus['facebook']?.id || 101,
+        id: omniCreatedStatus['facebook']?.id || 0,
 
         campaign_id: selectedCampaign?.id || 1,
 
@@ -1101,7 +1101,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
       omniContentsForExport.push({
 
-        id: omniCreatedStatus['tiktok']?.id || 102,
+        id: omniCreatedStatus['tiktok']?.id || 0,
 
         campaign_id: selectedCampaign?.id || 1,
 
@@ -1137,7 +1137,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
       omniContentsForExport.push({
 
-        id: omniCreatedStatus['email']?.id || 103,
+        id: omniCreatedStatus['email']?.id || 0,
 
         campaign_id: selectedCampaign?.id || 1,
 

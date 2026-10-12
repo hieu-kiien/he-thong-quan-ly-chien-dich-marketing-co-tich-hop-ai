@@ -227,3 +227,97 @@ def test_mark_notification_as_read_cross_tenant_forbidden(client: TestClient, db
     headers_beta = rbac_headers["beta_marketer"]
     res = client.patch(f"/api/v1/notifications/{notif_ws1.id}/read", headers=headers_beta)
     assert res.status_code in (403, 404)
+
+
+def test_compliance_check_cross_tenant_workspace_id_forbidden(client: TestClient, rbac_headers):
+    """Marketer WS1 không được gửi workspace_id=1 của người khác / WS không thuộc về họ.
+
+    Lỗ IDOR cũ: endpoint tin tưởng req.workspace_id từ client và query BrandKit
+    của workspace đó → đọc chéo banned-keywords.
+    """
+    # Beta marketer là thành viên WS2; gửi workspace_id=1 phải 403.
+    res = client.post(
+        "/api/v1/contents/compliance-check",
+        json={"title": "Kiểm tra", "body": "Nội dung kiểm tra", "workspace_id": 1},
+        headers=rbac_headers["beta_marketer"],
+    )
+    assert res.status_code == 403
+    detail = res.json()["detail"].lower()
+    assert "workspace" in detail or "không có quyền" in detail or "not authorized" in detail
+
+    # Alpha marketer (WS1) vẫn được phép dùng workspace_id của chính mình.
+    res_ok = client.post(
+        "/api/v1/contents/compliance-check",
+        json={"title": "Hợp lệ", "body": "Nội dung hợp lệ", "workspace_id": 1},
+        headers=rbac_headers["marketer"],
+    )
+    assert res_ok.status_code == 200
+
+
+def test_ai_models_rejects_api_key_in_query_string(client: TestClient, rbac_headers):
+    """`?api_key=` trên GET /settings/ai-models bị bỏ qua (không còn nhận qua query).
+
+    Khoá chỉ được nhận qua header `X-Test-Api-Key`. Query string rơi vào
+    access log và browser history — không được dùng làm kênh truyền secret.
+    """
+    res = client.get(
+        "/api/v1/settings/ai-models?provider=gemini&api_key=should-not-matter",
+        headers=rbac_headers["marketer"],
+    )
+    # Vẫn 200 (public provider listing) nhưng khoá trong query không được
+    # xử lý thành khoá hệ thống; chỉ assert không 500 và không lộ khoá.
+    assert res.status_code in (200, 400)
+    body = res.text
+    assert "should-not-matter" not in body
+
+
+def test_metrics_null_workspace_manager_bypass_removed(
+    client: TestClient, db_session: Session, rbac_headers
+):
+    """Campaign legacy workspace_id=NULL: MANAGER toàn cục không được bypass.
+
+    Fail-closed theo pattern campaigns.check_campaign_access: chỉ owner hoặc
+    CampaignMember được đọc metrics. Trước đây MANAGER trả thẳng sau workspace
+    isolation → đọc chéo tenant.
+    """
+    # Tìm campaign null-ws mà manager không sở hữu và không là member.
+    from app.models.entities import CampaignMember
+
+    manager_user_id = None
+    # Lấy user manager từ token headers (decode) — dùng fixture rbac + query DB.
+    mgr = db_session.query(User).filter(User.email.in_(["manager@gmail.com", "manager@gmail.com"])).first()
+    assert mgr is not None
+    manager_user_id = mgr.id
+
+    null_ws = db_session.query(Campaign).filter(Campaign.workspace_id.is_(None)).first()
+    if null_ws is None:
+        # Tạo campaign null-ws thuộc marketer alpha để manager không phải owner.
+        alpha = db_session.query(User).filter(User.email.in_(["marketer@gmail.com"])).first()
+        if alpha is None:
+            pytest.skip("No alpha marketer or null-workspace campaign available")
+        null_ws = Campaign(
+            name="Null WS Campaign for Fail-Closed",
+            product_id=1,
+            owner_id=alpha.id,
+            workspace_id=None,
+            objective="fail-closed",
+            audience="x",
+            start_date="2026-10-01",
+            end_date="2026-10-31",
+            budget=1000.0,
+        )
+        db_session.add(null_ws)
+        db_session.commit()
+        db_session.refresh(null_ws)
+
+    # Manager không là owner và không là member → 403, không 200.
+    is_member = db_session.query(CampaignMember).filter(
+        CampaignMember.campaign_id == null_ws.id,
+        CampaignMember.user_id == manager_user_id,
+    ).first()
+    if null_ws.owner_id == manager_user_id or is_member:
+        pytest.skip("Manager happens to own/join the null-ws campaign")
+
+    res = client.get(f"/api/v1/metrics/campaign/{null_ws.id}", headers=rbac_headers["manager"])
+    assert res.status_code == 403
+    assert "not authorized" in res.json()["detail"].lower()

@@ -1499,17 +1499,21 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                 <div className="mt-2 space-y-1 text-[11px] text-slate-300">
                   <div className="flex justify-between">
                     <span className="text-slate-400">Views:</span>
-                    <span className="font-bold">{campaignKpi ? campaignKpi.total_views.toLocaleString('vi-VN') : '15,700'}</span>
+                    <span className="font-bold">{campaignKpi?.total_views != null ? campaignKpi.total_views.toLocaleString('vi-VN') : '—'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">Clicks:</span>
                     <span className="font-bold text-emerald-400">
-                      {campaignKpi ? `${campaignKpi.total_clicks.toLocaleString('vi-VN')} (${campaignKpi.ctr_percent}%)` : '1,260 (8.0%)'}
+                      {campaignKpi?.total_clicks != null
+                        ? `${campaignKpi.total_clicks.toLocaleString('vi-VN')}${campaignKpi.ctr_percent != null ? ` (${campaignKpi.ctr_percent}%)` : ''}`
+                        : '—'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">ROI:</span>
-                    <span className="font-bold text-indigo-400">+{campaignKpi?.roi_percent || 410}%</span>
+                    <span className="font-bold text-indigo-400">
+                      {campaignKpi?.roi_percent != null ? `+${campaignKpi.roi_percent}%` : '—'}
+                    </span>
                   </div>
                 </div>
                 <button

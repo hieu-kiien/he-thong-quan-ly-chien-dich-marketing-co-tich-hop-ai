@@ -2,7 +2,7 @@
 
 import time
 from typing import Optional, List, Union
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Header
 import httpx
 from sqlalchemy.orm import Session
 
@@ -228,7 +228,11 @@ def _list_models_live(slug: str, api_key: str) -> List[str]:
 @router.get("/ai-models", response_model=AIModelListResponse)
 def list_ai_models(
     provider: str = Query(..., description="Slug nhà cung cấp, ví dụ gemini"),
-    api_key: Optional[str] = Query(None, description="Khoá tạm để thử; bỏ trống thì dùng khoá hệ thống"),
+    x_test_api_key: Optional[str] = Header(
+        None,
+        alias="X-Test-Api-Key",
+        description="Khoá tạm để thử; gửi qua header để không rò vào query/access log",
+    ),
     current_user: User = Depends(get_current_user),
 ):
     """Liệt kê model của nhà cung cấp cho UI chọn, KHÔNG đoán tên cứng.
@@ -236,6 +240,10 @@ def list_ai_models(
     Nguồn `live` = gọi được `/models` của provider. Nguồn `registry` = dự phòng
     từ danh sách đã kiểm chứng trong `providers.py`. Dù đường nào cũng không
     được rò khoá ra ngoài qua thông báo lỗi.
+
+    Khoá thử chỉ nhận qua header `X-Test-Api-Key` — query string `?api_key=`
+    bị from chối vì rơi vào access log proxy và lịch sử trình duyệt (vi phạm
+    quy tắc ghi trong `test_connection`).
     """
     slug = (provider or "").lower().strip()
     spec = provider_registry.get_provider(slug)
@@ -248,7 +256,7 @@ def list_ai_models(
             ),
         )
 
-    provided_key = (api_key or "").strip()
+    provided_key = (x_test_api_key or "").strip()
     # Không có khoá trong request thì lấy từ biến môi trường hệ thống. Không
     # tìm thấy ở cả hai chỗ vẫn không chặn: Ollama/HuggingFace/OpenCode Zen
     # miễn phí không cần khoá.

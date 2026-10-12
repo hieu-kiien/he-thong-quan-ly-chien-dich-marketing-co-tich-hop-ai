@@ -1,30 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Stethoscope, Sparkles, AlertTriangle, Zap, TrendingUp, RefreshCw, ArrowUpRight, PauseCircle, Wand2, Check, AlertCircle, Info } from 'lucide-react';
 import { AIDoctorReport, AIDoctorRecommendation } from '../../types';
 import { campaignApi } from '../../services/api';
 import { useToast } from '../Toast';
-
-// Kịch bản mẫu của Bác sĩ AI — import động như api.ts: chỉ tải khi backend
-// không trả được báo cáo, không cộng hàng nghìn dòng fixture vào bundle
-// chính của production.
-type DoctorMockReport = typeof import('../../services/mockData').MOCK_AI_DOCTOR_REPORT;
-let doctorMockPromise: Promise<DoctorMockReport> | null = null;
-const loadDoctorMock = (): Promise<DoctorMockReport> => {
-  if (!doctorMockPromise) {
-    doctorMockPromise = import('../../services/mockData').then(m => m.MOCK_AI_DOCTOR_REPORT);
-  }
-  return doctorMockPromise;
-};
-
-// Giá trị giữ chỗ trong lúc tải chunk mẫu (score 0 → badge "Nguy Kịch" chỉ
-// hiển thị vài chục mili giây, sau đó được thay bằng báo cáo mẫu thật).
-const PLACEHOLDER_REPORT: AIDoctorReport = {
-  health_score: 0,
-  health_status: 'CRITICAL',
-  diagnosis_summary: 'Đang tải kịch bản mẫu…',
-  key_bottlenecks: [],
-  recommendations: [],
-} as AIDoctorReport;
 
 export interface AIDoctorWidgetProps {
   campaignId?: number;
@@ -44,35 +22,42 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
   const toast = useToast();
   const [report, setReport] = useState<AIDoctorReport | null>(initialReport || null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
   const [appliedActions, setAppliedActions] = useState<Record<number, boolean>>({});
-  const [isFallback, setIsFallback] = useState<boolean>(!initialReport && !campaignId);
+  const [isFallback, setIsFallback] = useState<boolean>(false);
+
+  const loadDiagnosis = useCallback(async (cid: number) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await campaignApi.getAIDoctor(cid);
+      setReport(data);
+      setIsFallback(false);
+    } catch (e) {
+      // Không rơi về mock trong production — số liệu giả không được trình bày như thật.
+      setReport(null);
+      setIsFallback(false);
+      setError('Không lấy được báo cáo Bác sĩ AI. Vui lòng thử lại sau.');
+      toast.error('Không thể tải chẩn đoán AI cho chiến dịch này.');
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
     if (initialReport) {
       setReport(initialReport);
       setIsFallback(false);
+      setError(null);
     } else if (campaignId) {
       loadDiagnosis(campaignId);
     } else {
-      void loadDoctorMock().then(setReport);
-      setIsFallback(true);
-    }
-  }, [campaignId, initialReport]);
-
-  const loadDiagnosis = async (cid: number) => {
-    try {
-      setLoading(true);
-      const data = await campaignApi.getAIDoctor(cid);
-      setReport(data);
+      // Không có campaign và không có report ban đầu: không hiển thị số giả.
+      setReport(null);
       setIsFallback(false);
-    } catch (e) {
-      const mock = await loadDoctorMock();
-      setReport({ ...mock, campaign_id: cid });
-      setIsFallback(true);
-    } finally {
-      setLoading(false);
+      setError('Chọn một chiến dịch để xem chẩn đoán của Bác sĩ AI.');
     }
-  };
+  }, [campaignId, initialReport, loadDiagnosis]);
 
   const handleApplyAction = (index: number, rec: AIDoctorRecommendation) => {
     setAppliedActions(prev => ({ ...prev, [index]: true }));
@@ -89,13 +74,9 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
     }
   };
 
-  const currentReport = report || PLACEHOLDER_REPORT;
-  const score = currentReport.health_score;
-
-  // Determine if Demo Mode should be flagged (sparse/insufficient data or heuristic fallback)
   const isDemoMode = useMemo(() => {
+    if (!report) return false;
     if (isFallback) return true;
-    if (!report) return true;
     if (report.is_sparse_data) return true;
     const analyzed = report.metrics_analyzed;
     if (analyzed) {
@@ -111,7 +92,7 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
     if (status === 'HEALTHY' || scoreVal >= 75) {
       return {
         text: 'Khỏe Mạnh (HEALTHY)',
-        badge: 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300',
+        badge: 'bg-emerald-50 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300',
         color: '#047857',
         stroke: 'stroke-emerald-600',
         desc: 'Chiến dịch tăng trưởng tích cực, sẵn sàng tăng ngân sách'
@@ -120,7 +101,7 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
     if (status === 'NEEDS_ATTENTION' || scoreVal >= 45) {
       return {
         text: 'Cần Chú Ý (NEEDS_ATTENTION)',
-        badge: 'bg-amber-50 text-amber-900 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300',
+        badge: 'bg-amber-50 text-amber-900 border border-amber-300 dark:bg-amber-950/40 dark:text-amber-300',
         color: '#B45309',
         stroke: 'stroke-amber-600',
         desc: 'Phát hiện điểm nghẽn hiệu suất cần tối ưu hóa'
@@ -128,16 +109,44 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
     }
     return {
       text: 'Nguy Kịch (CRITICAL)',
-      badge: 'bg-rose-50 text-rose-900 border-rose-300 dark:bg-rose-950/40 dark:text-rose-300',
+      badge: 'bg-rose-50 text-rose-900 border border-rose-300 dark:bg-rose-950/40 dark:text-rose-300',
       color: '#BE123C',
       stroke: 'stroke-rose-600',
       desc: 'Báo động đỏ: Nguy cơ lãng phí ngân sách hoặc lỗ vốn'
     };
   };
 
-  const statusInfo = getStatusBadge(currentReport.health_status, score);
-  const bottlenecks = currentReport.key_bottlenecks || currentReport.bottlenecks || [];
-  const recommendations = currentReport.recommendations || [];
+  if (!report) {
+    return (
+      <div className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm ${className}`}>
+        <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+          <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+            <Stethoscope className="w-6 h-6 text-slate-400" />
+          </div>
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+            {error || 'Chưa có báo cáo chẩn đoán cho chiến dịch này.'}
+          </p>
+          {campaignId && (
+            <button
+              type="button"
+              onClick={() => loadDiagnosis(campaignId)}
+              disabled={loading}
+              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              <span>{loading ? 'Đang khám…' : 'Thử lại'}</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const statusInfo = getStatusBadge(report.health_status, report.health_score);
+  const bottlenecks = report.key_bottlenecks || report.bottlenecks || [];
+  const recommendations = report.recommendations || [];
+
+  const score = report.health_score;
 
   // SVG Circular Gauge calculation
   const radius = 38;
@@ -277,7 +286,7 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
             <span>Tóm tắt Chẩn đoán Cấp Quản lý</span>
           </span>
           <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
-            {currentReport.diagnosis_summary}
+            {report.diagnosis_summary}
           </p>
         </div>
       </div>

@@ -353,7 +353,19 @@ def compliance_check(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Kiểm tra tuân thủ chính sách quảng cáo & An toàn thương hiệu (FEAT-BE-13, FEAT-BE-14, FEAT-BE-15)."""
+    """Kiểm tra tuân thủ chính sách quảng cáo & An toàn thương hiệu (FEAT-BE-13, FEAT-BE-14, FEAT-BE-15).
+
+    `workspace_id` do client gửi chỉ được dùng sau khi xác minh người dùng là
+    owner/member của workspace đó (fail-closed). Trước đây giá trị tin cậy từ
+    client được forward thẳng vào BrandKit query → đọc chéo tenant banned-keywords.
+    """
+    if req.workspace_id is not None:
+        assert_workspace_access(
+            req.workspace_id,
+            current_user,
+            db,
+            denied_detail="Bạn không có quyền kiểm tra compliance theo workspace này",
+        )
     return ComplianceScanner.scan(
         title=req.title,
         body=req.body,

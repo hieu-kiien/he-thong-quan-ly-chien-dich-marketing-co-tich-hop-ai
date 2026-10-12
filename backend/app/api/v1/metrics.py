@@ -57,10 +57,12 @@ def check_campaign_access_for_metrics(campaign_id: int, user: User, db: Session)
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to access campaigns in this workspace"
             )
+        if user.role in ("MANAGER", "AGENCY_MANAGER"):
+            return campaign
 
-    if user.role in ("MANAGER", "AGENCY_MANAGER"):
-        return campaign
-
+    # Fail-closed: campaign không workspace thì không có ranh giới tenant để
+    # tin cậy — mọi role (kể cả MANAGER) phải là owner hoặc CampaignMember.
+    # Trước đây MANAGER toàn cục bypass nhánh này → đọc chéo tenant metrics.
     owner_id = getattr(campaign, "owner_id", None)
     if owner_id is None and hasattr(campaign, "created_by"):
         owner_id = getattr(campaign, "created_by", None)

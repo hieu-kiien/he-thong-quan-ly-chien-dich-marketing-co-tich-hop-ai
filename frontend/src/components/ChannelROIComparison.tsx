@@ -16,11 +16,22 @@ export const ChannelROIComparison: React.FC<ChannelROIComparisonProps> = ({
   const [isReallocated, setIsReallocated] = useState<boolean>(false);
   const [savedToVault, setSavedToVault] = useState<boolean>(false);
 
-  const totalBudget = Number(campaign.budget) || 10000000;
-  const totalCost = kpi?.total_cost || 4200000;
-  const totalRevenue = kpi?.total_revenue || 16800000;
+  // Chỉ dùng số thật từ KPI/campaign — không fallback về giá trị demo.
+  const totalBudget = Number(campaign.budget) || 0;
+  const totalCost = Number(kpi?.total_cost) || 0;
+  const totalRevenue = Number(kpi?.total_revenue) || 0;
+  const hasRealKpi = totalCost > 0 || totalRevenue > 0 || (Number(kpi?.total_clicks) || 0) > 0;
 
-  // Base channel allocations vs Reallocated channels
+  // Tính ROI theo tỉ lệ phân bổ giả định trên KPI thật; không hardcode +245%.
+  const channelRoi = (revShare: number, costShare: number): number | null => {
+    const rev = totalRevenue * revShare;
+    const cost = totalCost * costShare;
+    if (cost <= 0) return null;
+    return Math.round(((rev - cost) / cost) * 100);
+  };
+
+  // Base channel allocations vs Reallocated channels — tỉ lệ channel là
+  // phân bổ giả định của UI; tuyệt đối không in số tuyệt đối bịa làm KPI.
   const channels = [
     {
       id: 'facebook',
@@ -30,10 +41,10 @@ export const ChannelROIComparison: React.FC<ChannelROIComparisonProps> = ({
       badgeColor: 'bg-blue-600',
       allocatedBudget: isReallocated ? Math.round(totalBudget * 0.35) : Math.round(totalBudget * 0.45),
       spentAmount: Math.round(totalCost * 0.45),
-      clicks: Math.round((kpi?.total_clicks || 1200) * 0.50),
-      ctr: (kpi?.ctr_percent ? Number(kpi.ctr_percent) : 7.5),
+      clicks: Math.round((Number(kpi?.total_clicks) || 0) * 0.50),
+      ctr: kpi?.ctr_percent ? Number(kpi.ctr_percent) : null,
       revenue: Math.round(totalRevenue * 0.38),
-      roi: isReallocated ? 145 : Math.round(((totalRevenue * 0.38 - totalCost * 0.45) / (totalCost * 0.45 || 1)) * 100),
+      roi: channelRoi(0.38, 0.45),
       status: 'HIGH_VOLUME',
       note: isReallocated ? 'Đã giảm 10% ngân sách chuyển sang Google Ads' : 'Độ phủ rộng nhất'
     },
@@ -45,12 +56,14 @@ export const ChannelROIComparison: React.FC<ChannelROIComparisonProps> = ({
       badgeColor: 'bg-amber-600',
       allocatedBudget: isReallocated ? Math.round(totalBudget * 0.40) : Math.round(totalBudget * 0.30),
       spentAmount: isReallocated ? Math.round(totalCost * 0.38) : Math.round(totalCost * 0.30),
-      clicks: isReallocated ? Math.round((kpi?.total_clicks || 1200) * 0.35) : Math.round((kpi?.total_clicks || 1200) * 0.25),
-      ctr: Number(((kpi?.ctr_percent || 7.5) * 1.3).toFixed(1)),
+      clicks: isReallocated
+        ? Math.round((Number(kpi?.total_clicks) || 0) * 0.35)
+        : Math.round((Number(kpi?.total_clicks) || 0) * 0.25),
+      ctr: kpi?.ctr_percent ? Number((Number(kpi.ctr_percent) * 1.3).toFixed(1)) : null,
       revenue: isReallocated ? Math.round(totalRevenue * 0.52) : Math.round(totalRevenue * 0.42),
-      roi: isReallocated ? 285 : 245,
+      roi: isReallocated ? channelRoi(0.52, 0.38) : channelRoi(0.42, 0.30),
       status: 'STAR_PERFORMER',
-      note: isReallocated ? 'Đã nhận thêm ngân sách + Tăng 24% đơn hàng' : 'Hiệu quả chuyển đổi cao nhất'
+      note: isReallocated ? 'Đã nhận thêm ngân sách từ Facebook' : 'Hiệu quả chuyển đổi cao nhất'
     },
     {
       id: 'email',
@@ -60,10 +73,10 @@ export const ChannelROIComparison: React.FC<ChannelROIComparisonProps> = ({
       badgeColor: 'bg-purple-600',
       allocatedBudget: Math.round(totalBudget * 0.15),
       spentAmount: Math.round(totalCost * 0.12),
-      clicks: Math.round((kpi?.total_clicks || 1200) * 0.15),
-      ctr: Number(((kpi?.ctr_percent || 7.5) * 1.5).toFixed(1)),
+      clicks: Math.round((Number(kpi?.total_clicks) || 0) * 0.15),
+      ctr: kpi?.ctr_percent ? Number((Number(kpi.ctr_percent) * 1.5).toFixed(1)) : null,
       revenue: Math.round(totalRevenue * 0.15),
-      roi: Math.round(((totalRevenue * 0.15 - totalCost * 0.12) / (totalCost * 0.12 || 1)) * 100),
+      roi: channelRoi(0.15, 0.12),
       status: 'HIGH_EFFICIENCY',
       note: 'Chi phí cực thấp, giữ chân khách hàng tốt'
     },
@@ -75,10 +88,10 @@ export const ChannelROIComparison: React.FC<ChannelROIComparisonProps> = ({
       badgeColor: 'bg-emerald-600',
       allocatedBudget: Math.round(totalBudget * 0.10),
       spentAmount: Math.round(totalCost * 0.08),
-      clicks: Math.round((kpi?.total_clicks || 1200) * 0.10),
-      ctr: Number(((kpi?.ctr_percent || 7.5) * 0.9).toFixed(1)),
+      clicks: Math.round((Number(kpi?.total_clicks) || 0) * 0.10),
+      ctr: kpi?.ctr_percent ? Number((Number(kpi.ctr_percent) * 0.9).toFixed(1)) : null,
       revenue: Math.round(totalRevenue * 0.05),
-      roi: Math.round(((totalRevenue * 0.05 - totalCost * 0.08) / (totalCost * 0.08 || 1)) * 100),
+      roi: channelRoi(0.05, 0.08),
       status: 'ORGANIC_GROWTH',
       note: 'Lưu lượng tự nhiên dài hạn'
     }
@@ -86,7 +99,7 @@ export const ChannelROIComparison: React.FC<ChannelROIComparisonProps> = ({
 
   const handleApplyReallocation = () => {
     setIsReallocated(true);
-    toast.success('Đã áp dụng thành công Đề xuất Tối ưu Ngân sách của AI! Dự kiến tăng thêm 18.5% doanh thu trong 14 ngày tới.');
+    toast.success('Đã áp dụng đề xuất phân bổ lại ngân sách dựa trên KPI hiện tại của chiến dịch.');
   };
 
   const handleSaveToVault = () => {
@@ -100,7 +113,16 @@ export const ChannelROIComparison: React.FC<ChannelROIComparisonProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Không có KPI thật: không vẽ banner AI + bảng số giả định. */}
+      {!hasRealKpi && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-8 text-center">
+          <p className="text-sm font-semibold text-slate-700">Chưa đủ dữ liệu KPI để so sánh ROI đa kênh.</p>
+          <p className="text-xs text-slate-500 mt-1">Khi chiến dịch ghi nhận chi phí hoặc doanh thu thật, bảng phân bổ sẽ hiển thị tại đây.</p>
+        </div>
+      )}
+
       {/* 1. AI Budget Reallocation Suggestion Banner (Interactive) */}
+      {hasRealKpi && (
       <div className="bg-gradient-to-r from-emerald-900 via-teal-950 to-slate-900 rounded-2xl p-6 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-6 border border-emerald-500/20">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -111,16 +133,12 @@ export const ChannelROIComparison: React.FC<ChannelROIComparisonProps> = ({
           </div>
           <h3 className="text-base font-black tracking-tight">Chiến lược Tái phân bổ Ngân sách thông minh</h3>
           <p className="text-xs text-emerald-100 max-w-2xl leading-relaxed">
-            Kênh <strong>Google Search Ads</strong> đang đạt tỷ suất lợi nhuận ROI cao nhất (+245%). AI khuyến nghị <strong>điều chuyển 10% ngân sách từ Facebook sang Google Ads</strong> trong 14 ngày tới để tối đa hóa doanh thu chuyển đổi.
+            Dựa trên KPI hiện tại của chiến dịch, AI gợi ý điều chuyển ngân sách sang kênh hiệu quả cao hơn.
+            Xem bảng so sánh bên dưới để đối chiếu chi phí và doanh thu theo kênh.
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
-          <div className="px-4 py-2 bg-emerald-600/30 border border-emerald-500/40 rounded-xl text-center w-full sm:w-auto">
-            <span className="text-[10px] uppercase font-bold text-emerald-300 block">Dự kiến sau tối ưu</span>
-            <span className="text-lg font-black text-white">+18.5% Doanh thu</span>
-          </div>
-
           <button
             onClick={handleApplyReallocation}
             disabled={isReallocated}
@@ -131,12 +149,14 @@ export const ChannelROIComparison: React.FC<ChannelROIComparisonProps> = ({
             }`}
           >
             <CheckCircle2 className="w-4 h-4" />
-            <span>{isReallocated ? 'Đã điều chuyển ngân sách' : 'Áp dụng đề xuất AI ngay'}</span>
+            <span>{isReallocated ? 'Đã áp dụng đề xuất phân bổ' : 'Áp dụng đề xuất AI ngay'}</span>
           </button>
         </div>
       </div>
+      )}
 
-      {/* 2. Comparison Table */}
+      {/* 2. Comparison Table — chỉ khi có KPI thật */}
+      {hasRealKpi && (
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -192,18 +212,24 @@ export const ChannelROIComparison: React.FC<ChannelROIComparisonProps> = ({
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <span className="font-semibold text-slate-800">{ch.clicks.toLocaleString('vi-VN')}</span>
-                      <span className="block text-[10px] text-emerald-600 font-medium">CTR: {ch.ctr}%</span>
+                      <span className="block text-[10px] text-emerald-600 font-medium">
+                        {ch.ctr != null ? `CTR: ${ch.ctr}%` : 'CTR: —'}
+                      </span>
                     </td>
                     <td className="py-3.5 px-4 text-right font-bold text-slate-900">
                       {ch.revenue.toLocaleString('vi-VN')} đ
                     </td>
                     <td className="py-3.5 px-4 text-right">
-                      <span className={`inline-flex items-center gap-0.5 font-bold ${
-                        ch.roi > 200 ? 'text-emerald-600' : ch.roi > 100 ? 'text-indigo-600' : 'text-slate-700'
-                      }`}>
-                        <ArrowUpRight className="w-3.5 h-3.5" />
-                        +{ch.roi}%
-                      </span>
+                      {ch.roi != null ? (
+                        <span className={`inline-flex items-center gap-0.5 font-bold ${
+                          ch.roi > 200 ? 'text-emerald-600' : ch.roi > 100 ? 'text-indigo-600' : 'text-slate-700'
+                        }`}>
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                          {ch.roi >= 0 ? `+${ch.roi}%` : `${ch.roi}%`}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 font-medium">—</span>
+                      )}
                     </td>
                     <td className="py-3.5 px-4 text-center">
                       {ch.status === 'STAR_PERFORMER' && (
@@ -234,6 +260,7 @@ export const ChannelROIComparison: React.FC<ChannelROIComparisonProps> = ({
           </table>
         </div>
       </div>
+      )}
 
       {/* 3. POST-CAMPAIGN RETROSPECTIVE & KNOWLEDGE VAULT (Trả lời câu hỏi: Sau đó làm gì?) */}
       <div className="bg-slate-900 text-white rounded-2xl p-6 border border-slate-800 shadow-xl space-y-6">

@@ -41,10 +41,10 @@ def check_campaign_access_for_ai(campaign_id: int, user: User, db: Session) -> C
     """Xác thực phân quyền mức bản ghi và cách ly đa người thuê (Tenant Isolation):
     - User ADMIN có toàn quyền truy cập AI Context của bất kỳ chiến dịch nào.
     - User MANAGER / AGENCY_MANAGER:
-      + Nếu campaign.workspace_id is None hoặc <= 1: cho qua (tương thích ngược legacy tests).
-      + Nếu campaign.workspace_id > 1: bắt buộc user phải là owner hoặc member của workspace đó.
+      + Phải là owner hoặc member của workspace chứa campaign (khi có workspace).
+      + Campaign legacy workspace_id IS NULL: fail-closed — chỉ owner hoặc CampaignMember.
     - User MARKETER hoặc role khác:
-      + Nếu campaign.workspace_id > 1: kiểm tra workspace isolation.
+      + Nếu campaign.workspace_id khác NULL: kiểm tra workspace isolation.
       + Đồng thời user chỉ được thao tác trên campaign mà họ sở hữu (owner_id) HOẶC là thành viên chiến dịch (CampaignMember).
     """
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
@@ -67,10 +67,11 @@ def check_campaign_access_for_ai(campaign_id: int, user: User, db: Session) -> C
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to access campaigns in this workspace"
             )
+        if user.role in ("MANAGER", "AGENCY_MANAGER"):
+            return campaign
 
-    if user.role in ("MANAGER", "AGENCY_MANAGER"):
-        return campaign
-
+    # Fail-closed: campaign không workspace thì không có ranh giới tenant để tin cậy,
+    # mọi role (kể cả MANAGER/AGENCY_MANAGER) đều phải là owner hoặc CampaignMember.
     owner_id = getattr(campaign, "owner_id", None)
     if owner_id is None and hasattr(campaign, "created_by"):
         owner_id = getattr(campaign, "created_by", None)

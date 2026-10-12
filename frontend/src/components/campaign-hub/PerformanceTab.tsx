@@ -29,12 +29,12 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Current Live Campaign Metrics Grid */}
+      {/* Current Live Campaign Metrics Grid — chỉ hiển thị số thật từ backend; thiếu dữ liệu thì hiển thị — */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
           <span className="text-[11px] font-bold uppercase text-slate-400">Lượt hiển thị (Views)</span>
           <p className="text-xl font-black text-slate-900 mt-1">
-            {campaignKpi?.total_views ? campaignKpi.total_views.toLocaleString('vi-VN') : '15,700'}
+            {campaignKpi?.total_views != null ? campaignKpi.total_views.toLocaleString('vi-VN') : '—'}
           </p>
           <span className="text-[10px] text-slate-400">Độ phủ toàn chiến dịch</span>
         </div>
@@ -42,18 +42,20 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
         <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
           <span className="text-[11px] font-bold uppercase text-slate-400">Tương tác Click & CTR</span>
           <p className="text-xl font-black text-emerald-600 mt-1">
-            {campaignKpi?.total_clicks ? campaignKpi.total_clicks.toLocaleString('vi-VN') : '1,260'} 
-            <span className="text-xs text-slate-500 font-semibold ml-1">
-              ({campaignKpi?.ctr_percent || 8.0}%)
-            </span>
+            {campaignKpi?.total_clicks != null ? campaignKpi.total_clicks.toLocaleString('vi-VN') : '—'}
+            {campaignKpi?.ctr_percent != null && (
+              <span className="text-xs text-slate-500 font-semibold ml-1">
+                ({campaignKpi.ctr_percent}%)
+              </span>
+            )}
           </p>
-          <span className="text-[10px] text-emerald-600 font-medium">CTR trung bình đạt chuẩn</span>
+          <span className="text-[10px] text-emerald-600 font-medium">CTR trung bình</span>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
           <span className="text-[11px] font-bold uppercase text-slate-400">Chi phí mỗi Click (CPC)</span>
           <p className="text-xl font-black text-slate-900 mt-1">
-            {campaignKpi?.cpc_avg ? Math.round(campaignKpi.cpc_avg).toLocaleString('vi-VN') : '2,500'} đ
+            {campaignKpi?.cpc_avg ? `${Math.round(campaignKpi.cpc_avg).toLocaleString('vi-VN')} đ` : '—'}
           </p>
           <span className="text-[10px] text-slate-400">Mức tối ưu trên kênh</span>
         </div>
@@ -61,7 +63,7 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({
         <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
           <span className="text-[11px] font-bold uppercase text-slate-400">Tỷ suất sinh lời (ROI)</span>
           <p className="text-xl font-black text-indigo-600 mt-1">
-            +{campaignKpi?.roi_percent || 410}%
+            {campaignKpi?.roi_percent != null ? `+${campaignKpi.roi_percent}%` : '—'}
           </p>
           <span className="text-[10px] text-indigo-600 font-medium">Doanh thu / Chi phí</span>
         </div>
