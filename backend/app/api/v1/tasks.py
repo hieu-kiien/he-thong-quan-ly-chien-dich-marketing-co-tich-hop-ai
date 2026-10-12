@@ -330,18 +330,38 @@ def get_my_tasks_summary(
         base = base.filter(Task.workspace_id.in_(ws_ids)) if ws_ids else base.filter(false())
 
     today = datetime.utcnow().strftime("%Y-%m-%d")
-    open_clause = Task.status != "DONE"
 
+    # Một query SUM(CASE ...) thay vì 5 lần COUNT: mỗi COUNT là một lần quét
+    # index/heap riêng, gộp lại tốn gấp 5 lần round-trip tới CSDL chỉ để dựng
+    # 4 thẻ thống kê ở đầu màn hình.
+    from sqlalchemy import case, func
+
+    row = (
+        base.with_entities(
+            func.sum(
+                case(
+                    (Task.due_date.isnot(None) & (Task.due_date < today) & (Task.status != "DONE"), 1),
+                    else_=0,
+                )
+            ).label("overdue"),
+            func.sum(
+                case(
+                    ((Task.due_date == today) & (Task.status != "DONE"), 1),
+                    else_=0,
+                )
+            ).label("today"),
+            func.sum(case((Task.status == "IN_PROGRESS", 1), else_=0)).label("in_progress"),
+            func.sum(case((Task.status == "DONE", 1), else_=0)).label("done"),
+            func.count().label("total"),
+        )
+        .one()
+    )
     return {
-        "overdue": int(
-            base.filter(Task.due_date.isnot(None), Task.due_date < today, open_clause).count()
-        ),
-        "today": int(
-            base.filter(Task.due_date == today, open_clause).count()
-        ),
-        "in_progress": int(base.filter(Task.status == "IN_PROGRESS").count()),
-        "done": int(base.filter(Task.status == "DONE").count()),
-        "total": int(base.count()),
+        "overdue": int(row.overdue or 0),
+        "today": int(row.today or 0),
+        "in_progress": int(row.in_progress or 0),
+        "done": int(row.done or 0),
+        "total": int(row.total or 0),
     }
 
 

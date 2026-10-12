@@ -296,6 +296,10 @@ def ensure_sqlite_schema_compatibility(db_engine=engine):
                 "CREATE INDEX IF NOT EXISTS idx_contents_status ON marketing_contents (status)",
                 "CREATE INDEX IF NOT EXISTS idx_metrics_channel ON campaign_metrics (channel_id)",
                 "CREATE INDEX IF NOT EXISTS idx_workspace_members_workspace ON workspace_members (workspace_id)",
+                # Index hot cho màn hình "Việc của tôi" (due_date quét theo assignee)
+                # và lọc task theo tenant.
+                "CREATE INDEX IF NOT EXISTS idx_tasks_assignee_due ON campaign_tasks (assignee_id, due_date)",
+                "CREATE INDEX IF NOT EXISTS idx_tasks_workspace_status ON campaign_tasks (workspace_id, status)",
             ):
                 try:
                     conn.exec_driver_sql(index_sql)
@@ -411,4 +415,16 @@ def ensure_postgres_schema_compatibility(db_engine=engine) -> None:
                     "Migration FAILED to add %s.%s — các truy vấn cột này sẽ lỗi",
                     table, column, exc_info=True,
                 )
+
+    # Index hot (idempotent): bảng campaign_tasks đã tồn tại từ trước nên
+    # create_all không bao giờ tạo thêm index mới cho chúng.
+    with db_engine.begin() as conn:
+        for index_sql in (
+            "CREATE INDEX IF NOT EXISTS idx_tasks_assignee_due ON campaign_tasks (assignee_id, due_date)",
+            "CREATE INDEX IF NOT EXISTS idx_tasks_workspace_status ON campaign_tasks (workspace_id, status)",
+        ):
+            try:
+                conn.exec_driver_sql(index_sql)
+            except Exception:
+                logger.warning("Migration FAILED: %s", index_sql, exc_info=True)
 

@@ -593,6 +593,12 @@ class Task(Base):
         CheckConstraint("priority IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')", name="chk_task_priority"),
         Index("idx_tasks_campaign_status", "campaign_id", "status"),
         Index("idx_tasks_assignee_status", "assignee_id", "status"),
+        # Đọc nóng: /tasks/my-tasks lọc theo (assignee, due_date, status) và
+        # /tasks/my-tasks/summary quét toàn bộ task của user theo due_date —
+        # thiếu composite này thì mỗi lần mở trang "Việc của tôi" là full scan
+        # bảng campaign_tasks.
+        Index("idx_tasks_assignee_due", "assignee_id", "due_date"),
+        Index("idx_tasks_workspace_status", "workspace_id", "status"),
     )
 
     campaign = relationship("Campaign", back_populates="tasks")

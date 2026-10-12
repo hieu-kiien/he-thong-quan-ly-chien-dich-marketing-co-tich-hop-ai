@@ -105,3 +105,27 @@ Verification:
 
 ## Next — Phase 6+
 - Workstream E: Auth (logout revocation, change password)
+
+## Phase 6 — Workstream E: Auth (done)
+Backend:
+- `users.token_version` (c?t m?i, migration SQLite + Postgres): logout / d?i m?t kh?u tang phiên b?n ? m?i token cu b? 401 fail-closed qua `assert_token_version_current` (g?i ? `get_current_user` + `RoleChecker`)
+- `POST /auth/logout` (204): thu h?i toàn b? phiên c?a user
+- `POST /auth/change-password` (200): xác minh m?t kh?u hi?n t?i (400 n?u sai / trùng m?i), ghi hash m?i, thu h?i phiên cu, c?p token m?i cho phiên dang d?i
+- Login nhúng claim `ver` = token_version
+
+Fix P0 kèm theo (pre-existing, fail ngay trên HEAD):
+- `GET /campaigns` áp `_apply_tenant_scope` — tru?c dây thi?u filter workspace ? danh sách tr? c? chi?n d?ch `workspace_id=NULL` c?a tenant khác (test P0-4 fail 34/34 sau fix)
+
+Frontend:
+- `authApi.logout()` g?i `POST /auth/logout` best-effort (không await) tru?c khi d?n localStorage
+- `authApi.changePassword` + form "Ð?i m?t kh?u" trong Settings tab H? so
+
+Tests: `test_auth_workstream.py` (7) + toàn b? security suites ? 130 passed
+Verification: FE tsc + eslint --max-warnings=0 + build pass; detect_changes risk critical (auth core — expected)
+
+## Next — Phase 7+: Workstream F (DB/Performance), G (AI Foundation), H (AI Planner), I (FE/UX), J (Integration)
+
+## Phase 7 - Workstream F: DB/Performance (done)
+- Index hot cho manh "Viec cua toi": idx_tasks_assignee_due (assignee_id, due_date), idx_tasks_workspace_status (workspace_id, status) - entities.py + migration SQLite/Postgres (CREATE INDEX IF NOT EXISTS, idempotent)
+- GET /tasks/my-tasks/summary: gop 5 COUNT thanh 1 query SUM(CASE...) - giam 4 round-trip moi lan mo man hinh
+- Verification: 193 passed (tasks + pagination + budget + kpi + lifecycle + tier5 + p0 + auth_workstream); FE khong doi
