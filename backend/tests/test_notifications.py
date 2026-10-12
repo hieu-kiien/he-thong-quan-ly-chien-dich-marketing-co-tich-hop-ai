@@ -283,3 +283,108 @@ def test_reject_lifecycle_notification(client, db_session, manager_headers, mark
     rej_notif = next((n for n in res_notifs.json()["items"] if "từ chối" in n["title"].lower()), None)
     assert rej_notif is not None
     assert "Giọng văn chưa chuẩn phong cách thương hiệu" in rej_notif["message"]
+
+
+def test_task_assignment_creates_notification(client, db_session, manager_headers, marketer_headers):
+    """Tạo task giao cho người khác → người đó nhận notification (target_tab=tasks)."""
+    from app.models.entities import Task as TaskModel
+
+    # Tìm 1 user khác manager để giao (marketer)
+    mkt = db_session.query(User).filter(User.email == "marketer@gmail.com").first()
+    mgr = db_session.query(User).filter(User.email == "manager@gmail.com").first()
+    assert mkt is not None and mgr is not None
+    # manager là creator (headers) → assignee marketer khác người tạo
+    res = client.post(
+        "/api/v1/campaigns/1/tasks",
+        json={
+            "title": "Task có giao việc notification",
+            "task_type": "OTHER",
+            "priority": "MEDIUM",
+            "assignee_id": mkt.id,
+            "due_date": "2026-10-20",
+        },
+        headers=manager_headers,
+    )
+    assert res.status_code == 201, res.text
+    task_id = res.json()["id"]
+
+    notif = (
+        db_session.query(Notification)
+        .filter(Notification.user_id == mkt.id, Notification.target_tab == "tasks")
+        .order_by(Notification.id.desc())
+        .first()
+    )
+    assert notif is not None, "Phải có notification cho assignee"
+    assert "Task có giao việc notification" in notif.message
+    assert notif.read is False
+
+    # assignee thấy trong GET /notifications
+    seen = client.get("/api/v1/notifications?unread_only=true", headers=marketer_headers)
+    assert seen.status_code == 200
+    titles = [n["title"] for n in seen.json()["items"]]
+    assert "Bạn được giao việc mới" in titles
+
+    # Cleanup để các test khác không thấy
+    db_session.query(TaskModel).filter(TaskModel.id == task_id).delete()
+    db_session.query(Notification).filter(Notification.id == notif.id).delete()
+    db_session.commit()
+
+
+def test_task_self_assignment_no_notification(client, db_session, manager_headers):
+    """Tự giao việc cho mình → không tạo notification (tránh spam)."""
+    mgr = db_session.query(User).filter(User.email == "manager@gmail.com").first()
+    res = client.post(
+        "/api/v1/campaigns/1/tasks",
+        json={
+            "title": "Tự giao cho mình",
+            "task_type": "OTHER",
+            "priority": "LOW",
+            "assignee_id": mgr.id,
+        },
+        headers=manager_headers,
+    )
+    assert res.status_code == 201, res.text
+    notif = (
+        db_session.query(Notification)
+        .filter(Notification.user_id == mgr.id, Notification.message.contains("Tự giao cho mình"))
+        .first()
+    )
+    assert notif is None
+
+    # Cleanup
+    from app.models.entities import Task as TaskModel
+    db_session.query(TaskModel).filter(TaskModel.id == res.json()["id"]).delete()
+    db_session.commit()
+
+
+def test_task_reassign_creates_notification(client, db_session, manager_headers, marketer_headers):
+    """Đổi assignee (update) → người nhận mới nhận notification."""
+    mkt = db_session.query(User).filter(User.email == "marketer@gmail.com").first()
+    res = client.post(
+        "/api/v1/campaigns/1/tasks",
+        json={"title": "Task đổi người", "task_type": "OTHER", "priority": "MEDIUM"},
+        headers=manager_headers,
+    )
+    assert res.status_code == 201, res.text
+    task_id = res.json()["id"]
+
+    upd = client.patch(
+        f"/api/v1/tasks/{task_id}",
+        json={"assignee_id": mkt.id},
+        headers=manager_headers,
+    )
+    assert upd.status_code == 200, upd.text
+
+    notif = (
+        db_session.query(Notification)
+        .filter(Notification.user_id == mkt.id, Notification.message.contains("được giao"))
+        .order_by(Notification.id.desc())
+        .first()
+    )
+    assert notif is not None, "Reassign phải tạo notification cho người mới"
+
+    # Cleanup
+    from app.models.entities import Task as TaskModel
+    db_session.query(Notification).filter(Notification.id == notif.id).delete()
+    db_session.query(TaskModel).filter(TaskModel.id == task_id).delete()
+    db_session.commit()

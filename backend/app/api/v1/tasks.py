@@ -1,5 +1,6 @@
 from typing import Optional, List
 from datetime import datetime
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, false
@@ -10,6 +11,9 @@ from app.core.security import get_current_user
 from app.models.entities import Task, Campaign, User, Workspace, WorkspaceMember, CampaignMember, utc_now
 from app.schemas.schemas import TaskCreate, TaskUpdate, TaskResponse, TaskBase
 from app.api.v1.campaigns import _accessible_workspace_ids
+from app.api.v1.notifications import create_notification
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Quản lý Công việc & Tác vụ"])
 
@@ -212,6 +216,26 @@ def create_campaign_task(
     db.add(new_task)
     db.commit()
     db.refresh(new_task)
+
+    # Thông báo cho người được giao việc (không gửi khi tự giao cho mình).
+    if new_task.assignee_id and new_task.assignee_id != current_user.id:
+        try:
+            create_notification(
+                db=db,
+                user_id=new_task.assignee_id,
+                workspace_id=workspace_id,
+                title="Bạn được giao việc mới",
+                message=f"{current_user.full_name or current_user.email} giao bạn tác vụ '{new_task.title}'"
+                        + (f" trong chiến dịch '{campaign.name}'" if campaign.name else "")
+                        + (f" (hạn {new_task.due_date})" if new_task.due_date else "") + ".",
+                notif_type="task",
+                target_tab="tasks",
+            )
+        except Exception:
+            # Notification không được làm hỏng việc tạo task.
+            logger.warning("Không tạo được notification cho task %s", new_task.id, exc_info=True)
+            db.rollback()
+
     return new_task
 
 
@@ -386,12 +410,32 @@ def update_task(
                     detail="Người được giao việc không thuộc workspace hoặc chiến dịch này"
                 )
 
+    old_assignee = task.assignee_id
     for key, value in update_data.items():
         setattr(task, key, value)
 
     task.updated_at = utc_now()
     db.commit()
     db.refresh(task)
+
+    # Reassign → thông báo người nhận việc mới (không gửi khi tự đổi cho mình).
+    new_assignee = task.assignee_id
+    if new_assignee and new_assignee != old_assignee and new_assignee != current_user.id:
+        try:
+            create_notification(
+                db=db,
+                user_id=new_assignee,
+                workspace_id=task.workspace_id,
+                title="Bạn được giao việc",
+                message=f"Tác vụ '{task.title}' được giao cho bạn bởi {current_user.full_name or current_user.email}"
+                        + (f" (hạn {task.due_date})" if task.due_date else "") + ".",
+                notif_type="task",
+                target_tab="tasks",
+            )
+        except Exception:
+            logger.warning("Không tạo được notification cho task %s", task.id, exc_info=True)
+            db.rollback()
+
     return task
 
 
