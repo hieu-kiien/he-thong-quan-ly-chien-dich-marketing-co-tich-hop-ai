@@ -447,3 +447,41 @@ Bốn dòng env đã ghi vào `/opt/marketflow/backend/.env` (lưu ý: bản cũ
 
 Lưu ý: browser bsk (automation) gặp `ERR_SSL_UNRECOGNIZED_NAME_ALERT` khi mở
 `vps.cloud.codes` — thao tác Start phải làm tay trên browser người vận hành.
+
+## Phiên 2026-10-12 — chuỗi AI kiểu 9Router + 3 việc tối ưu tải trang
+
+### Chuỗi fallback model (AIModelChain) — backend + frontend
+
+- Bảng `ai_model_chains` (owner hoặc workspace, `hops_json` 1–10 bước,
+  `is_active`/`is_default`), CRUD đầy đủ tại
+  `GET/POST/PUT/PATCH/DELETE /api/v1/settings/ai-chains`. Quyền: ADMIN hoặc
+  creator, workspace chain cần MANAGER-owner/member. Tên trùng trong cùng
+  scope → 409; provider/model sai → 422; `model` để trống → backend tự điền
+  model mặc định của provider.
+- `execute_task` (AI service): resolve chuỗi theo `chain_id` của request →
+  default workspace → default cá nhân; thiếu key một hop thì skip (ghi
+  warning), lỗi schema/runtime thì sang hop kế tiếp, timeout chia đều theo
+  số hop. Hết chuỗi → template fallback có warning tên chuỗi. Fixture mode
+  (key test) không đụng chuỗi.
+- `chain_id` nhận ở 4 endpoint (`/ai/ideas`, `/ai/draft`, `/ai/summary`,
+  `/ai/omnichannel`) và trong payload job (`AIJobCreateRequest`).
+- Frontend: tab **Chuỗi AI (Fallback)** trong Settings — tạo/sửa/toggle/
+  đặt mặc định/xóa, hop = provider + model (model optional).
+- Test: `backend/tests/test_ai_model_chains.py` — 19 test, đều pass;
+  toàn suite 1627 passed.
+
+### Ba việc tối ưu (theo mục "Còn dở" trước đó)
+
+1. **API gọi trùng**: interceptor gộp GET in-flight trong `apiClient`
+   (key = baseURL+url+params+Authorization+X-Workspace-Id). Vào Dashboard
+   trước đây `/campaigns` gọi 4 lần, `/analytics/dashboard` và `/contents`
+   5 lần vì các component cùng mount tự fetch. Không cache sau khi xong —
+   nút tải lại vẫn là network thật. POST/PUT/DELETE không gộp.
+2. **Google Fonts tự host**: Plus Jakarta Sans (vietnamese + latin, 2 file
+   woff2 variable ~36 KB) chuyển vào `frontend/public/fonts/` + `@font-face`
+   trong `index.css`; bỏ `<link>` sang fonts.googleapis.com (render-blocking,
+   bên thứ ba) và preconnect. Preload 2 file trong `index.html`.
+3. **Dữ liệu mẫu ra khỏi bundle**: `mockData.ts` (~11 KB chunk) chỉ tải qua
+   `import()` khi vào nhánh Offline Demo — `api.ts` (35 điểm) và
+   `AIDoctorWidget`. Bundle chính không còn fixture (đã xác minh bằng
+   grep trên `dist/assets/index-*.js`).
