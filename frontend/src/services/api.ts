@@ -17,15 +17,17 @@ const API_BASE_URL = ((import.meta as any).env?.VITE_API_URL ||
  *
  * VÌ SAO PHẢI TÁCH:
  * Cloudflare Worker có giới hạn ~100 giây cho một subrequest. Đo thật trên
- * production: `POST /api/v1/ai/omnichannel` qua Worker trả về `error code: 524`
- * (Cloudflare timeout) sau ~100s, trong khi gọi thẳng Render cùng endpoint đó
- * trả 200 sau **237 giây** với `is_fallback=false`. Tức là mọi lời gọi AI qua
- * Worker đều chết, dù backend hoàn toàn ổn.
+ * production (thời còn host trên Render free): `POST /api/v1/ai/omnichannel`
+ * qua Worker trả về `error code: 524` (Cloudflare timeout) sau ~100s, trong
+ * khi gọi thẳng backend cùng endpoint đó trả 200 sau **237 giây** với
+ * `is_fallback=false`. Tức là mọi lời gọi AI qua Worker đều chết, dù backend
+ * hoàn toàn ổn.
  *
- * Cách sửa: chỉ nhóm `/ai/*` đi thẳng Render, các endpoint còn lại vẫn qua
- * Worker (giữ được một domain, không lộ URL backend cho người dùng thường).
- * CORS đã cho phép sẵn origin `https://marketing.kienhieu.id.vn` qua
- * `ALLOWED_ORIGIN_REGEXES` trong backend/app/core/config.py.
+ * Cách sửa: chỉ nhóm `/ai/*` đi thẳng tới backend gốc (bỏ qua Worker), các
+ * endpoint còn lại vẫn qua Worker (giữ được một domain, không lộ URL backend
+ * cho người dùng thường). CORS đã cho phép sẵn origin
+ * `https://marketing.kienhieu.id.vn` qua `ALLOWED_ORIGIN_REGEXES` trong
+ * backend/app/core/config.py.
  *
  * Rỗng/rỗng-không-cấu-hình => rơi về API_BASE_URL, tức hành vi cũ. Khi đó AI
  * sẽ lại gặp 524 — nhưng đó là lỗi cấu hình hiển thị được, không phải im lặng.
@@ -34,11 +36,11 @@ const AI_BASE_URL = ((import.meta as any).env?.VITE_AI_API_URL || '').replace(/\
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  // 60s chỉ đủ cho cold start của Render Free Tier. Các endpoint AI thật cần
-  // lâu hơn nhiều: /ai/omnichannel sinh đồng thời 3 kênh (Facebook + TikTok 4
-  // cảnh + Email A/B) nên đo thực tế là 83–174 giây. Với timeout 60s, axios
-  // huỷ request giữa chừng và trình duyệt báo ERR_ABORTED — người dùng thấy
-  // "Lỗi khi gọi AI" dù backend vẫn chạy và có thể đã trả kết quả.
+  // 60s quá ngắn cho nhóm endpoint AI: /ai/omnichannel sinh đồng thời 3 kênh
+  // (Facebook + TikTok 4 cảnh + Email A/B) nên đo thực tế là 83–174 giây. Với
+  // timeout 60s, axios huỷ request giữa chừng và trình duyệt báo
+  // ERR_ABORTED — người dùng thấy "Lỗi khi gọi AI" dù backend vẫn chạy và có
+  // thể đã trả kết quả.
   // Timeout riêng cho nhóm AI được đặt ở `AI_LONG_TIMEOUT` bên dưới.
   timeout: 60000,
   headers: {
@@ -127,48 +129,8 @@ const loadMockData = (): Promise<MockDataModule> => {
 };
 
 // =========================================================================
-// CƠ CHẾ CHỈ BÁO MÁY CHỦ THỨC DẬY (SERVER AWAKENING INDICATOR FOR RENDER)
+// GỘP GET TRÙNG LẶP IN-FLIGHT (IN-FLIGHT GET DEDUPLICATION)
 // =========================================================================
-export interface ServerAwakeningStatus {
-  isWakingUp: boolean;
-  elapsedSeconds: number;
-  message?: string;
-}
-
-type AwakeningListener = (status: ServerAwakeningStatus) => void;
-let awakeningListeners: AwakeningListener[] = [];
-let activeRequestsCount = 0;
-let awakeningTimer: any = null;
-let secondsInterval: any = null;
-let elapsedCount = 0;
-let isAwakeningActive = false;
-
-export const subscribeServerAwakening = (listener: AwakeningListener): (() => void) => {
-  awakeningListeners.push(listener);
-  // Cung cấp ngay trạng thái hiện tại cho subscriber mới
-  listener({
-    isWakingUp: isAwakeningActive,
-    elapsedSeconds: elapsedCount,
-    message: isAwakeningActive ? `Đang đánh thức máy chủ backend (${elapsedCount}s)...` : undefined
-  });
-  return () => {
-    awakeningListeners = awakeningListeners.filter(l => l !== listener);
-  };
-};
-
-const broadcastAwakening = (status: ServerAwakeningStatus) => {
-  awakeningListeners.forEach(fn => {
-    try {
-      fn(status);
-    } catch (e) {
-      console.error('Error in awakening listener:', e);
-    }
-  });
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('server-awakening', { detail: status }));
-  }
-};
-
 /**
  * Gộp các GET trùng lặp ĐANG CHẠY song song trên cùng một trang.
  *
@@ -244,7 +206,7 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Gắn Bearer token tự động, workspace hiện hành & theo dõi cold start Render
+// Gắn Bearer token tự động & workspace hiện hành
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token');
   if (token) {
@@ -262,10 +224,11 @@ apiClient.interceptors.request.use((config) => {
   // Timeout riêng cho lời gọi AI (xem giải thích cạnh AI_LONG_TIMEOUT).
   if (isAiPath(config.url)) {
     config.timeout = AI_LONG_TIMEOUT;
-    // Định tuyến AI thẳng về Render, BỎ QUA Worker. Cloudflare chặn subrequest
-    // ~100s nên mọi lời gọi AI đi qua Worker đều nhận 524; đo thật trên
-    // production: qua Worker = 524, gọi thẳng Render = 200 sau 237s với
-    // `is_fallback=false`. Xem giải thích dài ở AI_BASE_URL.
+    // Định tuyến AI thẳng về backend gốc (VITE_AI_API_URL), BỎ QUA Worker.
+    // Cloudflare chặn subrequest ~100s nên mọi lời gọi AI đi qua Worker đều
+    // nhận 524; đo thật trên production (thời Render free): qua Worker = 524,
+    // gọi thẳng backend = 200 sau 237s với `is_fallback=false`. Xem giải
+    // thích dài ở AI_BASE_URL.
     if (AI_BASE_URL) {
       const path = String(config.url || '').replace(/^\//, '');
       config.baseURL = AI_BASE_URL;
@@ -273,67 +236,17 @@ apiClient.interceptors.request.use((config) => {
     }
   }
 
-  activeRequestsCount++;
-  if (activeRequestsCount === 1) {
-    if (awakeningTimer) clearTimeout(awakeningTimer);
-    elapsedCount = 0;
-    // Nếu request kéo dài hơn 3.5 giây, máy chủ Render nhiều khả năng đang ngủ đông
-    awakeningTimer = setTimeout(() => {
-      isAwakeningActive = true;
-      elapsedCount = 3;
-      broadcastAwakening({
-        isWakingUp: true,
-        elapsedSeconds: elapsedCount,
-        message: 'Đang đánh thức máy chủ backend (Render Cloud)...'
-      });
-      if (secondsInterval) clearInterval(secondsInterval);
-      secondsInterval = setInterval(() => {
-        elapsedCount++;
-        broadcastAwakening({
-          isWakingUp: true,
-          elapsedSeconds: elapsedCount,
-          message: `Đang đánh thức máy chủ backend (${elapsedCount}s/60s)...`
-        });
-      }, 1000);
-    }, 3500);
-  }
-
   return config;
 });
 
 let backendReachable = true;
 
-const cleanupAwakeningTracking = () => {
-  activeRequestsCount = Math.max(0, activeRequestsCount - 1);
-  if (activeRequestsCount === 0) {
-    if (awakeningTimer) {
-      clearTimeout(awakeningTimer);
-      awakeningTimer = null;
-    }
-    if (secondsInterval) {
-      clearInterval(secondsInterval);
-      secondsInterval = null;
-    }
-    if (isAwakeningActive) {
-      isAwakeningActive = false;
-      broadcastAwakening({
-        isWakingUp: false,
-        elapsedSeconds: 0,
-        message: 'Máy chủ đã sẵn sàng!'
-      });
-    }
-    elapsedCount = 0;
-  }
-};
-
 apiClient.interceptors.response.use(
   (response) => {
-    cleanupAwakeningTracking();
     backendReachable = true;
     return response;
   },
   (error) => {
-    cleanupAwakeningTracking();
     if (!error?.response) {
       backendReachable = false;
       return Promise.reject(error);

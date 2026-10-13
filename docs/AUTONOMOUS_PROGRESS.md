@@ -195,3 +195,13 @@ Verification:
 - detect-changes --scope all: 3 files (chi commit useAIJob + progress doc; 2 file PROMPT_VARIANT van dirty tuyet doi khong dot cham), risk critical = expected cho hub hook
 - Browser-skill live test (backend uvicorn :8001 + vite :5174, seed marketer): login -> WorkflowCanvas -> tab Kế Hoạch AI -> Sinh ke hoach (POST /ai/jobs 202 -> poll -> fallback plan: banner amber + 5k x 3.000.000 = 15.000.000 + 5 task due 1/9..27/9) -> Ap dung (POST /campaigns/1/plan/apply 200, badge Tasks 0->5) -> GET budget-allocations: 5 row is_ai_estimate=true, GET tasks: 5 item due_date dung khoang chien dich
 - Consumer thu 2: Copilot "Tim y tuong" cung hoat dong (POST /ai/jobs 202 + poll) truoc do cung bi loi nay
+
+## Phase 12 - Cleanup: gỡ co che banner "danh thuc may chu (Render)" legacy
+
+Ly do: du an da chay toan bo tren VPS (vn-hn.cloudcode.io.vn, /opt/marketflow), khong con Render - nhung banner van hien "Render Cloud dang khoi dong container tu che do ngu dong" moi khi request cham hon 3.5s -> hieu nham (VPS luon on, cham = network/DB/dev compile).
+
+- Xoa `components/ServerAwakeningIndicator.tsx` + import/usage trong App.tsx
+- `services/api.ts`: xoa toan bo khoi awakening (ServerAwakeningStatus, subscribeServerAwakening, broadcastAwakening, activeRequestsCount, awakeningTimer, cleanupAwakeningTracking); GIU NGUYEN `backendReachable`/`isBackendConnected` (risk HIGH khi impact, khong cham toi) va cau hinh `VITE_AI_API_URL`
+- Don comment Render nhu deployment hien tai (api.ts AI_BASE_URL + timeout); comment lich su do thuc 237s tren Render free giu nguyen (qua khua, giai thich vi sao co hang doi AI)
+
+Verification: tsc + eslint --max-warnings=0 + build pass; impact: ServerAwakeningIndicator/subscribeServerAwakening risk LOW (App chi dung de render banner); detect-changes risk high = App la hub, diff chi 2 dong
