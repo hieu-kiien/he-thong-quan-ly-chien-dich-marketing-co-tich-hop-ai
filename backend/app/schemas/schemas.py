@@ -273,6 +273,8 @@ class BudgetAllocationCreate(BudgetAllocationBase):
 class BudgetAllocationResponse(BudgetAllocationBase):
     id: int
     campaign_id: int
+    # True = dòng này do AI Campaign Planner sinh ra (ước tính, chưa ai xác nhận).
+    is_ai_estimate: bool = False
     channel: Optional[ChannelResponse] = None
     model_config = ConfigDict(from_attributes=True)
 
@@ -309,6 +311,8 @@ class KPITargetCreate(KPITargetBase):
 class KPITargetResponse(KPITargetBase):
     id: int
     campaign_id: int
+    # True = chỉ tiêu do AI Campaign Planner đề xuất (ước tính).
+    is_ai_estimate: bool = False
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -710,6 +714,87 @@ class AISummaryResponse(BaseModel):
     prompt_version: str
     is_fallback: bool = False
     model_provider: Optional[str] = None
+
+
+# ==============================================================================
+# AI CAMPAIGN PLANNER (Workstream G + H)
+# ==============================================================================
+
+class AIPlanRequest(BaseModel):
+    """Yêu cầu sinh kế hoạch chiến dịch. `campaign_id` BẮT BUỘC: kế hoạch vô nghĩa
+    nếu thiếu ngân sách/thời gian/đối tượng thật của chiến dịch."""
+    campaign_id: int
+    prompt_version: str = "v3"
+    chain_id: Optional[int] = None
+
+
+class AIPlanBudgetItem(BaseModel):
+    """Một dòng phân bổ ngân sách do AI đề xuất (theo `channel_code`)."""
+    channel_code: str = Field(..., min_length=1, max_length=50)
+    planned_amount: float = Field(..., ge=0.0)
+    rationale: Optional[str] = Field(None, description="Lý do AI đề xuất mức phân bổ này")
+    # Mọi con số trong kế hoạch là ƯỚC TÍNH của AI. Nhãn này đi theo từng dòng
+    # để khi plan apply lưu vào CSDL, UI hiện "Ước tính AI" thay vì trình bày nó
+    # như số liệu người thật đã xác nhận.
+    is_ai_estimate: bool = True
+
+
+class AIPlanKPIItem(BaseModel):
+    """Một chỉ tiêu KPI do AI đề xuất."""
+    metric_name: str = Field(..., min_length=1, max_length=50)
+    target_value: float = Field(..., ge=0.0)
+    unit: str = Field("count", max_length=20)  # 'count', 'vnd', 'percent', 'ratio'
+    is_ai_estimate: bool = True
+
+
+class AIPlanTaskItem(BaseModel):
+    """Một công việc trong kế hoạch. `due_offset_days` tính từ start_date của
+    chiến dịch (apply endpoint kiểm tra không được vượt end_date)."""
+    title: str = Field(..., min_length=1, max_length=255)
+    task_type: str = Field(..., pattern="^(CONTENT|DESIGN|VIDEO|ADS|RESEARCH|OTHER)$")
+    priority: str = Field("MEDIUM", pattern="^(LOW|MEDIUM|HIGH|URGENT)$")
+    due_offset_days: int = Field(..., ge=0)
+    description: Optional[str] = None
+
+
+class AIPlanResponse(BaseModel):
+    task_type: str = "PLAN"
+    summary: str = Field(..., min_length=1, description="Tóm tắt kế hoạch bằng tiếng Việt")
+    budget_split: List[AIPlanBudgetItem] = Field(..., min_length=1)
+    kpi_targets: List[AIPlanKPIItem] = Field(default_factory=list)
+    tasks: List[AIPlanTaskItem] = Field(..., min_length=1)
+    warnings: List[str] = []
+    assumptions: List[str] = []
+    model_used: str
+    prompt_version: str
+    is_fallback: bool = False
+    model_provider: Optional[str] = None
+
+
+class PlanApplyRequest(BaseModel):
+    """Thân `POST /campaigns/{campaign_id}/plan/apply`.
+
+    Toàn bộ payload được validate TRƯỚC MỌI lần ghi (channel_code resolve được,
+    tổng ≤ ngân sách, KPI không trùng, task nằm trong khoảng chiến dịch) nên
+    request lỗi không bao giờ để lại phân nửa kế hoạch trong CSDL.
+    `idempotency_key` BẮT BUỘC: khoá giống nhau + cùng kế hoạch -> 200 dedup;
+    khoá giống nhau + kế hoạch khác -> 409.
+    """
+    budget_split: List[AIPlanBudgetItem] = Field(..., min_length=1)
+    kpi_targets: List[AIPlanKPIItem] = Field(default_factory=list)
+    tasks: List[AIPlanTaskItem] = Field(..., min_length=1)
+    idempotency_key: str = Field(..., min_length=8, max_length=200)
+
+
+class PlanApplyResponse(BaseModel):
+    campaign_id: int
+    # True = khoá idempotency đã tồn tại với cùng kế hoạch; lần gọi này KHÔNG
+    # ghi thêm gì và `budget_allocations`/`kpi_targets` là trạng thái hiện tại.
+    deduplicated: bool = False
+    budget_allocations: List[BudgetAllocationResponse] = []
+    kpi_targets: List[KPITargetResponse] = []
+    tasks_created: int = 0
+    tasks_skipped: int = 0
 
 
 # ==============================================================================

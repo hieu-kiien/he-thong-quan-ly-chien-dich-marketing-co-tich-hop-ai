@@ -492,7 +492,7 @@ class AIJob(Base):
     workspace_id = Column(Integer, ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     campaign_id = Column(Integer, ForeignKey("campaigns.id", onupdate="CASCADE", ondelete="SET NULL"), nullable=True)
-    # 'ideas' | 'draft' | 'summary' | 'omnichannel' (khớp endpoint đồng bộ tương ứng)
+    # 'ideas' | 'draft' | 'summary' | 'omnichannel' | 'plan' (khớp endpoint đồng bộ tương ứng)
     kind = Column(String(30), nullable=False)
     # 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
     status = Column(String(20), nullable=False, default="queued")
@@ -524,7 +524,7 @@ class AIJob(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('ideas', 'draft', 'summary', 'omnichannel')",
+            "kind IN ('ideas', 'draft', 'summary', 'omnichannel', 'plan')",
             name="chk_ai_job_kind",
         ),
         CheckConstraint(
@@ -614,6 +614,11 @@ class CampaignBudgetAllocation(Base):
     campaign_id = Column(Integer, ForeignKey("campaigns.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False, index=True)
     channel_id = Column(Integer, ForeignKey("marketing_channels.id", onupdate="CASCADE", ondelete="RESTRICT"), nullable=False)
     planned_amount = Column(Numeric(12, 2), nullable=False, default=0)
+    # Đánh dấu số AI ước tính: True khi dòng này do AI Campaign Planner sinh ra
+    # (POST /campaigns/{id}/plan/apply), False khi người dùng phân bổ tay qua
+    # PUT /budget-allocations. Nhờ cột này UI hiện nhãn "Ước tính AI" và người
+    # đọc không lẫn số máy đề xuất với số người thật xác nhận.
+    is_ai_estimate = Column(Boolean, nullable=False, default=False, server_default="false")
     created_at = Column(DateTime, default=utc_now, nullable=False)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
@@ -635,6 +640,8 @@ class CampaignKPITarget(Base):
     metric_name = Column(String(50), nullable=False) # 'leads', 'conversions', 'ctr', 'cpl', 'roas', 'revenue'
     target_value = Column(Numeric(12, 2), nullable=False)
     unit = Column(String(20), nullable=True, default="count") # 'count', 'vnd', 'percent', 'ratio'
+    # Cùng ý nghĩa với campaign_budget_allocations.is_ai_estimate (xem ở trên).
+    is_ai_estimate = Column(Boolean, nullable=False, default=False, server_default="false")
     created_at = Column(DateTime, default=utc_now, nullable=False)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
@@ -645,5 +652,38 @@ class CampaignKPITarget(Base):
 
     campaign = relationship("Campaign", back_populates="kpi_targets")
 
+
+class CampaignPlanApplication(Base):
+    """Nhật ký áp dụng kế hoạch AI vào chiến dịch (idempotency của plan apply).
+
+    `POST /campaigns/{id}/plan/apply` ghi dòng này TRONG CÙNG transaction với
+    phân bổ ngân sách / chỉ tiêu KPI / task mới. Nhờ UNIQUE (campaign_id,
+    idempotency_key) ở tầng CSDL, double-click hoặc retry mạng không thể áp
+    kế hoạch hai lần dù hai request chạy song song — request thứ hai kẹt ở
+    IntegrityError và được xử lý thành `deduplicated=True`.
+
+    `plan_hash` (SHA-256 của payload chuẩn hoá) phân biệt "gửi lại cùng khoá
+    với cùng kế hoạch" (200, dedup) khỏi "dùng nhầm khoá của kế hoạch khác"
+    (409) — tái sử dụng khoá im lặng sẽ trả kết quả của kế hoạch cũ mà người
+    dùng không hề biết.
+    """
+
+    __tablename__ = "campaign_plan_applications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False, index=True)
+    idempotency_key = Column(String(200), nullable=False)
+    plan_hash = Column(String(64), nullable=False)
+    # Snapshot JSON của kế hoạch đã áp — dùng cho audit ("lúc đó AI đề xuất gì").
+    plan_json = Column(Text, nullable=False, default="{}")
+    applied_by = Column(Integer, ForeignKey("users.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+
+    __table_args__ = (
+        UniqueConstraint("campaign_id", "idempotency_key", name="uq_campaign_plan_app_key"),
+        Index("idx_plan_app_campaign", "campaign_id"),
+    )
+
+    campaign = relationship("Campaign")
 
 

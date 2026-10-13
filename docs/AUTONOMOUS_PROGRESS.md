@@ -129,3 +129,27 @@ Verification: FE tsc + eslint --max-warnings=0 + build pass; detect_changes risk
 - Index hot cho manh "Viec cua toi": idx_tasks_assignee_due (assignee_id, due_date), idx_tasks_workspace_status (workspace_id, status) - entities.py + migration SQLite/Postgres (CREATE INDEX IF NOT EXISTS, idempotent)
 - GET /tasks/my-tasks/summary: gop 5 COUNT thanh 1 query SUM(CASE...) - giam 4 round-trip moi lan mo man hinh
 - Verification: 193 passed (tasks + pagination + budget + kpi + lifecycle + tier5 + p0 + auth_workstream); FE khong doi
+
+
+## Phase 8 - Workstream G (AI Foundation: kind=plan) + H (AI Campaign Planner) (done)
+
+Backend - Workstream G (queue foundation):
+- `queue.py`: `KIND_PLAN = "plan"` + `JOB_KINDS` (đối xứng với CHECK constraint `chk_ai_job_kind` ở entities)
+- `entities.py`: CHECK `chk_ai_job_kind` nhận `'plan'`; cột `is_ai_estimate BOOLEAN NOT NULL DEFAULT false` trên `campaign_budget_allocations` + `campaign_kpi_targets` (dòng do AI sinh gắn nhãn "ước tính", dòng tay giữ false); bảng mới `campaign_plan_applications` (UNIQUE (campaign_id, idempotency_key) = idempotency tầng DB, plan_hash SHA-256, plan_json snapshot audit)
+- `database.py`: SQLite `_migrate_ai_job_kind_constraint` (table rebuild, CHỤP SQL 7 index trước rename + tạo lại sau DROP vì bảng mới từ sqlite_master không mang index); ALTER ADD COLUMN is_ai_estimate x2; Postgres: checks tuple += 2 cột + DROP/ADD `chk_ai_job_kind` idempotent qua `pg_get_constraintdef`
+- `ai_jobs.py`: `_KIND_REQUEST_MODELS` / `_KIND_QUOTA_PREFIX` (`ai:plan`) / `_KIND_SYNC_ENDPOINT` (`generate_plan`) + description kind/campaign_id + docstring
+
+Backend - Workstream H (planner):
+- `schemas.py`: `AIPlanRequest` (campaign_id BẮT BUỘC), `AIPlanResponse` (budget_split min 1, tasks min 1, mọi item mang `is_ai_estimate=True`), `PlanApplyRequest` (idempotency_key bắt buộc), `PlanApplyResponse`; `is_ai_estimate` thêm vào BudgetAllocationResponse/KPITargetResponse
+- `prompts/prompts.json`: key `campaign_plan` v3 (system + user template tiếng Việt, chống bịa số)
+- `ai_service.py`: `_validate_task_output` + branch PLAN; `_generate_fallback_campaign_plan` (chia đều bằng đồng floor -> tổng LUÔN <= ngân sách thật, KPI chỉ sinh khi context có mục tiêu, task 5 pha theo trục chiến dịch, warnings trung thực); `_fallback_kpi_unit` phân loại unit theo tên metric
+- `ai.py`: `POST /ai/plan` (deprecated, đường cũ): quota `ai:plan:user`, tenant check, context thật (budget/dates/channels/KPI hiện có), clamp due_offset trong [0, (end-start).days] + warning, fallback recovery 502 khi fallback tắt
+- `campaigns.py`: `POST /campaigns/{id}/plan/apply`: validate TOÀN BỘ trước mọi ghi (channel resolve ACTIVE + không trùng, tổng <= budget, KPI không trùng, task trong khoảng chiến dịch) -> idempotency (200 dedup / 409 khoá sai) -> 1 transaction (application + replace budget + replace KPI chỉ khi list rỗng khác nghĩa "không đổi" + task dedup theo title, due_date = start + offset); IntegrityError -> rollback -> dedup/409
+
+Tests:
+- Mới `tests/test_ai_planner.py` (13): maps đồng bộ với JOB_KINDS + DDL, enqueue 202, worker execute_ai_job gọi lại generate_plan, sync plan offline fallback hợp lệ (tong <= 15M, offset <= 29, is_ai_estimate), tenant/role 403, 502 khi fallback tắt, fallback không vượt ngân sách (4 mức budget), apply success (is_ai_estimate + due_date + nhật ký), validate-before-write (5 case 400, không ghi gì), 404/403 auth, dedup 200, 409 khoá trùng kế hoạch khác, OpenAPI deprecated
+- Sửa: `test_ai_job_queue.py` (JOB_KINDS + "plan", kind=plan 422 khi thiếu campaign_id), `test_offline_core_works_without_ai.py` (fallback context campaign_plan)
+
+Verification:
+- Full pytest: 1671 passed, 4 failed = 4 pre-existing fail ngay tại HEAD df3790e (đối chứng qua worktree sạch): 2 e2e tier3 compliance 403, challenger banned-keywords 403, design_docs pagination doc claim
+- `analyze --index-only` (re-index) + `detect-changes --scope all`: 13 files, 80 symbols, 18 processes, risk critical (expected: fallback dùng chung mọi endpoint AI + migration mỗi startup; mitigated additive-only + 1671 tests)

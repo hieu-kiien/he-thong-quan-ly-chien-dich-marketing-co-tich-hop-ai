@@ -1,4 +1,5 @@
 from typing import List, Optional
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
@@ -10,6 +11,7 @@ from app.schemas.schemas import (
     AIIdeaRequest, AIIdeaResponse,
     AIDraftRequest, AIDraftResponse,
     AISummaryRequest, AISummaryResponse,
+    AIPlanRequest, AIPlanResponse,
     OmnichannelRequest, OmnichannelResponse,
     AILogResponse
 )
@@ -19,7 +21,7 @@ from app.services.ai.ai_service import ai_service
 # DEPRECATED (giữ nguyên để không làm hỏng gì trong lúc chuyển dịch sang hàng đợi)
 # ==============================================================================
 # Các endpoint dưới đây (/ideas, /draft, /generate, /summary, /summarize,
-# /omnichannel) là đường ĐỒNG BỘ và đã bị đánh dấu `deprecated=True` trong
+# /omnichannel, /plan) là đường ĐỒNG BỘ và đã bị đánh dấu `deprecated=True` trong
 # OpenAPI. Chúng vẫn chạy và vẫn được kiểm thử đầy đủ.
 #
 # LÝ DO BỎ ĐƯỜNG ĐỒNG BỘ (số đo, không phải phỏng đoán):
@@ -328,6 +330,139 @@ def generate_summary(
             fallback.setdefault("warnings", []).append(f"Dịch vụ AI gặp sự cố ({str(e)}), đã kích hoạt Smart Fallback.")
             return AISummaryResponse.model_validate(fallback)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Lỗi dịch vụ AI: {str(e)}")
+
+# DEPRECATED: xem khối giải thích ngay trên `router`. Hãy dùng POST /ai/jobs.
+@router.post(
+    "/plan",
+    response_model=AIPlanResponse,
+    deprecated=True,
+    description="[DEPRECATED] Đồng bộ. Dùng `POST /ai/jobs` với `kind=plan`.",
+)
+def generate_plan(
+    req: AIPlanRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Sinh KẾ HOẠCH chiến dịch (phân bổ ngân sách + KPI + task) cho một campaign.
+
+    `campaign_id` là BẮT BUỘC (AIPlanRequest đã enforce): kế hoạch sinh từ con
+    số thật — ngân sách, thời gian, đối tượng — chứ không từ chủ đề tự do.
+    Endpoint chỉ SINH kế hoạch; việc ghi vào CSDL là `POST /campaigns/{id}/plan/apply`.
+    """
+    enforce_quota(f"ai:plan:user={current_user.id}")
+    user_id = current_user.id
+    campaign = check_campaign_access_for_ai(req.campaign_id, current_user, db)
+
+    product = db.query(Product).filter(Product.id == campaign.product_id).first()
+
+    # Kênh chiến dịch có thể dùng: đã phân bổ sẵn thì giữ nguyên lựa chọn của
+    # người dùng; chưa có thì lấy toàn bộ kênh đang ACTIVE trong hệ thống.
+    allocated_codes = [
+        a.channel.code for a in campaign.budget_allocations
+        if a.channel is not None and a.channel.code
+    ]
+    if allocated_codes:
+        channel_codes = list(dict.fromkeys(allocated_codes))
+        channels_display = ", ".join(channel_codes)
+    else:
+        active_channels = db.query(MarketingChannel).filter(
+            MarketingChannel.status == "ACTIVE"
+        ).order_by(MarketingChannel.id).all()
+        channel_codes = [c.code for c in active_channels] or ["facebook"]
+        channels_display = ", ".join(c.name for c in active_channels) or "Chưa có kênh"
+
+    # Thời gian chiến dịch (chuỗi YYYY-MM-DD): offset task được kẹp trong khoảng
+    # [0, (end - start).days] để không có task rơi ngoài lịch chiến dịch.
+    try:
+        start_d = datetime.strptime(campaign.start_date, "%Y-%m-%d").date()
+        end_d = datetime.strptime(campaign.end_date, "%Y-%m-%d").date()
+        max_due_offset = max((end_d - start_d).days, 0)
+        duration_days = max_due_offset + 1
+    except (TypeError, ValueError):
+        max_due_offset = 30
+        duration_days = 31
+
+    # Mục tiêu KPI hiện có trên chiến dịch (nếu người dùng đã khai) làm chỉ tiêu
+    # gợi ý cho AI — không tự bịa chỉ tiêu mới.
+    from app.models.entities import CampaignKPITarget
+    existing_kpi = (
+        db.query(CampaignKPITarget)
+        .filter(CampaignKPITarget.campaign_id == campaign.id)
+        .order_by(CampaignKPITarget.id)
+        .first()
+    )
+
+    context = {
+        "campaign_name": campaign.name,
+        "objective": campaign.objective,
+        "audience": campaign.audience,
+        "product_name": product.name if product else "Sản phẩm",
+        "product_usp": product.usp if product else "Chất lượng vượt trội",
+        "budget": f"{float(campaign.budget):,.0f}",
+        "budget_amount": float(campaign.budget),
+        "start_date": campaign.start_date,
+        "end_date": campaign.end_date,
+        "duration_days": duration_days,
+        "channels": channels_display,
+        "channel_codes": channel_codes,
+        "max_due_offset": max_due_offset,
+        "target_kpi_name": existing_kpi.metric_name if existing_kpi else None,
+        "target_kpi_value": float(existing_kpi.target_value) if existing_kpi else None,
+        "workspace_id": campaign.workspace_id,
+    }
+    if req.chain_id is not None:
+        context["model_chain_id"] = req.chain_id
+
+    try:
+        result = ai_service.execute_task(
+            db=db,
+            user_id=user_id,
+            campaign_id=campaign.id,
+            task_type="campaign_plan",
+            task_code="PLAN",
+            prompt_version=req.prompt_version,
+            context=context
+        )
+        plan = AIPlanResponse.model_validate(result)
+    except ValidationError:
+        if ai_service.fallback_enabled:
+            fallback = ai_service._generate_fallback("campaign_plan", context)
+            fallback["model_used"] = f"{ai_service.model} (Fallback Recovered)"
+            fallback["prompt_version"] = req.prompt_version
+            fallback["task_type"] = "PLAN"
+            fallback.setdefault("warnings", []).append("Phản hồi AI sai cấu trúc schema, đã kích hoạt Smart Fallback.")
+            plan = AIPlanResponse.model_validate(fallback)
+        else:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Phản hồi từ AI không đúng cấu trúc schema yêu cầu.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        if ai_service.fallback_enabled:
+            fallback = ai_service._generate_fallback("campaign_plan", context)
+            fallback["model_used"] = f"{ai_service.model} (Fallback Recovered)"
+            fallback["prompt_version"] = req.prompt_version
+            fallback["task_type"] = "PLAN"
+            fallback.setdefault("warnings", []).append(f"Dịch vụ AI gặp sự cố ({str(e)}), đã kích hoạt Smart Fallback.")
+            plan = AIPlanResponse.model_validate(fallback)
+        else:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Lỗi dịch vụ AI: {str(e)}")
+
+    # Kẹp due_offset_days về [0, max_due_offset]: model thật có thể lệch một chút
+    # so với số ngày chiến dịch; kẹp tại đây (kèm warning) thay vì để apply 400.
+    clamped = 0
+    for t in plan.tasks:
+        if t.due_offset_days < 0:
+            t.due_offset_days = 0
+            clamped += 1
+        elif t.due_offset_days > max_due_offset:
+            t.due_offset_days = max_due_offset
+            clamped += 1
+    if clamped:
+        plan.warnings.append(
+            f"{clamped} công việc có ngày hoàn thành ngoài khoảng chiến dịch "
+            f"({campaign.start_date} -> {campaign.end_date}), đã kẹp về biên cho phép."
+        )
+    return plan
 
 def _score_omnichannel_compliance(payload: dict, brand_kit: Optional[BrandKit], db: Session) -> Optional[int]:
     """Chấm điểm tuân thủ TRÊN CHÍNH NỘI DUNG VỪA SINH, bằng bộ quy tắc tất định.

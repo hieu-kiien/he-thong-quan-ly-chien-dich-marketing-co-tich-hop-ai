@@ -215,6 +215,71 @@ def _migrate_custom_api_key_provider_constraint(db_engine, conn) -> None:
     conn.exec_driver_sql("DROP TABLE custom_api_keys_legacy")
 
 
+def _migrate_ai_job_kind_constraint(db_engine, conn) -> None:
+    """Dựng lại bảng `ai_jobs` nếu CHECK constraint kind chưa chứa 'plan'.
+
+    Cùng kỹ thuật với `_migrate_custom_api_key_provider_constraint`: SQLite không
+    có ALTER CONSTRAINT nên phải đổi tên bảng cũ -> tạo bảng mới với DDL đã nới
+    -> chép dữ liệu -> xoá bảng cũ. Hai điểm khác biệt quan trọng:
+
+    1. `ai_jobs` có 7 index khai báo trong `__table_args__` (4 index + 3 cột
+       `index=True`). ALTER RENAME giữ index gắn theo bảng cũ và chúng bị DROP
+       cùng bảng legacy, còn bảng MỚI từ `sqlite_master.sql` không mang theo
+       index (bảng và index là dòng riêng trong sqlite_master). Vì vậy phải
+       CHỤP SQL index TRƯỚC khi đổi tên và tạo lại SAU khi xoá — nếu không,
+       đường quét của worker (`idx_ai_jobs_claim`) biến mất và mỗi vòng duyệt
+       hàng đợi thành full scan âm thầm.
+    2. Danh sách cột lấy động qua PRAGMA thay vì hardcode, để CSDL cũ có thiếu
+       cột nào thì bước chép dữ liệu vẫn đúng với cấu trúc thật của nó.
+
+    Idempotent: DDL đã chứa 'plan' thì thoát ngay.
+    """
+    row = conn.exec_driver_sql(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='ai_jobs'"
+    ).fetchone()
+    if not row or not row[0]:
+        return
+    table_sql = row[0]
+    if "'plan'" in table_sql:
+        return
+
+    logger.info("Migrating ai_jobs kind constraint to include 'plan'")
+    new_sql = table_sql.replace(
+        "'summary', 'omnichannel')",
+        "'summary', 'omnichannel', 'plan')",
+    )
+    if new_sql == table_sql:
+        logger.warning(
+            "Khong nhan dang CHECK constraint cua ai_jobs trong DDL; bo qua migration."
+        )
+        return
+
+    index_rows = conn.exec_driver_sql(
+        "SELECT sql FROM sqlite_master WHERE type='index' "
+        "AND tbl_name='ai_jobs' AND sql IS NOT NULL"
+    ).fetchall()
+    index_sqls = [r[0] for r in index_rows if r and r[0]]
+
+    columns = [
+        r[1]
+        for r in conn.exec_driver_sql("PRAGMA table_info(ai_jobs)").fetchall()
+    ]
+    col_list = ", ".join(columns)
+
+    conn.exec_driver_sql("ALTER TABLE ai_jobs RENAME TO ai_jobs_legacy")
+    conn.exec_driver_sql(new_sql)
+    conn.exec_driver_sql(
+        f"INSERT INTO ai_jobs ({col_list}) SELECT {col_list} FROM ai_jobs_legacy"
+    )
+    conn.exec_driver_sql("DROP TABLE ai_jobs_legacy")
+    for sql in index_sqls:
+        try:
+            conn.exec_driver_sql(sql)
+        except Exception:
+            # Index đã tồn tại (tên không đổi) -> bỏ qua, không làm hỏng migration.
+            logger.debug("Index recreation skipped: %s", sql, exc_info=True)
+
+
 def ensure_sqlite_schema_compatibility(db_engine=engine):
     """Tự động kiểm tra và bổ sung các cột mới vào CSDL SQLite hiện hữu nếu thiếu (Idempotent Zero Migration Failure)."""
     if not str(db_engine.url).startswith("sqlite"):
@@ -283,6 +348,29 @@ def ensure_sqlite_schema_compatibility(db_engine=engine):
             if not table_kpi_check.fetchone():
                 CampaignKPITarget.__table__.create(bind=conn)
 
+            # 4a. Cột đánh dấu "số AI ước tính" (AI Campaign Planner). Dòng do
+            # người dùng phân bổ tay giữ DEFAULT false; chỉ POST
+            # /campaigns/{id}/plan/apply gán true. `create_all` không ALTER bảng
+            # đã có nên CSDL cũ phải thêm cột tại đây.
+            budget_cols = {
+                row[1] for row in conn.exec_driver_sql("PRAGMA table_info(campaign_budget_allocations)")
+            }
+            if budget_cols and "is_ai_estimate" not in budget_cols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE campaign_budget_allocations "
+                    "ADD COLUMN is_ai_estimate BOOLEAN NOT NULL DEFAULT false"
+                )
+                logger.info("Migration: added campaign_budget_allocations.is_ai_estimate")
+            kpi_cols = {
+                row[1] for row in conn.exec_driver_sql("PRAGMA table_info(campaign_kpi_targets)")
+            }
+            if kpi_cols and "is_ai_estimate" not in kpi_cols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE campaign_kpi_targets "
+                    "ADD COLUMN is_ai_estimate BOOLEAN NOT NULL DEFAULT false"
+                )
+                logger.info("Migration: added campaign_kpi_targets.is_ai_estimate")
+
             # 5. Bổ sung index cho các cột lọc nóng.
             # `Base.metadata.create_all` chỉ tạo index cho bảng MỚI; với CSDL SQLite
             # đã tồn tại, index khai báo trong `__table_args__` sẽ không bao giờ
@@ -326,10 +414,15 @@ def ensure_sqlite_schema_compatibility(db_engine=engine):
                     logger.debug("campaign_metrics.source add skipped", exc_info=True)
 
             # 5b. Nới CHECK constraint `provider` của custom_api_keys.
-            # SQLite không có ALTER CONSTRAINT nên phải dựng lại bảng. CSDL cũ
+            # SQLite không có ALTER Constraint nên phải dựng lại bảng. CSDL cũ
             # chặn 'opencode' ở tầng DB, khiến lưu khóa BYOK chết bằng
             # IntegrityError (HTTP 500) thay vì lỗi validation có thể đọc được.
             _migrate_custom_api_key_provider_constraint(db_engine=db_engine, conn=conn)
+
+            # 5c. Nới CHECK constraint `kind` của ai_jobs để nhận kind='plan'
+            # (AI Campaign Planner). CSDL cũ chặn 'plan' ở tầng DB thì enqueue
+            # plan job chết bằng IntegrityError (HTTP 500) thay vì 202.
+            _migrate_ai_job_kind_constraint(db_engine=db_engine, conn=conn)
 
             # Backfill tenant: gán workspace_id cho dữ liệu legacy còn NULL để không
             # rơi vào vùng fail-closed của tầng phân quyền (idempotent, bọc try/except).
@@ -384,6 +477,10 @@ def ensure_postgres_schema_compatibility(db_engine=engine) -> None:
         # được thêm (mọi token phát hành trước đây coi như phiên 0 đã hết hiệu lực
         # sau lần logout/đổi mật khẩu đầu tiên).
         ("users", "token_version", "INTEGER NOT NULL DEFAULT 0"),
+        # Đánh dấu "số AI ước tính" (AI Campaign Planner). Dòng phân bổ/KPI tay
+        # giữ DEFAULT false; dòng do plan apply tạo nhận true.
+        ("campaign_budget_allocations", "is_ai_estimate", "BOOLEAN NOT NULL DEFAULT false"),
+        ("campaign_kpi_targets", "is_ai_estimate", "BOOLEAN NOT NULL DEFAULT false"),
     )
     # `exec_driver_sql` NHẬN SQL THÔ, không bind tham số. Dùng `:t`/`:c` ở đây
     # sẽ được gửi thẳng xuống Postgres như chữ thường -> SyntaxError -> bị nuốt
@@ -427,4 +524,30 @@ def ensure_postgres_schema_compatibility(db_engine=engine) -> None:
                 conn.exec_driver_sql(index_sql)
             except Exception:
                 logger.warning("Migration FAILED: %s", index_sql, exc_info=True)
+
+    # Nới CHECK constraint `kind` của ai_jobs để nhận kind='plan' (Postgres có
+    # ALTER CONSTRAINT nên không cần dựng lại bảng như SQLite). Idempotent: chỉ
+    # drop/add khi định nghĩa hiện tại chưa chứa 'plan'. Bọc try/except riêng:
+    # bảng chưa tồn tại (DB rỗng, create_all chạy sau) không được phá startup.
+    with db_engine.begin() as conn:
+        try:
+            row = conn.execute(
+                text(
+                    "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+                    "WHERE conname = 'chk_ai_job_kind' "
+                    "AND conrelid = 'ai_jobs'::regclass"
+                )
+            ).fetchone()
+            if row is None or "'plan'" not in row[0]:
+                conn.exec_driver_sql("ALTER TABLE ai_jobs DROP CONSTRAINT IF EXISTS chk_ai_job_kind")
+                conn.exec_driver_sql(
+                    "ALTER TABLE ai_jobs ADD CONSTRAINT chk_ai_job_kind "
+                    "CHECK (kind IN ('ideas', 'draft', 'summary', 'omnichannel', 'plan'))"
+                )
+                logger.info("Migration: chk_ai_job_kind extended with 'plan'")
+        except Exception:
+            logger.warning(
+                "Migration FAILED to extend ai_jobs kind CHECK constraint",
+                exc_info=True,
+            )
 

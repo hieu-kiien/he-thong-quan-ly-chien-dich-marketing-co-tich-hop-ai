@@ -17,8 +17,8 @@ Endpoint đồng bộ cũ GIỮ NGUYÊN để không làm hỏng gì trong lúc 
 CÁCH CHẠY LẠI TÁC VỤ AI (điểm thiết kế quan trọng)
 -------------------------------------------------
 `execute_ai_job` gọi LẠI ĐÚNG HÀM ENDPOINT ĐỒNG BỘ (`generate_ideas`,
-`generate_draft`, `generate_summary`, `generate_omnichannel`) chứ không sao chép
-logic. Lý do: phần dựng ngữ cảnh (chiến dịch, sản phẩm, Brand Kit, chấm điểm tuân
+`generate_draft`, `generate_summary`, `generate_omnichannel`, `generate_plan`)
+chứ không sao chép logic. Lý do: phần dựng ngữ cảnh (chiến dịch, sản phẩm, Brand Kit, chấm điểm tuân
 thủ, Smart Fallback) dài hơn 200 dòng và phải tiếp tục tiến hoá cùng endpoint
 đồng bộ; một bản sao chắc chắn sẽ trôi lệch. Nhờ vậy job bất đồng bộ cho ra đúng
 kết quả mà người dùng sẽ nhận nếu gọi endpoint cũ.
@@ -49,6 +49,7 @@ from app.models.entities import AIJob, Campaign, User, Workspace, WorkspaceMembe
 from app.schemas.schemas import (
     AIDraftRequest,
     AIIdeaRequest,
+    AIPlanRequest,
     AISummaryRequest,
     OmnichannelRequest,
 )
@@ -70,6 +71,7 @@ _KIND_REQUEST_MODELS = {
     job_queue.KIND_DRAFT: AIDraftRequest,
     job_queue.KIND_SUMMARY: AISummaryRequest,
     job_queue.KIND_OMNICHANNEL: OmnichannelRequest,
+    job_queue.KIND_PLAN: AIPlanRequest,
 }
 
 # Khoá hạn mứng giống hệt endpoint đồng bộ tương ứng, để một lượt gọi AI được tính
@@ -79,6 +81,7 @@ _KIND_QUOTA_PREFIX = {
     job_queue.KIND_DRAFT: "ai:draft",
     job_queue.KIND_SUMMARY: "ai:summary",
     job_queue.KIND_OMNICHANNEL: "ai:omnichannel",
+    job_queue.KIND_PLAN: "ai:plan",
 }
 
 # Endpoint đồng bộ sẽ được worker gọi lại. Tên hàm được tra cứu động (import trễ)
@@ -89,6 +92,7 @@ _KIND_SYNC_ENDPOINT = {
     job_queue.KIND_DRAFT: "generate_draft",
     job_queue.KIND_SUMMARY: "generate_summary",
     job_queue.KIND_OMNICHANNEL: "generate_omnichannel",
+    job_queue.KIND_PLAN: "generate_plan",
 }
 
 # HTTP status nào là lỗi TẠM THỜI (đáng thử lại) khi endpoint đồng bộ ném ra.
@@ -111,7 +115,7 @@ class AIJobCreateRequest(BaseModel):
     định của endpoint đồng bộ vẫn có hiệu lực y hệt.
     """
 
-    kind: str = Field(..., description="Loại tác vụ: ideas | draft | summary | omnichannel")
+    kind: str = Field(..., description="Loại tác vụ: ideas | draft | summary | omnichannel | plan")
     idempotency_key: Optional[str] = Field(
         None,
         max_length=200,
@@ -133,8 +137,8 @@ class AIJobCreateRequest(BaseModel):
         None, description="Bắt buộc với kind=draft (ý tưởng đã chọn để viết bản nháp)"
     )
 
-    # --- summary (AISummaryRequest) ---
-    # `campaign_id` dùng chung, nhưng với kind=summary thì BẮT BUỘC.
+    # --- summary (AISummaryRequest) / plan (AIPlanRequest) ---
+    # `campaign_id` dùng chung, nhưng với kind=summary và kind=plan thì BẮT BUỘC.
 
     # --- omnichannel (OmnichannelRequest) ---
     brief: Optional[str] = Field(
@@ -148,7 +152,7 @@ class AIJobCreateRequest(BaseModel):
 
     # --- chung ---
     campaign_id: Optional[int] = Field(
-        None, description="ID chiến dịch (bắt buộc với kind=summary)"
+        None, description="ID chiến dịch (bắt buộc với kind=summary và kind=plan)"
     )
     prompt_version: Optional[str] = None
     chain_id: Optional[int] = Field(

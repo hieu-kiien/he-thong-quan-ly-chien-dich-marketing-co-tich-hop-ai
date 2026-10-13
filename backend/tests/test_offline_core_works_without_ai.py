@@ -542,6 +542,7 @@ def test_fallback_templates_are_never_labelled_as_ai_output():
         ("content_draft", {"campaign_name": "C", "product_name": "P", "product_usp": "U", "channel_name": "Facebook"}),
         ("performance_summary", {"campaign_name": "C", "total_views": 10, "total_clicks": 1, "ctr": 10.0}),
         ("omnichannel_generation", {"brief": "B", "brand_name": "Brand", "product_name": "P", "usp": "U"}),
+        ("campaign_plan", {"campaign_name": "C", "budget_amount": 15000000, "channel_codes": ["facebook", "email"], "max_due_offset": 29}),
     ]
 
     for task_type, context in contexts:

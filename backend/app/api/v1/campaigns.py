@@ -1,14 +1,18 @@
 from typing import Optional, List
+import hashlib
+import json
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Header
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, false, or_
+from sqlalchemy.exc import IntegrityError
 from app.core.database import get_db
 from app.core.pagination import Page, PageParams, page_params, paginate_query
 from app.core.security import RoleChecker, get_current_user
 from app.services import quota
 from app.services import campaign_lifecycle
-from app.models.entities import Campaign, Product, User, CampaignMember, WorkspaceMember, Workspace, MarketingContent, CampaignBudgetAllocation, CampaignKPITarget, MarketingChannel, Task, CampaignMetric
-from app.schemas.schemas import CampaignCreate, CampaignUpdate, CampaignResponse, ContentResponse, BudgetAllocationCreate, BudgetAllocationResponse, BudgetSummaryResponse, BudgetChannelSummary, KPITargetCreate, KPITargetResponse, KpiProgressResponse, KpiProgressTarget
+from app.models.entities import Campaign, Product, User, CampaignMember, WorkspaceMember, Workspace, MarketingContent, CampaignBudgetAllocation, CampaignKPITarget, MarketingChannel, Task, CampaignMetric, CampaignPlanApplication
+from app.schemas.schemas import CampaignCreate, CampaignUpdate, CampaignResponse, ContentResponse, BudgetAllocationCreate, BudgetAllocationResponse, BudgetSummaryResponse, BudgetChannelSummary, KPITargetCreate, KPITargetResponse, KpiProgressResponse, KpiProgressTarget, PlanApplyRequest, PlanApplyResponse
 
 
 router = APIRouter(prefix="/campaigns", tags=["Quản lý Chiến dịch"])
@@ -890,5 +894,246 @@ def get_campaign_kpi_progress(
         measurable_count=len(achievable),
         total_count=len(out_targets),
     )
+
+
+def _plan_apply_state_response(campaign_id: int, db: Session, deduplicated: bool) -> PlanApplyResponse:
+    """Trạng thái hiện tại của chiến dịch, dùng cho nhánh dedup (không ghi gì)."""
+    allocations = (
+        db.query(CampaignBudgetAllocation)
+        .filter(CampaignBudgetAllocation.campaign_id == campaign_id)
+        .order_by(CampaignBudgetAllocation.id)
+        .all()
+    )
+    kpis = (
+        db.query(CampaignKPITarget)
+        .filter(CampaignKPITarget.campaign_id == campaign_id)
+        .order_by(CampaignKPITarget.id)
+        .all()
+    )
+    return PlanApplyResponse(
+        campaign_id=campaign_id,
+        deduplicated=deduplicated,
+        budget_allocations=allocations,
+        kpi_targets=kpis,
+        tasks_created=0,
+        tasks_skipped=0,
+    )
+
+
+@router.post("/{campaign_id}/plan/apply", response_model=PlanApplyResponse)
+def apply_campaign_plan(
+    campaign_id: int,
+    plan_in: PlanApplyRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Áp dụng kế hoạch AI (từ POST /ai/plan hoặc POST /ai/jobs kind=plan) vào chiến dịch.
+
+    BẢO MẬT TÍNH TOÁN TOÀN BỘ TRƯỚC, GHI SAU: toàn bộ payload (kênh resolve
+    được, tổng phân bổ ≤ ngân sách, KPI không trùng, task nằm trong khoảng
+    chiến dịch) được kiểm tra xong MỚI chạm vào CSDL — request lỗi không bao
+    giờ để lại "nửa kế hoạch".
+
+    Idempotency BẮT BUỘC: khoá (campaign_id, idempotency_key) là UNIQUE ở tầng
+    CSDL nên double-click/retry không thể áp kế hoạch hai lần. Khoá lặp lại với
+    CÙNG kế hoạch -> 200 deduplicated=True (không ghi gì); khoá lặp lại với kế
+    hoạch KHÁC -> 409 (tái sử dụng khoá im lặng sẽ trả kết quả cũ mà người dùng
+    không biết).
+    """
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
+    check_campaign_access(campaign, current_user, db)
+
+    # Chỉ owner hoặc manager/admin được áp kế hoạch (cùng ranh giới với phân bổ
+    # ngân sách / KPI ở hai endpoint phía trên).
+    if current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER") and campaign.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền áp dụng kế hoạch cho chiến dịch")
+
+    # Task bắt buộc có workspace_id NOT NULL — fail-closed trước khi ghi gì.
+    if campaign.workspace_id is None and plan_in.tasks:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Chiến dịch chưa thuộc workspace nào; không thể tạo task từ kế hoạch.",
+        )
+
+    # --- Validate 1: kênh — chuẩn hoá code (lower/trim), không trùng, phải tồn tại & ACTIVE.
+    normalized_codes = [b.channel_code.strip().lower() for b in plan_in.budget_split]
+    if len(set(normalized_codes)) != len(normalized_codes):
+        dupes = sorted({c for c in normalized_codes if normalized_codes.count(c) > 1})
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Kênh bị phân bổ trặp lặp: {dupes}",
+        )
+    channels = db.query(MarketingChannel).filter(
+        MarketingChannel.code.in_(normalized_codes)
+    ).all()
+    channel_by_code = {c.code: c for c in channels if c.status == "ACTIVE"}
+    missing = [c for c in normalized_codes if c not in channel_by_code]
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Các kênh tiếp thị không tồn tại hoặc không hoạt động: {missing}",
+        )
+
+    # --- Validate 2: tổng phân bổ không vượt ngân sách (cùng ngưỡng với PUT budget).
+    total_planned = sum(float(b.planned_amount) for b in plan_in.budget_split)
+    total_budget = float(campaign.budget or 0)
+    if total_planned > total_budget + 1e-6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Tổng phân bổ {total_planned:,.0f} vượt ngân sách "
+                f"{total_budget:,.0f}. Hãy giảm phân bổ hoặc tăng ngân sách chiến dịch."
+            ),
+        )
+
+    # --- Validate 3: KPI không trùng metric_name (DB unique campaign_id+metric_name).
+    kpi_names = [t.metric_name.strip().lower() for t in plan_in.kpi_targets]
+    if len(set(kpi_names)) != len(kpi_names):
+        dupes = sorted({n for n in kpi_names if kpi_names.count(n) > 1})
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Chỉ tiêu KPI trùng lặp: {dupes}",
+        )
+
+    # --- Validate 4: task nằm trong khoảng thời gian chiến dịch.
+    start_d = end_d = None
+    try:
+        start_d = datetime.strptime(campaign.start_date, "%Y-%m-%d").date()
+        end_d = datetime.strptime(campaign.end_date, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        start_d = end_d = None  # dữ liệu ngày lạ -> bỏ qua kiểm tra khoảng, due_date=None
+    for t in plan_in.tasks:
+        if start_d is not None and end_d is not None:
+            offset = t.due_offset_days
+            if offset < 0 or start_d + timedelta(days=offset) > end_d:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        f"Công việc “{t.title}” có ngày hoàn thành ngoài khoảng "
+                        f"chiến dịch ({campaign.start_date} -> {campaign.end_date})."
+                    ),
+                )
+
+    # --- Idempotency: hash CỦA KẾ HOẠCH (không gồm khoá) — khoá giống + kế hoạch
+    # giống -> dedup; khoá giống + kế hoạch khác -> 409.
+    canonical = json.dumps(
+        plan_in.model_dump(exclude={"idempotency_key"}),
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    plan_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    existing_app = (
+        db.query(CampaignPlanApplication)
+        .filter(
+            CampaignPlanApplication.campaign_id == campaign_id,
+            CampaignPlanApplication.idempotency_key == plan_in.idempotency_key,
+        )
+        .first()
+    )
+    if existing_app is not None:
+        if existing_app.plan_hash == plan_hash:
+            return _plan_apply_state_response(campaign_id, db, deduplicated=True)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Khóa idempotency đã được dùng cho một kế hoạch khác của chiến dịch này. Dùng khóa mới cho kế hoạch mới.",
+        )
+
+    # --- Ghi (1 transaction): nhật ký + phân bổ + KPI + task.
+    try:
+        db.add(CampaignPlanApplication(
+            campaign_id=campaign_id,
+            idempotency_key=plan_in.idempotency_key,
+            plan_hash=plan_hash,
+            plan_json=canonical,
+            applied_by=current_user.id,
+        ))
+
+        # Thay TOÀN BỘ phân bổ (cùng semantics với PUT budget-allocations), dòng
+        # mới luôn gắn is_ai_estimate=True để UI gắn nhãn "Ước tính AI".
+        db.query(CampaignBudgetAllocation).filter(
+            CampaignBudgetAllocation.campaign_id == campaign_id
+        ).delete(synchronize_session=False)
+        for b in plan_in.budget_split:
+            db.add(CampaignBudgetAllocation(
+                campaign_id=campaign_id,
+                channel_id=channel_by_code[b.channel_code.strip().lower()].id,
+                planned_amount=b.planned_amount,
+                is_ai_estimate=True,
+            ))
+
+        # KPI: chỉ thay khi kế hoạch ĐỀ XUẤT KPI (list rỗng = không đổi gì —
+        # tránh xoá mất chỉ tiêu người dùng đã khai tay).
+        if plan_in.kpi_targets:
+            db.query(CampaignKPITarget).filter(
+                CampaignKPITarget.campaign_id == campaign_id
+            ).delete(synchronize_session=False)
+            for t in plan_in.kpi_targets:
+                db.add(CampaignKPITarget(
+                    campaign_id=campaign_id,
+                    metric_name=t.metric_name,
+                    target_value=t.target_value,
+                    unit=t.unit,
+                    is_ai_estimate=True,
+                ))
+
+        # Task: bỏ qua title đã tồn tại (dedup theo campaign) thay vì tạo trùng.
+        existing_titles = {
+            (row[0] or "").strip().lower()
+            for row in db.query(Task.title).filter(Task.campaign_id == campaign_id).all()
+        }
+        tasks_created = 0
+        tasks_skipped = 0
+        for t in plan_in.tasks:
+            key = t.title.strip().lower()
+            if key in existing_titles:
+                tasks_skipped += 1
+                continue
+            existing_titles.add(key)
+            due_date = None
+            if start_d is not None:
+                due_date = (start_d + timedelta(days=t.due_offset_days)).strftime("%Y-%m-%d")
+            db.add(Task(
+                campaign_id=campaign_id,
+                workspace_id=campaign.workspace_id,
+                title=t.title.strip(),
+                description=t.description,
+                task_type=t.task_type,
+                priority=t.priority,
+                status="TODO",
+                creator_id=current_user.id,
+                due_date=due_date,
+            ))
+            tasks_created += 1
+
+        db.commit()
+    except IntegrityError:
+        # Request song song thứ hai chèn khoá idempotency trước: rollback rồi
+        # đọc lại trạng thái để trả dedup hoặc 409 đúng bản chất xung đột.
+        db.rollback()
+        existing_app = (
+            db.query(CampaignPlanApplication)
+            .filter(
+                CampaignPlanApplication.campaign_id == campaign_id,
+                CampaignPlanApplication.idempotency_key == plan_in.idempotency_key,
+            )
+            .first()
+        )
+        if existing_app is not None:
+            if existing_app.plan_hash == plan_hash:
+                return _plan_apply_state_response(campaign_id, db, deduplicated=True)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Khóa idempotency đã được dùng cho một kế hoạch khác của chiến dịch này. Dùng khóa mới cho kế hoạch mới.",
+            )
+        raise
+
+    state = _plan_apply_state_response(campaign_id, db, deduplicated=False)
+    state.tasks_created = tasks_created
+    state.tasks_skipped = tasks_skipped
+    return state
+
 
 

@@ -139,7 +139,12 @@ class AIService:
 
     def _validate_task_output(self, task_code: str, data: Dict[str, Any], prompt_version: str):
         """Kiểm tra schema cấu trúc kết quả từ AI provider trước khi chấp nhận"""
-        from app.schemas.schemas import AIIdeaResponse, AIDraftResponse, AISummaryResponse
+        from app.schemas.schemas import (
+            AIIdeaResponse,
+            AIDraftResponse,
+            AISummaryResponse,
+            AIPlanResponse,
+        )
         test_payload = {
             **data,
             "model_used": self.model,
@@ -152,6 +157,8 @@ class AIService:
             AIDraftResponse.model_validate(test_payload)
         elif task_code == "SUMMARY":
             AISummaryResponse.model_validate(test_payload)
+        elif task_code == "PLAN":
+            AIPlanResponse.model_validate(test_payload)
         elif task_code == "OMNICHANNEL":
             from app.schemas.schemas import OmnichannelResponse
             OmnichannelResponse.model_validate(test_payload)
@@ -650,7 +657,126 @@ class AIService:
             }
         elif task_type in ["omnichannel_generation", "OMNICHANNEL"]:
             return self._generate_fallback_omnichannel(context)
+        elif task_type in ["campaign_plan", "PLAN"]:
+            return self._generate_fallback_campaign_plan(context)
         return {}
+
+    def _generate_fallback_campaign_plan(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Sinh kế hoạch chiến dịch deterministic khi không có AI key / lỗi mạng.
+
+        Nguyên tắc anti-hallucination: chỉ PHÂN BỔ LẠI số ngân sách THẬT trong
+        context — không bịa doanh số, lead hay CTR. Chia đều tới từng đồng bằng
+        floor để tổng planned_amount LUÔN <= ngân sách gốc (không bao giờ cộng
+        gộp vượt budget). Task đi theo trục thời gian của chiến dịch
+        (due_offset_days <= max_due_offset). KPI chỉ sinh khi context có mục tiêu
+        thật; không có thì để rỗng kèm warning thay vì bịa con số.
+        """
+        import math
+
+        try:
+            budget = float(context.get("budget_amount") or 0.0)
+        except (TypeError, ValueError):
+            budget = 0.0
+        if budget < 0:
+            budget = 0.0
+
+        codes = [str(c) for c in (context.get("channel_codes") or []) if c]
+        if not codes:
+            # Chiến dịch chưa gán kênh: vẫn phải trả budget_split hợp lệ (>=1 dòng).
+            # Mã dự phòng này sẽ được apply endpoint đối chiếu lại với CSDL.
+            codes = ["FACEBOOK"]
+
+        try:
+            max_offset = int(context.get("max_due_offset") or 30)
+        except (TypeError, ValueError):
+            max_offset = 30
+        if max_offset < 0:
+            max_offset = 0
+
+        # Chia đều bằng đồng nguyên tử: floor toàn bộ rồi dồn phần lẻ vào các
+        # kênh đầu, bảo đảm sum == floor(budget*100)/100 <= budget.
+        n = len(codes)
+        budget_cents = int(math.floor(budget * 100))
+        base_cents = budget_cents // n
+        remainder = budget_cents - base_cents * n
+        budget_split = []
+        for idx, code in enumerate(codes):
+            cents = base_cents + (1 if idx < remainder else 0)
+            budget_split.append({
+                "channel_code": code,
+                "planned_amount": cents / 100.0,
+                "rationale": "Chia đều theo tổng ngân sách (Smart Fallback — chưa tối ưu theo lịch sử hiệu suất).",
+                "is_ai_estimate": True,
+            })
+
+        kpi_name = context.get("target_kpi_name")
+        kpi_value = context.get("target_kpi_value")
+        kpi_targets: List[Dict[str, Any]] = []
+        if kpi_name and kpi_value is not None:
+            try:
+                val = float(kpi_value)
+            except (TypeError, ValueError):
+                val = None
+            if val is not None and val >= 0:
+                kpi_targets.append({
+                    "metric_name": str(kpi_name)[:50],
+                    "target_value": val,
+                    "unit": self._fallback_kpi_unit(str(kpi_name)),
+                    "is_ai_estimate": True,
+                })
+
+        warnings = ["Kế hoạch sinh từ chế độ Smart Fallback (mạng ngoại vi / thiếu API key)."]
+        if budget <= 0:
+            warnings.append("Chiến dịch chưa có ngân sách > 0 nên chưa phân bổ được ngân sách.")
+        if not context.get("channel_codes"):
+            warnings.append("Chiến dịch chưa gán kênh hoạt động; dòng phân bổ mặc định cần kiểm tra trước khi áp dụng.")
+
+        phases = [
+            ("Nghiên cứu & chốt kịch bản", "RESEARCH", "HIGH", 0.00),
+            ("Sản xuất nội dung chính", "CONTENT", "URGENT", 0.15),
+            ("Thiết kế ấn phẩm & media", "DESIGN", "HIGH", 0.35),
+            ("Chạy quảng cáo & phân phối", "ADS", "URGENT", 0.65),
+            ("Đo lường & tối ưu", "OTHER", "MEDIUM", 0.90),
+        ]
+        tasks = []
+        for title, t_type, prio, pct in phases:
+            tasks.append({
+                "title": title,
+                "task_type": t_type,
+                "priority": prio,
+                "due_offset_days": math.floor(max_offset * pct),
+                "description": f"Giai đoạn {title.lower()} trong chiến dịch '{context.get('campaign_name', '')}'.",
+            })
+
+        return {
+            "summary": (
+                f"Kế hoạch phân bổ ngân sách {budget:,.0f} VNĐ cho {n} kênh "
+                f"({', '.join(codes)}), triển khai trong {max_offset + 1} ngày. "
+                "Phân bổ chia đều, cần tối ưu lại theo hiệu suất thực tế trước khi chạy."
+            ),
+            "budget_split": budget_split,
+            "kpi_targets": kpi_targets,
+            "tasks": tasks,
+            "warnings": warnings,
+            "assumptions": [
+                "Phân bổ chia đều vì chưa có dữ liệu lịch sử hiệu suất từng kênh.",
+                "KPI giữ nguyên mục tiêu đã khai báo trên chiến dịch (nếu có).",
+            ],
+            "is_fallback": True,
+            "model_provider": "template-fallback-engine",
+        }
+
+    @staticmethod
+    def _fallback_kpi_unit(metric_name: str) -> str:
+        """Suy unit cho KPI từ tên metric — không bịa, chỉ phân loại mặt chữ."""
+        m = (metric_name or "").lower()
+        if "roas" in m:
+            return "ratio"
+        if any(k in m for k in ("cpl", "cpc", "cpm", "cpa", "cost", "revenue", "doanh thu", "chi phí", "chi phi")):
+            return "vnd"
+        if any(k in m for k in ("rate", "ctr", "cvr", "share", "tỷ lệ", "ty le", "phần trăm", "phan tram")):
+            return "percent"
+        return "count"
 
     def _generate_fallback_omnichannel(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Sinh dữ liệu mẫu đa kênh chất lượng cao chuẩn nghiệp vụ khi không có API key hoặc lỗi mạng.

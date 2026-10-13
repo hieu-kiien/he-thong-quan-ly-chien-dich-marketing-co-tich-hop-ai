@@ -58,8 +58,9 @@ KIND_IDEAS = "ideas"
 KIND_DRAFT = "draft"
 KIND_SUMMARY = "summary"
 KIND_OMNICHANNEL = "omnichannel"
+KIND_PLAN = "plan"
 
-JOB_KINDS = (KIND_IDEAS, KIND_DRAFT, KIND_SUMMARY, KIND_OMNICHANNEL)
+JOB_KINDS = (KIND_IDEAS, KIND_DRAFT, KIND_SUMMARY, KIND_OMNICHANNEL, KIND_PLAN)
 
 # Lý do thất bại dùng chung cho cả API lẫn test, để client đổi chuỗi hiển thị
 # không bị lệch với những gì worker thực sự ghi.

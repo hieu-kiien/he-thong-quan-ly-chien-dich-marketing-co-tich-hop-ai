@@ -195,6 +195,7 @@ def test_enqueue_validates_payload_against_sync_schema(client, queue_session):
     headers = _headers(queue_session, "manager@gmail.com")
 
     assert client.post(API, json={"kind": "summary"}, headers=headers).status_code == 422
+    assert client.post(API, json={"kind": "plan"}, headers=headers).status_code == 422
     assert client.post(API, json={"kind": "omnichannel", "campaign_id": 1}, headers=headers).status_code == 422
     assert client.post(API, json={"kind": "draft", "campaign_id": 1}, headers=headers).status_code == 422
 
@@ -1479,7 +1480,7 @@ def test_sync_endpoints_marked_deprecated_in_openapi():
 def test_job_enums_are_documented_constants():
     """Ràng buộc CHECK trong entities.py và hằng số ở job_queue phải khớp — nếu lệch
     thì worker ghi trạng thái mà CSDL từ chối, và job kẹt ở trạng thái cũ mãi mãi."""
-    assert set(job_queue.JOB_KINDS) == {"ideas", "draft", "summary", "omnichannel"}
+    assert set(job_queue.JOB_KINDS) == {"ideas", "draft", "summary", "omnichannel", "plan"}
     assert set(job_queue.JOB_TERMINAL_STATUSES) == {"succeeded", "failed", "cancelled"}
 
 
