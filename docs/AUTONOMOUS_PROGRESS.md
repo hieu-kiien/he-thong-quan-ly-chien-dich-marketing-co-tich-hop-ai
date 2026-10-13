@@ -205,3 +205,10 @@ Ly do: du an da chay toan bo tren VPS (vn-hn.cloudcode.io.vn, /opt/marketflow), 
 - Don comment Render nhu deployment hien tai (api.ts AI_BASE_URL + timeout); comment lich su do thuc 237s tren Render free giu nguyen (qua khua, giai thich vi sao co hang doi AI)
 
 Verification: tsc + eslint --max-warnings=0 + build pass; impact: ServerAwakeningIndicator/subscribeServerAwakening risk LOW (App chi dung de render banner); detect-changes risk high = App la hub, diff chi 2 dong
+
+## Phase 13 - Dọn rac repo (user request)
+
+Xoa (untracked/ignored, tai tao duoc): test-recordings/ (67.5MB playwright), test-results/, archive/, .agents/ (log teamwork cu), .coverage, coverage.xml, backend/uvicorn.log, frontend/vite.log, test_marketing.db-shm/-wal, marketing_campaigns.db root (stray 27/09), 4 anh screenshot root (ai_studio_*.png, dashboard_view.png)
+Xoa (tracked, sua link kem): TEST_INFRA.md + TEST_READY.md (docs tu goi la bao cao test cu) + cap nhat docs/README.md, docs/TESTING.md, docs/ROADMAP.md
+Giu: ORIGINAL_REQUEST.md, BIEN_BAN_NGHIEM_THU.md (nguon/cau chung tests), CLAUDE.md (= AGENTS.md, config Claude Code), Bao_Cao V9 + PDF da nop, 2 anh chup yeu cau mon hoc
+Verify: test_design_docs_integrity + test_ai_ethics + test_prompt_variant_harness: 52 passed, 1 failed = pre-existing pagination doc claim

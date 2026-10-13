@@ -44,7 +44,6 @@ Tài liệu này là mục lục cho **tài liệu sống của dự án**. Các
 ## Tài liệu lịch sử và hồ sơ học thuật
 
 - [Release notes V9.5](RELEASE_NOTES_V9.5_OPERATIONS.md): snapshot lịch sử, không phải trạng thái phát hành hiện tại.
-- [TEST_READY.md](../TEST_READY.md) và [TEST_INFRA.md](../TEST_INFRA.md): báo cáo test cũ; hướng dẫn hiện hành ở [TESTING.md](TESTING.md).
 - [Biên bản nghiệm thu](../BIEN_BAN_NGHIEM_THU.md): hồ sơ lịch sử.
 - [Yêu cầu ban đầu](../ORIGINAL_REQUEST.md): lưu nguyên văn làm nguồn bối cảnh.
 - V8/V9: xem README trong từng thư mục để biết snapshot, nguồn LaTeX và PDF tương ứng.

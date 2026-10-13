@@ -76,6 +76,4 @@ Gate 6 dùng `|| echo` sau `pip-audit` và `npm audit`, nên run có thể xanh 
 
 ## Hồ sơ lịch sử
 
-- [TEST_READY.md](../TEST_READY.md) là snapshot readiness ngày 2026-09-27; số liệu không đồng bộ baseline hiện hành.
-- [TEST_INFRA.md](../TEST_INFRA.md) là thiết kế hạ tầng test cũ; workflow hiện tại đã thay đổi.
-- Run/commit mới hơn thay thế các con số trong snapshot lịch sử; không xóa các file này để giữ dấu vết quyết định.
+- `TEST_READY.md` (snapshot readiness 2026-09-27) và `TEST_INFRA.md` (thiết kế hạ tầng test cũ) đã bị gỡ khỏi repo ngày 2026-10-13 theo yêu cầu dọn dồn; nội dung cũ còn trong git history. Hướng dẫn test hiện hành nằm ở tài liệu này.
