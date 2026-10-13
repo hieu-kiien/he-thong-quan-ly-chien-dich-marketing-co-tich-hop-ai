@@ -1,0 +1,181 @@
+\chapter{PHÂN TÍCH YÊU CẦU HỆ THỐNG VÀ KIỂM SOÁT PHÂN QUYỀN}
+
+\section{Phân tích tác nhân và mục tiêu nghiệp vụ}
+
+Hệ thống MarketFlow AI được thiết kế xoay quanh hai nhóm tác nhân con người chính (Manager và Marketer) cùng hai thực thể ngoại vi (Nhà cung cấp dịch vụ AI và Nền tảng phân phối nội dung), được định nghĩa trong Bảng~\ref{tab:v9-actors}.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Tác nhân, mục tiêu và ranh giới quyền hạn trong hệ thống}
+\label{tab:v9-actors}
+\begin{tabularx}{\textwidth}{|L{3.2cm}|Y|Y|}
+\hline
+\thead{Tác nhân} & \thead{Mục tiêu nghiệp vụ} & \thead{Ranh giới quyền hạn}\\
+\hline
+Quản lý Marketing (Manager) & Thiết lập chiến dịch, duyệt ngân sách, phân công thành viên, thẩm định và phê duyệt nội dung, xem báo cáo tổng thể toàn doanh nghiệp. & Quyền quản trị toàn hệ thống; có quyền duyệt/từ chối (\texttt{/approve}, \texttt{/reject}); không được can thiệp sửa đổi nhật ký kiểm toán bất biến.\\
+\hline
+Nhân viên Marketing (Marketer) & Sáng tạo ý tưởng, gọi AI trợ lý soạn thảo bản nháp, biên tập nội dung, gửi yêu cầu duyệt, nhập số liệu chiến dịch được giao. & Chỉ thao tác trong phạm vi các chiến dịch được phân công (Record-level Scope); tuyệt đối không có quyền tự phê duyệt bài viết của chính mình.\\
+\hline
+Dịch vụ Google Gemini AI & Nhận ngữ cảnh dữ liệu chọn lọc, sinh gợi ý ý tưởng, soạn nháp và tóm tắt chỉ số theo JSON Schema quy chuẩn. & Thực thể tính toán thụ động; không có quyền truy cập trực tiếp CSDL; kết quả luôn mang tính khuyến nghị và gắn cờ \texttt{is\_ai\_generated = True}.\\
+\hline
+Kênh truyền thông & Tiếp nhận lịch đăng và nội dung đã được phê duyệt chính thức để chuẩn bị xuất bản. & Đứng sau rào chắn kiểm duyệt; chỉ tiếp nhận nội dung có trạng thái \texttt{APPROVED} và lịch biểu hợp lệ.\\
+\hline
+\end{tabularx}
+\end{table}
+
+\begin{figure}[h!]
+\centering
+\input{figures/usecase.tex}
+\caption{Sơ đồ ca sử dụng chính của hệ thống MarketFlow AI}
+\label{fig:v9-usecase}
+\end{figure}
+
+\section{Danh mục yêu cầu chức năng (FR)}
+
+Hệ thống hiện thực hóa trọn vẹn 14 yêu cầu chức năng cốt lõi (FR01--FR14), toàn bộ đều đã được kiểm chứng bằng các ca kiểm thử tự động, như được chi tiết hóa trong Bảng~\ref{tab:v9-functional}.
+
+\begin{small}
+\begin{longtable}{|C{1.1cm}|L{1.9cm}|L{3.9cm}|L{5.1cm}|C{1.7cm}|}
+\caption{Danh mục yêu cầu chức năng và kết quả nghiệm thu thực chứng}\label{tab:v9-functional}\\
+\hline
+\thead{Mã} & \thead{Phân hệ} & \thead{Nội dung yêu cầu} & \thead{Kết quả kiểm chứng thực tế} & \thead{Trạng thái}\\
+\hline
+\endfirsthead
+
+\multicolumn{5}{c}{{\small\bfseries Bảng~\ref{tab:v9-functional} (tiếp theo): Danh mục yêu cầu chức năng}}\\
+\hline
+\thead{Mã} & \thead{Phân hệ} & \thead{Nội dung yêu cầu} & \thead{Kết quả kiểm chứng thực tế} & \thead{Trạng thái}\\
+\hline
+\endhead
+
+\hline
+\multicolumn{5}{|r|}{{\footnotesize Tiếp tục sang trang tiếp theo...}}\\
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+FR01 & Xác thực & Đăng nhập bằng email và mật khẩu; cấp phát JWT token an toàn. & Đăng nhập thành công cấp Bearer token; sai mật khẩu trả 401 Unauthorized; mã hóa Bcrypt. & TESTED\\
+\hline
+FR02 & Phân quyền & Backend kiểm tra vai trò ở các thao tác nhạy cảm. & Manager được duyệt bài/xóa chiến dịch; Marketer bị từ chối 403 Forbidden; tài khoản bị khóa bị chặn ngay lập tức. & TESTED\\
+\hline
+FR03 & Dữ liệu nền & Quản lý danh mục ngành hàng, sản phẩm và kênh tiếp thị. & Đầy đủ CRUD; ràng buộc khóa ngoại ngăn chặn xóa danh mục khi còn sản phẩm tham chiếu. & IMPLEMENTED\\
+\hline
+FR04 & Chiến dịch & Tạo và quản lý chiến dịch với mục tiêu, ngân sách, thời gian. & Kiểm tra ngân sách không âm; ràng buộc ngày \texttt{start\_date} $\le$ \texttt{end\_date}; chống SQL injection. & TESTED\\
+\hline
+FR05 & Phân công & Quản lý thành viên tham gia chiến dịch (\texttt{CampaignMember}). & Hỗ trợ phân công nhiều thành viên vào chiến dịch; ngăn chặn trùng lặp thành viên; xác lập phạm vi quyền. & TESTED\\
+\hline
+FR06 & Soạn nội dung & Tạo bản nháp nội dung gắn với chiến dịch, kênh và tác giả. & Nội dung khởi tạo mang trạng thái \texttt{DRAFT} hoặc \texttt{AI\_DRAFT}; kiểm tra khóa ngoại chiến dịch/kênh. & TESTED\\
+\hline
+FR07 & Duyệt nội dung & Quy trình phê duyệt Human-in-the-loop qua các endpoint chuyên biệt. & Gửi duyệt (\texttt{/submit}), phê duyệt (\texttt{/approve}), từ chối (\texttt{/reject}); cấm tự duyệt; tự động reset khi sửa. & TESTED\\
+\hline
+FR08 & Lập lịch & Tạo, sửa và hủy lịch xuất bản cho nội dung đã duyệt. & Chỉ cho phép lên lịch đối với bài viết \texttt{APPROVED}; hỗ trợ múi giờ quốc tế; trạng thái đồng bộ \texttt{SCHEDULED}. & TESTED\\
+\hline
+FR09 & Chỉ số kênh & Nhập views, clicks, conversions, cost và revenue theo ngày/kênh. & Bộ ba (\texttt{campaign}, \texttt{channel}, \texttt{date}) duy nhất; tự động tính toán KPI: CTR, CPC, CPA, ROI; chống chia cho 0. & TESTED\\
+\hline
+FR10 & Báo cáo & Lọc, tìm kiếm chiến dịch và xem dashboard số liệu đa chiều. & Lọc đa tiêu chí theo kênh, thời gian; tổng hợp số liệu chính xác; Marketer chỉ xem số liệu chiến dịch của mình. & TESTED\\
+\hline
+FR11 & AI Ý tưởng & Gợi ý 3 góc tiếp cận ý tưởng dựa trên mục tiêu và sản phẩm. & Trả về cấu trúc JSON gồm angle, concept, hook; schema valid 100\%; Smart Fallback kích hoạt khi mất mạng. & MEASURED\\
+\hline
+FR12 & AI Soạn nháp & Tạo caption/email theo định dạng chuẩn của từng kênh. & Sinh tiêu đề, nội dung, lời kêu gọi (CTA); gắn cờ nguồn gốc AI; chuyển tiếp mượt mà sang Review Queue. & MEASURED\\
+\hline
+FR13 & AI Tóm tắt & Tóm tắt hiệu quả và khuyến nghị cải tiến từ metrics thực tế. & Grounding score >95\%; khử ảo giác tuyệt đối trong Fallback (chỉ diễn giải số liệu có trong context). & MEASURED\\
+\hline
+FR14 & Kiểm toán & Ghi nhận audit log cho các thao tác duyệt và lần gọi AI. & Bảng \texttt{content\_reviews} lưu lý do duyệt; bảng \texttt{ai\_logs} lưu chi tiết model, latency, tokens và cờ fallback. & TESTED\\
+\end{longtable}
+\end{small}
+
+\section{Danh mục yêu cầu chất lượng (NFR)}
+
+Hệ thống tuân thủ 6 yêu cầu phi chức năng (NFR01--NFR06) đạt tiêu chuẩn công nghiệp:
+\begin{itemize}
+  \item \textbf{NFR01 (Kiểm soát truy cập đa tầng)}: Kết hợp RBAC và kiểm soát phạm vi bản ghi (Record-level Scope). Loại bỏ hoàn toàn nguy cơ rò rỉ dữ liệu chéo giữa các nhân viên tiếp thị.
+  \item \textbf{NFR02 (Toàn vẹn dữ liệu và giao dịch)}: SQLite kích hoạt \texttt{PRAGMA foreign\_keys = ON}, ràng buộc chỉ số không âm, bảo toàn tính nguyên tử (Atomicity) qua SQLAlchemy transactions.
+  \item \textbf{NFR03 (Hiệu năng phản hồi)}: Thời gian phản hồi của các API nghiệp vụ CRUD đạt P50 $<$ 15ms, P95 $<$ 45ms. Độ trễ AI Smart Fallback $<$ 50ms.
+  \item \textbf{NFR04 (Tính khả dụng và phục hồi giao diện)}: Giao diện web hỗ trợ đầy đủ ba trạng thái tương tác: loading skeleton, empty state thông minh, và toast thông báo tức thời.
+  \item \textbf{NFR05 (Khả năng chịu lỗi dịch vụ AI)}: Tự động bắt lỗi timeout (sau 10 giây), lỗi quota hoặc lỗi sai lệch JSON Schema từ nhà cung cấp mô hình để chuyển hướng an toàn sang Smart Fallback mà không gây gián đoạn phiên làm việc của người dùng.
+  \item \textbf{NFR06 (Khả năng tái lập và tự động hóa)}: Cung cấp đầy đủ cấu hình Docker, script khởi tạo seed dữ liệu mẫu và pipeline GitHub Actions xác minh toàn diện mọi thay đổi.
+\end{itemize}
+
+\section{Kiến trúc phân quyền RBAC và Kiểm soát mức bản ghi (Record-level NFR01)}
+
+Một trong những cải tiến quan trọng nhất trong kiến trúc an ninh của MarketFlow AI V9 là việc siết chặt phân quyền mức bản ghi (Record-level Authorization), khắc phục hoàn toàn lỗ hổng IDOR (Insecure Direct Object Reference).
+
+\begin{figure}[h!]
+\centering
+\input{figures/approval-sequence.tex}
+\caption{Quy trình phân quyền và kiểm soát phạm vi bản ghi khi xử lý yêu cầu}
+\label{fig:v9-auth-sequence}
+\end{figure}
+
+\subsection{Cơ chế đồng bộ trạng thái tài khoản người dùng}
+Trong module xác thực \texttt{backend/app/core/security.py} và \texttt{backend/app/api/deps.py}, hàm phụ thuộc \texttt{get\_current\_user} và lớp \texttt{RoleChecker} không chỉ kiểm tra tính hợp lệ của chữ ký điện tử JWT mà còn bắt buộc truy vấn trạng thái thực của người dùng trong cơ sở dữ liệu:
+\begin{equation}
+\text{Allowed} \iff (\text{Token Valid}) \land (\text{User.status} == \text{'ACTIVE'}) \land (\text{Role} \in \text{AllowedRoles})
+\end{equation}
+Nếu tài khoản bị vô hiệu hóa (\texttt{user.status == 'INACTIVE'}), hệ thống lập tức từ chối yêu cầu với mã lỗi HTTP 403 Forbidden, bất kể token JWT vẫn còn trong thời hạn hiệu lực.
+
+\subsection{Thuật toán giải quyết phạm vi bản ghi (Record Scope Resolution)}
+Đối với vai trò Marketer, quyền thao tác trên các thực thể được xác định nghiêm ngặt theo thuật toán sau:
+\begin{enumerate}
+  \item \textbf{Đối với Chiến dịch (Campaign)}:
+    \begin{itemize}
+      \item Manager: Có quyền xem, tạo, chỉnh sửa và xóa mọi chiến dịch trong hệ thống.
+      \item Marketer: Chỉ được xem và cập nhật các chiến dịch mà mình là người tạo lập (\texttt{campaign.owner\_id == current\_user.id}) hoặc được chỉ định là thành viên thông qua bảng liên kết \texttt{CampaignMember} (\texttt{campaign\_members.user\_id == current\_user.id}). Mọi yêu cầu truy cập chiến dịch ngoài phạm vi đều bị chặn với HTTP 403 hoặc HTTP 404 (để che giấu sự tồn tại của tài nguyên). Thao tác xóa chiến dịch bị cấm hoàn toàn đối với Marketer.
+    \end{itemize}
+  \item \textbf{Đối với Nội dung tiếp thị (MarketingContent)}:
+    \begin{itemize}
+      \item Marketer chỉ được tạo bài viết mới gắn với chiến dịch mà mình có quyền phụ trách.
+      \item Khi xem danh sách hoặc chỉnh sửa nội dung, backend tự động lọc hoặc kiểm tra quan hệ sở hữu của chiến dịch chứa nội dung đó. Marketer không thể đọc hay can thiệp vào bài viết thuộc chiến dịch của đồng nghiệp khác.
+    \end{itemize}
+  \item \textbf{Đối với Chỉ số hiệu quả (Metrics) và Bảng điều khiển (Dashboard)}:
+    \begin{itemize}
+      \item Khi Marketer truy cập \texttt{GET /metrics/dashboard}, hệ thống tự động chèn mệnh đề lọc \texttt{campaign\_id.in\_(allowed\_campaign\_ids)}, bảo đảm người dùng chỉ nhìn thấy số liệu tổng hợp trong phạm vi được phân công.
+    \end{itemize}
+  \item \textbf{Đối với Ngữ cảnh AI (AI Context Gate)}:
+    \begin{itemize}
+      \item Khi gọi các endpoint AI (\texttt{/ai/ideas}, \texttt{/ai/draft}, \texttt{/ai/summary}), hệ thống kiểm tra quyền của Marketer trên \texttt{campaign\_id} mục tiêu trước khi nạp dữ liệu vào Prompt Engine, triệt tiêu nguy cơ trích xuất thông tin chiến dịch của người khác qua AI.
+    \end{itemize}
+\end{enumerate}
+
+\section{Máy trạng thái duyệt nội dung Human-in-the-loop (HITL State Machine)}
+
+Để bảo đảm tính toàn vẹn của nội dung truyền thông doanh nghiệp, vòng đời của mỗi bài viết tiếp thị tuân thủ một máy trạng thái hữu hạn (Finite State Machine) nghiêm ngặt được mô tả tại Hình~\ref{fig:v9-content-state}.
+
+\begin{figure}[h!]
+\centering
+\input{figures/content-state.tex}
+\caption{Máy trạng thái duyệt nội dung Human-in-the-loop}
+\label{fig:v9-content-state}
+\end{figure}
+
+\subsection{Các trạng thái hợp lệ}
+\begin{itemize}
+  \item \texttt{DRAFT}: Bản nháp do người dùng tự soạn thảo thủ công.
+  \item \texttt{AI\_DRAFT}: Bản nháp do AI sinh ra, cần sự rà soát chỉnh sửa của con người.
+  \item \texttt{IN\_REVIEW}: Bài viết đã được hoàn thiện và gửi lên hàng đợi phê duyệt (Review Queue).
+  \item \texttt{APPROVED}: Bài viết đã được cấp quản lý (Manager) thẩm định và chính thức phê duyệt.
+  \item \texttt{REJECTED}: Bài viết bị từ chối phê duyệt (kèm lý do giải thích minh bạch).
+  \item \texttt{PUBLISHED}: Bài viết đã được phát hành lên kênh truyền thông theo lịch đăng.
+\end{itemize}
+
+\subsection{Quy tắc chống gian lận và can thiệp ngoài luồng (Anti-Tampering Rules)}
+Nhằm triệt tiêu hoàn toàn khả năng người dùng vượt quyền hoặc bỏ qua khâu kiểm duyệt, hệ thống áp dụng các rào chắn kỹ thuật ở tầng sâu:
+\begin{enumerate}
+  \item \textbf{Cấm tạo bài viết trực tiếp ở trạng thái duyệt}: Endpoint \texttt{POST /contents} tuyệt đối không chấp nhận tham số trạng thái \texttt{APPROVED} hoặc \texttt{PUBLISHED}. Mọi nội dung tạo mới chỉ có thể bắt đầu ở \texttt{DRAFT} hoặc \texttt{AI\_DRAFT}.
+  \item \textbf{Cấm sửa đổi trực tiếp trạng thái qua API cập nhật}: Endpoint \texttt{PUT /contents/\{id\}} từ chối mọi nỗ lực gán trường \texttt{status} sang \texttt{APPROVED} hoặc \texttt{PUBLISHED} với mã lỗi HTTP 400 Bad Request.
+  \item \textbf{Endpoint nghiệp vụ chuyên biệt}: Việc thay đổi trạng thái bắt buộc phải thông qua các endpoint chuyên trách:
+    \begin{itemize}
+      \item \texttt{POST /contents/\{id\}/submit}: Chuyển từ \texttt{DRAFT} / \texttt{AI\_DRAFT} / \texttt{REJECTED} sang \texttt{IN\_REVIEW} (bất kỳ tác giả nào có quyền trên nội dung đều gọi được).
+      \item \texttt{POST /contents/\{id\}/approve}: Chỉ cho phép vai trò Manager gọi trên các bài viết đang ở \texttt{IN\_REVIEW}. Tự động ghi nhận thông tin người duyệt và mốc thời gian vào bảng kiểm toán.
+      \item \texttt{POST /contents/\{id\}/reject}: Chỉ cho phép vai trò Manager gọi trên các bài viết đang ở \texttt{IN\_REVIEW}, bắt buộc truyền tham số lý do (\texttt{review\_notes}).
+      \item \texttt{POST /contents/\{id\}/publish}: Chỉ cho phép xuất bản bài viết đang ở trạng thái \texttt{APPROVED}.
+    \end{itemize}
+  \item \textbf{Cơ chế tự động thu hồi phê duyệt khi nội dung bị sửa đổi (Approval Invalidation)}: Nếu một bài viết đã ở trạng thái \texttt{APPROVED} nhưng sau đó bị người dùng chỉnh sửa tiêu đề (\texttt{title}), nội dung (\texttt{body}) hoặc lời kêu gọi (\texttt{cta}) qua \texttt{PUT /contents/\{id\}}, hệ thống tự động hạ trạng thái bài viết về \texttt{AI\_DRAFT} và yêu cầu phải trải qua toàn bộ quy trình gửi duyệt lại từ đầu. Quy tắc này loại bỏ hoàn toàn kịch bản gian lận: phê duyệt một nội dung lành tính rồi sau đó bí mật thay đổi thành nội dung vi phạm chính sách.
+\end{enumerate}
+
+\section{Kết luận chương}
+
+Chương 3 đã hoàn thiện phân tích chi tiết toàn bộ các yêu cầu nghiệp vụ của MarketFlow AI. Sự kết hợp chặt chẽ giữa Ma trận phân quyền RBAC, cơ chế kiểm soát phạm vi bản ghi (Record-level Scope NFR01) và Máy trạng thái duyệt nội dung khép kín (HITL State Machine) đã thiết lập nên một kiến trúc bảo mật đa tầng, ngăn chặn mọi hành vi leo quyền hoặc can thiệp dữ liệu trái phép. Chương tiếp theo sẽ trình bày thiết kế kiến trúc tổng thể, mô hình dữ liệu và Prompt Engine của hệ thống.

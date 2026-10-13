@@ -1,0 +1,156 @@
+=== PAGE 29 ===
+product_categories
+(Nhóm SP)
+PK id : INTEGER
+name : VARCHAR(100)
+description : TEXT
+products (Sản phẩm)
+PK id : INTEGER
+FK category_id : INT
+name : VARCHAR(150)
+price : NUMERIC(12,2)
+status : VARCHAR(20)
+marketing_channels
+(Kênh)
+PK id : INTEGER
+name : VARCHAR(80)
+code : VARCHAR(30)
+format_rules : JSON
+status : VARCHAR(20)
+users (Tài khoản)
+PK id : INTEGER
+email : VARCHAR(120)
+password_hash : TEXT
+role : VARCHAR(20)
+status : VARCHAR(20)
+campaigns (Chiến dịch)
+PK id : INTEGER
+FK product_id : INT
+FK owner_id : INT
+title : VARCHAR(200)
+objective : TEXT
+budget : NUMERIC(15,2)
+start_date, end_date :
+DATE
+status : VARCHAR(20)
+marketing_contents
+(Nội dung)
+PK id : INTEGER
+FK campaign_id : INTEGER
+FK channel_id : INTEGER
+FK created_by : INTEGER
+title : VARCHAR(200)
+status : VARCHAR(20)
+body, prompt : TEXT
+1 0..*
+1
+0..*
+1 0..* 1 0..*
+1
+0..*
+Hình 4.2: Mô hình dữ liệu hạt nhân của MarketFlow AI
+content_reviews
+[Lịch sử duyệt]
+PK id : INTEGER
+FK content_id : INT
+FK reviewer_id : INT
+decision : VARCHAR(20)
+reason : TEXT
+reviewed_at : TIMESTAMP
+marketing_contents
+[Bảng Lõi]
+PK id : INTEGER
+FK campaign_id : INT
+FK channel_id : INT
+status : VARCHAR(20)
+title, body : TEXT
+marketing_schedules
+(Lịch đăng)
+PK id : INTEGER
+FK content_id : INT
+scheduled_at : TIMESTAMP
+timezone : VARCHAR(50)
+status : VARCHAR(20)
+campaign_members
+(Phân công)
+PK, FK campaign_id : INT
+PK, FK user_id : INT
+role : VARCHAR(30)
+assigned_at : TIMESTAMP
+campaigns [Bảng Lõi]
+PK id : INTEGER
+FK product_id : INT
+title : VARCHAR(200)
+budget : NUMERIC(15,2)
+campaign_metrics (Chỉ số)
+PK id : INTEGER
+FK campaign_id : INT
+FK channel_id : INT
+metric_date : DATE
+views, clicks : INT
+cost, rev : NUMERIC(12,2)
+ai_logs (Nhật ký
+kiểm toán AI)
+PK id : INTEGER
+FK user_id, campaign_id :
+INT
+provider, model : TEXT
+prompt_version : TEXT
+status : VARCHAR(20)
+latency_ms, tokens_used :
+INT
+created_at : TIMESTAMP
+10..* 1 0..*
+10..* 1 0..*
+1
+0..*
+Hình 4.3: Mô hình các bảng vận hành và liên kết khóa ngoại
+dịchkhácngoàiphạmviđượcphâncông.
+19
+=== PAGE 30 ===
+4.4.1. Đặc tả hợp đồng dữ liệu chuẩn hóa (Data Contract Specification)
+Prompt Engine thiết lập các hợp đồng dữ liệu đầu ra bắt buộc thông qua mô hình Pydantic
+v2 nhằm bảo đảm tính xác thực cấu trúc (Structural Validity) trước khi chuyển giao dữ liệu
+sangtầngứngdụng. Bảng 4.3đặctảchitiếtcấutrúcdữliệuchobatácvụAIcốtlõi(100%
+cáctrườngđềulàbắtbuộc).
+Bảng 4.3: Đặc tả hợp đồng dữ liệu Pydantic Schema cho các tác vụ AI (Bắt buộc 100%)
+Tác vụ Trường dữ liệu Kiểu dữ liệu Ý nghĩa nghiệp vụ & Ràng buộc
+IDEA
+task Literal["IDEA"] Địnhdanhloạitácvụgợiýýtưởng.
+campaign_name str Tênchiếndịchngữcảnhmụctiêu.
+ideas List[IdeaItem] Danhsáchcácgóctiếpcậnýtưởngđề
+xuất.
+ideas[i] Dict[str, str] Gồm3khóa: angle, concept,và
+target_hook.
+DRAFT
+task Literal["DRAFT"] Địnhdanhloạitácvụviếtbảnnháp.
+channel ChannelEnum Kênhtruyềnthông(Facebook,Email,
+Ads).
+title, body str Tiêuđềvàthânbàiviếtđịnhdạng
+chuẩntheokênh.
+cta str Lờikêugọihànhđộngcụthể(CallTo
+Action).
+SUMMARY
+task Literal["SUMMARY"]Địnhdanhloạitácvụtómtắtchỉsố.
+kpi_overview Dict[str,
+float]
+Tổnghợpsốhọc: views,clicks,cost,
+revenue,ROI.
+insights, recs List[str] Nhậnđịnhbámsátsốliệuthựcvàđề
+xuấttốiưuhóa.
+4.4.2. Cơ chế khử ảo giác (De-hallucination Smart Fallback)
+TrongtrườnghợpnhàcungcấpGeminigặpsựcốkếtnối,quáthờigianchờ(10s)hoặcphản
+hồi không thể phân tích cú pháp JSON, hệ thống chuyển hướng tự động sang bộ sinh dự
+phòng _generate_fallback:
+• Ý tưởng và bản nháp: Tổnghợpnộidungdựatrênbộkhungmẫu(templates)chuẩn
+côngnghiệpgắnliềnvớithôngsốsảnphẩmvàkênhthựctế.
+• Tóm tắt chỉ số: Tínhtoánchínhxáccácchỉsốtàichínhtừdữliệumảngmetricstruyền
+vào; loại bỏ hoàn toàn các nhận định ảo giác (nhưtựsuydiễnkhunggiờvàng19h–
+21h hay khuyến nghị đăng bài cuối tuần khi dữ liệu đầu vào chỉ có các con số thống
+kêtổngthể).
+• Minh bạch thông tin: Hệthốngđánhdấucờ is_fallback = True ,ghinhậnrõràng
+vào ai_logsvàthôngbáominhbạchchongườidùngtrêngiaodiện.
+4.5. Kết luận chương
+Chương 4 đã trình bày thiết kế kiến trúc toàn diện của MarketFlow AI từ sơ đồ khối logic,
+mô hình dữ liệu quan hệ chặt chẽ đến cơ chế tương tác an toàn với mô hình ngôn ngữ lớn
+20

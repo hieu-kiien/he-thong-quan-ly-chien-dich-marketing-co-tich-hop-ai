@@ -1,0 +1,80 @@
+\begin{tikzpicture}[
+  font=\sffamily\footnotesize,
+  >=Latex,
+  state/.style={
+    draw=ictunavy,
+    fill=white,
+    rounded corners=4pt,
+    minimum width=2.8cm,
+    minimum height=0.95cm,
+    align=center,
+    line width=0.85pt,
+    text width=2.6cm,
+    inner sep=3pt
+  },
+  state_ai/.style={
+    draw=ictunavy,
+    fill=black!4,
+    rounded corners=4pt,
+    minimum width=2.8cm,
+    minimum height=0.95cm,
+    align=center,
+    line width=0.85pt,
+    text width=2.6cm,
+    inner sep=3pt
+  },
+  state_warn/.style={
+    draw=black!80,
+    fill=white,
+    rounded corners=4pt,
+    minimum width=2.8cm,
+    minimum height=0.95cm,
+    align=center,
+    line width=0.85pt,
+    dashed,
+    text width=2.6cm,
+    inner sep=3pt
+  },
+  rel/.style={-{Latex[length=2.2mm]},draw=black!85,line width=0.75pt},
+  lab/.style={font=\sffamily\tiny,fill=white,inner sep=1.5pt,align=center,text=black}
+]
+
+% Điểm bắt đầu UML (bên trái DRAFT)
+\node[circle,fill=black,inner sep=3.5pt] (start) at (0.2, 1.6) {};
+
+% Hàng 1 (y = 1.6): DRAFT, AI_DRAFT, IN_REVIEW
+\node[state] (draft) at (2.8, 1.6) {\textbf{DRAFT}\\(Bản nháp thủ công)};
+\node[state_ai] (ai_draft) at (7.5, 1.6) {\textbf{AI\_DRAFT}\\(Bản nháp AI sinh)};
+\node[state] (in_review) at (12.2, 1.6) {\textbf{IN\_REVIEW}\\(Chờ Quản lý duyệt)};
+
+% Hàng 2 (y = -1.6): PUBLISHED, APPROVED, REJECTED
+\node[state] (published) at (2.8, -1.6) {\textbf{PUBLISHED}\\(Đã xuất bản/Đăng)};
+\node[state] (approved) at (7.5, -1.6) {\textbf{APPROVED}\\(Đã được phê duyệt)};
+\node[state_warn] (rejected) at (12.2, -1.6) {\textbf{REJECTED}\\(Bị từ chối/Cần sửa)};
+
+% Điểm kết thúc UML (bên trái PUBLISHED)
+\node[draw=black,circle,line width=0.9pt,inner sep=4.5pt] (final_out) at (0.2, -1.6) {};
+\node[circle,fill=black,inner sep=2.5pt] at (0.2, -1.6) {};
+
+% Luồng khởi tạo
+\draw[rel] (start) -- (draft.west);
+
+% DRAFT <-> AI_DRAFT (vòng cung nhẹ, offset sang phải)
+\draw[rel] ([xshift=0.5cm]draft.north) -- ++(0,0.4) -| node[lab,above,pos=0.25]{Yêu cầu AI sinh nháp} ([xshift=-0.5cm]ai_draft.north);
+\draw[rel] ([xshift=-0.5cm]ai_draft.south) -- ++(0,-0.4) -| node[lab,below,pos=0.25]{Chỉnh sửa thủ công} ([xshift=0.5cm]draft.south);
+
+% Gửi duyệt
+\draw[rel] (ai_draft) -- node[lab,above]{Gửi duyệt} (in_review);
+
+% IN_REVIEW rẽ 2 nhánh: Duyệt (APPROVED) hoặc Từ chối (REJECTED)
+\draw[rel] (in_review.south) -- node[lab,right=2pt]{Từ chối [Kèm lý do]} (rejected.north);
+\draw[rel] (in_review.south west) -- node[lab,above,sloped]{Phê duyệt [Đạt]} (approved.north east);
+
+% APPROVED -> PUBLISHED -> Final
+\draw[rel] (approved) -- node[lab,above]{Lập lịch đăng} (published);
+\draw[rel] (published.west) -- node[lab,above=2pt]{Hoàn tất} (final_out.east);
+
+% REJECTED quay về DRAFT: Đi vòng ngoài qua phía trên, tiếp đất lệch trái 0.7cm
+\draw[rel] (rejected.east) -- ++(0.6,0) -- ++(0,4.2) -- node[lab,above,pos=0.5]{Sửa đổi và hoàn thiện lại} ([xshift=-0.7cm,yshift=1.0cm]draft.north) -- ([xshift=-0.7cm]draft.north);
+
+\end{tikzpicture}

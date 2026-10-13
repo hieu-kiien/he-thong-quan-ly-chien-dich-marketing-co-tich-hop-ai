@@ -1,0 +1,118 @@
+\ProvidesPackage{ictu_v8_style}[2026/09/19 AIA331 report style]
+
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\setmonofont{Consolas}[Scale=0.88]
+
+\usepackage{geometry}
+\geometry{a4paper,left=3.4cm,right=2.1cm,top=2.5cm,bottom=2.5cm}
+\usepackage{setspace}
+\setstretch{1.16}
+\setlength{\parindent}{1.25cm}
+\setlength{\parskip}{2pt}
+\setlength{\emergencystretch}{2em}
+\raggedbottom
+
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc,fit,matrix,positioning,shapes,shapes.geometric,backgrounds,shadows,decorations.pathmorphing}
+\usepackage{enumitem}
+\setlist{itemsep=2pt,topsep=3pt,parsep=0pt}
+\usepackage{array,booktabs,tabularx,longtable,multirow,makecell,colortbl,ragged2e}
+\renewcommand{\arraystretch}{1.28}
+\setlength{\LTpre}{6pt}
+\setlength{\LTpost}{6pt}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{R}[1]{>{\raggedleft\arraybackslash}p{#1}}
+
+\usepackage{amsmath,amssymb}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{xcolor}
+\definecolor{ictunavy}{RGB}{0,48,96}
+\definecolor{ictublue}{RGB}{0,76,135}
+\definecolor{ictuteal}{RGB}{0,105,100}
+\definecolor{ictuamber}{RGB}{180,83,9}
+\definecolor{softblue}{RGB}{238,244,250}
+\definecolor{softteal}{RGB}{235,246,244}
+\definecolor{softamber}{RGB}{255,247,231}
+\definecolor{softgray}{RGB}{248,249,251}
+\definecolor{codegray}{RGB}{248,248,248}
+\definecolor{tableheader}{RGB}{240,243,246}
+\definecolor{tablerowalt}{RGB}{255,255,255}
+\definecolor{tableborder}{RGB}{200,210,225}
+\definecolor{slateborder}{RGB}{140,150,165}
+
+\setlength{\arrayrulewidth}{0.55pt}
+\renewcommand{\thead}[1]{\textbf{\color{black}#1}}
+\newcommand{\rowhead}{}
+\newcommand{\rowalt}{}
+\renewcommand{\arraystretch}{1.18}
+
+\usepackage{listings}
+\lstdefinestyle{ictucode}{
+  backgroundcolor=\color{codegray},
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  keepspaces=true,
+  numbers=left,
+  numbersep=6pt,
+  numberstyle=\tiny\color{gray},
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,
+  frame=single,
+  rulecolor=\color{black!25},
+  captionpos=b
+}
+\lstset{style=ictucode}
+
+\usepackage{caption}
+\captionsetup[table]{position=top,labelfont=bf,textfont=it,justification=centering,skip=4pt}
+\captionsetup[figure]{position=bottom,labelfont=bf,textfont=it,justification=centering,skip=4pt}
+
+\renewcommand{\contentsname}{MỤC LỤC}
+\renewcommand{\listfigurename}{DANH MỤC HÌNH VẼ}
+\renewcommand{\listtablename}{DANH MỤC BẢNG BIỂU}
+\renewcommand{\bibname}{TÀI LIỆU THAM KHẢO}
+\renewcommand{\figurename}{Hình}
+\renewcommand{\tablename}{Bảng}
+\renewcommand{\chaptername}{Chương}
+
+\usepackage{titlesec}
+\titleformat{\chapter}[display]
+  {\bfseries\centering\fontsize{15pt}{19pt}\selectfont\color{ictunavy}}
+  {\MakeUppercase{\chaptername~\thechapter.}}{4pt}{\MakeUppercase}
+\titlespacing*{\chapter}{0pt}{4pt}{14pt}
+\titleformat{\section}
+  {\bfseries\fontsize{13pt}{16pt}\selectfont\color{ictunavy}}
+  {\thesection.}{6pt}{}
+\titlespacing*{\section}{0pt}{9pt}{4pt}
+\titleformat{\subsection}
+  {\bfseries\fontsize{12.5pt}{15pt}\selectfont\color{ictublue}}
+  {\thesubsection.}{6pt}{}
+\titlespacing*{\subsection}{0pt}{7pt}{3pt}
+\titleformat{\subsubsection}
+  {\bfseries\itshape\fontsize{12pt}{14pt}\selectfont}
+  {\thesubsubsection.}{6pt}{}
+\titlespacing*{\subsubsection}{0pt}{6pt}{3pt}
+\setcounter{secnumdepth}{3}
+
+\usepackage{fancyhdr}
+\pagestyle{plain}
+\usepackage{hyperref}
+\usepackage{xspace}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=ictunavy,
+  urlcolor=ictublue,
+  citecolor=ictunavy,
+  pdftitle={Phân tích và thiết kế hệ thống quản lý chiến dịch marketing có tích hợp AI},
+  pdfauthor={Vũ Hiếu Kiên, Nguyễn Hải Đăng},
+  pdfsubject={Báo cáo dự án học phần AIA331}
+}
+
+\newcommand{\projectterm}[1]{\textit{#1}\xspace}

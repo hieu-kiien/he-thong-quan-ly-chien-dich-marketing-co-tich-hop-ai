@@ -1,0 +1,111 @@
+\chapter{TỔNG QUAN ĐỀ TÀI VÀ BỐI CẢNH ỨNG DỤNG}
+
+\section{Bối cảnh thực tiễn}
+
+Trong kỷ nguyên số hóa mạnh mẽ, hoạt động tiếp thị (marketing) của doanh nghiệp đã chuyển dịch từ các chiến dịch đơn lẻ sang quy trình vận hành đa kênh (omni-channel) liên tục. Một chiến dịch marketing điển hình đòi hỏi sự phối hợp nhịp nhàng giữa nhiều mắt xích: hoạch định mục tiêu kinh doanh, phân bổ ngân sách tài chính, chọn lọc danh mục sản phẩm và kênh tiếp cận (Facebook, Email Marketing, Google Ads, TikTok), sáng tạo thông điệp, kiểm duyệt nội dung, lập lịch đăng tải và giám sát chỉ số chuyển đổi theo thời gian thực.
+
+Khi dữ liệu vận hành bị phân mảnh trên các bảng tính Excel rời rạc hoặc các công cụ giao tiếp phân tán, các rủi ro vận hành nghiêm trọng xuất hiện:
+\begin{itemize}
+  \item \textbf{Bất nhất thông tin}: Sai lệch số liệu giữa chi phí quảng cáo thực tế và doanh thu ghi nhận, thiếu tính truy vết về phiên bản nội dung cuối cùng đã được phê duyệt.
+  \item \textbf{Lỗ hổng quy trình}: Thiếu cơ chế kiểm soát phân quyền dẫn đến nguy cơ nội dung chưa qua kiểm duyệt bị phát hành sai lệch tôn chỉ thương hiệu, hoặc nhân viên vô tình sửa đổi nội dung đã được duyệt.
+  \item \textbf{Lãng phí nguồn lực sáng tạo}: Đội ngũ tiếp thị tiêu tốn phần lớn thời gian vào việc định dạng lại bài viết cho từng kênh hoặc tổng hợp báo cáo thủ công thay vì tập trung tối ưu chiến lược.
+\end{itemize}
+
+Sự bùng nổ của các mô hình ngôn ngữ lớn (Large Language Models - LLMs) mở ra cơ hội tự động hóa sáng tạo nội dung và diễn giải dữ liệu. Tuy nhiên, nếu tích hợp LLM vào doanh nghiệp một cách tự phát và thiếu rào chắn kỹ thuật (guardrails), hệ thống sẽ đối mặt với hiện tượng ảo giác (hallucination), bị lộ dữ liệu nhạy cảm hoặc không kiểm soát được trách nhiệm quyết định.
+
+Đề tài \textbf{“Hệ thống quản lý chiến dịch marketing có tích hợp AI (MarketFlow AI)”} được triển khai nhằm cung cấp giải pháp quản trị tập trung, kết hợp quy trình phê duyệt Human-in-the-loop (HITL) nghiêm ngặt với sức mạnh của mô hình ngôn ngữ lớn thế hệ mới thuộc hệ sinh thái Google Gemini. Hệ thống bảo đảm AI luôn đóng vai trò trợ lý tăng cường năng suất, tuyệt đối không thay thế con người trong các quyết định kinh doanh nhạy cảm.
+
+\section{Các bên liên quan và phân tích nhu cầu}
+
+Hệ thống được thiết kế và hiện thực hóa nhằm phục vụ bốn nhóm tác nhân chính, với nhu cầu và tiêu chí bảo đảm cụ thể được lượng hóa trong Bảng~\ref{tab:v9-stakeholders}.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Người sử dụng và tiêu chí bảo đảm kỹ thuật}
+\label{tab:v9-stakeholders}
+\begin{tabularx}{\textwidth}{|L{3.2cm}|Y|Y|}
+\hline
+\thead{Bên liên quan} & \thead{Nhu cầu cốt lõi} & \thead{Điều hệ thống bảo đảm thực tế}\\
+\hline
+Giám đốc Tiếp thị (CMO) / Trưởng bộ phận & Giám sát chiến lược tiếp thị, tối ưu hóa ngân sách chiến dịch, theo dõi các chỉ số tài chính cốt lõi (ROI, CPA) và bảo đảm quy chuẩn thông điệp thương hiệu. & Dashboard trực quan hóa tổng hợp số liệu đa chiều theo thời gian thực; quy trình duyệt Human-in-the-loop (HITL) bảo đảm không có ấn phẩm nào phát hành trái phép.\\
+\hline
+Quản lý Marketing (Manager) & Giám sát ngân sách, phân bổ nhân sự vào chiến dịch, phê duyệt nội dung và theo dõi ROI tổng thể. & Toàn quyền trên các chiến dịch thuộc phạm vi quản trị; cơ chế State Machine khóa chặt quyền phê duyệt (/approve, /reject); báo cáo chỉ số tài chính chuẩn xác.\\
+\hline
+Nhân viên Marketing (Marketer) & Lên kế hoạch, kích hoạt AI hỗ trợ viết nháp/ý tưởng, chỉnh sửa nội dung, gửi duyệt và nhập số liệu kênh. & Phân quyền mức bản ghi (Record-level NFR01): chỉ thao tác trên chiến dịch/nội dung được phân công; giao diện trực quan hỗ trợ loading skeleton và toast phản hồi.\\
+\hline
+Kỹ sư vận hành (DevOps/SecOps) & Đóng gói triển khai nhanh, cấu hình an toàn, dễ dàng sao lưu và phục hồi dữ liệu. & Đóng gói container Docker chuẩn hóa, pipeline CI/CD GitHub Actions tự động kiểm thử, hệ thống audit log ghi nhận mọi thao tác nhạy cảm và lần gọi AI.\\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Ranh giới và phạm vi hệ thống}
+
+Hình~\ref{fig:v8-context} thể hiện ranh giới hệ thống MarketFlow AI trong mối tương quan với các thực thể bên ngoài.
+
+\begin{figure}[h!]
+\centering
+\vspace{4pt}
+\input{figures/context.tex}
+\vspace{6pt}
+\caption{Sơ đồ ranh giới hệ thống MarketFlow AI}
+\label{fig:v8-context}
+\end{figure}
+
+Trong phạm vi hiện thực hóa của hệ thống:
+\begin{itemize}
+  \item \textbf{Bên trong ranh giới}: Ứng dụng Single Page Application (React 18 + Vite), máy chủ dịch vụ API (FastAPI), cơ sở dữ liệu quan hệ (SQLite kích hoạt WAL mode và ràng buộc khóa ngoại), và lớp tích hợp trí tuệ nhân tạo (AI Engine với Prompt Engine và Smart Fallback khử ảo giác).
+  \item \textbf{Ngoài ranh giới}: Nhà cung cấp dịch vụ AI (Google Gemini API qua HTTPS RESTful connector an toàn) và các nền tảng mạng xã hội (được trừu tượng hóa thông qua kênh phát hành và lịch đăng, chuẩn bị sẵn sàng cho kết nối Webhook chính thức).
+\end{itemize}
+
+\section{Mục tiêu và tiêu chí nghiệm thu thực chứng}
+
+Hệ thống đặt ra 5 mục tiêu kỹ thuật cốt lõi (M1--M5), toàn bộ đều được hiện thực hóa và kiểm chứng bằng các bài test tự động cũng như dữ liệu thực tế tại Bảng~\ref{tab:v9-goals}.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Mục tiêu kỹ thuật và kết quả kiểm chứng thực tế}
+\label{tab:v9-goals}
+\begin{tabularx}{\textwidth}{|C{1.0cm}|L{3.6cm}|Y|L{3.4cm}|}
+\hline
+\thead{Mã} & \thead{Mục tiêu} & \thead{Giải pháp kỹ thuật đã cài đặt} & \thead{Bằng chứng thực chứng}\\
+\hline
+M1 & Quản trị tập trung toàn bộ vòng đời tiếp thị. & CRUD hoàn chỉnh: Chiến dịch, Kênh, Sản phẩm, Nội dung, Lịch đăng, Chỉ số hiệu quả (Metrics). & Bộ kiểm thử mở rộng và ca kiểm thử chuẩn IEEE 829 (70+ test cases) đạt tỷ lệ Pass 100\%.\\
+\hline
+M2 & An toàn phân quyền và toàn vẹn quy trình. & Phân quyền đa tầng RBAC kết hợp Record-level Scope (NFR01); Máy trạng thái HITL chống sửa đổi ngoài luồng. & Bộ kiểm thử kịch bản sâu và đối kháng bảo mật (35+ test cases) ngăn chặn 100\% các nỗ lực leo quyền IDOR.\\
+\hline
+M3 & Tích hợp AI có kiểm soát và khử ảo giác. & Tích hợp hệ sinh thái Gemini; kiểm duyệt ngữ cảnh đầu vào; Prompt Engine định dạng JSON Schema; Smart Fallback bám sát số liệu. & Bộ thực nghiệm 300 mẫu đạt Schema Valid Rate 100\%, Grounding Score >95\%, kiểm thử tiêm lỗi tự động kích hoạt Fallback an toàn.\\
+\hline
+M4 & Trải nghiệm giao diện thân thiện, chịu lỗi cao. & Kiến trúc Bento Grid trên React 18, Tailwind CSS, Skeleton loading states, ErrorBoundary và Toast notification. & Lệnh xây dựng giao diện đạt Exit Code 0, kịch bản kiểm thử luồng người dùng mượt mà trên môi trường trình duyệt.\\
+\hline
+M5 & Khả năng tái lập và tự động hóa triển khai. & Dockerfile đa tầng, \texttt{docker-compose.yml}, script seed dữ liệu mẫu tự động, GitHub Actions CI. & Quy trình CI pipeline tự động kiểm thử 205 ca pass 100\%, seed data nạp đủ 4 chiến dịch, 14 nội dung, 60 bản ghi metrics.\\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Phạm vi hiện thực hóa}
+
+\subsection{Các chức năng đã hiện thực hóa hoàn chỉnh}
+\begin{enumerate}
+  \item \textbf{Xác thực và phân quyền}: Đăng nhập JWT an toàn, mã hóa mật khẩu Bcrypt, xác thực vai trò Manager/Marketer và kiểm tra trạng thái kích hoạt tài khoản (\texttt{user.status == 'ACTIVE'}).
+  \item \textbf{Phân quyền mức bản ghi (Record-level Authorization)}: Marketer chỉ xem, biên tập nội dung, gọi AI và ghi nhận metrics trên các chiến dịch mà mình là người tạo (\texttt{owner\_id}) hoặc được phân công qua \texttt{CampaignMember}. Manager có quyền quản trị toàn hệ thống.
+  \item \textbf{Quản lý dữ liệu hạt nhân}: Quản trị danh mục ngành hàng, sản phẩm, kênh truyền thông và chiến dịch tiếp thị với ràng buộc ngân sách và khoảng thời gian hợp lệ (\texttt{start\_date} $\le$ \texttt{end\_date}).
+  \item \textbf{Quy trình phê duyệt nội dung Human-in-the-loop}: Vòng đời trạng thái nghiêm ngặt qua 4 bước: \texttt{DRAFT / AI\_DRAFT} $\rightarrow$ \texttt{IN\_REVIEW} $\rightarrow$ \texttt{APPROVED / REJECTED} $\rightarrow$ \texttt{PUBLISHED}. Chặn tuyệt đối việc tạo bài viết trực tiếp ở trạng thái phê duyệt; tự động thu hồi trạng thái về \texttt{AI\_DRAFT} nếu bài viết đã duyệt bị chỉnh sửa nội dung.
+  \item \textbf{Lập lịch xuất bản có điều kiện}: Chỉ cho phép lên lịch đối với nội dung mang trạng thái \texttt{APPROVED}, hỗ trợ đầy đủ phần bù múi giờ quốc tế.
+  \item \textbf{Tổng hợp chỉ số và tính toán tài chính}: Nhập số liệu theo bộ ba định danh duy nhất (\texttt{campaign\_id}, \texttt{channel\_id}, \texttt{metric\_date}); tự động tính toán KPI then chốt: CTR, CPC, CPA, ROI với cơ chế chống lỗi chia cho 0.
+  \item \textbf{Trợ lý AI đa tác vụ}: 3 tính năng AI then chốt: Gợi ý ý tưởng, viết bản nháp chuẩn hóa theo kênh, và tóm tắt chỉ số hiệu quả. Cơ chế Smart Fallback bảo đảm dịch vụ hoạt động liên tục khi mất mạng.
+  \item \textbf{Nhật ký kiểm toán (Audit Trail)}: Ghi nhận minh bạch lịch sử duyệt nội dung (\texttt{content\_reviews}) và nhật ký gọi AI (\texttt{ai\_logs}) gồm độ trễ, mô hình và cờ fallback.
+\end{enumerate}
+
+\subsection{Các nội dung chủ động loại trừ khỏi phạm vi}
+Để tập trung tối đa nguồn lực vào kiến trúc phần mềm và tính đúng đắn của giải thuật, hệ thống chủ động đặt ngoài phạm vi:
+\begin{itemize}
+  \item Tự động trích tiền từ thẻ tín dụng hoặc can thiệp trực tiếp vào tài khoản ngân hàng của doanh nghiệp.
+  \item Trực tiếp gọi API phát hành bài đăng lên các mạng xã hội khi chưa có tài khoản doanh nghiệp xác thực chính thức (sử dụng Review Queue và Lịch biểu nội bộ để chuẩn bị).
+  \item Tự huấn luyện (pre-training) mô hình ngôn ngữ riêng từ đầu (sử dụng kỹ thuật Prompt Engineering trên nền mô hình thương mại Gemini tiên tiến).
+\end{itemize}
+
+\section{Kết luận chương}
+
+Chương 1 đã định hình bối cảnh bài toán thực tế, xác lập các mục tiêu kỹ thuật định lượng và ranh giới hệ thống MarketFlow AI. Toàn bộ mục tiêu đề ra đều được quy chiếu vào các thành phần phần mềm cụ thể đã hoàn tất. Chương tiếp theo sẽ phân tích cơ sở lý thuyết, các tiêu chuẩn kỹ thuật quốc tế và các quyết định công nghệ định hình nên kiến trúc hệ thống.

@@ -1,0 +1,202 @@
+=== PAGE 11 ===
+CHƯƠNG 1.
+TỔNG QUAN ĐỀ TÀI VÀ BỐI CẢNH ỨNG DỤNG
+1.1. Bối cảnh thực tiễn
+Trongkỷnguyênsốhóamạnhmẽ,hoạtđộngtiếpthị(marketing)củadoanhnghiệpđãchuyển
+dịchtừcácchiếndịchđơnlẻsangquytrìnhvậnhànhđakênh(omni-channel)liêntục. Một
+chiến dịch marketing điển hình đòi hỏi sự phối hợp nhịp nhàng giữa nhiều mắt xích: hoạch
+địnhmụctiêukinhdoanh,phânbổngânsáchtàichính,chọnlọcdanhmụcsảnphẩmvàkênh
+tiếpcận(Facebook,EmailMarketing,GoogleAds,TikTok),sángtạothôngđiệp,kiểmduyệt
+nộidung,lậplịchđăngtảivàgiámsátchỉsốchuyểnđổitheothờigianthực.
+KhidữliệuvậnhànhbịphânmảnhtrêncácbảngtínhExcelrờirạchoặccáccôngcụ
+giaotiếpphântán,cácrủirovậnhànhnghiêmtrọngxuấthiện:
+• Bất nhất thông tin: Sai lệch số liệu giữa chi phí quảng cáo thực tế và doanh thu ghi
+nhận,thiếutínhtruyvếtvềphiênbảnnộidungcuốicùngđãđượcphêduyệt.
+• Lỗ hổng quy trình : Thiếu cơ chế kiểm soát phân quyền dẫn đến nguy cơ nội dung
+chưaquakiểmduyệtbịpháthànhsailệchtônchỉthươnghiệu,hoặcnhânviênvôtình
+sửađổinộidungđãđượcduyệt.
+• Lãng phí nguồn lực sáng tạo : Đội ngũ tiếp thị tiêu tốn phần lớn thời gian vào việc
+địnhdạnglạibàiviếtchotừngkênhhoặctổnghợpbáocáothủcôngthayvìtậptrung
+tốiưuchiếnlược.
+Sựbùngnổcủacácmôhìnhngônngữlớn(LargeLanguageModels-LLMs)mởra
+cơhộitựđộnghóasángtạonộidungvàdiễngiảidữliệu. Tuynhiên,nếutíchhợpLLMvào
+doanh nghiệp một cách tự phát và thiếu rào chắn kỹ thuật (guardrails), hệ thống sẽ đối mặt
+với hiện tượng ảo giác (hallucination), bị lộ dữ liệu nhạy cảm hoặc không kiểm soát được
+tráchnhiệmquyếtđịnh.
+Đềtài “Hệ thống quản lý chiến dịch marketing có tích hợp AI (MarketFlow AI)”
+được triển khai nhằm cung cấp giải pháp quản trị tập trung, kết hợp quy trình phê duyệt
+Human-in-the-loop(HITL)nghiêmngặtvớisứcmạnhcủamôhìnhngônngữlớnthếhệmới
+thuộchệsinhtháiGoogleGemini. HệthốngbảođảmAIluônđóngvaitròtrợlýtăngcường
+năngsuất,tuyệtđốikhôngthaythếconngườitrongcácquyếtđịnhkinhdoanhnhạycảm.
+1.2. Các bên liên quan và phân tích nhu cầu
+Hệ thống được thiết kế và hiện thực hóa nhằm phục vụ bốn nhóm tác nhân chính, với nhu
+cầuvàtiêuchíbảođảmcụthểđượclượnghóatrongBảng 1.1.
+1
+=== PAGE 12 ===
+Bảng 1.1: Người sử dụng và tiêu chí bảo đảm kỹ thuật
+Bên liên quan Nhu cầu cốt lõi Điều hệ thống bảo đảm thực tế
+Hộiđồngthẩmđịnh
+/Giảngviên
+Đánhgiátínhtoànvẹnkỹthuật,
+kiếntrúcphầnmềmvàđộtincậy
+củathựcnghiệm.
+BáocáohọcthuậtV9chuẩnmực,
+mãnguồnrõràng,170+cakiểm
+thửtựđộngđạt100%Passvàma
+trậntruyxuấtnguồngốc(RTM)
+đồngbộhoàntoàn.
+QuảnlýMarketing
+(Manager)
+Giámsátngânsách,phânbổnhân
+sựvàochiếndịch,phêduyệtnội
+dungvàtheodõiROItổngthể.
+Toànquyềntrêncácchiếndịch
+thuộcphạmviquảntrị;cơchế
+StateMachinekhóachặtquyềnphê
+duyệt(/approve,/reject);báocáo
+chỉsốtàichínhchuẩnxác.
+Nhânviên
+Marketing
+(Marketer)
+Lênkếhoạch,kíchhoạtAIhỗtrợ
+viếtnháp/ýtưởng,chỉnhsửanội
+dung,gửiduyệtvànhậpsốliệu
+kênh.
+Phânquyềnmứcbảnghi
+(Record-levelNFR01): chỉthaotác
+trênchiếndịch/nộidungđượcphân
+công;giaodiệntrựcquanhỗtrợ
+loadingskeletonvàtoastphảnhồi.
+Kỹsưvậnhành
+(DevOps/SecOps)
+Đónggóitriểnkhainhanh,cấu
+hìnhantoàn,dễdàngsaolưuvà
+phụchồidữliệu.
+ĐónggóicontainerDockerchuẩn
+hóa,pipelineCI/CDGitHub
+Actionstựđộngkiểmthử,hệthống
+auditlogghinhậnmọithaotác
+nhạycảmvàlầngọiAI.
+1.3. Ranh giới và phạm vi hệ thống
+Hình1.1thểhiệnranhgiớihệthốngMarketFlowAItrongmốitươngquanvớicácthựcthể
+bênngoài.
+Quản lý
+Marketing
+[Vai trò Quản trị]
+Lập chiến dịch, duyệt
+bài, theo dõi tiến
+độ & ngân sách
+Nhân viên
+Marketing
+[Vai trò Thực thi]
+Soạn thảo nội dung, gọi
+AI nháp, cập nhật số liệu
+HỆ THỐNG
+QUẢN LÝ
+CHIẾN DỊCH
+MARKETING
+[Đề tài AIA331 – ICTU]
+Quản lý tập trung chiến dịch,
+nội dung, chỉ số; điều phối
+AI tạo bản nháp dưới sự
+kiểm soát của người dùng.
+Dịch vụ
+AI (LLM)
+[Hệ thống đối tác]
+Tiếp nhận prompt có
+cấu trúc, suy luận
+và phản hồi JSON
+Kênh Truyền
+thông
+[Hệ thống đối tác]
+Nền tảng mạng
+xã hội tiếp nhận
+bài viết đã duyệt
+Thiết lập &
+Phê duyệt
+Soạn thảo &
+Báo cáo số
+Prompt→
+← JSON
+Xuất bản
+đã duyệt
+Hình 1.1: Sơ đồ ranh giới hệ thống MarketFlow AI
+Trongphạmvihiệnthựchóacủahệthống:
+• Bên trong ranh giới: ỨngdụngSinglePageApplication(React18+Vite),máychủ
+dịch vụ API (FastAPI), cơ sở dữ liệu quan hệ (SQLite kích hoạt WAL mode và ràng
+buộc khóa ngoại), và lớp tích hợp trí tuệ nhân tạo (AI Engine với Prompt Engine và
+SmartFallbackkhửảogiác).
+2
+=== PAGE 13 ===
+• Ngoài ranh giới: NhàcungcấpdịchvụAI(GoogleGeminiAPIquaHTTPSRESTful
+connectorantoàn)vàcácnềntảngmạngxãhội(đượctrừutượnghóathôngquakênh
+pháthànhvàlịchđăng,chuẩnbịsẵnsàngchokếtnốiWebhookchínhthức).
+1.4. Mục tiêu và tiêu chí nghiệm thu thực chứng
+Hệ thống đặt ra 5 mục tiêu kỹ thuật cốt lõi (M1–M5), toàn bộ đều được hiện thực hóa và
+kiểmchứngbằngcácbàitesttựđộngcũngnhưdữliệuthựctếtạiBảng 1.2.
+Bảng 1.2: Mục tiêu kỹ thuật và kết quả kiểm chứng thực tế
+Mã Mục tiêu Giải pháp kỹ thuật đã cài đặt Bằng chứng thực
+chứng
+M1 Quảntrịtậptrungtoàn
+bộvòngđờitiếpthị.
+CRUDhoànchỉnh: Chiếndịch,
+Kênh,Sảnphẩm,Nộidung,Lịch
+đăng,Chỉsốhiệuquả(Metrics).
+Bộtest
+test_extended_coverage.py
+và
+test_ieee829_cases.py
+pass100%.
+M2 Antoànphânquyềnvà
+toànvẹnquytrình.
+PhânquyềnđatầngRBACkếthợp
+Record-levelScope(NFR01);Máy
+trạngtháiHITLchốngsửađổingoài
+luồng.
+Bộtest
+test_marketflow_deep_scenarios.py
+chặn100%cácnỗ
+lựcleoquyềnIDOR.
+M3 TíchhợpAIcókiểm
+soátvàkhửảogiác.
+TíchhợphệsinhtháiGemini;kiểm
+duyệtngữcảnhđầuvào;Prompt
+EngineđịnhdạngJSONSchema;
+SmartFallbackbámsátsốliệu.
+Schemavalidrate
+100%,Grounding
+score>95%,kiểm
+thửtiêmlỗi
+schema/timeouttự
+độngkíchhoạt
+fallback.
+M4 Trảinghiệmgiaodiện
+thânthiện,chịulỗicao.
+KiếntrúcBentoGridtrênReact18,
+TailwindCSS,Skeletonloading
+states,ErrorBoundaryvàToast
+notification.
+Lệnh npm run
+buildđạtExitCode
+0;kịchbản
+Playwrightghihình
+mượtmà.
+M5 Khảnăngtáilậpvàtự
+độnghóatriểnkhai.
+Dockerfileđatầng,
+docker‐compose.yml,scriptseeddữ
+liệumẫutựđộng,GitHubActions
+CI.
+CIpipelinexanh
+100%,seeddatanạp
+đủ4chiếndịch,14
+nộidung,60bảnghi
+metrics.
+1.5. Phạm vi hiện thực hóa
+1.5.1. Các chức năng đã hiện thực hóa hoàn chỉnh
+1. Xác thực và phân quyền: ĐăngnhậpJWTantoàn,mãhóamậtkhẩuBcrypt,xácthực
+vaitròManager/Marketervàkiểmtratrạngtháikíchhoạttàikhoản( user.status ==
+'ACTIVE').
+2. Phân quyền mức bản ghi (Record-level Authorization) : Marketer chỉ xem, biên
+tập nội dung, gọi AI và ghi nhận metrics trên các chiến dịch mà mình là người tạo
+3

@@ -1,0 +1,85 @@
+\begin{tikzpicture}[
+  font=\sffamily\footnotesize,
+  >=Latex,
+  user_node/.style={
+    draw=ictunavy,
+    fill=white,
+    rounded corners=4pt,
+    minimum width=2.8cm,
+    minimum height=1.4cm,
+    align=center,
+    line width=0.85pt,
+    text width=2.6cm,
+    inner sep=3pt
+  },
+  sys_node/.style={
+    draw=ictunavy,
+    fill=black!3,
+    rounded corners=5pt,
+    minimum width=4.0cm,
+    minimum height=2.4cm,
+    align=center,
+    line width=1.1pt,
+    text width=3.8cm,
+    inner sep=5pt
+  },
+  ext_node/.style={
+    draw=black!70,
+    fill=white,
+    rounded corners=4pt,
+    minimum width=2.8cm,
+    minimum height=1.4cm,
+    align=center,
+    line width=0.85pt,
+    dashed,
+    text width=2.6cm,
+    inner sep=3pt
+  },
+  rel/.style={-{Latex[length=2.2mm]},draw=black!85,line width=0.8pt},
+  lab/.style={font=\sffamily\tiny,fill=white,inner sep=2pt,align=center,text=black}
+]
+
+\useasboundingbox (0.0, -2.45) rectangle (14.0, 2.45);
+
+% 1. Người dùng (Trái: x = 1.5cm, span: 0.1 -> 2.9)
+\node[user_node] (mgr) at (1.5, 1.6) {
+  \textbf{Quản lý Marketing}\\
+  {\tiny [Vai trò Quản trị]}\\[2pt]
+  {\tiny Lập chiến dịch, duyệt bài, theo dõi tiến độ \& ngân sách}
+};
+
+\node[user_node] (stf) at (1.5, -1.6) {
+  \textbf{Nhân viên Marketing}\\
+  {\tiny [Vai trò Thực thi]}\\[2pt]
+  {\tiny Soạn thảo nội dung, gọi AI nháp, cập nhật số liệu}
+};
+
+% 2. Hệ thống trung tâm (Giữa: x = 7.0cm, span: 5.0 -> 9.0)
+\node[sys_node] (sys) at (7.0, 0) {
+  \textbf{\normalsize HỆ THỐNG QUẢN LÝ}\\
+  \textbf{\normalsize CHIẾN DỊCH MARKETING}\\
+  {\scriptsize [Đề tài AIA331 -- ICTU]}\\[4pt]
+  {\scriptsize Quản lý tập trung chiến dịch, nội dung, chỉ số; điều phối AI tạo bản nháp dưới sự kiểm soát của người dùng.}
+};
+
+% 3. Hệ thống bên ngoài (Phải: x = 12.5cm, span: 11.1 -> 13.9)
+\node[ext_node] (ai) at (12.5, 1.6) {
+  \textbf{Dịch vụ AI (LLM)}\\
+  {\tiny [Hệ thống đối tác]}\\[2pt]
+  {\tiny Tiếp nhận prompt có cấu trúc, suy luận và phản hồi JSON}
+};
+
+\node[ext_node] (soc) at (12.5, -1.6) {
+  \textbf{Kênh Truyền thông}\\
+  {\tiny [Hệ thống đối tác]}\\[2pt]
+  {\tiny Nền tảng mạng xã hội tiếp nhận bài viết đã duyệt}
+};
+
+% 4. Đường kết nối với nhãn 2 dòng gọn gàng (Khoảng cách thông thủy 2.1cm)
+\draw[rel] (mgr.east) -- node[lab, above=1pt]{Thiết lập \&\\Phê duyệt} (sys.150);
+\draw[rel] (stf.east) -- node[lab, below=1pt]{Soạn thảo \&\\Báo cáo số} (sys.210);
+
+\draw[rel] (sys.30) -- node[lab, above=1pt]{Prompt $\rightarrow$\\[-1pt]$\leftarrow$ JSON} (ai.west);
+\draw[rel] (sys.330) -- node[lab, below=1pt]{Xuất bản\\đã duyệt} (soc.west);
+
+\end{tikzpicture}

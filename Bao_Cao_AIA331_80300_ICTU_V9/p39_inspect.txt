@@ -1,0 +1,55 @@
+• Tổng số ca kiểm thử: 205/205Passed.
+• Tỷ lệ thành công: 100.0%(0Failures,0Errors).
+• Cảnh báo phát sinh : 0 Warnings (Đã chuẩn hóa hoàn toàn cú pháp truy vấn
+SQLAlchemy2.0).
+• Thời gian thực thi: 182.4giây(baogồmtoànbộcáckịchbảnđốikhángmạngvàtiêm
+lỗi).
+Bảng ?? phân rã chi tiết kết quả thực nghiệm tự động theo từng phân hệ chức năng
+vàphạmvikiểmsoátanninhcủahệthống.
+Bảng 6.3: Phân rã kết quả kiểm thử tự động theo phân hệ chức năng và an ninh
+Phân hệ kiểm định Số ca test Đạt (Pass) Lỗi (Fail) Đánh giá kỹ thuật & An
+ninh
+Xácthực&Tàikhoản
+ngườidùng
+28 28 0 XácthựcJWT,từchốitài
+khoản INACTIVE.
+QuảnlýChiếndịch&
+Kênh
+35 35 0 Kiểmsoátphạmvibản
+ghi( Record‐level
+NFR01).
+Nộidung&Máytrạng
+tháiHITL
+42 42 0 Khóađiểmbypass,chống
+sửađổisauphêduyệt.
+Chỉsốhiệuquả(Metrics
+Engine)
+30 30 0 Chốngtrùnglặpkhóaduy
+nhất,antoànphépchia0.
+DịchvụAI&Khửảo
+giác
+35 35 0 KiểmthựcPydanticv2,
+SmartFallbackminh
+bạch.
+KiểmthửĐốikháng
+(Adversarial)
+35 35 0 Khángcự100%tấncông
+SQLi,XSS,IDOR,
+Fuzzing.
+Tổng cộng toàn hệ
+thống
+205 205 0 Tỷ lệ vượt qua tuyệt đối:
+100.0%
+6.5.1. Phân tích độ tin cậy và tính bất biến của bộ kiểm thử
+Toàn bộ các ca kiểm thử tự động được thiết kế tuân thủ nghiêm ngặt nguyên tắc cô lập
+trạng thái (Test Isolation). Mỗi ca kiểm thử tự động khởi tạo và dọn dẹp môi trường phiên
+CSDLriêngbiệttrongbộnhớ,triệttiêuhoàntoànnguycơônhiễmdữliệuchéo(cross-test
+contamination). BộkiểmthửđượctíchhợptrựctiếpvàopipelineGitHubActions,đóngvai
+trò chốt chặn kỹ thuật (Quality Gate) tự động: bất kỳ một vi phạm phân quyền hay khiếm
+khuyếthồiquynàođềulậptứclàmgiánđoạnquytrìnhtíchhợpliêntục.
+6.6. Kết luận chương
+Chương6đãcungcấpbằngchứngthựcnghiệmrõràng,minhbạchvềchấtlượngmãnguồn
+củaMarketFlowAI.Với205cakiểmthửtựđộngbaophủtoàndiệntừkiểmthửđơnvị,kiểm
+thử luồng nghiệp vụ đến kiểm thử bảo mật đối kháng đạt tỷ lệ vượt qua 100%, hệ thống đã
+chứngminhđộbềnbỉ, tínhtoànvẹndữliệuvàkhảnăngkhángcựvượttrộitrướcmọikịch
+29

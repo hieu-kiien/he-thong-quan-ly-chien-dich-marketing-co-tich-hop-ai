@@ -1,0 +1,84 @@
+\chapter{CƠ SỞ KỸ THUẬT VÀ CÔNG NGHỆ NỀN TẢNG}
+
+\section{Phương pháp luận và tiêu chuẩn kỹ thuật áp dụng}
+
+Để đảm bảo tính chuẩn mực học thuật và độ tin cậy kỹ thuật trong công nghiệp, hệ thống MarketFlow AI được thiết kế và hiện thực hóa dựa trên khung phương pháp luận Nghiên cứu Khoa học Thiết kế (Design Science Research Methodology - DSRM) đề xuất bởi Peffers và cộng sự \cite{peffers2007dsrm}. Quá trình phát triển tuân thủ một chu trình lặp chặt chẽ: xuất phát từ việc nhận diện điểm nghẽn thực tế trong vận hành tiếp thị, xác lập các mục tiêu giải pháp khả thi, kiến tạo cấu trúc phần mềm thực thi, và tiến hành kiểm định đối kháng đa tầng.
+
+Hệ thống tích hợp đồng bộ các tiêu chuẩn kỹ thuật quốc tế:
+\begin{itemize}
+  \item \textbf{ISO/IEC/IEEE 29148:2018 (Requirements Engineering)}: Toàn bộ các yêu cầu chức năng (FR) và phi chức năng (NFR) được định danh duy nhất, phân rã nguyên tử, có điều kiện nghiệm thu rõ ràng và liên kết trực tiếp với các ca kiểm thử tự động trong Ma trận truy xuất nguồn gốc (Traceability Matrix).
+  \item \textbf{ISO/IEC/IEEE 42010:2011 (Systems and Software Engineering -- Architecture Description)}: Kiến trúc hệ thống được phân tách theo góc nhìn của các bên liên quan (Stakeholder Viewpoints), mô hình hóa theo khung chuẩn C4 (Context, Container, Component).
+  \item \textbf{ISO/IEC 25010:2011 (System and Software Quality Models)}: Định chuẩn các thuộc tính chất lượng phần mềm bao gồm: Tính đúng đắn chức năng (Functional Suitability), Hiệu năng phản hồi (Performance Efficiency), Khả năng tương thích (Compatibility), Tính khả dụng (Usability), Độ tin cậy (Reliability), và An toàn bảo mật (Security).
+  \item \textbf{NIST AI Risk Management Framework (AI RMF 1.0)}: Khung quản lý rủi ro trí tuệ nhân tạo của Viện Tiêu chuẩn và Công nghệ Quốc gia Hoa Kỳ \cite{nist-airmf,nist-genai-profile}, đặc biệt là nguyên tắc quản lý rủi ro ảo giác (hallucination), rò rỉ dữ liệu qua prompt (data poisoning/leakage) và bảo đảm sự tham gia của con người trong chu trình quyết định (Human-in-the-loop).
+\end{itemize}
+
+\section{Khảo sát và phân tích lựa chọn công nghệ cốt lõi}
+
+Hệ thống MarketFlow AI được xây dựng trên một ngăn xếp công nghệ hiện đại, cân bằng tối ưu giữa hiệu năng thực thi cao, độ ổn định của dữ liệu và tính tinh gọn trong triển khai cục bộ cũng như môi trường điện toán đám mây. Bảng~\ref{tab:v9-tech-stack} tổng hợp các công nghệ nền tảng đã được triển khai trong thực tế.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Ngăn xếp công nghệ hiện thực hóa hệ thống MarketFlow AI}
+\label{tab:v9-tech-stack}
+\begin{tabularx}{\textwidth}{|L{2.8cm}|L{3.2cm}|Y|}
+\hline
+\thead{Thành phần} & \thead{Công nghệ lựa chọn} & \thead{Phân tích kỹ thuật và lý do lựa chọn thực tế}\\
+\hline
+Backend Web API & FastAPI (Python 3.11) & Framework ASGI bất đồng bộ hiệu năng cao; tích hợp Pydantic v2 cho kiểm định dữ liệu đầu vào tự động; tự sinh tài liệu OpenAPI 3.0; cơ chế Dependency Injection mạnh mẽ quản lý session và xác thực quyền.\\
+\hline
+Frontend Client & React 18, TypeScript, Vite, Tailwind CSS & Thư viện UI dựa trên Component-driven; Virtual DOM tối ưu hóa render; TypeScript đảm bảo tính an toàn kiểu dữ liệu compile-time; Tailwind CSS cung cấp hệ thống utility classes nhất quán; Vite tối ưu tốc độ build dưới 3 giây.\\
+\hline
+Cơ sở dữ liệu & SQLite 3 (WAL mode) \& SQLAlchemy 2.0 ORM & Cơ sở dữ liệu nhúng nhỏ gọn, zero-configuration; kích hoạt chế độ ghi trước nhật ký (Write-Ahead Logging) cho phép truy cập đọc/ghi song song mượt mà; SQLAlchemy 2.0 trừu tượng hóa mô hình dữ liệu, bảo đảm sẵn sàng nâng cấp sang PostgreSQL mà không cần sửa đổi mã nguồn nghiệp vụ.\\
+\hline
+Mô hình AI & Hệ sinh thái Google Gemini (Gemini API) & Mô hình ngôn ngữ lớn tiên tiến với khả năng hiểu ngữ cảnh sâu; hỗ trợ Native Structured Outputs trả về JSON tuân thủ nghiêm ngặt JSON Schema; độ trễ xử lý thấp và chi phí tối ưu trên mỗi token.\\
+\hline
+Đóng gói \& CI/CD & Docker, Docker Compose, GitHub Actions & Đóng gói container chuẩn hóa phân lập môi trường; multi-stage build giảm kích thước image; pipeline GitHub Actions tự động hóa kiểm tra tĩnh (linting), unit tests và integration tests.\\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Backend Framework: FastAPI và Pydantic v2}
+FastAPI được lựa chọn làm máy chủ API trung tâm nhờ các ưu điểm kỹ thuật vượt trội:
+\begin{enumerate}
+  \item \textbf{Kiến trúc bất đồng bộ (Asynchronous ASGI)}: FastAPI vận hành trên nền tảng Starlette và Uvicorn, cho phép xử lý hàng nghìn kết nối đồng thời với mô hình Non-blocking I/O. Điều này đặc biệt quan trọng khi hệ thống phải gọi các API bên ngoài như Google Gemini mà không làm nghẽn luồng xử lý của các yêu cầu CRUD nghiệp vụ thông thường.
+  \item \textbf{Kiểm định dữ liệu chặt chẽ qua Pydantic v2}: Pydantic v2 được viết lại bằng Rust, mang lại tốc độ tuần tự hóa (serialization) và kiểm định dữ liệu (validation) nhanh gấp 5--10 lần phiên bản cũ. Hệ thống tận dụng các bộ validator chặt chẽ để kiểm tra tính hợp lệ của định dạng ngày tháng (\texttt{YYYY-MM-DD}), ngân sách không âm, và chuỗi trạng thái máy nội dung trước khi dữ liệu chạm tới tầng ORM.
+  \item \textbf{Cơ chế Tiêm phụ thuộc (Dependency Injection)}: Module \texttt{backend/app/api/deps.py} sử dụng hệ thống phụ thuộc của FastAPI để quản lý vòng đời kết nối cơ sở dữ liệu (\texttt{get\_db}), giải mã xác thực người dùng từ JWT (\texttt{get\_current\_user}), và kiểm tra vai trò linh hoạt (\texttt{RoleChecker}).
+\end{enumerate}
+
+\subsection{Frontend: React 18, TypeScript và Tailwind CSS}
+Giao diện người dùng được xây dựng theo kiến trúc Single Page Application (SPA):
+\begin{enumerate}
+  \item \textbf{React 18 Concurrent Rendering}: Cơ chế render đồng thời giúp giao diện duy trì độ mượt mà khi tương tác với các bảng dữ liệu lớn hoặc đồ thị phân tích phức tạp. Các thành phần giao diện như AI Drawer, Review Queue, Campaign Table được module hóa độc lập.
+  \item \textbf{Kiểm soát kiểu chặt chẽ với TypeScript}: Toàn bộ các mô hình dữ liệu (User, Campaign, MarketingContent, Metric, AIResponse) được đồng bộ kiểu dữ liệu chính xác với backend schemas, loại bỏ hoàn toàn các lỗi truy cập thuộc tính không xác định (\texttt{undefined property}).
+  \item \textbf{Trạng thái tương tác toàn diện (UI Resilience)}: Hệ thống cài đặt các thành phần chuyên biệt: \texttt{Skeleton} cho trạng thái chờ phản hồi mạng, \texttt{Toast} cho thông báo tức thời (thành công/cảnh báo/thất bại), và \texttt{ErrorBoundary} ngăn ngừa hiện tượng màn hình trắng (white screen) khi xảy ra ngoại lệ giao diện.
+\end{enumerate}
+
+\subsection{Hệ sinh thái AI: Google Gemini và cơ chế Smart Fallback}
+Tuân thủ nghiêm ngặt chỉ thị kiến trúc, dự án sử dụng độc quyền hệ sinh thái mô hình Google Gemini (Gemini Pro / Gemini Flash) và tuyệt đối không phụ thuộc vào các dịch vụ bị cấm (như Claude hay GPT):
+\begin{enumerate}
+  \item \textbf{Kiểm soát ngữ cảnh (Context Whitelisting)}: Trước khi gửi yêu cầu tới mô hình ngôn ngữ, hệ thống chỉ lọc lấy các thông tin tối cần thiết cho tác vụ (tên sản phẩm, mục tiêu chiến dịch, tệp khách hàng mục tiêu, các dòng số liệu metrics đã được phê duyệt). Mọi thông tin nhạy cảm (mật khẩu, khóa API, dữ liệu định danh người dùng) đều bị loại bỏ tuyệt đối khỏi prompt.
+  \item \textbf{Cơ chế Structured Outputs}: Prompt Engine ép buộc Gemini trả về kết quả tuân thủ nghiêm ngặt định dạng JSON Schema quy định trước, ngăn ngừa việc mô hình sinh văn bản tự do khó phân tích cú pháp.
+  \item \textbf{Cơ chế Smart Fallback (De-hallucination Engine)}: Khi gặp sự cố mạng, vượt hạn ngạch (rate limit) hoặc lỗi phản hồi từ LLM, hệ thống tự động kích hoạt bộ sinh nội suy cục bộ theo quy tắc dựa trên số liệu thực chứng. Bộ sinh dự phòng này được thiết kế loại bỏ hoàn toàn các suy đoán ảo giác (ví dụ: không suy diễn về khung giờ đăng hay hành vi cuối tuần khi dữ liệu đầu vào chỉ có metric tổng).
+\end{enumerate}
+
+\subsection{Cơ sở dữ liệu: SQLite với WAL Mode và SQLAlchemy 2.0}
+Hệ thống sử dụng SQLite làm hệ quản trị cơ sở dữ liệu hạt nhân trong giai đoạn vận hành hiện tại với các cấu hình tối ưu hóa chuyên sâu:
+\begin{enumerate}
+  \item \textbf{Ràng buộc khóa ngoại bắt buộc}: Mặc định SQLite không bật kiểm tra khóa ngoại; hệ thống kích hoạt tường minh chỉ thị \texttt{PRAGMA foreign\_keys = ON} ngay khi khởi tạo mỗi session kết nối trong \texttt{backend/app/db/session.py}, bảo đảm tính toàn vẹn tham chiếu 100\%.
+  \item \textbf{Chế độ Write-Ahead Logging (WAL)}: Bật \texttt{PRAGMA journal\_mode = WAL} cho phép các tiến trình đọc (readers) và tiến trình ghi (writer) hoạt động đồng thời mà không gây khóa bảng (table lock), gia tăng thông lượng xử lý của hệ thống.
+  \item \textbf{Chuyển đổi linh hoạt qua SQLAlchemy 2.0}: Việc sử dụng chuẩn SQLAlchemy 2.0 Declarative Base giúp toàn bộ định nghĩa bảng, chỉ mục (indices) và ràng buộc duy nhất (UniqueConstraints) hoàn toàn độc lập với phần mềm máy chủ CSDL, sẵn sàng chuyển đổi liền mạch sang PostgreSQL trong môi trường sản xuất quy mô lớn.
+\end{enumerate}
+
+\subsection{Đóng gói Container và Tự động hóa CI/CD}
+\begin{enumerate}
+  \item \textbf{Kiến trúc Containerization}: Ứng dụng được đóng gói thành các dịch vụ độc lập trong \texttt{docker-compose.yml}: dịch vụ Backend chạy trên nền Python 3.11-slim tối giản dung lượng theo chuẩn Non-Root, và dịch vụ Frontend sử dụng kỹ thuật multi-stage build (biên dịch bằng Node.js và phân phối tĩnh bằng máy chủ web siêu nhẹ Nginx Alpine).
+  \item \textbf{Tự động hóa tích hợp liên tục (CI Pipeline)}: Pipeline GitHub Actions (\texttt{.github/workflows/ci.yml}) tự động kích hoạt mỗi khi có mã nguồn mới, thực hiện toàn diện ba giai đoạn: kiểm tra chất lượng mã (Linting/Typecheck), chạy bộ test tự động backend với \texttt{pytest}, và kiểm tra tính toàn vẹn khi đóng gói container Docker.
+  \item \textbf{Giám sát sức khỏe tự động (Health Check Lifecycle)}: Cài đặt endpoint \texttt{GET /health} trả về trạng thái kết nối CSDL, tính sẵn sàng của Gemini API và tình trạng phân bổ bộ nhớ; tích hợp trực tiếp vào Docker daemon để hỗ trợ cơ chế tự phục hồi dịch vụ (Self-healing).
+\end{enumerate}
+
+\section{Kết luận chương}
+
+Việc lựa chọn và kết hợp hài hòa giữa FastAPI, React 18, hệ sinh thái mô hình Google Gemini, SQLite tối ưu hóa sâu (WAL mode) và container hóa Docker đã tạo nên một nền tảng kỹ thuật vững chắc cho MarketFlow AI. Sự nhất quán về công nghệ và việc tuân thủ triệt để các tiêu chuẩn kỹ thuật quốc tế là tiền đề để triển khai chi tiết các yêu cầu nghiệp vụ phức tạp ở các chương tiếp theo.
+
+Nền tảng kiến trúc này vừa bảo đảm tính linh hoạt cao trong quá trình phát triển nhanh, vừa đặt nền móng vững chắc cho khả năng mở rộng quy mô tải và chuyển đổi liền mạch sang môi trường máy chủ phân tán trong tương lai.

@@ -1,0 +1,40 @@
+=== PAGE 7 ===
+DANH MỤC BẢNG BIỂU
+1 Cáctừviếttắtsửdụngtrongtàiliệu . . . . . . . . . . . . . . . . . . . . . ii
+1.1 Ngườisửdụngvàtiêuchíbảođảmkỹthuật . . . . . . . . . . . . . . . . . 2
+1.2 Mụctiêukỹthuậtvàkếtquảkiểmchứngthựctế . . . . . . . . . . . . . . . 3
+2.1 NgănxếpcôngnghệhiệnthựchóahệthốngMarketFlowAI . . . . . . . . 6
+3.1 Tácnhân,mụctiêuvàranhgiớiquyềnhạntronghệthống . . . . . . . . . . 9
+3.2 Danhmụcyêucầuchứcnăngvàkếtquảnghiệmthuthựcchứng . . . . . . 10
+4.1 Phânđịnhtráchnhiệmcủacácmoduletronghệthống . . . . . . . . . . . . 17
+4.2 Từđiểndữliệuvàcácràngbuộctoànvẹn . . . . . . . . . . . . . . . . . . 18
+4.3 ĐặctảhợpđồngdữliệuPydanticSchemachocáctácvụAI . . . . . . . . 20
+5.1 CấutrúcphânbổmãnguồnhệthốngMarketFlowAI . . . . . . . . . . . . 22
+5.2 Matrậnphângiảiquyềnhạntruycậptàinguyêntheongữcảnhnghiệpvụ . 23
+5.3 Quy tắc chuyển dịch trạng thái nội dung và cơ chế chống can thiệp (Anti-
+tampering) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .24
+6.1 DanhmụccáctệpkiểmthửtựđộngtrongMarketFlowAI . . . . . . . . . . 27
+6.2 Matrậnkiểmthửđốikhángvàtỷlệkhángcựcủahệthống . . . . . . . . . 28
+7.1 KếtquảđođạcthựcnghiệmđịnhlượngcácdịchvụAItrongMarketFlowAI 31
+7.2 Dựphóngtiêuthụtokenvàchiphílýthuyếtcho1,000yêucầudoanhnghiệp 33
+8.1 Đánhgiákháchquancácgiớihạnkỹthuậtđãbiếtvàphươngánnângcấp . 35
+A.1 Matrậntruyxuấtnguồngốchoànthiện(RequirementsTraceabilityMatrix-
+V9) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .39
+B.1 Promptmẫuchochứcnăngtạonộidungnháp . . . . . . . . . . . . . . . . 40
+B.2 CáctrườngdữliệulưuvếttrongnhậtkýAI . . . . . . . . . . . . . . . . . 40
+B.3 NhậtkýminhchứngtươngtácAIqua4mốcpháttriểnphầnmềm(SDLC) . 42
+B.4 KếtquảAICodeReviewvàtốiưubảomậtmãnguồn . . . . . . . . . . . . 43
+B.5 Đặctảkỹthuậtbảovệchuỗibímậtvàbộlọcnhậtkýantoàn . . . . . . . . 44
+B.6 Đặctảchínhsáchphânquyềnvaitròngườidùng(RBACPolicySpecification) 44
+B.7 ĐốichiếugiảipháptốiưuhóatruyvấnCSDLvàkếtquảđolường . . . . . 44
+C.1 Phântầngcấutrúcmãnguồnvàtráchnhiệmcácgóimô-đun . . . . . . . . 45
+C.2 Quytrìnhcácbướckhởitạovàvậnhànhhệthống(LifecycleCLIProcedures) 46
+C.3 Danhmụccácbiếnmôitrườnghệthốngvàcấuhìnhanninh . . . . . . . . 46
+C.4 ĐặctảchỉthịđónggóicontainerBackendFastAPI(Non-RootImageSpeci-
+fication) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .47
+vi
+=== PAGE 8 ===
+C.5 QuytrìnhđónggóiMulti-stageBuildvàphânphốitĩnhFrontendquaNginx
+Alpine . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .48
+C.6 MatrậnđiềuphốidịchvụvàràngbuộcmạngtrongDockerCompose . . . 48
+vii

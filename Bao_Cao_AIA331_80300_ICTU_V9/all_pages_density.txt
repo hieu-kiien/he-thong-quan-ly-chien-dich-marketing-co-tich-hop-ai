@@ -1,0 +1,62 @@
+Page 01: words= 65, lines=13 | TRƯỜNG ĐẠI HỌC CÔNG NGHỆ THÔNG TIN VÀ
+Page 02: words= 49, lines= 9 | LỜI CẢM ƠN Nhómxincảmơngiảngviênhướngdẫnđãcungcấpđềtài,tiêuchímônhọcvàđịnhhướng để nhóm tiếp cận
+Page 03: words= 41, lines=14 | DANH MỤC TỪ VIẾT TẮT Bảng 1: Các
+Page 04: words=501, lines=32 | MỤC LỤC LỜI CẢM ƠN i DANH MỤC
+Page 05: words=629, lines=36 | 3.5.2 Quy tắc chống gian lận và can
+Page 06: words=573, lines=35 | 7.3.2 Phântíchmứcđộkhửảogiác(De-hallucination GroundingAnalysis) 32 7.3.3 Phântíchhiệunăngthờigianphảnhồi(LatencyBenchmarking) . .
+Page 07: words=292, lines=22 | DANH MỤC BẢNG BIỂU 1 Cáctừviếttắtsửdụngtrongtàiliệu . .
+Page 08: words=129, lines=11 | DANH MỤC HÌNH VẼ 1.1 SơđồranhgiớihệthốngMarketFlowAI . .
+Page 09: words=325, lines=37 | LỜI MỞ ĐẦU Lý do chọn đề tài
+Page 10: words=106, lines=16 | ngữcảnh. 5. Chương 5: Hiện thực hóa hệ
+Page 11: words=212, lines=33 | CHƯƠNG 1. TỔNG QUAN ĐỀ TÀI VÀ BỐI
+Page 12: words=260, lines=94 | Bảng 1.1: Người sử dụng và tiêu chí
+Page 13: words=188, lines=72 | • Ngoài ranh giới: NhàcungcấpdịchvụAI(GoogleGeminiAPIquaHTTPSRESTful connectorantoàn)vàcácnềntảngmạngxãhội(đượctrừutượnghóathôngquakênh pháthànhvàlịchđăng,chuẩnbịsẵnsàngchokếtnốiWebhookchínhthức). 1.4.
+Page 14: words=254, lines=39 | (owner_id) hoặc được phân công quaCampaignMember. Manager có
+Page 15: words=265, lines=36 | CHƯƠNG 2. CƠ SỞ KỸ THUẬT VÀ CÔNG
+Page 16: words=225, lines=64 | Bảng 2.1: Ngăn xếp công nghệ hiện thực
+Page 17: words=342, lines=40 | mượt mà khi tương tác với các bảng
+Page 18: words=137, lines=18 | Declarative Base giúp toàn bộ định nghĩa bảng,
+Page 19: words=174, lines=59 | CHƯƠNG 3. PHÂN TÍCH YÊU CẦU HỆ THỐNG
+Page 20: words=189, lines=128 | Bảng 3.2: Danh mục yêu cầu chức năng
+Page 21: words=242, lines=47 | HỆ THỐNG QUẢN LÝ CHIẾN DỊCH MARKETING Quản
+Page 22: words=225, lines=34 | Nhân viên Giao diện Web API Backend Điều
+Page 23: words=211, lines=53 | xóachiếndịchbịcấmhoàntoànđốivớiMarketer. 2. Đối với Nội dung tiếp thị
+Page 24: words=271, lines=35 | • PUBLISHED:Bàiviếtđãđượcpháthànhlênkênhtruyềnthôngtheolịchđăng. 3.5.2. Quy tắc chống gian lận
+Page 25: words=251, lines=51 | CHƯƠNG 4. THIẾT KẾ KIẾN TRÚC VÀ MÔ
+Page 26: words=163, lines=47 | Bảng 4.1: Phân định trách nhiệm của các
+Page 27: words=143, lines=81 | Bảng 4.2: Từ điển dữ liệu và các
+Page 28: words=335, lines=108 | product_categories (Nhóm SP) PK id : INTEGER name
+Page 29: words=229, lines=43 | 4.4.1. Đặc tả hợp đồng dữ liệu JSON
+Page 30: words=103, lines=10 | consốthốngkêtổngthể). • Hệ thống đánh dấu cờis_fallback =
+Page 31: words=151, lines=54 | CHƯƠNG 5. HIỆN THỰC HÓA HỆ THỐNG 5.1.
+Page 32: words=248, lines=46 | 5.2.1. Phân hệ Bảo mật, Xác thực và
+Page 33: words=418, lines=70 | 3 # Chan tao truc tiep bai viet
+Page 34: words=210, lines=40 | 5.3.1. Các phân trang chức năng chính 1.
+Page 35: words=364, lines=48 | 7 "recommendations": ["Vui long nhap chi so kenh
+Page 36: words= 46, lines= 4 | dung HITL, giao diện người dùng Bento Grid
+Page 37: words=370, lines=34 | CHƯƠNG 6. KIỂM THỬ THỰC NGHIỆM VÀ ĐỐI
+Page 38: words=216, lines=51 | Bảng 6.1: Danh mục các tệp kiểm thử
+Page 39: words=183, lines=125 | Bảng 6.2: Ma trận kiểm thử đối kháng
+Page 40: words=168, lines=15 | • Số lượng thất bại (Failures) : 0.
+Page 41: words=393, lines=36 | CHƯƠNG 7. ĐÁNH GIÁ THỰC NGHIỆM AI ĐỊNH
+Page 42: words=354, lines=51 | trễ từ thời điểm gửi yêu cầu tới
+Page 43: words=345, lines=38 | • Đáng chú ý, động cơ Smart Fallback
+Page 44: words=429, lines=49 | Bảng 7.2: Ước tính tiêu thụ token và
+Page 45: words=  3, lines= 2 | hệ thống. 35
+Page 46: words=477, lines=38 | CHƯƠNG 8. KẾT LUẬN VÀ GIỚI HẠN ĐÃ
+Page 47: words=270, lines=66 | lượt yêu cầu. 8.2. Đánh giá khách quan
+Page 48: words=151, lines=12 | • Giai đoạn 3 (Nâng cấp Trí tuệ
+Page 49: words=241, lines=36 | TÀI LIỆU THAM KHẢO [1] K. Peffers, T.
+Page 50: words=135, lines=13 | PHỤ LỤC A. MA TRẬN TRUY XUẤT NGUỒN
+Page 51: words=212, lines=146 | Bảng A.1: Ma trận truy xuất nguồn gốc
+Page 52: words=182, lines=33 | PHỤ LỤC B. PROMPT VÀ NHẬT KÝ SỬ
+Page 53: words=435, lines=39 | B.3. Nhật ký tương tác AI qua bốn
+Page 54: words=215, lines=146 | Bảng B.3: Nhật ký minh chứng tương tác
+Page 55: words=136, lines=100 | Bảng B.4: Kết quả AI Code Review và
+Page 56: words=279, lines=40 | def mask_api_key(key: str) ‐> str: """Che giấu chuỗi
+Page 57: words=108, lines=28 | from sqlalchemy import select, func from sqlalchemy.orm import
+Page 58: words=342, lines=38 | PHỤ LỤC C. THIẾT KẾ DỮ LIỆU VÀ
+Page 59: words=331, lines=39 | C.5. Cấu hình đóng gói và triển khai
+Page 60: words=290, lines=40 | # Chuyển sang thực thi dưới user không
+Page 61: words=197, lines=44 | } \ location /api { \ proxy_pass http://backend:8000;
+Page 62: words=101, lines=39 | restart: unless‐stopped env_file: ‐ .env ports: ‐ "8000:8000"

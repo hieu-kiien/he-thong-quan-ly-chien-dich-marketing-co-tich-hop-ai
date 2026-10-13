@@ -1,0 +1,46 @@
+project:
+  name: "AIA331 80300 - Marketing campaign management with AI"
+  repository: "not started at design baseline"
+  commit: "not applicable before application implementation"
+  report_version: "V8"
+  status: "DESIGNED / PLANNED"
+environment:
+  os: "Windows 11 or equivalent documented environment"
+  hardware: "to be recorded at implementation and evaluation"
+  runtime_versions:
+    report_builder: "XeLaTeX / MiKTeX"
+    backend: "to be locked after implementation"
+    frontend: "to be locked after implementation"
+  dependency_lockfile: "not available before application implementation"
+data:
+  source: "synthetic/demo data planned; no real marketing dataset claimed"
+  seed_or_snapshot: "to be created with the application"
+  preprocessing:
+    - "document schema and metric grain"
+    - "record data completeness and missing-value policy"
+ai:
+  provider: "not selected"
+  model: "not selected"
+  model_version_or_date: "unknown"
+  prompt_version: "draft-contract-v1"
+  parameters: {}
+commands:
+  setup:
+    - "build the LaTeX source with XeLaTeX"
+    - "after implementation, add fresh application setup commands"
+  test:
+    - "after implementation, add unit/integration/UI commands"
+  evaluation:
+    - "after implementation, add fixture replay and prompt comparison commands"
+artifacts:
+  raw_results:
+    - "to be added: test reports and AI output logs"
+  processed_results:
+    - "to be added: evaluation tables and plots"
+  figures:
+    - "figures/*.tex"
+    - "main.pdf"
+limitations:
+  - "No application runtime exists at this report baseline."
+  - "No model quality, performance or usability result is claimed."
+  - "External product pages are reference context, not project evidence."

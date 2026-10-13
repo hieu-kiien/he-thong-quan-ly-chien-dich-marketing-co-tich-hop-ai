@@ -1,0 +1,89 @@
+\begin{tikzpicture}[
+  font=\sffamily\footnotesize,
+  >=Latex,
+  uc/.style={
+    draw=ictunavy,
+    fill=white,
+    rounded corners=10pt,
+    minimum width=3.8cm,
+    minimum height=0.62cm,
+    align=center,
+    line width=0.85pt,
+    text width=3.5cm,
+    inner sep=3pt
+  },
+  uc_ai/.style={
+    draw=ictunavy,
+    fill=black!4,
+    rounded corners=10pt,
+    minimum width=3.8cm,
+    minimum height=0.62cm,
+    align=center,
+    line width=0.85pt,
+    text width=3.5cm,
+    inner sep=3pt
+  },
+  actor_lbl/.style={font=\sffamily\bfseries\scriptsize,text=black,align=center},
+  assoc/.style={draw=black!85,line width=0.7pt},
+  dep/.style={draw=black!75,dashed,line width=0.7pt,-{Latex[length=2.2mm]}},
+  ste/.style={font=\sffamily\tiny\itshape,fill=white,inner sep=1.5pt,text=black}
+]
+
+\useasboundingbox (0.0, -4.6) rectangle (13.3, 4.3);
+
+% Khung ranh giới hệ thống
+\draw[draw=black!60,fill=black!1,rounded corners=6pt,line width=0.8pt] (2.5,-4.4) rectangle (13.1,4.1);
+\node[font=\sffamily\bfseries\scriptsize,text=ictunavy,anchor=north west] at (2.8,3.9) {HỆ THỐNG QUẢN LÝ CHIẾN DỊCH MARKETING};
+
+% Actor: Quản lý Marketing (Manager)
+\coordinate (mgr_c) at (1.1, 2.0);
+\draw[line width=0.9pt,draw=black] (mgr_c) circle (0.22cm);
+\draw[line width=0.9pt,draw=black] (1.1, 1.78) -- (1.1, 1.15);
+\draw[line width=0.9pt,draw=black] (0.7, 1.55) -- (1.5, 1.55);
+\draw[line width=0.9pt,draw=black] (1.1, 1.15) -- (0.75, 0.65);
+\draw[line width=0.9pt,draw=black] (1.1, 1.15) -- (1.45, 0.65);
+\node[actor_lbl] at (1.1, 0.3) {Quản lý\\Marketing};
+\coordinate (mgr_pt) at (1.6, 1.3);
+
+% Actor: Nhân viên Marketing (Marketer)
+\coordinate (stf_c) at (1.1, -1.8);
+\draw[line width=0.9pt,draw=black] (stf_c) circle (0.22cm);
+\draw[line width=0.9pt,draw=black] (1.1, -2.02) -- (1.1, -2.65);
+\draw[line width=0.9pt,draw=black] (0.7, -2.25) -- (1.5, -2.25);
+\draw[line width=0.9pt,draw=black] (1.1, -2.65) -- (0.75, -3.15);
+\draw[line width=0.9pt,draw=black] (1.1, -2.65) -- (1.45, -3.15);
+\node[actor_lbl] at (1.1, -3.5) {Nhân viên\\Marketing};
+\coordinate (stf_pt) at (1.6, -2.3);
+
+% Cột Use Case 1: Nghiệp vụ hệ thống cốt lõi
+\node[uc] (uc_auth) at (5.2, 3.2)  {\scriptsize Đăng nhập \& Phân quyền};
+\node[uc] (uc_camp) at (5.2, 2.1)  {\scriptsize Quản lý chiến dịch \& Ngân sách};
+\node[uc] (uc_chan) at (5.2, 1.0)  {\scriptsize Quản lý kênh \& Phân công};
+\node[uc] (uc_appr) at (5.2, -0.1) {\scriptsize \textbf{Phê duyệt nội dung (HITL)}};
+\node[uc] (uc_cont) at (5.2, -1.2) {\scriptsize Soạn thảo \& Gửi duyệt bài};
+\node[uc] (uc_plan) at (5.2, -2.3) {\scriptsize Quản lý lịch xuất bản bài};
+\node[uc] (uc_metr) at (5.2, -3.4) {\scriptsize Ghi nhận \& Theo dõi chỉ số};
+
+% Cột Use Case 2: Phân hệ Trí tuệ nhân tạo (AI Assistant)
+\node[uc_ai] (uc_idea)  at (10.6, -0.7) {\scriptsize AI: Gợi ý ý tưởng nội dung};
+\node[uc_ai] (uc_draft) at (10.6, -1.7) {\scriptsize AI: Sinh bản nháp nội dung};
+\node[uc_ai] (uc_sum)   at (10.6, -3.4) {\scriptsize AI: Tóm tắt hiệu quả chỉ số};
+
+% Kết nối Actor Quản lý (Manager)
+\draw[assoc] (mgr_pt) -- (uc_auth.west);
+\draw[assoc] (mgr_pt) -- (uc_camp.west);
+\draw[assoc] (mgr_pt) -- (uc_chan.west);
+\draw[assoc] (mgr_pt) -- (uc_appr.west);
+
+% Kết nối Actor Nhân viên (Staff / Marketer)
+\draw[assoc] (stf_pt) -- (uc_auth.west);
+\draw[assoc] (stf_pt) -- (uc_cont.west);
+\draw[assoc] (stf_pt) -- (uc_plan.west);
+\draw[assoc] (stf_pt) -- (uc_metr.west);
+
+% Quan hệ mở rộng AI (<<extend>>)
+\draw[dep] (uc_idea)  -- node[ste,above=1pt]{$\ll$extend$\gg$} (uc_cont.15);
+\draw[dep] (uc_draft) -- node[ste,below=1pt]{$\ll$extend$\gg$} (uc_cont.345);
+\draw[dep] (uc_sum)   -- node[ste,above=1pt]{$\ll$extend$\gg$} (uc_metr.east);
+
+\end{tikzpicture}

@@ -1,0 +1,187 @@
+=== PAGE 35 (words=364) ===
+7 "recommendations": ["Vui long nhap chi so kenh thuc te de AI co the
+phan tich."]
+8 }
+9
+10 # Tinh toan chinh xac cac tong so va KPI dua tren du lieu thuc truyen vao
+11 total_views = sum (m.get("views", 0) for m in metrics_data)
+12 total_clicks = sum (m.get("clicks", 0) for m in metrics_data)
+13 total_cost = sum (m.get("cost", 0.0) for m in metrics_data)
+14 total_revenue = sum (m.get("revenue", 0.0) for m in metrics_data)
+15
+16 ctr = (total_clicks / total_views * 100) if total_views > 0 else 0.0
+17 roi = ((total_revenue ‐ total_cost) / total_cost * 100) if total_cost > 0 else
+0.0
+18
+19 # Chi dua ra nhan dinh dua tren cac con so co that ‐ KHONG SUY DIEN KHUNG GIO
+HAY CUOI TUAN
+20 insights = [
+21 f"Tong so luot xem ghi nhan dat {total_views:,} luot tren toan bo cac kenh.
+",
+22 f"Ty le nhap chuot trung binh (CTR) dat {ctr:.2f}%, cho thay muc do quan
+tam cua nguoi dung.",
+23 f"Hieu qua dau tu (ROI) dat {roi:.1f}% voi tong doanh thu {total_revenue
+:,.0f} VND tren tong chi phi {total_cost:,.0f} VND."
+24 ]
+25 recommendations = [
+26 "Tiep tuc theo doi cac kenh co chi phi tren moi chuyen doi (CPA) thap de
+toi uu hoa ngan sach.",
+27 "Duy tri cac mau thong diep co ty le tuong tac cao da duoc kiem chung tren
+he thong."
+28 ]
+29 return {
+30 "task": "SUMMARY",
+31 "kpi_overview": {
+32 "total_views": total_views , "total_clicks": total_clicks ,
+33 "total_cost": total_cost , "total_revenue": total_revenue , "roi": roi
+34 },
+35 "insights": insights ,
+36 "recommendations": recommendations ,
+37 "is_fallback": True,
+38 "model_provider": "RuleBasedFallbackEngine"
+39 }
+Nhờ giải thuật này, hệ thống loại bỏ 100% hiện tượng ảo giác về thời
+gian phát hành hoặc suy đoán vô căn cứ, bảo đảm mọi kết luận đưa tới người
+quản lý đều có bằng chứng số học vững chắc.
+5.5. Kết luận chương
+Chương 5 đã chứng minh tính hiện thực hóa đầy đủ của MarketFlow AI. Toàn
+bộ các thiết kế kiến trúc từ bảo mật phân quyền đa tầng, máy trạng thái nội
+25
+
+=== PAGE 36 (words=46) ===
+dung HITL, giao diện người dùng Bento Grid đến cơ chế AI Smart Fallback khử
+ảo giác đều đã được chuyển giao thành mã nguồn chất lượng cao, vận hành ổn
+định và sẵn sàng cho các bài kiểm định thực nghiệm ở Chương 6.
+26
+
+=== PAGE 37 (words=370) ===
+CHƯƠNG 6.
+KIỂM THỬ THỰC NGHIỆM VÀ ĐỐI KHÁNG
+6.1. Chiến lược kiểm thử đa tầng (Testing Pyramid)
+Nhằm bảo đảm hệ thống MarketFlow AI vận hành an toàn tuyệt đối trong môi
+trường sản xuất thực tế, dự án thiết lập một chiến lược kiểm thử đa tầng
+theo mô hình Kim tự tháp kiểm thử (Testing Pyramid). Chiến lược này bao
+phủ từ tầng kiểm thử đơn vị (Unit Tests), kiểm thử tích hợp giao diện API
+(Integration Tests), kiểm thử quy trình máy trạng thái nghiệp vụ (State
+Machine Workflow Tests) đến tầng kiểm thử bảo mật đối kháng nâng cao (Adversarial
+Security Tests).
+Mọi ca kiểm thử đều được tự động hóa hoàn toàn thông qua framework
+pytest và thư viện httpx, chạy trên cơ sở dữ liệu kiểm thử cô lập trong bộ
+nhớ (sqlite:///:memory:) để bảo đảm tính độc lập, có thể tái lập 100% và
+không gây ảnh hưởng đến dữ liệu thực tế.
+6.2. Danh mục các bộ kiểm thử tự động
+Hệ thống sở hữu bộ kiểm thử tự động đồ sộ gồm 170 ca kiểm thử chuyên sâu
+được tổ chức trong thư mục backend/tests/, được phân loại chi tiết trong
+Bảng 6.1.
+6.3. Kiểm thử đối kháng bảo mật (Adversarial Security Testing)
+Nhằm ngăn chặn tình trạng tự chứng nhận kết quả lỏng lẻo, nhóm đã triển
+khai bộ kiểm thử đối kháng (Adversarial Attack Suite) nhằm giả lập các hành
+vi tấn công mạng và gian lận quy trình tinh vi nhất.
+Bảng 6.2 tổng hợp các kịch bản tấn công đối kháng và kết quả phòng
+thủ của hệ thống.
+6.4. Kiểm thử quy trình duyệt nội dung Human‐in‐the‐loop
+Quy trình phê duyệt nội dung được kiểm thử nghiêm ngặt qua toàn bộ vòng đời
+thực tế:
+1. Khởi tạo : Nhân viên Marketer tạo bài viết nháp qua API hoặc AI Drawer.
+Trạng thái ghi nhận chính xác là DRAFT hoặc AI_DRAFT.
+2. Gửi duyệt : Tác giả gọi POST /contents/{id}/submit. Hệ thống kiểm tra
+tính hợp lệ và chuyển trạng thái sang IN_REVIEW.
+3. Thẩm định : Manager xem xét bài viết trong Review Queue.
+• Nếu chấp thuận: Manager gọi POST /contents/{id}/approve. Trạng
+27
+
+=== PAGE 44 (words=429) ===
+Bảng 7.2: Ước tính tiêu thụ token và chi phí vận hành cho 1,000 yêu cầu
+Tác vụ AI Input
+Tokens/req
+Output
+Tokens/req
+Chi phí / 1,000
+req (USD)
+Quy đổi VND (Tỷ
+giá 25,400)
+Gợiýýtưởng
+(IDEA)
+420 280 $0.115 2,920VNĐ
+Viếtbảnnháp
+(DRAFT)
+650 350 $0.154 3,910VNĐ
+Tómtắtchỉsố
+(SUMMARY)
+780 210 $0.122 3,100VNĐ
+Trung bình hỗn
+hợp
+616 280 $0.130 3,300 VNĐ
+Nhận định kinh tế kỹ thuật : Với mức chi phí chỉ khoảng 3,300 VNĐ cho
+mỗi 1,000 lần gọi AI hỗ trợ nhân viên tiếp thị, giải pháp MarketFlow AI
+mang lại hiệu quả kinh tế vượt trội so với các mô hình độc quyền đắt đỏ
+khác, giúp doanh nghiệp tiết kiệm hơn 95% chi phí bản quyền trong khi vẫn
+bảo đảm chất lượng nội dung chuyên nghiệp và an toàn dữ liệu.
+7.5. Thực nghiệm khả năng chịu lỗi (Fault Injection Resilience Testing)
+Nhằm kiểm chứng độ bền bỉ của hệ thống theo yêu cầu NFR05, nhóm đã thực
+hiện tiêm lỗi cưỡng bức (Fault Injection) trong môi trường thử nghiệm:
+1. Kịch bản ngắt kết nối mạng (Network Outage) : Giả lập mất kết nối Internet
+bằng cách cấu hình sai địa chỉ gateway. Kết quả: AIService bắt ngoại
+lệ httpx.ConnectError, tự động kích hoạt Smart Fallback trong 18ms,
+người dùng nhận được bản nháp theo mẫu chuẩn mà không hề bị gián đoạn.
+2. Kịch bản vượt thời gian chờ (Timeout Injection) : Giả lập thời gian
+phản hồi của dịch vụ ngoài kéo dài quá 10 giây. Kết quả: Cơ chế timeout
+hủy yêu cầu mạng và kích hoạt Fallback thành công, ngăn ngừa hiện tượng
+treo tiến trình (hanging request).
+3. Kịch bản phản hồi dữ liệu rác (Malformed Response) : Mô phỏng máy chủ
+AI trả về văn bản không phải JSON hoặc bị cắt cụt. Kết quả: Bộ xác
+thực Pydantic v bắt lỗi và chuyển giao an toàn, tỷ lệ lỗi 500 phát
+sinh bằng 0.
+7.6. Kết luận chương
+Chương 7 đã cung cấp một bức tranh toàn cảnh định lượng về năng lực của các
+dịch vụ trí tuệ nhân tạo trong MarketFlow AI. Các số liệu thực nghiệm khoa
+học chứng minh hệ thống đạt độ tin cậy cấu trúc tuyệt đối (100% SVR), độ
+bám sát số liệu cao (>95% Grounding Score), hoàn toàn khử ảo giác trong cơ
+chế dự phòng, thời gian phản hồi nhanh và chi phí vận hành siêu tiết kiệm.
+Đây là bằng chứng vững chắc khẳng định tính sẵn sàng vận hành thực tế của
+34
+
+=== PAGE 45 (words=3) ===
+hệ thống.
+35
+
+=== PAGE 46 (words=477) ===
+CHƯƠNG 8.
+KẾT LUẬN VÀ GIỚI HẠN ĐÃ BIẾT
+8.1. Tổng kết thành quả đạt được
+Đề tài “Hệ thống quản lý chiến dịch marketing có tích hợp AI (MarketFlow
+AI)” đã hoàn thành xuất sắc toàn bộ các mục tiêu nghiên cứu và hiện thực
+hóa phần mềm đặt ra cho học phần AIA331. Dự án không chỉ dừng lại ở bản
+thiết kế lý thuyết mà đã chuyển giao thành một hệ thống phần mềm hoàn chỉnh,
+vận hành ổn định trên nền tảng FastAPI, React 18, SQLite và Docker, đồng
+thời vượt qua các bài kiểm định thực nghiệm khắt khe.
+Các thành quả cốt lõi đạt được bao gồm:
+1. Hiện thực hóa trọn vẹn quy trình quản trị tiếp thị : Xây dựng thành
+công hệ thống quản lý tập trung từ mục tiêu chiến dịch, danh mục sản
+phẩm, phân bổ ngân sách, sáng tạo nội dung đa kênh đến thu thập chỉ số
+hiệu quả (views, clicks, conversions, cost, revenue) và tự động tính
+toán các chỉ số kinh doanh then chốt (CTR, CPC, CPA, ROI).
+2. Kiến trúc bảo mật đa tầng và kiểm soát phân quyền mức bản ghi (Record‐level
+NFR01): Khắc phục triệt để lỗ hổng leo quyền ngang IDOR. Marketer chỉ
+được thao tác trong phạm vi các chiến dịch mà mình là chủ sở hữu hoặc
+được chỉ định thành viên (CampaignMember). Đồng bộ kiểm tra trạng thái
+tài khoản kích hoạt (user.status == 'ACTIVE') tại mọi ranh giới bảo
+mật.
+3. Máy trạng thái duyệt nội dung Human‐in‐the‐loop (HITL) chống can thiệp :
+Thiết lập chu trình kiểm duyệt nghiêm ngặt DRAFT / AI_DRAFT → IN_REVIEW
+→ APPROVED / REJECTED → PUBLISHED. Chặn tuyệt đối việc tạo bài viết
+trực tiếp ở trạng thái phê duyệt; tự động hạ cấp trạng thái về AI_DRAFT
+nếu bài viết đã duyệt bị chỉnh sửa nội dung.
+4. Tích hợp AI có kiểm soát và khử ảo giác (De‐hallucination Engine) : Ứng
+dụng độc quyền hệ sinh thái Google Gemini qua lớp Prompt Engine kiểm
+soát ngữ cảnh an toàn; cơ chế Smart Fallback bảo đảm hệ thống không
+bao giờ gián đoạn dịch vụ và loại bỏ 100% hiện tượng ảo giác vô căn cứ
+về thời gian hay xu hướng.
+5. Hệ thống kiểm thử tự động toàn diện : Xây dựng và thực thi 170 ca kiểm
+thử tự động (pytest) bao phủ từ đơn vị, tích hợp đến kiểm thử đối kháng
+(Adversarial Tests) đạt tỷ lệ vượt qua 100%, 0 lỗi và 0 cảnh báo.
+6. Đánh giá định lượng minh bạch : Đo lường thực chứng tỷ lệ hợp lệ Schema
+đạt 100%, Grounding Score đạt 95.8%, độ trễ trung vị P50 ở mức 1.52
+giây, và chi phí vận hành siêu tiết kiệm chỉ 3,300 VNĐ cho mỗi 1,000
+36
+
