@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Campaign, MarketingContent, KPISummary, AIIdeaResponse, AIDraftResponse, AISummaryResponse, OmnichannelRequest, OmnichannelResponse, User, Product, MarketingSchedule, ContentComplianceCheck, Workspace, BrandKit, ComplianceCheckRequest, ComplianceCheckResponse, ComplianceViolation, ChannelAttribution, AIDoctorReport, CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse, AIChain, AIChainSaveRequest, AppNotification, Task, TaskCreate, TaskUpdate, BudgetAllocation, BudgetSummary, KPITarget, KpiProgress, CommandCenterResponse, Page, QuotaSnapshot, QuotaErrorDetail, CampaignSort, ContentSort, AIModelListResponse } from '../types';
+import { Campaign, MarketingContent, KPISummary, AIIdeaResponse, AIDraftResponse, AISummaryResponse, AIPlanResponse, PlanApplyRequest, PlanApplyResponse, OmnichannelRequest, OmnichannelResponse, User, Product, MarketingSchedule, ContentComplianceCheck, Workspace, BrandKit, ComplianceCheckRequest, ComplianceCheckResponse, ComplianceViolation, ChannelAttribution, AIDoctorReport, CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse, AIChain, AIChainSaveRequest, AppNotification, Task, TaskCreate, TaskUpdate, BudgetAllocation, BudgetSummary, KPITarget, KpiProgress, CommandCenterResponse, Page, QuotaSnapshot, QuotaErrorDetail, CampaignSort, ContentSort, AIModelListResponse } from '../types';
 import { MarketingChannel, getChannelRegistry } from '../utils/channels';
 import type {
   AIJobAccepted,
@@ -67,7 +67,7 @@ const AI_LONG_TIMEOUT = 600000;
  * hiện ra dưới dạng message có kiểm chứng thay vì im lặng.
  */
 const isAiPath = (url?: string): boolean =>
-  !!url && (url.includes('/ai/omnichannel') || url.includes('/ai/generate') || url.includes('/ai/draft') || url.includes('/ai/ideas') || url.includes('/ai/summary') || url.includes('/ai/summarize') || url.includes('/ai/jobs') || url.includes('/ai-doctor'));
+  !!url && (url.includes('/ai/omnichannel') || url.includes('/ai/generate') || url.includes('/ai/draft') || url.includes('/ai/ideas') || url.includes('/ai/summary') || url.includes('/ai/summarize') || url.includes('/ai/plan') || url.includes('/ai/jobs') || url.includes('/ai-doctor'));
 
 // Helper kiểm tra chế độ Demo Offline (chỉ kích hoạt khi có cờ VITE_ENABLE_OFFLINE_DEMO=true tường minh)
 //
@@ -876,6 +876,26 @@ export const campaignApi = {
       return list.filter(c => c.campaign_id === campaignId);
     }
   },
+  applyPlan: async (campaignId: number, payload: PlanApplyRequest): Promise<PlanApplyResponse> => {
+    try {
+      const res = await apiClient.post(`/campaigns/${campaignId}/plan/apply`, payload);
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: campaignApi.applyPlan');
+      return {
+        campaign_id: campaignId,
+        deduplicated: false,
+        // Không giả lập phân bổ/KPI: chế độ mẫu không biết channel_id thật,
+        // UI chỉ cần số liệu đếm để hiển thị kết quả áp dụng.
+        budget_allocations: [],
+        kpi_targets: [],
+        tasks_created: payload.tasks.length,
+        tasks_skipped: 0
+      };
+    }
+  },
   delete: async (id: number): Promise<void> => {
     try {
       await apiClient.delete(`/campaigns/${id}`);
@@ -1428,6 +1448,43 @@ export const aiApi = {
         model_provider: OFFLINE_DEMO_PROVIDER,
         is_fallback: true,
         prompt_version: 'v3'
+      };
+    }
+  },
+  generatePlan: async (campaignId: number, promptVersion = 'v3'): Promise<AIPlanResponse> => {
+    try {
+      const res = await apiClient.post('/ai/plan', {
+        campaign_id: campaignId,
+        prompt_version: promptVersion
+      });
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: aiApi.generatePlan');
+      return {
+        task_type: 'PLAN',
+        summary: 'Kế hoạch mẫu chạy ngoại tuyến: chia đều ngân sách cho 3 kênh chủ lực, tập trung sản xuất nội dung tuần đầu và đo lường hiệu suất sau 7 ngày. (Dữ liệu mẫu cục bộ — không gọi AI.)',
+        budget_split: [
+          { channel_code: 'FACEBOOK', planned_amount: 5000000, rationale: 'Chia đều theo tổng ngân sách (dữ liệu mẫu ngoại tuyến).', is_ai_estimate: true },
+          { channel_code: 'TIKTOK', planned_amount: 5000000, rationale: 'Chia đều theo tổng ngân sách (dữ liệu mẫu ngoại tuyến).', is_ai_estimate: true },
+          { channel_code: 'EMAIL', planned_amount: 5000000, rationale: 'Chia đều theo tổng ngân sách (dữ liệu mẫu ngoại tuyến).', is_ai_estimate: true }
+        ],
+        kpi_targets: [
+          { metric_name: 'ROAS', target_value: 3, unit: 'ratio', is_ai_estimate: true },
+          { metric_name: 'CPL', target_value: 150000, unit: 'vnd', is_ai_estimate: true }
+        ],
+        tasks: [
+          { title: 'Chốt thông điệp & brief nội dung', task_type: 'CONTENT', priority: 'HIGH', due_offset_days: 0, description: 'Dữ liệu mẫu ngoại tuyến.' },
+          { title: 'Đặt lịch tuần 1 đa kênh', task_type: 'OTHER', priority: 'MEDIUM', due_offset_days: 3, description: null },
+          { title: 'Đánh giá hiệu suất tuần 1', task_type: 'RESEARCH', priority: 'HIGH', due_offset_days: 7, description: null }
+        ],
+        warnings: ['Dữ liệu mẫu ngoại tuyến — mô hình AI chưa được gọi.'],
+        assumptions: [],
+        model_used: OFFLINE_DEMO_MODEL_LABEL,
+        model_provider: OFFLINE_DEMO_PROVIDER,
+        is_fallback: true,
+        prompt_version: promptVersion
       };
     }
   },

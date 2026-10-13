@@ -153,3 +153,17 @@ Tests:
 Verification:
 - Full pytest: 1671 passed, 4 failed = 4 pre-existing fail ngay tại HEAD df3790e (đối chứng qua worktree sạch): 2 e2e tier3 compliance 403, challenger banned-keywords 403, design_docs pagination doc claim
 - `analyze --index-only` (re-index) + `detect-changes --scope all`: 13 files, 80 symbols, 18 processes, risk critical (expected: fallback dùng chung mọi endpoint AI + migration mỗi startup; mitigated additive-only + 1671 tests)
+
+
+## Phase 9 - Workstream I: FE Planner UI (done)
+
+Frontend:
+- `types/index.ts`: `AIPlanResponse` / `AIPlanBudgetItem` / `AIPlanKPIItem` / `AIPlanTaskItem` / `PlanApplyRequest` / `PlanApplyResponse` (khop contract backend `schemas.py`); them `is_ai_estimate?: boolean` vao `BudgetAllocation` + `KPITarget`
+- `services/api.ts`: `isAiPath` + `/ai/plan` (timeout dai 600s nhu cac endpoint AI dong bo); `aiApi.generatePlan(campaignId)` POST `/ai/plan` + offline-demo mock (is_fallback=true, model_used=OFFLINE_DEMO_MODEL_LABEL, model_provider=OFFLINE_DEMO_PROVIDER - khong goi AI); `campaignApi.applyPlan(campaignId, payload)` POST `/campaigns/{id}/plan/apply` + offline-demo mock (tasks_created, khong gia lap channel_id that)
+- `components/campaign-hub/PlannerTab.tsx` (moi): sinh ke hoach -> hien summary (fallback banner amber khi is_fallback), bang phan bo ngan sach (tong vs budget, badge "Uoc tinh AI", canh bao vuot ngan sach va tu disable apply), bang KPI (format theo unit vnd/percent/ratio), bang task (due_date = start_date + due_offset_days, priority badge, loai task tieng Viet); nut "Ap dung" generate idempotency_key = crypto.randomUUID() moi ke hoach moi, giu key qua retry mang, doi key khi 409; xu ly 200 dedup/400/403/409/502; gate FE owner/manager (backend chan lai day du) + chi CLIENT_APPROVER khong phai owner bi disable
+- `campaign-hub/index.ts`: export PlannerTab
+- `WorkflowCanvas.tsx`: tab moi 'planner' (nut Wand2 "Ke Hoach AI (Planner)" truoc tab lifecycle); onApplied nạp lai task + budget allocations + KPI summary + KPI progress + goi onRefreshData
+
+Verification:
+- FE: `npm run typecheck` + `npm run lint --max-warnings=0` + `npm run build` pass
+- Backend full pytest: 1671 passed, 4 failed = 4 pre-existing (khong doi so voi Phase 8 - FE changes khong anh huong backend)

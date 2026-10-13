@@ -555,6 +555,8 @@ export interface BudgetAllocation {
   campaign_id?: number;
   channel_id: number;
   planned_amount: number;
+  /** true khi số tiền do AI ước tính (áp dụng kế hoạch AI), false khi người dùng tự ghi. */
+  is_ai_estimate?: boolean;
   channel?: {
     id: number;
     code: string;
@@ -585,6 +587,8 @@ export interface KPITarget {
   metric_name: string;
   target_value: number;
   unit: string;
+  /** true khi mục tiêu do AI ước tính (áp dụng kế hoạch AI). */
+  is_ai_estimate?: boolean;
 }
 
 export interface KpiProgressTarget {
@@ -603,6 +607,65 @@ export interface KpiProgress {
   overall_achieved_pct: number | null;
   measurable_count: number;
   total_count: number;
+}
+
+// ==========================================
+// AI Campaign Planner (POST /ai/plan + POST /campaigns/{id}/plan/apply)
+// ==========================================
+
+export interface AIPlanBudgetItem {
+  channel_code: string;
+  planned_amount: number;
+  rationale?: string | null;
+  is_ai_estimate: boolean;
+}
+
+export interface AIPlanKPIItem {
+  metric_name: string;
+  target_value: number;
+  unit: string;
+  is_ai_estimate: boolean;
+}
+
+export interface AIPlanTaskItem {
+  title: string;
+  task_type: TaskType;
+  priority: TaskPriority;
+  /** Số ngày sau campaign.start_date. */
+  due_offset_days: number;
+  description?: string | null;
+}
+
+export interface AIPlanResponse {
+  task_type: string;
+  summary: string;
+  budget_split: AIPlanBudgetItem[];
+  kpi_targets: AIPlanKPIItem[];
+  tasks: AIPlanTaskItem[];
+  warnings: string[];
+  assumptions: string[];
+  model_used: string;
+  prompt_version: string;
+  /** true khi nội dung là template dự phòng (không do mô hình sinh). PHAI hiển thị cảnh báo. */
+  is_fallback: boolean;
+  model_provider?: string | null;
+}
+
+export interface PlanApplyRequest {
+  budget_split: AIPlanBudgetItem[];
+  kpi_targets: AIPlanKPIItem[];
+  tasks: AIPlanTaskItem[];
+  idempotency_key: string;
+}
+
+export interface PlanApplyResponse {
+  campaign_id: number;
+  /** true khi khoá idempotency khớp kế hoạch đã áp dụng trước đó (không ghi thêm lần 2). */
+  deduplicated: boolean;
+  budget_allocations: BudgetAllocation[];
+  kpi_targets: KPITarget[];
+  tasks_created: number;
+  tasks_skipped: number;
 }
 
 export interface CommandCenterAttentionItem {

@@ -13,7 +13,8 @@ import {
   ContentTab, 
   CalendarTab, 
   BudgetTab, 
-  PerformanceTab 
+  PerformanceTab,
+  PlannerTab 
 } from './campaign-hub';
 
 interface WorkflowCanvasProps {
@@ -43,8 +44,8 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   const toast = useToast();
   const isApprover = userRole === 'MANAGER' || userRole === 'AGENCY_MANAGER' || userRole === 'CLIENT_APPROVER' || userRole === 'ADMIN';
 
-  // Top Tabs: 'brief' | 'tasks' | 'pipeline' | 'calendar' | 'attribution' | 'copilot' | 'doctor' | 'lifecycle'
-  const [activeTab, setActiveTab] = useState<'brief' | 'tasks' | 'pipeline' | 'calendar' | 'attribution' | 'copilot' | 'doctor' | 'lifecycle'>('brief');
+  // Top Tabs: 'brief' | 'tasks' | 'pipeline' | 'calendar' | 'attribution' | 'planner' | 'copilot' | 'doctor' | 'lifecycle'
+  const [activeTab, setActiveTab] = useState<'brief' | 'tasks' | 'pipeline' | 'calendar' | 'attribution' | 'planner' | 'copilot' | 'doctor' | 'lifecycle'>('brief');
 
   // KPI & Doctor states
   const [campaignKpi, setCampaignKpi] = useState<KPISummary | null>(null);
@@ -777,6 +778,18 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('planner')}
+            className={`px-4 py-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'planner'
+                ? 'border-violet-600 text-violet-700 bg-white'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Wand2 className="w-4 h-4 text-violet-500" />
+            <span>Kế Hoạch AI (Planner)</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('lifecycle')}
             className={`px-4 py-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'lifecycle'
@@ -789,6 +802,26 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
           </button>
         </div>
       </div>
+
+      {/* 2.0b TAB KẾ HOẠCH AI (PLANNER TAB) */}
+      {activeTab === 'planner' && (
+        <PlannerTab
+          campaign={campaign}
+          userRole={userRole}
+          onApplied={() => {
+            if (campaign) {
+              loadCampaignExtraData(campaign.id);
+              campaignApi.getKpi(campaign.id)
+                .then(res => setCampaignKpi(res))
+                .catch(() => setCampaignKpi(null));
+              kpiApi.getKpiProgress(campaign.id)
+                .then(res => setKpiProgress(res))
+                .catch(() => setKpiProgress(null));
+            }
+            if (onRefreshData) onRefreshData();
+          }}
+        />
+      )}
 
       {/* 2.1 TAB BRIEF & MỤC TIÊU VẬN HÀNH (OVERVIEW TAB) */}
       {activeTab === 'brief' && (
