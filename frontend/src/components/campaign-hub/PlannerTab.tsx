@@ -11,7 +11,14 @@ import {
   Info
 } from 'lucide-react';
 import { AIPlanResponse, Campaign, PlanApplyResponse, TaskPriority, TaskType } from '../../types';
-import { aiApi, campaignApi, getApiErrorMessage } from '../../services/api';
+import { campaignApi, getApiErrorMessage } from '../../services/api';
+import {
+  AIJobError,
+  describeAIJobFailure,
+  describeAIResultOrigin
+} from '../../services/aiJobPoller';
+import { useAIJob } from '../../hooks/useAIJob';
+import { AIJobProgress } from '../AIJobProgress';
 import { formatVND, formatNumber, formatDateVN, addDaysLocalISO } from '../../utils/format';
 import { useToast } from '../Toast';
 import { useAuth } from '../../context/AuthContext';
@@ -69,10 +76,12 @@ export const PlannerTab: React.FC<PlannerTabProps> = ({
   const { user } = useAuth();
 
   const [plan, setPlan] = useState<AIPlanResponse | null>(null);
-  const [loadingPlan, setLoadingPlan] = useState<boolean>(false);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [applying, setApplying] = useState<boolean>(false);
   const [applied, setApplied] = useState<PlanApplyResponse | null>(null);
+  // Đường async (POST /ai/jobs kind=plan -> poll): endpoint đồng bộ /ai/plan bị
+  // Cloudflare Worker cắt ở ~100s (524) với model chậm; hàng đợi trả 202 ngay.
+  const planJob = useAIJob();
   // Khoá idempotency sinh MỚI mỗi khi có kế hoạch mới; giữ nguyên qua các lần
   // retry cùng kế hoạch (mạng lỗi server có thể đã ghi) và đổi mới khi 409.
   const [idempotencyKey, setIdempotencyKey] = useState<string>(() => newIdempotencyKey());
@@ -97,18 +106,33 @@ export const PlannerTab: React.FC<PlannerTabProps> = ({
 
   const handleGenerate = async () => {
     try {
-      setLoadingPlan(true);
       setApplyError(null);
       setApplied(null);
-      const generated = await aiApi.generatePlan(campaign.id);
+      const generated = await planJob.run<AIPlanResponse>({
+        kind: 'plan',
+        campaign_id: campaign.id,
+        prompt_version: 'v3'
+      });
       setPlan(generated);
       setIdempotencyKey(newIdempotencyKey());
-    } catch (e: any) {
+      const origin = describeAIResultOrigin(generated);
+      if (origin.isFallback) {
+        toast.warning(`Kế hoạch tạo từ ${origin.label}.`, 'Chưa gọi được AI');
+      } else {
+        toast.success(`Đã sinh kế hoạch bằng ${origin.label}!`, 'Sinh kế hoạch thành công');
+      }
+    } catch (e: unknown) {
+      if (e instanceof AIJobError) {
+        if (e.disposed) return;
+        const { title, hint } = describeAIJobFailure(e.kind);
+        const parts = [hint];
+        if (e.backendReason) parts.push(`Thông báo từ máy chủ: ${e.backendReason}`);
+        toast.error(parts.join('\n'), title);
+        return;
+      }
       const msg = getApiErrorMessage(e);
       setApplyError(msg);
       toast.error(msg, 'Lỗi sinh kế hoạch AI');
-    } finally {
-      setLoadingPlan(false);
     }
   };
 
@@ -161,16 +185,18 @@ export const PlannerTab: React.FC<PlannerTabProps> = ({
         </div>
         <button
           onClick={handleGenerate}
-          disabled={loadingPlan}
+          disabled={planJob.busy}
           className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white text-xs font-bold flex items-center gap-2 whitespace-nowrap transition-colors shadow"
         >
-          {loadingPlan ? (
+          {planJob.busy ? (
             <><Loader2 className="w-4 h-4 animate-spin" /> Đang sinh kế hoạch...</>
           ) : (
             <><Sparkles className="w-4 h-4" /> {plan ? 'Sinh kế hoạch mới' : 'Sinh kế hoạch AI'}</>
           )}
         </button>
       </div>
+
+      <AIJobProgress job={planJob} label="kế hoạch chiến dịch" onRetry={handleGenerate} />
 
       {plan?.is_fallback && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3.5 rounded-xl text-xs font-medium flex items-start gap-2">
@@ -182,7 +208,7 @@ export const PlannerTab: React.FC<PlannerTabProps> = ({
         </div>
       )}
 
-      {!plan && !loadingPlan && (
+      {!plan && !planJob.busy && (
         <div className="bg-white p-10 rounded-xl border border-slate-200 shadow-sm text-center">
           <Sparkles className="w-8 h-8 text-violet-400 mx-auto mb-3" />
           <p className="text-sm font-bold text-slate-700">Chưa có kế hoạch nào</p>

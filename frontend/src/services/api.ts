@@ -1208,6 +1208,9 @@ const buildOfflineDemoSnapshot = async (
         prompt_version: request.prompt_version,
       })) as unknown as Record<string, unknown>;
       break;
+    case 'plan':
+      result = (await aiApi.generatePlan(campaignId ?? 1, request.prompt_version ?? 'v3')) as unknown as Record<string, unknown>;
+      break;
     default:
       result = {};
   }

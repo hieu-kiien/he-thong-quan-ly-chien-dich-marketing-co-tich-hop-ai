@@ -167,3 +167,14 @@ Frontend:
 Verification:
 - FE: `npm run typecheck` + `npm run lint --max-warnings=0` + `npm run build` pass
 - Backend full pytest: 1671 passed, 4 failed = 4 pre-existing (khong doi so voi Phase 8 - FE changes khong anh huong backend)
+
+
+## Phase 10 - Workstream J: Integration - async plan job path (done)
+
+Bo sung tich hop duong async cho ke hoach (dong bo hoa voi cac loai job khac):
+- `aiJobPoller.ts`: `AIJobKind` += `'plan'` - truoc do FE khong the enqueue kind=plan du backend ho tro day du (Workstream G)
+- `services/api.ts` `buildOfflineDemoSnapshot`: `case 'plan'` goi `aiApi.generatePlan` (offline demo tra ve snapshot succeeded voi noi dung mau, nhan OFFLINE_DEMO_* ong hoat nhu 4 kind khac)
+- `PlannerTab.tsx`: chuyen sinh ke hoach sang duong `POST /ai/jobs kind=plan` -> poll qua `useAIJob` + `AIJobProgress` (progress + cancel + retry classification); ly do: endpoint dong bo /ai/plan bi Cloudflare Worker cat ~100s (524) voi model cham - chinh la ly do hang doi ton tai; toast ghi nhan nguon goc qua `describeAIResultOrigin` (fallback = canh bao khong goi duoc AI); loi hien qua AIJobError classification (timeout/rate_limit/quota/...)
+- idempotency: poller tu sinh `idempotency_key` cho moi job; plan apply van dung crypto.randomUUID() rieng
+
+Verification: FE tsc + eslint --max-warnings=0 + build pass; backend khong doi (1671 passed + 4 pre-existing tai Phase 9); kind=plan enqueue/worker da duoc bao boi `tests/test_ai_planner.py`

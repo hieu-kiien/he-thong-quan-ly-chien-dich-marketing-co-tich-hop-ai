@@ -33,7 +33,7 @@
  * hồ bằng lịch bơm vào — không bao giờ gọi mạng thật, không bao giờ gọi AI thật.
  */
 
-export type AIJobKind = 'ideas' | 'draft' | 'summary' | 'omnichannel';
+export type AIJobKind = 'ideas' | 'draft' | 'summary' | 'omnichannel' | 'plan';
 
 export type AIJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 
