@@ -90,7 +90,7 @@ Thời lượng dưới đây là khung tương đối để lập kế hoạch.
 
 - Dùng `docs/README.md` làm mục lục; dùng tài liệu này làm roadmap; dùng `docs/TESTING.md` làm nguồn hướng dẫn test.
 - Sửa README và tài liệu kiến trúc để phân biệt rõ đã hiện thực, đã kiểm thử, đề xuất và chưa xác nhận.
-- TEST_READY/Test_INFRA đã gỡ (dọn tài liệu cũ 2026-10-13, còn trong git history); giữ nguyên biên bản nghiệm thu và bộ báo cáo V8/V9, đặc biệt PDF đã nộp.
+- TEST_READY/Test_INFRA đã gỡ (dọn tài liệu cũ 2026-10-13, còn trong git history); giữ nguyên biên bản nghiệm thu và bộ báo cáo V9, đặc biệt PDF đã nộp.
 - Ghi lại baseline repo/CI, rủi ro Cloudflare và khoảng trống phát hành thật.
 - Xác định một chủ sở hữu cho từng tài liệu sống và quy tắc cập nhật theo nguồn sự thật.
 

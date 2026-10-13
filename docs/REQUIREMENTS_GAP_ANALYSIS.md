@@ -18,9 +18,9 @@ trả lời được.
 | `BIEN_BAN_NGHIEM_THU.md` | Biên bản nghiệm thu | Tự ghi rõ là hồ sơ lịch sử | Đầy đủ |
 | `Bao_Cao_AIA331_80300_ICTU_V9/research_pack/requirements-traceability.csv` | Ma trận truy vết | 20 dòng, 12 cột | Đầy đủ |
 | `docs/`, `README.md`, `cloudflare/README.md`, `render.yaml` | Tài liệu kỹ thuật | — | Đầy đủ |
-| `it-thesis-research-documentation-engineer/` | Gói skill hỗ trợ | Xem `README-VI.md` | Đủ để kết luận |
+| `it-thesis-research-documentation-engineer/` | Gói skill hỗ trợ (đã gỡ khỏi repo 2026-10-13) | Kết luận dưới đây | Đủ để kết luận |
 
-**Kết luận về `it-thesis-research-documentation-engineer/`:** đây **không phải** một
+**Kết luận về `it-thesis-research-documentation-engineer/` (hồ sơ, thư mục đã gỡ):** đây **không phải** một
 phần của bài nộp. Nó là một gói *agent skill* dùng để hướng dẫn quy trình nghiên cứu
 và soạn báo cáo (đọc yêu cầu môn học → lập evidence map → traceability → kiến trúc
 → kế hoạch eval → compile LaTeX). Nó là **công cụ**, không phải sản phẩm. Không cần

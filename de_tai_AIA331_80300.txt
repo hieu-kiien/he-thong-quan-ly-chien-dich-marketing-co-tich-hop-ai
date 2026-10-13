@@ -1,0 +1,74 @@
+ĐỀ TÀI DỰ ÁN — ỨNG DỤNG TRÍ TUỆ NHÂN TẠO (AIA331)
+(Bản txt chuyển nguyên văn từ ảnh "de_tai_mon_hoc.png" — trước đây đặt tên "đề tài của tài.png")
+
+
+ĐẠI HỌC THÁI NGUYÊN
+TRƯỜNG ĐẠI HỌC CÔNG NGHỆ THÔNG TIN VÀ TRUYỀN THÔNG
+
+DỰ ÁN
+- Học phần: Ứng dụng trí tuệ nhân tạo - AIA331
+- Hình thức: Dự án
+- Mã số: 80300
+
+
+Hệ thống quản lý chiến dịch marketing có tích hợp AI
+
+1. Mô tả bài toán
+
+Doanh nghiệp cần quản lý chiến dịch marketing, kênh truyền thông, nội dung, ngân sách, lịch đăng và chỉ số hiệu quả. Việc lên ý tưởng nội dung và tổng hợp kết quả thường tốn nhiều thời gian. Hệ thống cần quản lý chiến dịch marketing và tích hợp AI sinh nội dung nháp, tóm tắt hiệu quả chiến dịch và gợi ý cải thiện.
+
+2. Mục tiêu
+
+- Quản lý chiến dịch, kênh, nội dung, ngân sách, lịch đăng và chỉ số.
+- Tích hợp AI để sinh ý tưởng nội dung, báo cáo hiệu quả, gợi ý tối ưu.
+- Sử dụng AI trong SDLC và trong nghiệp vụ marketing.
+
+3. Yêu cầu chức năng
+
+3.1. Chức năng quản lý
+
+1. Đăng nhập và phân quyền quản lý, nhân viên marketing.
+2. Quản lý chiến dịch, mục tiêu, thời gian, ngân sách.
+3. Quản lý kênh truyền thông.
+4. Quản lý nội dung và lịch đăng.
+5. Ghi nhận chỉ số: lượt xem, click, chuyển đổi, chi phí.
+6. Theo dõi trạng thái duyệt nội dung.
+7. Tra cứu chiến dịch theo kênh, thời gian, trang thái.
+8. Thống kê hiệu quả và chi phí chiến dịch.
+
+3.2. Chức năng AI
+
+1. AI sinh ý tưởng nội dung theo mục tiêu chiến dịch.
+2. AI sinh caption/email nháp theo kênh.
+3. AI tóm tắt hiệu quả chiến dịch và gợi ý cải thiện.
+
+4. Yêu cầu kỹ thuật
+
+- Backend FastAPI/Flask/Django; frontend React/Vue/HTML.
+- CSDL SQLite/MySQL/PostgreSQL.
+- AI Engine OpenAI/Gemini/Claude/Hugging Face/Ollama.
+- Có cơ chế duyệt nội dung AI trước khi sử dụng.
+- Có test cho chiến dịch, lịch đăng, chỉ số và AI.
+
+5. Dữ liệu đầu vào, đầu ra và dữ liệu hệ thống
+
+- Dữ liệu chính: chiến dịch, kênh, nội dung, lịch đăng, ngân sách, chỉ số.
+- Đầu vào AI: mục tiêu, đối tượng, kênh, sản phẩm, chỉ số.
+- Đầu ra AI: ý tưởng, nội dung nháp, báo cáo hiệu quả.
+
+Prompt mẫu:
+
+System: Bạn là trợ lý marketing. Tạo nội dung nháp để con người duyệt, không đưa cam kết sai sự thật.
+
+User: Chiến dịch: {{campaign_brief}}. Hãy đề xuất 5 ý tưởng nội dung cho kênh Facebook, giọng văn tr trung.
+
+6. Hướng dẫn sử dụng AI trong từng giai đoạn SDLC
+
+- KT1: Dùng AI phân tích chiến dịch, nội dung, chỉ số; thiết kế ERD và chức năng AI.
+- KT2: Dùng AI sinh CRUD chiến dịch, lịch đăng, chỉ số; debug báo cáo.
+- KT3: Dùng AI thiết kế prompt sinh nội dung, test nội dung sai hoặc quá dài.
+- Cuối kỳ: Dùng AI viết tài liệu, báo cáo, slide và đánh giá chất lượng AI.
+
+7. Mức độ khó
+
+Trung bình: Dữ liệu nghiệp vụ không quá phức tạp nhưng cần quy trình duyệt nội dung AI và đánh giá kết quả chiến dịch.

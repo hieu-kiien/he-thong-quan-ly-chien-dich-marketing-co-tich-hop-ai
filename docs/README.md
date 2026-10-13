@@ -30,7 +30,7 @@ Tài liệu này là mục lục cho **tài liệu sống của dự án**. Các
 | Kết quả CI | GitHub Actions theo commit; ghi link run và commit khi trích số liệu. |
 | Benchmark AI | `scripts/evaluate_ai_grounding.py` là generator; báo cáo được sinh lại trong Gate 5. Kết quả chỉ đúng với bộ case/môi trường ghi trong báo cáo. |
 | Roadmap | [ROADMAP.md](ROADMAP.md), trạng thái đề xuất cho đến khi có quyết định/evidence mới. |
-| Hồ sơ nộp V8/V9 | PDF và source trong `Bao_Cao_AIA331_80300_ICTU_V8/` và `Bao_Cao_AIA331_80300_ICTU_V9/`; xem README từng thư mục. Giữ nguyên như snapshot lịch sử. |
+| Hồ sơ nộp V9 | PDF và source trong `Bao_Cao_AIA331_80300_ICTU_V9/`; xem README từng thư mục. Bản V8 cũ đã gỡ 2026-10-13 (còn trong git history). |
 
 ## Quy tắc duy trì
 

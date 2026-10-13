@@ -84,7 +84,7 @@ Xem [docs/TESTING.md](docs/TESTING.md) để chạy test và hiểu giới hạn
 - backend/: FastAPI, SQLAlchemy và API nghiệp vụ.
 - scripts/: công cụ benchmark; một số script sinh báo cáo vào docs/.
 - docs/: kiến trúc, roadmap, kiểm thử, đánh giá AI và tài liệu đồ án.
-- Bao_Cao_AIA331_80300_ICTU_V8/ và Bao_Cao_AIA331_80300_ICTU_V9/: source/PDF báo cáo học thuật theo phiên bản.
+- Bao_Cao_AIA331_80300_ICTU_V9/ và Bao_Cao_AIA331_80300_ICTU_V9.pdf: source LaTeX + PDF báo cáo học thuật (bản đã nộp; bản V8 cũ đã gỡ 2026-10-13, còn trong git history).
 - cloudflare/: Worker static + proxy; xem [cloudflare/README.md](cloudflare/README.md) trước khi dùng dữ liệu thật.
 
 ## Cổng chất lượng (quality gate) của frontend
