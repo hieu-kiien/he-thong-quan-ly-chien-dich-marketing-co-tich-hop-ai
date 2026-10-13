@@ -26,6 +26,7 @@ from app.api.v1.settings import router as settings_router
 from app.api.v1.notifications import router as notifications_router
 from app.api.v1.tasks import router as tasks_router
 from app.api.v1.export import router as export_router
+from app.api.v1.mcp import router as mcp_router
 
 
 
@@ -149,6 +150,7 @@ app.include_router(settings_router, prefix=settings.API_V1_PREFIX)
 app.include_router(notifications_router, prefix=settings.API_V1_PREFIX)
 app.include_router(tasks_router, prefix=settings.API_V1_PREFIX)
 app.include_router(export_router, prefix=settings.API_V1_PREFIX)
+app.include_router(mcp_router, prefix=settings.API_V1_PREFIX)
 
 
 

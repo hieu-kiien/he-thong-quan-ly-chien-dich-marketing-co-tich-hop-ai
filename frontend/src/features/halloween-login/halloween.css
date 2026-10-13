@@ -504,7 +504,7 @@ body:not(.night) .eye[aria-pressed="true"]  {
 .night.flashlight-on #password  {
   color: transparent;
   -webkit-text-fill-color: transparent;
-  caret-color: #e5f7f5;
+  caret-color: transparent;
 }
 
 .night.flashlight-on #password::placeholder  {
@@ -566,6 +566,36 @@ body:not(.night) .eye[aria-pressed="true"]  {
   width: 1ch;
   height: 100%;
   vertical-align: top;
+}
+
+@keyframes halloween-caret-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.reveal-char.has-caret-before::before,
+.reveal-caret-end {
+  display: inline-block;
+  width: 1.5px;
+  height: 20px;
+  background: #e5f7f5;
+  box-shadow: 0 0 6px rgb(229 247 245 / 70%);
+  animation: halloween-caret-blink 1s infinite;
+  pointer-events: none;
+}
+
+.reveal-char.has-caret-before::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.reveal-caret-end {
+  vertical-align: middle;
+  margin-left: 1px;
+  margin-top: -2px;
 }
 
 .reveal-char .masked-char, .reveal-char .plain-char  {
@@ -1458,7 +1488,7 @@ h1, .signup-row, .status, .text-action, .field input::placeholder,
   transition: opacity 700ms ease, filter var(--theme-duration) var(--theme-easing);
 }
 
-/* --- B? sung cho MarketFlow --- */
+/* --- Bổ sung cho MarketFlow (Unified Login & Register) --- */
 .status-error  {
   color: #b3261e;
   font-weight: 600;
@@ -1467,6 +1497,129 @@ h1, .signup-row, .status, .text-action, .field input::placeholder,
 
 .night .status-error  {
   color: #ff9d97;
+}
+
+.auth-mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  margin: 0 0 18px;
+  border-radius: 14px;
+  border: 1px solid rgb(255 255 255 / 60%);
+  background: rgb(255 255 255 / 26%);
+  box-shadow: inset 0 1px 2px rgb(15 50 69 / 8%);
+}
+
+.night .auth-mode-switch {
+  border-color: #ac774a45;
+  background: rgb(21 13 31 / 55%);
+}
+
+.auth-mode-switch button {
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #365c69;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 220ms ease, color 220ms ease, box-shadow 220ms ease;
+}
+
+.auth-mode-switch button.is-active {
+  background: linear-gradient(135deg, #148d9d, #136a7b);
+  color: #fff;
+  box-shadow: 0 4px 12px rgb(16 110 127 / 22%);
+}
+
+.night .auth-mode-switch button {
+  color: #c1cbd2;
+}
+
+.night .auth-mode-switch button.is-active {
+  background: linear-gradient(135deg, #f69b49, #ce622b);
+  color: #241222;
+  box-shadow: 0 4px 14px #b54f2840;
+}
+
+.form-panel.is-register {
+  padding-top: 64px;
+  padding-bottom: 28px;
+}
+
+.register-form h1 {
+  margin-bottom: 22px;
+  font-size: 27px;
+}
+
+.register-form .field {
+  margin-bottom: 12px;
+}
+
+.register-form .field input {
+  height: 46px;
+  font-size: 15px;
+}
+
+.register-role-badge {
+  margin: 6px 0 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px dashed rgb(20 129 144 / 45%);
+  background: rgb(255 255 255 / 28%);
+  color: #173e4b;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.register-role-badge strong {
+  display: block;
+  margin-bottom: 2px;
+  color: #115e6d;
+  font-size: 13.5px;
+}
+
+.night .register-role-badge {
+  border-color: #eaa26766;
+  background: rgb(32 23 43 / 58%);
+  color: #dbe4ea;
+}
+
+.night .register-role-badge strong {
+  color: #ffc48d;
+}
+
+.recent-registered-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 11px;
+  border: 1px solid #148d9d66;
+  background: rgb(20 141 157 / 12%);
+  color: #124e5b;
+  font-size: 13px;
+  text-align: left;
+  transition: background-color 180ms ease, transform 150ms ease;
+}
+
+.recent-registered-chip:hover {
+  background: rgb(20 141 157 / 20%);
+  transform: translateY(-1px);
+}
+
+.night .recent-registered-chip {
+  border-color: #f69b4977;
+  background: rgb(246 155 73 / 14%);
+  color: #ffe2bc;
+}
+
+.night .recent-registered-chip:hover {
+  background: rgb(246 155 73 / 24%);
 }
 
 .quick-login  {
@@ -1506,3 +1659,4 @@ h1, .signup-row, .status, .text-action, .field input::placeholder,
   opacity: .6;
   cursor: progress;
 }
+

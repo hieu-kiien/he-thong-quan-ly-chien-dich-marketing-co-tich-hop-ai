@@ -268,3 +268,50 @@ def change_password(
         user=UserResponse.model_validate(current_user),
     )
 
+
+DEMO_PERSONA_EMAILS = {
+    "manager": "manager@gmail.com",
+    "marketer": "marketer@gmail.com",
+    "approver": "approver@gmail.com",
+}
+
+
+@router.post("/switch-demo-role", response_model=TokenResponse)
+def switch_demo_role(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Chuyển nhanh giữa 3 vai trò Demo RBAC (Manager / Marketer / Approver) trong 1 cú nhấp.
+
+    Bảo mật:
+    - Yêu cầu người gọi ĐÃ ĐĂNG NHẬP hợp lệ (`get_current_user`).
+    - Không cần nhúng mật khẩu rõ vào bundle Frontend (tuân thủ tuyệt đối
+      `test_seed_credentials_not_shipped.py`).
+    - Chỉ cho phép chuyển sang các tài khoản mẫu nằm trong `DEMO_PERSONA_EMAILS`.
+    """
+    role_key = str(payload.get("role_key") or "").strip().lower()
+    target_email = DEMO_PERSONA_EMAILS.get(role_key)
+    if not target_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Vai trò demo không hợp lệ. Chọn một trong: manager, marketer, approver.",
+        )
+
+    target_user = db.query(User).filter(User.email == target_email).first()
+    if not target_user or target_user.status != "ACTIVE":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tài khoản mẫu ({target_email}) chưa được khởi tạo hoặc không hoạt động.",
+        )
+
+    access_token = create_access_token(
+        data={"sub": str(target_user.id), "ver": int(target_user.token_version or 0)}
+    )
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserResponse.model_validate(target_user),
+    )
+
+

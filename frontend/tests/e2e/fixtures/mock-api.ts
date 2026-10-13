@@ -516,10 +516,50 @@ export async function setupMockApiRoutes(page: Page, options: SetupMockOptions =
     const method = request.method();
 
     // 1. Auth Endpoints
+    if (path.endsWith('/auth/register') && method === 'POST') {
+      const body = request.postDataJSON() || {};
+      const email = String(body.email || '').trim();
+      const fullName = String(body.full_name || 'Người Dùng Mới').trim();
+      const role = body.role || 'MARKETER';
+      if (role !== 'MARKETER') {
+        return route.fulfill({
+          status: 403,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            detail: 'Self-registration with privileged roles is not allowed. Contact your workspace administrator.',
+          }),
+        });
+      }
+      const existing = Object.values(USERS).find(u => u.email.toLowerCase() === email.toLowerCase());
+      if (existing) {
+        return route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'Email này đã được sử dụng trong hệ thống' }),
+        });
+      }
+      const newUser: MockUser = {
+        id: Object.keys(USERS).length + 10,
+        email,
+        full_name: fullName,
+        role: 'MARKETER',
+        status: 'ACTIVE',
+        created_at: new Date().toISOString(),
+      };
+      USERS[`registered_${newUser.id}`] = newUser;
+      currentUser = newUser;
+      return route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify(newUser),
+      });
+    }
+
     if (path.endsWith('/auth/login') && method === 'POST') {
       const body = request.postDataJSON() || {};
       const foundUser = Object.values(USERS).find(u => u.email.toLowerCase() === (body.email || '').toLowerCase());
       if (foundUser) {
+        currentUser = foundUser;
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -539,7 +579,12 @@ export async function setupMockApiRoutes(page: Page, options: SetupMockOptions =
     if (path.endsWith('/auth/me') && method === 'GET') {
       const authHeader = request.headers()['authorization'] || '';
       let userToReturn = currentUser;
-      if (authHeader.includes('agency_mgr') || authHeader.includes('agency')) userToReturn = USERS.agency_mgr;
+      const customMatch = authHeader.match(/token-[a-z_]+-(\d+)/);
+      if (customMatch) {
+        const uid = Number(customMatch[1]);
+        const byId = Object.values(USERS).find(u => u.id === uid);
+        if (byId) userToReturn = byId;
+      } else if (authHeader.includes('agency_mgr') || authHeader.includes('agency')) userToReturn = USERS.agency_mgr;
       else if (authHeader.includes('manager')) userToReturn = USERS.manager;
       else if (authHeader.includes('marketer')) userToReturn = USERS.marketer;
       else if (authHeader.includes('approver')) userToReturn = USERS.approver;
@@ -1264,6 +1309,142 @@ export async function setupMockApiRoutes(page: Page, options: SetupMockOptions =
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify([]),
+      });
+    }
+
+    // MCP Endpoints (Model Context Protocol 2025-03-26)
+    if (path.endsWith('/mcp/manifest') && method === 'GET') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          server: {
+            name: 'marketflow-mcp-server',
+            version: '2.0.0',
+            protocolVersion: '2025-03-26',
+            capabilities: { tools: {}, resources: {}, prompts: {} },
+            description: 'Model Context Protocol (MCP) Server cho MarketFlow AI',
+          },
+          tools: [
+            { name: 'list_workspace_campaigns', description: 'Liệt kê danh sách các chiến dịch tiếp thị thuộc Workspace hiện tại.', inputSchema: { type: 'object' } },
+            { name: 'get_campaign_metrics', description: 'Trích xuất chỉ số KPI thực tế (Views, Clicks, CTR, Conversions, Cost, Revenue, ROI).', inputSchema: { type: 'object' } },
+            { name: 'diagnose_campaign_health', description: 'Chạy AI Performance Doctor phân tích nguyên nhân gốc rễ hiệu quả chiến dịch.', inputSchema: { type: 'object' } },
+            { name: 'scan_content_compliance', description: 'Quét nội dung tiếp thị qua bộ lọc an toàn thương hiệu.', inputSchema: { type: 'object' } },
+            { name: 'auto_fix_compliance_violations', description: 'Tự động sửa ngữ nghĩa các cụm từ vi phạm chính sách quảng cáo.', inputSchema: { type: 'object' } },
+            { name: 'create_marketing_draft', description: 'Tạo và lưu trực tiếp bản nháp nội dung tiếp thị (AI_DRAFT).', inputSchema: { type: 'object' } },
+            { name: 'rebalance_campaign_budget', description: 'Phân tích hiệu suất chi tiêu và đề xuất tái phân bổ ngân sách theo ROAS.', inputSchema: { type: 'object' } },
+          ],
+          resources: [
+            { uri: 'marketflow://workspace/brand-kit', name: 'Workspace Brand Kit & Guardrails', description: 'Thông tin nhận diện thương hiệu, tone giọng và từ khóa cấm.', mimeType: 'application/json' },
+            { uri: 'marketflow://campaigns/active-summary', name: 'Active Campaigns Portfolio Summary', description: 'Bức tranh tổng thể các chiến dịch đang hoạt động.', mimeType: 'application/json' },
+            { uri: 'marketflow://policies/ad-compliance-rules', name: 'Ad Platform Compliance Ruleset', description: 'Danh mục quy tắc kiểm duyệt quảng cáo đa nền tảng.', mimeType: 'application/json' },
+          ],
+          prompts: [
+            { name: 'omnichannel-campaign-architect', description: 'Kiểm toán toàn diện chiến dịch bằng chuỗi công cụ MCP.', arguments: [] },
+            { name: 'compliance-safe-copywriter', description: 'Sáng tạo nội dung chuẩn Brand Kit và tự động làm sạch vi phạm.', arguments: [] },
+            { name: 'roas-performance-doctor', description: 'Phân tích ROAS/CPA và tối ưu phân bổ ngân sách.', arguments: [] },
+          ],
+        }),
+      });
+    }
+
+    if ((path.endsWith('/mcp/rpc') || path.endsWith('/mcp/tools/call')) && method === 'POST') {
+      const rpcBody = request.postDataJSON() || {};
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: rpcBody.id ?? 1,
+          result: { status: 'OK', method: rpcBody.method || rpcBody.name, params: rpcBody.params || rpcBody.arguments || {} },
+        }),
+      });
+    }
+
+    if (path.endsWith('/mcp/resources/read') && method === 'GET') {
+      const uri = url.searchParams.get('uri') || 'marketflow://workspace/brand-kit';
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          contents: [{ uri, mimeType: 'application/json', data: { brand_name: 'MarketFlow AI' } }],
+        }),
+      });
+    }
+
+    if (path.endsWith('/mcp/agent/run') && method === 'POST') {
+      const reqBody = request.postDataJSON() || {};
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          protocol: 'MCP/2025-03-26',
+          server: 'marketflow-mcp-server',
+          goal: reqBody.goal || 'Kiểm toán chiến dịch',
+          steps_executed: 3,
+          total_latency_ms: 18.4,
+          trace: [
+            {
+              step: 1,
+              kind: 'RESOURCE_READ',
+              name: 'marketflow://workspace/brand-kit',
+              input: { uri: 'marketflow://workspace/brand-kit' },
+              latency_ms: 4.2,
+              summary: 'Đã nạp Brand Kit của Workspace để đồng bộ giọng điệu.',
+              output: { brand_name: 'MarketFlow AI' },
+            },
+            {
+              step: 2,
+              kind: 'TOOL_CALL',
+              name: 'get_campaign_metrics',
+              input: { campaign_id: reqBody.campaign_id || 1 },
+              latency_ms: 6.1,
+              summary: 'Đã trích xuất KPI thực tế (CTR, ROI).',
+              output: { roi_pct: 185.4, ctr_pct: 3.2 },
+            },
+            {
+              step: 3,
+              kind: 'TOOL_CALL',
+              name: 'rebalance_campaign_budget',
+              input: { campaign_id: reqBody.campaign_id || 1 },
+              latency_ms: 8.1,
+              summary: 'Đã tính toán phương án phân bổ ngân sách theo ROAS.',
+              output: { applied: false, proposals: [] },
+            },
+          ],
+          artifacts: {},
+          final_answer: 'Đã hoàn tất kiểm toán chiến dịch và tối ưu ngân sách qua MCP Server.',
+        }),
+      });
+    }
+
+    if (path.endsWith('/mcp/compliance/auto-fix') && method === 'POST') {
+      const reqBody = request.postDataJSON() || {};
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          before_score: 40,
+          before_status: 'REJECTED',
+          rewritten: {
+            title: String(reqBody.title || '').replace(/cam kết 100%/gi, 'hỗ trợ tối đa'),
+            body: String(reqBody.body || '').replace(/cam kết 100%/gi, 'hỗ trợ tối đa'),
+            cta: String(reqBody.cta || ''),
+          },
+          applied_fixes: [{ original: 'cam kết 100%', replacement: 'hỗ trợ tối đa', category: 'Cam kết tuyệt đối' }],
+          after_compliance: {
+            score: 100,
+            status: 'PASSED',
+            can_submit: true,
+            violations: [],
+            checked_at: new Date().toISOString(),
+          },
+          brand_context: {
+            brand_name: 'MarketFlow AI',
+            tone_of_voice: 'Chuyên nghiệp',
+            usp: 'Tối ưu chuyển đổi',
+          },
+        }),
       });
     }
 

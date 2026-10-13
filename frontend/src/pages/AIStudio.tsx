@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 
-import { Sparkles, Lightbulb, FileText, SendHorizontal, Copy, Check, Loader2, ArrowRight, CheckCircle2, Zap, Stethoscope, RefreshCw, AlertTriangle, ThumbsUp, Video, Mail, ExternalLink, ShieldCheck, Eye, Lock } from 'lucide-react';
+import { Sparkles, Lightbulb, FileText, SendHorizontal, Copy, Check, Loader2, ArrowRight, CheckCircle2, Zap, Stethoscope, RefreshCw, AlertTriangle, ThumbsUp, Video, Mail, ExternalLink, ShieldCheck, Eye, Lock, Bot } from 'lucide-react';
 import { Campaign, AIIdeaResponse, AIDraftResponse, MarketingContent, AISummaryResponse, KPISummary, OmnichannelResponse, ComplianceCheckResponse } from '../types';
 
-import { contentApi, campaignApi, getApiErrorMessage } from '../services/api';
+import { contentApi, campaignApi, mcpApi, getApiErrorMessage } from '../services/api';
 import { AIJobError, describeAIJobFailure, describeAIResultOrigin } from '../services/aiJobPoller';
 import { useAIJob } from '../hooks/useAIJob';
 import { AIJobProgress } from '../components/AIJobProgress';
@@ -11,6 +11,7 @@ import { AIJobProgress } from '../components/AIJobProgress';
 import { useToast } from '../components/Toast';
 
 import { ComplianceAlertBadge } from '../components/ComplianceAlertBadge';
+import { MCPAgentStudio } from '../components/MCPAgentStudio';
 
 import { FacebookPreviewCard, TikTokPhoneMockup, EmailInboxPreview } from '../components/previews';
 
@@ -77,9 +78,9 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
 
 
-  // Studio Modes: 'omnichannel' | 'create' | 'doctor'
+  // Studio Modes: 'omnichannel' | 'create' | 'doctor' | 'mcp'
 
-  const [studioSection, setStudioSection] = useState<'omnichannel' | 'create' | 'doctor'>('omnichannel');
+  const [studioSection, setStudioSection] = useState<'omnichannel' | 'create' | 'doctor' | 'mcp'>('omnichannel');
 
 
 
@@ -671,6 +672,33 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
     }, 200);
 
+  };
+
+  const handleMCPAutoFixAll = async () => {
+    if (!draftData || isCheckingCompliance) return;
+    setIsCheckingCompliance(true);
+    try {
+      const res = await mcpApi.autoFixCompliance({
+        channel: channelCode,
+        title: draftData.title,
+        body: draftData.body,
+        cta: draftData.cta || '',
+      });
+      setDraftData({
+        ...draftData,
+        title: res.rewritten.title,
+        body: res.rewritten.body,
+        cta: res.rewritten.cta,
+      });
+      setComplianceResult(res.after_compliance);
+      toast.success(
+        `MCP Guardrail đã tự động sửa ${res.applied_fixes.length} cụm từ vi phạm (Điểm tuân thủ: ${res.after_compliance.score}/100)!`,
+      );
+    } catch (e: any) {
+      toast.error(getApiErrorMessage(e), 'Lỗi khi tự động sửa vi phạm bằng MCP');
+    } finally {
+      setIsCheckingCompliance(false);
+    }
   };
 
 
@@ -1280,6 +1308,18 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
             <Stethoscope className="w-3.5 h-3.5" /> 🩺 Bác sĩ AI Khám Bệnh
 
+          </button>
+
+          <button
+            data-testid="studio-tab-mcp"
+            onClick={() => setStudioSection('mcp')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+              studioSection === 'mcp'
+                ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm'
+                : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <Bot className="w-3.5 h-3.5 text-amber-300" /> 🤖 MCP &amp; Agentic Copilot
           </button>
 
         </div>
@@ -3468,7 +3508,20 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
                       {complianceResult && (
 
-                        <div className="pt-2">
+                        <div className="pt-2 space-y-2">
+                          {complianceResult.violations && complianceResult.violations.length > 0 && (
+                            <div className="flex items-center justify-end">
+                              <button
+                                type="button"
+                                onClick={handleMCPAutoFixAll}
+                                disabled={isCheckingCompliance}
+                                className="text-xs font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 px-3.5 py-1.5 rounded-lg shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                              >
+                                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                                <span>✨ AI Tự động Sửa Toàn bộ Vi phạm (MCP Guardrail 100/100)</span>
+                              </button>
+                            </div>
+                          )}
 
                           <ComplianceAlertBadge
 
@@ -3900,6 +3953,16 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
         </div>
 
+      )}
+
+      {/* SECTION 3: MCP & AGENTIC COPILOT */}
+      {studioSection === 'mcp' && (
+        <MCPAgentStudio
+          campaigns={campaigns}
+          selectedCampaign={selectedCampaign}
+          onSelectCampaign={onSelectCampaign}
+          onContentCreated={onContentCreated}
+        />
       )}
 
     </div>

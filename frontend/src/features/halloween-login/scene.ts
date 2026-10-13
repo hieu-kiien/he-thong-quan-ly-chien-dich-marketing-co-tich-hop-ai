@@ -27,6 +27,7 @@ export function startScene(): Cleanup {
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   const passwordInput = document.getElementById('password') as HTMLInputElement;
+  const confirmPasswordInput = document.getElementById('confirmPassword') as HTMLInputElement | null;
   const toggleButton = document.getElementById('show-password') as HTMLButtonElement;
   const statusMessage = document.getElementById('status');
   const beam = document.getElementById('flash-beam') as HTMLElement;
@@ -51,6 +52,11 @@ export function startScene(): Cleanup {
   };
 
   let nightMode = false;
+  try {
+    nightMode = sessionStorage.getItem('mf_halloween_night') === '1';
+  } catch {
+    nightMode = false;
+  }
   let revealEnabled = false;
   let cursor = { x: 0, y: 0 };
   let beamAngle = Math.PI;
@@ -100,9 +106,12 @@ export function startScene(): Cleanup {
   }
 
   function renderPassword(): void {
-    const chars = Array.from(passwordInput.value, (letter) => {
+    const isFocused = document.activeElement === passwordInput;
+    const rawCaret = passwordInput.selectionStart;
+    const caretPos = typeof rawCaret === 'number' ? rawCaret : passwordInput.value.length;
+    const chars = Array.from(passwordInput.value, (letter, idx) => {
       const character = document.createElement('span');
-      character.className = 'reveal-char';
+      character.className = isFocused && idx === caretPos ? 'reveal-char has-caret-before' : 'reveal-char';
       const masked = document.createElement('span');
       masked.className = 'masked-char';
       masked.textContent = '•';
@@ -112,6 +121,12 @@ export function startScene(): Cleanup {
       character.append(masked, plain);
       return character;
     });
+    if (isFocused && caretPos >= passwordInput.value.length) {
+      const endCaret = document.createElement('span');
+      endCaret.className = 'reveal-caret-end';
+      endCaret.setAttribute('aria-hidden', 'true');
+      chars.push(endCaret);
+    }
     passwordChars.replaceChildren(...chars);
   }
 
@@ -162,6 +177,7 @@ export function startScene(): Cleanup {
     passwordChars.style.transform = `translateX(${-passwordInput.scrollLeft}px)`;
 
     for (const character of Array.from(passwordChars.children)) {
+      if (!character.classList.contains('reveal-char')) continue;
       const bounds = character.getBoundingClientRect();
       const light = getLightLevel(
         bounds.left + bounds.width / 2,
@@ -234,6 +250,9 @@ export function startScene(): Cleanup {
     revealEnabled = enabled;
     document.body.classList.toggle('flashlight-on', nightMode && enabled);
     passwordInput.type = !nightMode && enabled ? 'text' : 'password';
+    if (confirmPasswordInput) {
+      confirmPasswordInput.type = enabled ? 'text' : 'password';
+    }
     toggleButton.setAttribute('aria-pressed', String(enabled));
     const description = nightMode ? texts[enabled ? 'lightOff' : 'lightOn'] : texts[enabled ? 'hide' : 'show'];
     toggleButton.setAttribute('aria-label', description);
@@ -263,6 +282,11 @@ export function startScene(): Cleanup {
     departingFlights.forEach((animation) => animation.cancel());
     departingFlights.length = 0;
     nightMode = enabled;
+    try {
+      sessionStorage.setItem('mf_halloween_night', enabled ? '1' : '0');
+    } catch {
+      // ignore storage errors
+    }
     const retiring = !enabled && document.body.classList.contains('night') && !reduced.matches;
     document.body.classList.toggle('night-exiting', retiring);
     if (enabled) document.body.classList.add('night');
@@ -303,10 +327,18 @@ export function startScene(): Cleanup {
   document.addEventListener('pointermove', onPointerMove, { passive: true });
   cleanups.push(() => document.removeEventListener('pointermove', onPointerMove));
 
-  passwordInput.addEventListener('input', () => {
-    if (nightMode && revealEnabled) renderPassword();
-    updateFlashlight();
-  });
+  const syncPasswordOverlay = (): void => {
+    if (nightMode && revealEnabled) {
+      renderPassword();
+      updateFlashlight();
+    }
+  };
+  passwordInput.addEventListener('input', syncPasswordOverlay);
+  passwordInput.addEventListener('keyup', syncPasswordOverlay);
+  passwordInput.addEventListener('keydown', () => requestAnimationFrame(syncPasswordOverlay));
+  passwordInput.addEventListener('click', syncPasswordOverlay);
+  passwordInput.addEventListener('focus', syncPasswordOverlay);
+  passwordInput.addEventListener('blur', syncPasswordOverlay);
   passwordInput.addEventListener('scroll', updateFlashlight);
   const onResize = (): void => updateFlashlight();
   window.addEventListener('resize', onResize);
@@ -321,9 +353,15 @@ export function startScene(): Cleanup {
   // --- Dây leo SVG ---
   let vineNodes: Element[] = [];
   let vineFrames: Record<string, number>[][] = [];
-  let vineProgress = 0;
-  let vineTarget = 0;
+  let vineProgress = nightMode ? 1 : 0;
+  let vineTarget = nightMode ? 1 : 0;
   let vineAnimation = 0;
+
+  if (nightMode) {
+    document.body.classList.add('night');
+    themeButton.setAttribute('aria-pressed', 'true');
+    themeButton.setAttribute('aria-label', texts.day);
+  }
 
   function paintVineFrame(progress: number): void {
     if (!vineFrames.length) return;

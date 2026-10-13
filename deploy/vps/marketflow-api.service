@@ -1,23 +1,64 @@
+# /etc/systemd/system/marketflow-api.service
+#
+# Tiến trình FastAPI cho MarketFlow AI (Production VPS — 2 vCPU / 2 GiB RAM).
+# Đồng bộ 100% với cấu hình thực tế trên VPS:
+# - Đọc biến môi trường từ /opt/marketflow/backend/.env
+# - Chạy 2 Uvicorn workers với --timeout-keep-alive 75 (khớp keepalive của Nginx/Cloudflare)
+# - Giới hạn bộ nhớ MemoryHigh/MemoryMax bảo vệ VPS 2 GiB RAM khỏi OOM killer.
+#
+# Cài đặt / Cập nhật:
+#   sudo cp deploy/vps/marketflow-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now marketflow-api
+#   sudo systemctl status marketflow-api
+
 [Unit]
-Description=MarketFlow FastAPI service
-After=network-online.target postgresql.service
+Description=MarketFlow AI — FastAPI backend (Production VPS)
+After=network-online.target
 Wants=network-online.target
-Requires=postgresql.service
 
 [Service]
 Type=simple
 User=marketflow
 Group=marketflow
 WorkingDirectory=/opt/marketflow/backend
-EnvironmentFile=/etc/marketflow/api.env
-Environment=PYTHONUNBUFFERED=1
-ExecStart=/opt/marketflow/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips=127.0.0.1
-Restart=on-failure
-RestartSec=5
+
+# Tệp .env chứa SECRET_KEY, BYOK_ENCRYPTION_KEY, AI_API_KEY (chmod 600).
+EnvironmentFile=/opt/marketflow/backend/.env
+Environment="PYTHONUNBUFFERED=1"
+Environment="PYTHONDONTWRITEBYTECODE=1"
+
+# 2 workers cho VPS 2 vCPU (SQLite WAL + busy_timeout=5000ms hỗ trợ đọc song song).
+ExecStart=/opt/marketflow/backend/venv/bin/uvicorn app.main:app \
+    --host 127.0.0.1 \
+    --port 8000 \
+    --workers 2 \
+    --timeout-keep-alive 75 \
+    --limit-concurrency 120 \
+    --backlog 256 \
+    --proxy-headers \
+    --forwarded-allow-ips="127.0.0.1"
+
+Restart=always
+RestartSec=3
 TimeoutStopSec=30
+
+# Giới hạn tài nguyên cho VPS 2 vCPU / 2 GiB RAM (tránh OOM toàn máy)
+MemoryHigh=1024M
+MemoryMax=1400M
+CPUQuota=180%
+LimitNOFILE=65535
+
+# Hardening cơ bản của systemd
 NoNewPrivileges=true
 PrivateTmp=true
-UMask=0077
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/marketflow/backend/data /opt/marketflow/backend
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=marketflow-api
 
 [Install]
 WantedBy=multi-user.target

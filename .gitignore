@@ -78,3 +78,12 @@ backend/data/*
 # Output cua lenh tsc - file rac, khong commit
 tsc-errors.txt
 frontend/tsc-errors.txt
+
+# Bổ sung lọc rác dự án lồng cấp (nested junk & backups)
+**/.coverage
+**/coverage.xml
+**/htmlcov/
+**/playwright-report/
+**/test-results/
+**/*.pre_sprint_backup
+backend/backend/

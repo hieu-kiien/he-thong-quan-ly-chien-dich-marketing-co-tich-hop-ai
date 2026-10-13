@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Sparkles, Menu, Palette, LogOut, Shield, AlertTriangle, X, Sun, Moon } from 'lucide-react';
+import { Search, Sparkles, Menu, Palette, LogOut, Shield, AlertTriangle, X, Sun, Moon, ChevronDown, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { NotificationCenter } from './NotificationCenter';
-import { isOfflineDemoEnabled, isBackendConnected } from '../services/api';
+import { isOfflineDemoEnabled, isBackendConnected, getApiErrorMessage } from '../services/api';
 import { useColorScheme } from '../utils/colorScheme';
+import { useToast } from './Toast';
 
 interface NavbarProps {
   onOpenBrandKit: () => void;
@@ -26,10 +27,38 @@ export const Navbar: React.FC<NavbarProps> = ({
   pendingReviewsCount = 0,
   activeCampaignsCount = 0
 }) => {
-  const { user, userRole, logout } = useAuth();
+  const { user, userRole, switchDemoRole, logout } = useAuth();
+  const toast = useToast();
   const { scheme, toggle: toggleColorScheme } = useColorScheme();
   const [searchQuery, setSearchQuery] = useState('');
+  const [roleSwitcherOpen, setRoleSwitcherOpen] = useState(false);
+  const [switchingRole, setSwitchingRole] = useState(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const roleSwitcherRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (roleSwitcherRef.current && !roleSwitcherRef.current.contains(e.target as Node)) {
+        setRoleSwitcherOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSwitchDemoRole = async (roleKey: 'manager' | 'marketer' | 'approver') => {
+    if (switchingRole) return;
+    setSwitchingRole(true);
+    try {
+      const nextUser = await switchDemoRole(roleKey);
+      setRoleSwitcherOpen(false);
+      toast.success(`Đã chuyển sang vai trò Demo: ${nextUser.full_name} (${nextUser.role})`);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err), 'Không thể chuyển vai trò Demo');
+    } finally {
+      setSwitchingRole(false);
+    }
+  };
 
   // Keyboard shortcut Cmd+K / Ctrl+K to focus search
   useEffect(() => {
@@ -220,7 +249,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             chiếm ~100px ở navbar, cộng dồn với các nút khác khiến vùng trái bị
             bóp và chồng lấn. Tên/email bên cạnh vốn đã là `hidden lg:flex`. */}
         {user && (
-          <div className="hidden lg:flex items-center gap-2 pl-2 border-l border-slate-800 shrink-0">
+          <div
+            ref={roleSwitcherRef}
+            className="hidden lg:flex items-center gap-2 pl-2 border-l border-slate-800 shrink-0 relative"
+          >
             {/* Khối này khai báo lại `bg-slate-900` — cùng màu với header, nên
                 giao diện không đổi. Cần thiết vì axe đo tương phản bằng cách dò
                 nền của chính khối chứa chữ và các tổ tiên KẾ TIẾP; nó bỏ qua nền
@@ -235,7 +267,80 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {user.email}
               </span>
             </div>
-            {getRoleBadge(userRole)}
+            <button
+              type="button"
+              data-testid="navbar-role-switcher-btn"
+              onClick={() => setRoleSwitcherOpen((prev) => !prev)}
+              aria-expanded={roleSwitcherOpen}
+              aria-label="Đổi nhanh vai trò Demo RBAC"
+              title="Bấm để chuyển nhanh giữa 3 vai trò Demo (Manager / Marketer / Approver)"
+              className="flex items-center gap-0.5 cursor-pointer hover:opacity-90 transition-opacity"
+            >
+              {getRoleBadge(userRole)}
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            </button>
+
+            {roleSwitcherOpen && (
+              <div
+                data-testid="navbar-role-switcher-menu"
+                className="absolute right-0 top-full mt-2 w-72 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-3 z-50 text-left space-y-2"
+              >
+                <div className="pb-2 border-b border-slate-800">
+                  <div className="text-xs font-black text-amber-300 flex items-center justify-between">
+                    <span>🎭 Chuyển Vai trò Demo (RBAC)</span>
+                    <span className="text-[10px] font-mono bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">
+                      1-Click
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                    Kiểm thử ngay luồng phân quyền 3 tầng mà không cần đăng xuất:
+                  </p>
+                </div>
+
+                {[
+                  {
+                    key: 'manager' as const,
+                    label: 'Nguyễn Quản Lý (MANAGER)',
+                    email: 'manager@gmail.com',
+                    desc: 'Toàn quyền: Tạo chiến dịch, Duyệt & Xuất bản, Ngân sách, AI Keys',
+                    active: user.email === 'manager@gmail.com',
+                  },
+                  {
+                    key: 'marketer' as const,
+                    label: 'Trần Chuyên Viên (MARKETER)',
+                    email: 'marketer@gmail.com',
+                    desc: 'Sáng tạo AI Studio, Tạo nháp, Gửi duyệt (Không được tự duyệt)',
+                    active: user.email === 'marketer@gmail.com',
+                  },
+                  {
+                    key: 'approver' as const,
+                    label: 'Lê Duyệt Bài (CLIENT_APPROVER)',
+                    email: 'approver@gmail.com',
+                    desc: 'Khách hàng / Giám đốc thương hiệu: Phê duyệt hoặc Từ chối bài',
+                    active: user.email === 'approver@gmail.com',
+                  },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    disabled={switchingRole}
+                    onClick={() => handleSwitchDemoRole(item.key)}
+                    className={`w-full p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-start justify-between gap-2 ${
+                      item.active
+                        ? 'bg-indigo-950/90 border-indigo-500/60 text-white'
+                        : 'bg-slate-800/70 hover:bg-slate-800 border-slate-700/70 text-slate-200'
+                    }`}
+                  >
+                    <div className="space-y-0.5 min-w-0">
+                      <div className="text-xs font-bold truncate">{item.label}</div>
+                      <div className="text-[10px] font-mono text-indigo-300">{item.email}</div>
+                      <div className="text-[10px] text-slate-400 leading-tight">{item.desc}</div>
+                    </div>
+                    {item.active && <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

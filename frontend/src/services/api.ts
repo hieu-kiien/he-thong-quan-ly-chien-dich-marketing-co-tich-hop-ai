@@ -2349,3 +2349,234 @@ export const commandCenterApi = {
 
 
 
+export interface MCPToolSpec {
+  name: string;
+  description: string;
+  inputSchema: Record<string, any>;
+}
+
+export interface MCPResourceSpec {
+  uri: string;
+  name: string;
+  description: string;
+  mimeType: string;
+}
+
+export interface MCPPromptSpec {
+  name: string;
+  description: string;
+  arguments?: Array<{ name: string; description: string; required?: boolean }>;
+}
+
+export interface MCPManifestResponse {
+  server: {
+    name: string;
+    version: string;
+    protocolVersion: string;
+    capabilities: Record<string, any>;
+    description: string;
+  };
+  tools: MCPToolSpec[];
+  resources: MCPResourceSpec[];
+  prompts: MCPPromptSpec[];
+}
+
+export interface MCPTraceStep {
+  step: number;
+  kind: 'RESOURCE_READ' | 'TOOL_CALL';
+  name: string;
+  input: Record<string, any>;
+  summary: string;
+  latency_ms: number;
+  output?: any;
+}
+
+export interface MCPAgentRunResponse {
+  protocol: string;
+  server: string;
+  goal: string;
+  total_latency_ms: number;
+  steps_executed: number;
+  trace: MCPTraceStep[];
+  artifacts: Record<string, any>;
+  final_answer: string;
+}
+
+export interface MCPComplianceAutoFixResponse {
+  rewritten: {
+    title: string;
+    body: string;
+    cta: string;
+  };
+  applied_fixes: Array<{
+    original: string;
+    replacement: string;
+    category: string;
+  }>;
+  before_score: number;
+  before_status: string;
+  after_compliance: ComplianceCheckResponse;
+  brand_context: {
+    brand_name: string;
+    tone_of_voice: string;
+    usp: string;
+  };
+}
+
+export const mcpApi = {
+  getManifest: async (): Promise<MCPManifestResponse> => {
+    try {
+      const res = await apiClient.get('/mcp/manifest');
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      return {
+        server: {
+          name: 'marketflow-mcp-server',
+          version: '2.0.0',
+          protocolVersion: '2025-03-26',
+          capabilities: { tools: {}, resources: {}, prompts: {} },
+          description: 'Model Context Protocol (MCP) Server cho MarketFlow AI',
+        },
+        tools: [
+          {
+            name: 'list_workspace_campaigns',
+            description: 'Liệt kê danh sách các chiến dịch tiếp thị trong Workspace hiện tại.',
+            inputSchema: { type: 'object', properties: { workspace_id: { type: 'integer' } } },
+          },
+          {
+            name: 'get_campaign_metrics',
+            description: 'Truy xuất toàn bộ chỉ số hiệu năng thực tế (Views, Clicks, Conversions, ROAS, ROI).',
+            inputSchema: { type: 'object', properties: { campaign_id: { type: 'integer' } } },
+          },
+          {
+            name: 'diagnose_campaign_health',
+            description: 'Kích hoạt Bác sĩ AI phân tích phễu chuyển đổi & tìm điểm nghẽn ngân sách.',
+            inputSchema: { type: 'object', properties: { campaign_id: { type: 'integer' } } },
+          },
+          {
+            name: 'scan_content_compliance',
+            description: 'Quét tuân thủ chính sách quảng cáo & từ khóa cấm trong Brand Kit.',
+            inputSchema: { type: 'object', properties: { title: { type: 'string' }, body: { type: 'string' } } },
+          },
+          {
+            name: 'auto_fix_compliance_violations',
+            description: 'Agentic AI tự động viết lại nội dung vi phạm đạt chuẩn 100/100 (PASSED).',
+            inputSchema: { type: 'object', properties: { title: { type: 'string' }, body: { type: 'string' } } },
+          },
+          {
+            name: 'create_marketing_draft',
+            description: 'Khởi tạo bản nháp nội dung tiếp thị chuẩn Brand Kit và lưu trực tiếp vào CSDL.',
+            inputSchema: { type: 'object', properties: { campaign_id: { type: 'integer' }, channel: { type: 'string' } } },
+          },
+          {
+            name: 'rebalance_campaign_budget',
+            description: 'Tính toán phương án tái phân bổ ngân sách thông minh theo ROAS thực tế.',
+            inputSchema: { type: 'object', properties: { campaign_id: { type: 'integer' } } },
+          },
+          {
+            name: 'dispatch_external_webhook',
+            description: 'Bắn sự kiện Outbound Webhook chuẩn ký số HMAC-SHA256 ra hệ thống bên ngoài (n8n, Zapier, Telegram, Slack/Discord, Meta, WordPress).',
+            inputSchema: { type: 'object', properties: { connector_type: { type: 'string' }, event_type: { type: 'string' } } },
+          },
+        ],
+        resources: [
+          {
+            uri: 'marketflow://workspace/brand-kit',
+            name: 'Workspace Brand Kit & Safety Guidelines',
+            description: 'Thông tin nhận diện thương hiệu, USP, Tone of Voice và từ khóa cấm.',
+            mimeType: 'application/json',
+          },
+          {
+            uri: 'marketflow://campaigns/active-summary',
+            name: 'Active Campaigns & KPI Snapshot',
+            description: 'Bức tranh tổng thể các chiến dịch đang chạy kèm tổng ngân sách.',
+            mimeType: 'application/json',
+          },
+          {
+            uri: 'marketflow://policies/ad-compliance-rules',
+            name: 'Omnichannel Advertising Compliance Ruleset',
+            description: 'Bộ quy tắc kiểm duyệt quảng cáo đa kênh.',
+            mimeType: 'application/json',
+          },
+        ],
+        prompts: [
+          {
+            name: 'omnichannel-campaign-architect',
+            description: 'Thiết kế chiến lược nội dung đa kênh đồng bộ từ một Brief.',
+          },
+          {
+            name: 'compliance-safe-copywriter',
+            description: 'Kiểm toán và viết lại nội dung quảng cáo đảm bảo điểm tuân thủ 100/100.',
+          },
+          {
+            name: 'roas-performance-doctor',
+            description: 'Chẩn đoán chuyên sâu nguyên nhân rò rỉ ngân sách theo ROAS.',
+          },
+        ],
+      };
+    }
+  },
+
+  callTool: async (name: string, args: Record<string, any> = {}): Promise<any> => {
+    const res = await apiClient.post('/mcp/tools/call', { name, arguments: args });
+    return res.data;
+  },
+
+  readResource: async (uri: string, workspaceId?: number): Promise<any> => {
+    const res = await apiClient.get('/mcp/resources/read', {
+      params: { uri, ...(workspaceId ? { workspace_id: workspaceId } : {}) },
+    });
+    return res.data;
+  },
+
+  runAgent: async (data: {
+    goal: string;
+    campaign_id?: number;
+    workspace_id?: number;
+    channel?: string;
+    draft_input?: { title: string; body: string; cta: string };
+  }): Promise<MCPAgentRunResponse> => {
+    const res = await apiClient.post('/mcp/agent/run', data);
+    return res.data;
+  },
+
+  autoFixCompliance: async (data: {
+    workspace_id?: number;
+    channel?: string;
+    title: string;
+    body: string;
+    cta?: string;
+  }): Promise<MCPComplianceAutoFixResponse> => {
+    const res = await apiClient.post('/mcp/compliance/auto-fix', data);
+    return res.data;
+  },
+
+  getIntegrationsBlueprint: async (workspaceId = 1): Promise<any> => {
+    const res = await apiClient.get('/mcp/integrations/blueprint', {
+      params: { workspace_id: workspaceId },
+    });
+    return res.data;
+  },
+
+  testWebhookDispatch: async (data: {
+    connector_type: string;
+    event_type: string;
+    campaign_id?: number;
+    workspace_id?: number;
+    target_url?: string;
+  }): Promise<any> => {
+    const res = await apiClient.post('/mcp/integrations/webhook-test', data);
+    return res.data;
+  },
+
+  switchDemoRole: async (
+    roleKey: 'manager' | 'marketer' | 'approver',
+  ): Promise<{ access_token: string; user: User }> => {
+    const res = await apiClient.post('/auth/switch-demo-role', { role_key: roleKey });
+    localStorage.setItem('access_token', res.data.access_token);
+    localStorage.setItem('current_user', JSON.stringify(res.data.user));
+    return res.data;
+  },
+};
+

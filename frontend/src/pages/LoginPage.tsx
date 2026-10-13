@@ -13,9 +13,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToRegister }) =>
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [statusNote, setStatusNote] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [recentRegistered, setRecentRegistered] = useState<{ email: string; full_name: string } | null>(null);
 
   useEffect(() => {
+    try {
+      const raw = localStorage.getItem('mf_recent_registered_user');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.email) {
+          setRecentRegistered(parsed);
+        }
+      }
+      const prefill = sessionStorage.getItem('mf_prefill_email');
+      if (prefill) {
+        setEmail(prefill);
+        sessionStorage.removeItem('mf_prefill_email');
+      }
+    } catch {
+      // ignore storage errors
+    }
     const teardown = startHalloweenScene();
     return teardown;
   }, []);
@@ -24,6 +42,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToRegister }) =>
     setEmail(quickEmail);
     setPassword(quickPass);
     setError(null);
+    setStatusNote(null);
+  };
+
+  const handleFillRecentAccount = () => {
+    if (!recentRegistered) return;
+    setEmail(recentRegistered.email);
+    setError(null);
+    setStatusNote(`Đã điền email vừa đăng ký (${recentRegistered.full_name}). Vui lòng nhập mật khẩu của bạn.`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,6 +60,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToRegister }) =>
     }
 
     setError(null);
+    setStatusNote(null);
     setIsLoading(true);
     try {
       await login(email, password);
@@ -112,7 +139,31 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToRegister }) =>
 
           <section className="form-panel">
             <form className="login-form" id="login-form" onSubmit={handleSubmit}>
+              <div className="auth-mode-switch" role="tablist" aria-label="Chế độ xác thực">
+                <button type="button" role="tab" aria-selected="true" className="is-active">
+                  Đăng nhập
+                </button>
+                <button type="button" role="tab" aria-selected="false" onClick={onNavigateToRegister}>
+                  Đăng ký tài khoản
+                </button>
+              </div>
+
               <h1 id="login-title">Đăng nhập</h1>
+
+              {recentRegistered && (
+                <button
+                  type="button"
+                  className="recent-registered-chip"
+                  onClick={handleFillRecentAccount}
+                  title="Điền nhanh email tài khoản bạn vừa đăng ký"
+                >
+                  <span>
+                    ✦ Vừa đăng ký: <strong>{recentRegistered.full_name}</strong> ({recentRegistered.email})
+                  </span>
+                  <span>Điền ➔</span>
+                </button>
+              )}
+
               <div className="field">
                 <label className="sr-only" htmlFor="email">
                   Email
@@ -156,8 +207,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToRegister }) =>
                 </p>
               )}
 
+              {statusNote && !error && (
+                <p className="status" role="status">
+                  {statusNote}
+                </p>
+              )}
+
               {/* Trạng thái chờ: giữ nguyên vùng aria-live để người dùng biết đang xử lý. */}
-              <p className={error ? 'sr-only' : 'status'} role="status" aria-live="polite">
+              <p className={error || statusNote ? 'sr-only' : 'status'} role="status" aria-live="polite">
                 {isLoading ? 'Đang xác thực...' : ''}
               </p>
 

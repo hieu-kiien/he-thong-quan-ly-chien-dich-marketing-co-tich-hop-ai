@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { User, UserRole } from '../types';
-import { authApi, getApiErrorMessage } from '../services/api';
+import { authApi, mcpApi, getApiErrorMessage } from '../services/api';
 import { useToast } from '../components/Toast';
 
 interface AuthContextType {
@@ -10,6 +10,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: { email: string; password: string; full_name: string; role?: string }) => Promise<void>;
+  switchDemoRole: (roleKey: 'manager' | 'marketer' | 'approver') => Promise<User>;
   logout: () => void;
 }
 
@@ -93,6 +94,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     []
   );
 
+  const switchDemoRole = useCallback(
+    async (roleKey: 'manager' | 'marketer' | 'approver'): Promise<User> => {
+      const res = await mcpApi.switchDemoRole(roleKey);
+      setUser(res.user);
+      return res.user;
+    },
+    []
+  );
+
   const logout = useCallback(() => {
     endSession();
   }, [endSession]);
@@ -105,9 +115,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isLoading,
       login,
       register,
+      switchDemoRole,
       logout,
     }),
-    [user, isLoading, login, register, logout]
+    [user, isLoading, login, register, switchDemoRole, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
