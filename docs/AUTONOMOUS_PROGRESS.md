@@ -178,3 +178,20 @@ Bo sung tich hop duong async cho ke hoach (dong bo hoa voi cac loai job khac):
 - idempotency: poller tu sinh `idempotency_key` cho moi job; plan apply van dung crypto.randomUUID() rieng
 
 Verification: FE tsc + eslint --max-warnings=0 + build pass; backend khong doi (1671 passed + 4 pre-existing tai Phase 9); kind=plan enqueue/worker da duoc bao boi `tests/test_ai_planner.py`
+
+
+## Phase 11 - Bugfix: useAIJob + React.StrictMode (dev) + browser-skill verification
+
+Bug: `useAIJob` tao task 1 lan trong render va `useEffect` cleanup goi `dispose()` -> trong React.StrictMode (dev) mount -> cleanup -> mount, task cu da dispose VING VIEN (flag `disposed` trong closure), lan mount lai van dung task do -> `run()` luon nem "Tac vu da bi huy do roi khoi trang" im lang, khong co request nao. Anh huong MOI consumer (AIDrawer, AIStudio, Campaigns, WorkflowCanvas copilot, PlannerTab) - chi hien ro o dev, production build khong double-effect.
+
+Fix `frontend/src/hooks/useAIJob.ts` (giu nguyen API contract):
+- helper `buildTask(transport, deadlineMs, onUpdate)` cap module
+- render body van lazy-init (giu truocg behavior cho layout effect caller)
+- `useEffect` hien tai Tao TASK MOI moi setup (deps `[transport, deadlineMs]` - ca 2 on dinh vi consumer nao cung goi `useAIJob()` khong args), cleanup dispose task cua chinh no
+
+Verification:
+- FE: tsc + eslint --max-warnings=0 pass
+- impact(`useAIJob` upstream): risk CRITICAL, 5 direct callers, 7 processes - da canh bao truoc khi sua; contract giu nguyen (khong doi return shape)
+- detect-changes --scope all: 3 files (chi commit useAIJob + progress doc; 2 file PROMPT_VARIANT van dirty tuyet doi khong dot cham), risk critical = expected cho hub hook
+- Browser-skill live test (backend uvicorn :8001 + vite :5174, seed marketer): login -> WorkflowCanvas -> tab Kế Hoạch AI -> Sinh ke hoach (POST /ai/jobs 202 -> poll -> fallback plan: banner amber + 5k x 3.000.000 = 15.000.000 + 5 task due 1/9..27/9) -> Ap dung (POST /campaigns/1/plan/apply 200, badge Tasks 0->5) -> GET budget-allocations: 5 row is_ai_estimate=true, GET tasks: 5 item due_date dung khoang chien dich
+- Consumer thu 2: Copilot "Tim y tuong" cung hoat dong (POST /ai/jobs 202 + poll) truoc do cung bi loi nay

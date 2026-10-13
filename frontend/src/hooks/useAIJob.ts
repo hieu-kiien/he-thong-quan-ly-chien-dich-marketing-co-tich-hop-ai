@@ -79,6 +79,17 @@ const startTicker = (onTick: () => void): (() => void) => {
   return () => clearInterval(handle);
 };
 
+/** Tạo task với `onUpdate` bỏ qua khi đã dispose — dùng cho cả render lẫn effect. */
+const buildTask = (
+  transport: AIJobTransport,
+  deadlineMs: number | undefined,
+  onUpdate: (next: AIJobTaskUpdate) => void,
+): AIJobTask =>
+  createAIJobTask(transport, {
+    ...(deadlineMs !== undefined ? { deadlineMs } : {}),
+    onUpdate,
+  });
+
 export const useAIJob = (
   transport: AIJobTransport = aiJobTransport,
   deadlineMs?: number,
@@ -87,25 +98,33 @@ export const useAIJob = (
   const taskRef = useRef<AIJobTask | null>(null);
   const disposedRef = useRef(false);
 
+  // `dispose()` có thể chạy trước khi React tháo effect; bỏ qua để không
+  // setState vào cây component đã ngừng.
+  const guardedUpdate = (next: AIJobTaskUpdate): void => {
+    if (disposedRef.current) return;
+    setUpdate(next);
+  };
+
   if (!taskRef.current) {
-    taskRef.current = createAIJobTask(transport, {
-      ...(deadlineMs !== undefined ? { deadlineMs } : {}),
-      onUpdate: (next) => {
-        // `dispose()` có thể chạy trước khi React tháo effect; bỏ qua để không
-        // setState vào cây component đã ngừng.
-        if (disposedRef.current) return;
-        setUpdate(next);
-      },
-    });
+    taskRef.current = buildTask(transport, deadlineMs, guardedUpdate);
   }
 
   useEffect(() => {
     disposedRef.current = false;
+    // React.StrictMode (dev) chạy mount → cleanup → mount: cleanup đã
+    // `dispose()` task cũ VĨNH VIỄN (đóng cờ `disposed` trong closure), nên
+    // mount lại phải tạo task thay vì dùng lại task đã chết — nếu không,
+    // `run()` luôn ném "Tác vụ đã bị huỷ do rời khỏi trang" ngay từ đầu.
+    const task = buildTask(transport, deadlineMs, (next) => {
+      if (disposedRef.current) return;
+      setUpdate(next);
+    });
+    taskRef.current = task;
     return () => {
       disposedRef.current = true;
-      taskRef.current?.dispose();
+      task.dispose();
     };
-  }, []);
+  }, [transport, deadlineMs]);
 
   const busy = update.phase === 'enqueuing' || update.phase === 'queued' || update.phase === 'running';
 
