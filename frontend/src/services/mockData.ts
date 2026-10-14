@@ -404,7 +404,7 @@ export const MOCK_CUSTOM_API_KEYS: CustomApiKey[] = [
   {
     id: 2,
     provider: 'gemini',
-    model: 'gemini-3.1-pro-preview',
+    model: 'gemini-4-argon',
     masked_key: 'AIzaSy...8kP2',
     is_active: false,
     workspace_id: null,

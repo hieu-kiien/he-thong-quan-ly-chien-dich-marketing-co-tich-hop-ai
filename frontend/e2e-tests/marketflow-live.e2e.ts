@@ -29,8 +29,8 @@ describe('MarketFlow AI Live Production E2E Suite (marketing.kienhieu.id.vn)', {
     await passwordInput.tap();
     await passwordInput.fill(credentials.user('manager').password);
 
-    // Bấm nútSubmit Đăng nhập
-    await browser.locator('#submit-btn').tap();
+    // Bấm nút Submit Đăng nhập
+    await browser.locator('button[type="submit"]').tap();
 
     // 2. Xác nhận vào Dashboard và kiểm tra Chu trình 5 Bước Khép kín
     await expect(screen.getByText('Nghiên cứu & Brief', { exact: false }).first()).toBeVisible({ timeout: 20_000 });
@@ -81,9 +81,9 @@ describe('MarketFlow AI Live Production E2E Suite (marketing.kienhieu.id.vn)', {
     const customModelInput = browser.locator('#byok-custom-model-input');
     await customModelInput.waitFor({ state: 'visible', timeout: 15_000 });
     await customModelInput.clear();
-    await customModelInput.pressSequentially('gemini-2.5-pro-custom', { delay: 45 });
+    await customModelInput.pressSequentially('gemini-4-argon', { delay: 45 });
     await customModelInput.clear();
-    await customModelInput.pressSequentially('gemini-2.5-flash', { delay: 45 });
+    await customModelInput.pressSequentially('gemini-3.8-flash', { delay: 45 });
 
     // Bấm Đồng bộ danh sách từ API
     const syncModelsBtn = screen.getByRole('button', 'Đồng bộ danh sách từ API', { exact: false }).first();

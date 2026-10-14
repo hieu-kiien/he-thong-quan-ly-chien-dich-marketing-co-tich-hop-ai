@@ -36,41 +36,41 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     name: 'Google Gemini',
     initials: 'G',
     initialsColor: 'text-indigo-700',
-    badge: 'Chính thức · Có Free Tier',
+    badge: 'Gemini 3.8 & 4 Series · Free Tier',
     badgeColor: 'bg-emerald-100 text-emerald-800',
-    desc: 'Hệ sinh thái Google Gemini (gemini-2.5-flash, gemini-2.5-pro, gemini-2.0-flash) hoặc tự nhập mã model bất kỳ từ Google AI Studio.',
+    desc: 'Hệ sinh thái Google Gemini chuẩn 2026 (gemini-3.8-flash, gemini-4-argon, gemini-3.7-flash) hoặc tự nhập mã model bất kỳ từ Google AI Studio.',
     keyLabel: 'Google Gemini API Key',
     keyLink: 'https://aistudio.google.com/app/apikey',
     linkText: 'Lấy API Key tại Google AI Studio',
     placeholder: 'AIzaSy... (Dán khóa API Google Gemini tại đây)',
     models: [
       {
-        id: 'gemini-2.5-flash',
-        name: 'gemini-2.5-flash',
+        id: 'gemini-3.8-flash',
+        name: 'gemini-3.8-flash',
         badge: 'Khuyên dùng · Free Tier',
         badgeColor: 'bg-indigo-100 text-indigo-700',
-        desc: 'Mô hình lai suy luận (Hybrid Reasoning) tốc độ cao của Google, hỗ trợ 1M token context & Free Tier.'
+        desc: 'Mô hình chủ lực Gemini 3.8 Flash tốc độ cao của Google, hỗ trợ 2M token context & Free Tier.'
       },
       {
-        id: 'gemini-2.5-pro',
-        name: 'gemini-2.5-pro',
-        badge: 'Suy luận chuyên sâu',
+        id: 'gemini-4-argon',
+        name: 'gemini-4-argon',
+        badge: 'Flagship Suy luận',
         badgeColor: 'bg-purple-100 text-purple-700',
-        desc: 'Mô hình Pro mạnh nhất cho lập kế hoạch chiến lược, Bác sĩ AI Doctor & phân bổ ngân sách ROAS.'
+        desc: 'Mô hình Gemini 4 Argon mạnh nhất cho lập kế hoạch chiến lược, Bác sĩ AI Doctor & phân bổ ngân sách ROAS.'
       },
       {
-        id: 'gemini-2.5-flash-lite',
-        name: 'gemini-2.5-flash-lite',
+        id: 'gemini-3.7-flash',
+        name: 'gemini-3.7-flash',
+        badge: 'Cân bằng · Ổn định',
+        badgeColor: 'bg-emerald-100 text-emerald-800',
+        desc: 'Dòng Gemini 3.7 Flash ổn định cao cho các tác vụ biên tập nội dung đa kênh hàng ngày.'
+      },
+      {
+        id: 'gemini-3.5-flash-lite',
+        name: 'gemini-3.5-flash-lite',
         badge: 'Siêu nhẹ · Tiết kiệm',
         badgeColor: 'bg-blue-100 text-blue-700',
         desc: 'Tối ưu chi phí và độ trễ thấp cho các tác vụ sinh biến thể A/B và kiểm duyệt nhanh.'
-      },
-      {
-        id: 'gemini-2.0-flash',
-        name: 'gemini-2.0-flash',
-        badge: 'Ổn định · Free Tier',
-        badgeColor: 'bg-emerald-100 text-emerald-800',
-        desc: 'Dòng Flash phổ biến, ổn định cao cho các tác vụ biên tập nội dung hàng ngày.'
       }
     ]
   },
@@ -80,7 +80,7 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     initialsColor: 'text-purple-700',
     badge: '300+ Model · Tự nhập ID',
     badgeColor: 'bg-purple-100 text-purple-800',
-    desc: 'Gateway hợp nhất hơn 300 mô hình; hỗ trợ tự nhập bất kỳ ID tác giả/tên-model nào hoặc dùng openrouter/free.',
+    desc: 'Gateway hợp nhất hơn 300 mô hình 2026; hỗ trợ tự nhập bất kỳ ID tác giả/tên-model nào hoặc dùng openrouter/free.',
     keyLabel: 'OpenRouter API Key',
     keyLink: 'https://openrouter.ai/keys',
     linkText: 'Lấy API Key tại OpenRouter',
@@ -94,25 +94,25 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
         desc: 'Bộ định tuyến tự động chọn mô hình :free đang hoạt động tốt nhất trên OpenRouter.'
       },
       {
-        id: 'deepseek/deepseek-r1:free',
-        name: 'deepseek/deepseek-r1:free',
-        badge: 'Miễn phí · Suy luận',
+        id: 'google/gemini-3.8-flash',
+        name: 'google/gemini-3.8-flash',
+        badge: 'Gemini 3.8 qua OR',
         badgeColor: 'bg-indigo-100 text-indigo-700',
-        desc: 'Mô hình suy luận chuỗi tư duy (Reasoning) DeepSeek R1 miễn phí qua OpenRouter.'
+        desc: 'Google Gemini 3.8 Flash định tuyến qua cổng OpenRouter.'
       },
       {
-        id: 'deepseek/deepseek-chat-v3-0324:free',
-        name: 'deepseek/deepseek-chat-v3-0324:free',
-        badge: 'Miễn phí · Đa năng',
+        id: 'deepseek/deepseek-v4.1-flash',
+        name: 'deepseek/deepseek-v4.1-flash',
+        badge: 'DeepSeek V4.1 · Đa năng',
         badgeColor: 'bg-amber-100 text-amber-800',
-        desc: 'DeepSeek V3 0324 miễn phí, văn phong tự nhiên và tốc độ phản hồi nhanh.'
+        desc: 'DeepSeek V4.1 Flash thế hệ mới, văn phong tự nhiên và tốc độ phản hồi nhanh.'
       },
       {
-        id: 'meta-llama/llama-3.3-70b-instruct:free',
-        name: 'meta-llama/llama-3.3-70b-instruct:free',
-        badge: 'Miễn phí · 70B',
+        id: 'meta-llama/llama-4-maverick:free',
+        name: 'meta-llama/llama-4-maverick:free',
+        badge: 'Miễn phí · Llama 4',
         badgeColor: 'bg-purple-100 text-purple-700',
-        desc: 'Mô hình mở 70B của Meta miễn phí qua cổng OpenRouter.'
+        desc: 'Mô hình mở Llama 4 Maverick 128E của Meta miễn phí qua cổng OpenRouter.'
       }
     ]
   },
@@ -120,41 +120,41 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     name: 'OpenAI',
     initials: 'OA',
     initialsColor: 'text-emerald-700',
-    badge: 'GPT-4.1 · GPT-4o · o3',
+    badge: 'GPT-6.1 Sol & Luna Series',
     badgeColor: 'bg-blue-100 text-blue-800',
-    desc: 'Hệ sinh thái OpenAI chuẩn thực tế (gpt-4.1, gpt-4o, o3, o4-mini) hoặc tự nhập tên model/fine-tune riêng của bạn.',
+    desc: 'Hệ sinh thái OpenAI chuẩn 2026 (gpt-6.1-sol, gpt-6.1-sol-pro, gpt-6-luna, gpt-6-sol) hoặc tự nhập tên model riêng của bạn.',
     keyLabel: 'OpenAI API Key',
     keyLink: 'https://platform.openai.com/api-keys',
     linkText: 'Lấy API Key tại OpenAI Platform',
     placeholder: 'sk-proj-... (Dán khóa API OpenAI tại đây)',
     models: [
       {
-        id: 'gpt-4.1',
-        name: 'gpt-4.1',
-        badge: 'Khuyên dùng · 1M Context',
+        id: 'gpt-6.1-sol',
+        name: 'gpt-6.1-sol',
+        badge: 'Khuyên dùng · Flagship',
         badgeColor: 'bg-indigo-100 text-indigo-700',
-        desc: 'Flagship GPT-4.1 của OpenAI: tuân thủ cấu trúc JSON chuẩn xác và biên tập nội dung sắc bén.'
+        desc: 'Flagship GPT-6.1 Sol của OpenAI: tuân thủ cấu trúc JSON chuẩn xác và biên tập nội dung sắc bén.'
       },
       {
-        id: 'gpt-4o',
-        name: 'gpt-4o',
-        badge: 'Đa phương thức',
-        badgeColor: 'bg-emerald-100 text-emerald-800',
-        desc: 'Mô hình Omni đa năng, cân bằng tốc độ và chất lượng sáng tạo đa kênh.'
-      },
-      {
-        id: 'o3',
-        name: 'o3',
-        badge: 'Suy luận sâu',
+        id: 'gpt-6.1-sol-pro',
+        name: 'gpt-6.1-sol-pro',
+        badge: 'Suy luận chuyên sâu',
         badgeColor: 'bg-purple-100 text-purple-700',
         desc: 'Mô hình suy luận chuyên sâu cho phân bổ ngân sách ROI/ROAS và chẩn đoán phễu chuyển đổi.'
       },
       {
-        id: 'o4-mini',
-        name: 'o4-mini',
-        badge: 'Suy luận nhanh',
+        id: 'gpt-6-luna',
+        name: 'gpt-6-luna',
+        badge: 'Đa phương thức · Nhanh',
+        badgeColor: 'bg-emerald-100 text-emerald-800',
+        desc: 'Mô hình Luna cân bằng tốc độ và chất lượng sáng tạo đa kênh.'
+      },
+      {
+        id: 'gpt-6-sol',
+        name: 'gpt-6-sol',
+        badge: 'Ổn định · Đa năng',
         badgeColor: 'bg-slate-100 text-slate-700',
-        desc: 'Mô hình suy luận tốc độ cao, chi phí thấp cho tác nhân MCP tự hành.'
+        desc: 'Mô hình nền tảng GPT-6 Sol cho tác nhân MCP tự hành.'
       }
     ]
   },
@@ -162,41 +162,41 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     name: 'Anthropic (Claude)',
     initials: 'AN',
     initialsColor: 'text-orange-700',
-    badge: 'Claude 4 & 3.7 Series',
+    badge: 'Claude 5.5 Series',
     badgeColor: 'bg-orange-100 text-orange-800',
-    desc: 'Dòng Claude Sonnet 4, Opus 4 & 3.7 Sonnet qua Messages API gốc — văn phong tự nhiên, hoặc tự nhập mã model Claude bất kỳ.',
+    desc: 'Dòng Claude Sonnet 5.5, Opus 5.5 & Haiku 5.5 qua Messages API gốc — văn phong tự nhiên, hoặc tự nhập mã model Claude bất kỳ.',
     keyLabel: 'Anthropic API Key',
     keyLink: 'https://console.anthropic.com/settings/keys',
     linkText: 'Lấy API Key tại Anthropic Console',
     placeholder: 'sk-ant-... (Dán khóa API Anthropic tại đây)',
     models: [
       {
-        id: 'claude-sonnet-4-0',
-        name: 'claude-sonnet-4-0',
-        badge: 'Khuyên dùng',
+        id: 'claude-sonnet-5-5',
+        name: 'claude-sonnet-5-5',
+        badge: 'Khuyên dùng · Chuẩn 2026',
         badgeColor: 'bg-indigo-100 text-indigo-700',
-        desc: 'Claude Sonnet 4: cân bằng giữa chiều sâu ngôn từ quảng cáo, tốc độ và chi phí.'
+        desc: 'Claude Sonnet 5.5: cân bằng hoàn hảo giữa chiều sâu ngôn từ quảng cáo, tốc độ và chi phí.'
       },
       {
-        id: 'claude-opus-4-0',
-        name: 'claude-opus-4-0',
+        id: 'claude-opus-5-5',
+        name: 'claude-opus-5-5',
         badge: 'Flagship Sáng tạo',
         badgeColor: 'bg-purple-100 text-purple-700',
-        desc: 'Claude Opus 4 cho chiến lược B2B phức tạp, kịch bản đa kênh & thẩm định rủi ro thương hiệu.'
+        desc: 'Claude Opus 5.5 cho chiến lược B2B phức tạp, kịch bản đa kênh & thẩm định rủi ro thương hiệu.'
       },
       {
-        id: 'claude-3-7-sonnet-latest',
-        name: 'claude-3-7-sonnet-latest',
-        badge: 'Hybrid Reasoning',
-        badgeColor: 'bg-amber-100 text-amber-800',
-        desc: 'Claude 3.7 Sonnet hỗ trợ suy luận mở rộng và viết nội dung dài mạch lạc.'
-      },
-      {
-        id: 'claude-3-5-haiku-latest',
-        name: 'claude-3-5-haiku-latest',
-        badge: 'Siêu tốc',
+        id: 'claude-haiku-5-5',
+        name: 'claude-haiku-5-5',
+        badge: 'Siêu tốc · Tiết kiệm',
         badgeColor: 'bg-emerald-100 text-emerald-800',
-        desc: 'Phản hồi tức thì cho tóm tắt chỉ số chiến dịch và kiểm duyệt nhanh.'
+        desc: 'Claude Haiku 5.5 phản hồi tức thì cho tóm tắt chỉ số chiến dịch và kiểm duyệt nhanh.'
+      },
+      {
+        id: 'claude-fable-5-1',
+        name: 'claude-fable-5-1',
+        badge: 'Kể chuyện & Brand Voice',
+        badgeColor: 'bg-amber-100 text-amber-800',
+        desc: 'Claude Fable 5.1 tối ưu hóa kịch bản kể chuyện thương hiệu và bài PR dài.'
       }
     ]
   },
@@ -204,20 +204,20 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     name: 'Groq LPU (Siêu tốc)',
     initials: 'GQ',
     initialsColor: 'text-rose-700',
-    badge: 'LPU ~800 tok/s',
+    badge: 'Llama 4 · LPU ~1000 tok/s',
     badgeColor: 'bg-rose-100 text-rose-800',
-    desc: 'Hạ tầng vi xử lý LPU chuyên biệt cho suy luận AI thời gian thực (Llama 3.3, Llama 4 Scout/Maverick, DeepSeek R1).',
+    desc: 'Hạ tầng vi xử lý LPU chuyên biệt cho suy luận AI thời gian thực (Llama 4 Maverick 128E, Llama 4 Scout 16E, Qwen 3).',
     keyLabel: 'GroqCloud API Key',
     keyLink: 'https://console.groq.com/keys',
     linkText: 'Lấy API Key miễn phí tại GroqCloud Console',
     placeholder: 'gsk_... (Dán khóa API GroqCloud tại đây)',
     models: [
       {
-        id: 'llama-3.3-70b-versatile',
-        name: 'llama-3.3-70b-versatile',
-        badge: 'Khuyên dùng · Ổn định',
+        id: 'meta-llama/llama-4-maverick-17b-128e-instruct',
+        name: 'llama-4-maverick-17b-128e',
+        badge: 'Khuyên dùng · Llama 4 128E',
         badgeColor: 'bg-indigo-100 text-indigo-700',
-        desc: 'Mô hình 70B ổn định nhất trên Groq LPU cho tiếng Việt và cấu trúc JSON.'
+        desc: 'Kiến trúc Llama 4 MoE 128 chuyên gia chạy siêu tốc trên phần cứng Groq LPU.'
       },
       {
         id: 'meta-llama/llama-4-scout-17b-16e-instruct',
@@ -227,18 +227,11 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
         desc: 'Mô hình Llama 4 MoE 16 chuyên gia tốc độ cực cao trên GroqCloud.'
       },
       {
-        id: 'meta-llama/llama-4-maverick-17b-128e-instruct',
-        name: 'llama-4-maverick-17b-128e',
-        badge: 'Llama 4 · 128E',
+        id: 'qwen/qwen3-32b',
+        name: 'qwen/qwen3-32b',
+        badge: 'Qwen 3 · Tiếng Việt',
         badgeColor: 'bg-emerald-100 text-emerald-800',
-        desc: 'Kiến trúc Llama 4 MoE 128 chuyên gia chạy trên phần cứng LPU.'
-      },
-      {
-        id: 'deepseek-r1-distill-llama-70b',
-        name: 'deepseek-r1-distill-llama-70b',
-        badge: 'Suy luận nhanh',
-        badgeColor: 'bg-amber-100 text-amber-800',
-        desc: 'Suy luận chuỗi tư duy tốc độ cao cho chẩn đoán điểm nghẽn chiến dịch.'
+        desc: 'Mô hình Qwen 3 32B tối ưu tiếng Việt và cấu trúc JSON tốc độ cao.'
       }
     ]
   },
@@ -246,31 +239,31 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     name: 'xAI (Grok)',
     initials: 'X',
     initialsColor: 'text-slate-900',
-    badge: 'Grok 3 Series',
+    badge: 'Grok 4.7 Series',
     badgeColor: 'bg-slate-200 text-slate-900',
-    desc: 'Hệ sinh thái Grok của xAI (grok-3, grok-3-mini) hoặc tự nhập bất kỳ mã model xAI nào của bạn.',
+    desc: 'Hệ sinh thái Grok chuẩn 2026 của xAI (grok-4.7, grok-4.6, grok-4.5) hoặc tự nhập bất kỳ mã model xAI nào của bạn.',
     keyLabel: 'xAI (Grok) API Key',
     keyLink: 'https://console.x.ai/',
     linkText: 'Lấy API Key tại xAI Console',
     placeholder: 'xai-... (Dán khóa API xAI Grok tại đây)',
     models: [
       {
-        id: 'grok-3',
-        name: 'grok-3',
-        badge: 'Khuyên dùng',
+        id: 'grok-4.7',
+        name: 'grok-4.7',
+        badge: 'Khuyên dùng · Chuẩn 2026',
         badgeColor: 'bg-indigo-100 text-indigo-700',
-        desc: 'Mô hình chủ lực của xAI: ngôn từ sắc sảo, tối ưu cho hook mạng xã hội và phân tích.'
+        desc: 'Mô hình chủ lực Grok 4.7 của xAI: ngôn từ sắc sảo, tối ưu cho hook mạng xã hội và phân tích.'
       },
       {
-        id: 'grok-3-mini',
-        name: 'grok-3-mini',
-        badge: 'Suy luận nhẹ',
+        id: 'grok-4.6',
+        name: 'grok-4.6',
+        badge: 'Suy luận cân bằng',
         badgeColor: 'bg-purple-100 text-purple-700',
-        desc: 'Mô hình suy luận nhanh, tiết kiệm chi phí của xAI.'
+        desc: 'Mô hình Grok 4.6 ổn định, tiết kiệm chi phí của xAI.'
       },
       {
-        id: 'grok-3-fast',
-        name: 'grok-3-fast',
+        id: 'grok-4.5',
+        name: 'grok-4.5',
         badge: 'Tốc độ cao',
         badgeColor: 'bg-emerald-100 text-emerald-800',
         desc: 'Phản hồi độ trễ thấp cho sinh biến thể nội dung quảng cáo hàng loạt.'
@@ -281,7 +274,7 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     name: 'Hugging Face',
     initials: 'HF',
     initialsColor: 'text-amber-700',
-    badge: 'Open-Weights · Tự nhập repo',
+    badge: 'Qwen 3 & DeepSeek V4.1',
     badgeColor: 'bg-amber-100 text-amber-800',
     desc: 'Router suy luận OpenAI-compatible của Hugging Face; hỗ trợ tự nhập bất kỳ repo ID model mở nào.',
     keyLabel: 'Hugging Face Token (tuỳ chọn)',
@@ -291,32 +284,25 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     keyless: true,
     models: [
       {
-        id: 'Qwen/Qwen2.5-72B-Instruct',
-        name: 'Qwen/Qwen2.5-72B-Instruct',
-        badge: 'Khuyên dùng',
+        id: 'Qwen/Qwen3-235B-A22B',
+        name: 'Qwen/Qwen3-235B-A22B',
+        badge: 'Khuyên dùng · MoE 235B',
         badgeColor: 'bg-indigo-100 text-indigo-700',
-        desc: 'Mô hình mở 72B ổn định, mạnh về tiếng Việt và sáng tạo nội dung đa kênh.'
+        desc: 'Mô hình mở Qwen 3 MoE 235B mạnh về tiếng Việt và sáng tạo nội dung đa kênh.'
       },
       {
-        id: 'deepseek-ai/DeepSeek-R1',
-        name: 'deepseek-ai/DeepSeek-R1',
-        badge: 'Suy luận sâu',
+        id: 'deepseek-ai/DeepSeek-V4.1-Flash',
+        name: 'deepseek-ai/DeepSeek-V4.1-Flash',
+        badge: 'DeepSeek V4.1',
         badgeColor: 'bg-blue-100 text-blue-700',
         desc: 'Chuyên trị lập kế hoạch ngân sách chiến dịch và phân tích điểm nghẽn chuyển đổi.'
       },
       {
-        id: 'deepseek-ai/DeepSeek-V3-0324',
-        name: 'deepseek-ai/DeepSeek-V3-0324',
-        badge: 'MoE 685B',
-        badgeColor: 'bg-emerald-100 text-emerald-800',
-        desc: 'Mô hình MoE mã nguồn mở cho viết quảng cáo & phân tích.'
-      },
-      {
-        id: 'meta-llama/Llama-3.3-70B-Instruct',
-        name: 'meta-llama/Llama-3.3-70B-Instruct',
-        badge: 'Meta 70B',
+        id: 'meta-llama/Llama-4-Maverick-17B-128E-Instruct',
+        name: 'Llama-4-Maverick-17B-128E',
+        badge: 'Meta Llama 4',
         badgeColor: 'bg-purple-100 text-purple-700',
-        desc: 'Dòng Llama 3.3 70B Instruct chuẩn xác của Meta.'
+        desc: 'Dòng Llama 4 Maverick 128E Instruct chuẩn xác của Meta.'
       }
     ]
   },
@@ -324,9 +310,9 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     name: 'Ollama (chạy cục bộ)',
     initials: 'OL',
     initialsColor: 'text-slate-700',
-    badge: 'Local · Tự nhập tag',
+    badge: 'Qwen 3.6 · Local',
     badgeColor: 'bg-emerald-100 text-emerald-800',
-    desc: 'Chạy mô hình mở (qwen3, deepseek-r1, llama3.2, gemma3) ngay trên máy hoặc tự nhập bất kỳ tag Ollama nào bạn đã pull.',
+    desc: 'Chạy mô hình mở chuẩn 2026 (qwen3.6:27b, qwen3.6:8b, gemma4:12b, llama4:scout) ngay trên máy hoặc tự nhập bất kỳ tag Ollama nào bạn đã pull.',
     keyLabel: 'Không cần API Key',
     keyLink: 'https://ollama.com/library',
     linkText: 'Xem thư viện model trên Ollama',
@@ -334,32 +320,32 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     keyless: true,
     models: [
       {
-        id: 'qwen3:8b',
-        name: 'qwen3:8b',
-        badge: 'Khuyên dùng · 8GB RAM',
+        id: 'qwen3.6:27b',
+        name: 'qwen3.6:27b',
+        badge: 'Khuyên dùng · Chuẩn 2026',
         badgeColor: 'bg-indigo-100 text-indigo-700',
+        desc: 'Mô hình Qwen 3.6 27B chạy cục bộ cực mạnh cho tiếng Việt và suy luận marketing.'
+      },
+      {
+        id: 'qwen3.6:8b',
+        name: 'qwen3.6:8b',
+        badge: 'Nhẹ · 8GB RAM',
+        badgeColor: 'bg-emerald-100 text-emerald-800',
         desc: 'Chạy mượt trên laptop 8GB–16GB RAM, hỗ trợ tiếng Việt tự nhiên.'
       },
       {
-        id: 'deepseek-r1:8b',
-        name: 'deepseek-r1:8b',
-        badge: 'Suy luận cục bộ',
-        badgeColor: 'bg-purple-100 text-purple-700',
-        desc: 'Mô hình suy luận chuỗi tư duy (Reasoning) chạy hoàn toàn offline.'
-      },
-      {
-        id: 'llama3.2:3b',
-        name: 'llama3.2:3b',
-        badge: 'Siêu nhẹ',
-        badgeColor: 'bg-emerald-100 text-emerald-800',
-        desc: 'Mô hình 3B cực nhẹ, phản hồi tức thì trên mọi cấu hình CPU/GPU.'
-      },
-      {
-        id: 'gemma3:12b',
-        name: 'gemma3:12b',
-        badge: 'Google Gemma 3',
+        id: 'gemma4:12b',
+        name: 'gemma4:12b',
+        badge: 'Google Gemma 4',
         badgeColor: 'bg-blue-100 text-blue-700',
-        desc: 'Thế hệ Gemma 3 của Google chạy trên phần cứng cá nhân.'
+        desc: 'Thế hệ Gemma 4 12B của Google chạy trên phần cứng cá nhân.'
+      },
+      {
+        id: 'llama4:scout',
+        name: 'llama4:scout',
+        badge: 'Llama 4 Local',
+        badgeColor: 'bg-purple-100 text-purple-700',
+        desc: 'Mô hình Llama 4 Scout chạy hoàn toàn offline.'
       }
     ]
   },
@@ -404,7 +390,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
   const [selectedProvider, setSelectedProvider] = useState<ProviderSlug>('gemini');
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
+  const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash');
   const [scope, setScope] = useState<'workspace' | 'personal'>('workspace');
 
   // Model nạp động từ nhà cung cấp. Danh sách tĩnh trong PROVIDER_CONFIGS chỉ
@@ -994,7 +980,7 @@ const handleTestConnection = async () => {
                       list="byok-model-suggestions"
                       value={selectedModel}
                       onChange={(e) => setSelectedModel(e.target.value)}
-                      placeholder={`Nhập mã model bất kỳ của ${PROVIDER_CONFIGS[selectedProvider].name} (VD: ${PROVIDER_CONFIGS[selectedProvider].models[0]?.id || 'gemini-2.5-flash'})`}
+                      placeholder={`Nhập mã model bất kỳ của ${PROVIDER_CONFIGS[selectedProvider].name} (VD: ${PROVIDER_CONFIGS[selectedProvider].models[0]?.id || 'gemini-3.8-flash'})`}
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm bg-white shadow-sm"
                     />
                     <datalist id="byok-model-suggestions">
