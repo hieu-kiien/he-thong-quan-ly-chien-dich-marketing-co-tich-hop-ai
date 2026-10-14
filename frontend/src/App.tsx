@@ -164,11 +164,11 @@ function AppContent() {
             <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
           </div>
         }>
-          {authMode === 'register' ? (
-            <RegisterPage onNavigateToLogin={() => setAuthMode('login')} />
-          ) : (
-            <LoginPage onNavigateToRegister={() => setAuthMode('register')} />
-          )}
+          <LoginPage
+            mode={authMode}
+            onNavigateToRegister={() => setAuthMode('register')}
+            onNavigateToLogin={() => setAuthMode('login')}
+          />
         </Suspense>
       </div>
     );

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { KeyRound, ShieldCheck, Zap, CheckCircle2, AlertCircle, Eye, EyeOff, Trash2, ExternalLink, RefreshCw, Loader2, Building2, User, Check, Power, Route, Plus, Star, ArrowDown, X } from 'lucide-react';
-import { settingsApi, authApi, getApiErrorMessage } from '../services/api';
+import { KeyRound, ShieldCheck, Zap, CheckCircle2, AlertCircle, Eye, EyeOff, Trash2, ExternalLink, RefreshCw, Loader2, Building2, User, Check, Power, Route, Plus, Star, ArrowDown, X, UserPlus, Users, Lock, Crown } from 'lucide-react';
+import { settingsApi, authApi, workspaceApi, getApiErrorMessage } from '../services/api';
 import { useToast } from '../components/Toast';
-import { CustomApiKey, AIKeyTestResponse, User as UserType, Workspace, AIModelListResponse, AIChain, AIChainHop } from '../types';
+import { CustomApiKey, AIKeyTestResponse, User as UserType, Workspace, AIModelListResponse, AIChain, AIChainHop, WorkspaceMemberItem } from '../types';
 
 /**
  * Cấu hình hiển thị cho từng nhà cung cấp AI.
@@ -397,6 +397,106 @@ export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspac
       setIsChangingPassword(false);
     }
   }, [currentPassword, newPassword, confirmPassword, toast]);
+
+  // =========================================================================
+  // Quản trị Nhân sự & Cấp phát Tài khoản theo Phân quyền (RBAC 2-Tầng)
+  // =========================================================================
+  const workspaceId = currentWorkspace?.id || 1;
+  const isManagerOrAdmin =
+    currentUser?.role === 'MANAGER' ||
+    currentUser?.role === 'AGENCY_MANAGER' ||
+    (currentUser?.role as string) === 'ADMIN' ||
+    (currentWorkspace?.owner_id && currentUser?.id === currentWorkspace.owner_id);
+
+  const [members, setMembers] = useState<WorkspaceMemberItem[]>([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  const [membersError, setMembersError] = useState<string | null>(null);
+
+  const [provFullName, setProvFullName] = useState('');
+  const [provEmail, setProvEmail] = useState('');
+  const [provPassword, setProvPassword] = useState('');
+  const [provRole, setProvRole] = useState<'MANAGER' | 'MARKETER' | 'CLIENT_APPROVER'>('MARKETER');
+  const [isProvisioning, setIsProvisioning] = useState(false);
+  const [updatingUserId, setUpdatingUserId] = useState<number | null>(null);
+
+  const loadMembers = useCallback(async () => {
+    setIsLoadingMembers(true);
+    setMembersError(null);
+    try {
+      const list = await workspaceApi.getMembers(workspaceId);
+      setMembers(list);
+    } catch (err) {
+      setMembersError(getApiErrorMessage(err));
+    } finally {
+      setIsLoadingMembers(false);
+    }
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (activeTab === 'profile' || activeTab === 'workspace') {
+      void loadMembers();
+    }
+  }, [activeTab, loadMembers]);
+
+  const handleProvisionAccount = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!provFullName.trim() || !provEmail.trim() || provPassword.length < 6) {
+      toast.error('Điền đầy đủ họ tên, email và mật khẩu tối thiểu 6 ký tự.');
+      return;
+    }
+    setIsProvisioning(true);
+    try {
+      const res = await workspaceApi.provisionAccount(workspaceId, {
+        full_name: provFullName.trim(),
+        email: provEmail.trim().toLowerCase(),
+        password: provPassword,
+        role: provRole,
+      });
+      toast.success(
+        res.created_new_user
+          ? `Đã tạo tài khoản ${res.email} với quyền ${provRole}.`
+          : `Đã gán quyền ${provRole} cho tài khoản ${res.email}.`,
+      );
+      setProvFullName('');
+      setProvEmail('');
+      setProvPassword('');
+      setProvRole('MARKETER');
+      await loadMembers();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err), 'Không thể cấp phát tài khoản');
+    } finally {
+      setIsProvisioning(false);
+    }
+  }, [workspaceId, provFullName, provEmail, provPassword, provRole, loadMembers, toast]);
+
+  const handleRoleChange = useCallback(async (member: WorkspaceMemberItem, nextRole: 'MANAGER' | 'MARKETER' | 'CLIENT_APPROVER') => {
+    setUpdatingUserId(member.user_id);
+    try {
+      await workspaceApi.updateMemberRole(workspaceId, member.user_id, nextRole);
+      toast.success(`Đã đổi quyền của ${member.full_name} sang ${nextRole}.`);
+      await loadMembers();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err), 'Không thể đổi vai trò');
+    } finally {
+      setUpdatingUserId(null);
+    }
+  }, [workspaceId, loadMembers, toast]);
+
+  const handleRemoveMember = useCallback(async (member: WorkspaceMemberItem) => {
+    if (!window.confirm(`Gỡ ${member.full_name} (${member.email}) khỏi Workspace hiện tại?`)) {
+      return;
+    }
+    setUpdatingUserId(member.user_id);
+    try {
+      await workspaceApi.removeMember(workspaceId, member.user_id);
+      toast.success(`Đã gỡ ${member.email} khỏi không gian làm việc.`);
+      await loadMembers();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err), 'Không thể gỡ thành viên');
+    } finally {
+      setUpdatingUserId(null);
+    }
+  }, [workspaceId, loadMembers, toast]);
 
   const loadChains = useCallback(async () => {
     setIsLoadingChains(true);
@@ -1203,96 +1303,384 @@ const handleTestConnection = async () => {
 
       {/* Tab 2: Profile & RBAC */}
       {activeTab === 'profile' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
-          <div className="flex items-center gap-4 pb-6 border-b border-slate-100">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-600 text-white font-bold text-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              {currentUser?.full_name ? currentUser.full_name[0].toUpperCase() : 'U'}
+        <div className="space-y-6">
+          {/* Card 1: Hồ sơ cá nhân & Đổi mật khẩu */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
+            <div className="flex items-center gap-4 pb-6 border-b border-slate-100">
+              <div className="w-16 h-16 rounded-2xl bg-[#121316] text-white font-bold text-2xl flex items-center justify-center shadow-sm">
+                {currentUser?.full_name ? currentUser.full_name[0].toUpperCase() : 'U'}
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">{currentUser?.full_name || 'Người dùng MarketFlow'}</h2>
+                <p className="text-slate-500 text-sm">{currentUser?.email || 'manager@gmail.com'}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="px-2.5 py-0.5 bg-[#FFF3EE] text-[#D95D39] border border-[#F5D0C5] text-xs font-bold rounded-full uppercase">
+                    {currentUser?.role || 'MANAGER'}
+                  </span>
+                  <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-xs font-medium rounded-full">
+                    {currentUser?.status || 'ACTIVE'}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">{currentUser?.full_name || 'Người dùng MarketFlow'}</h2>
-              <p className="text-slate-500 text-sm">{currentUser?.email || 'manager@agency.com'}</p>
-              <div className="flex items-center gap-2 mt-2">
-                <span className="px-2.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-full uppercase">
-                  {currentUser?.role || 'MANAGER'}
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+              <div className="p-4 bg-[#F6F5F0] rounded-xl border border-slate-200">
+                <span className="text-slate-500 text-xs block mb-1">Mã định danh Người dùng</span>
+                <span className="font-mono font-bold text-slate-800">#{currentUser?.id || 1}</span>
+              </div>
+              <div className="p-4 bg-[#F6F5F0] rounded-xl border border-slate-200">
+                <span className="text-slate-500 text-xs block mb-1">Cấp độ Quyền hạn hiện tại</span>
+                <span className="font-semibold text-slate-800">
+                  {isManagerOrAdmin
+                    ? 'Quản lý Chiến dịch — Được cấp phát tài khoản & duyệt bài'
+                    : currentUser?.role === 'CLIENT_APPROVER'
+                      ? 'Khách hàng Duyệt bài — Được phê duyệt / trả bài'
+                      : 'Chuyên viên Nội dung — Soạn thảo & gửi duyệt'}
                 </span>
-                <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-xs font-medium rounded-full">
-                  {currentUser?.status || 'ACTIVE'}
+              </div>
+              <div className="p-4 bg-[#F6F5F0] rounded-xl border border-slate-200">
+                <span className="text-slate-500 text-xs block mb-1">Cơ chế Tạo tài khoản (RBAC 2-Tầng)</span>
+                <span className="font-semibold text-slate-800">
+                  Tự đăng ký = <code className="text-xs bg-white px-1.5 py-0.5 rounded border">MARKETER</code> · Quản lý cấp quyền cao hơn
                 </span>
               </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-              <span className="text-slate-500 text-xs block mb-1">Mã định danh Người dùng</span>
-              <span className="font-mono font-bold text-slate-800">{currentUser?.id || 1}</span>
-            </div>
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-              <span className="text-slate-500 text-xs block mb-1">Quyền hạn Quản trị</span>
-              <span className="font-semibold text-slate-800">
-                {currentUser?.role === 'MANAGER' || currentUser?.role === 'AGENCY_MANAGER'
-                  ? 'Toàn quyền Phê duyệt & Cấu hình BYOK'
-                  : 'Sáng tạo Nội dung & Yêu cầu duyệt'}
-              </span>
-            </div>
-          </div>
-
-          {/* Đổi mật khẩu — thu hồi mọi phiên đang mở ở các thiết bị khác */}
-          <form
-            onSubmit={handlePasswordSubmit}
-            className="pt-6 border-t border-slate-100 space-y-4"
-          >
-            <div>
-              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-indigo-600" />
-                Đổi mật khẩu
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Sau khi đổi, mọi phiên đăng nhập khác sẽ bị thu hồi và phải đăng nhập lại.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <input
-                type="password"
-                autoComplete="current-password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="Mật khẩu hiện tại"
-                className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-              />
-              <input
-                type="password"
-                autoComplete="new-password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Mật khẩu mới (tối thiểu 6 ký tự)"
-                className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-                minLength={6}
-              />
-              <input
-                type="password"
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Nhập lại mật khẩu mới"
-                className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-              />
-            </div>
-            {passwordError && (
-              <p className="text-xs text-red-600">{passwordError}</p>
-            )}
-            <button
-              type="submit"
-              disabled={isChangingPassword}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            {/* Đổi mật khẩu — thu hồi mọi phiên đang mở ở các thiết bị khác */}
+            <form
+              onSubmit={handlePasswordSubmit}
+              className="pt-6 border-t border-slate-100 space-y-4"
             >
-              {isChangingPassword && <Loader2 className="w-4 h-4 animate-spin" />}
-              Cập nhật mật khẩu
-            </button>
-          </form>
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-[#0F766E]" />
+                  Đổi mật khẩu cá nhân
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Sau khi đổi, mọi phiên đăng nhập khác sẽ bị thu hồi và phải đăng nhập lại.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Mật khẩu hiện tại"
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  required
+                />
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Mật khẩu mới (tối thiểu 6 ký tự)"
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  required
+                  minLength={6}
+                />
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Nhập lại mật khẩu mới"
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  required
+                />
+              </div>
+              {passwordError && (
+                <p className="text-xs text-red-600">{passwordError}</p>
+              )}
+              <button
+                type="submit"
+                disabled={isChangingPassword}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[#121316] text-white text-sm font-semibold rounded-lg hover:bg-slate-800 disabled:opacity-50"
+              >
+                {isChangingPassword && <Loader2 className="w-4 h-4 animate-spin" />}
+                Cập nhật mật khẩu
+              </button>
+            </form>
+          </div>
+
+          {/* Card 2: Kiến trúc Phân quyền 2-Tầng & Cấp phát Tài khoản Nhân sự */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#F6F5F0]/60">
+              <div>
+                <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#D95D39] mb-1">
+                  <Lock className="w-3.5 h-3.5" />
+                  Phân quyền Tạo Tài khoản Hợp lý (Zero Privilege Escalation)
+                </div>
+                <h3 className="text-lg font-bold text-slate-900">
+                  Quản trị Nhân sự & Cấp phát Tài khoản theo Vai trò (RBAC)
+                </h3>
+                <p className="text-xs text-slate-600 mt-1 max-w-3xl leading-relaxed">
+                  Để bảo mật hệ thống, người lạ tự đăng ký ngoài trang chủ chỉ nhận quyền <strong>MARKETER (Chuyên viên Nội dung)</strong>.
+                  Chỉ <strong>Quản lý chiến dịch (MANAGER)</strong> hoặc <strong>Chủ sở hữu Workspace</strong> mới có quyền tạo tài khoản mới với vai trò
+                  <strong> MANAGER</strong>, <strong>CLIENT_APPROVER (Khách hàng duyệt bài)</strong> hoặc nâng/hạ quyền thành viên tại đây.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void loadMembers()}
+                className="self-start sm:self-center inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingMembers ? 'animate-spin' : ''}`} />
+                Làm mới
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Ma trận 3 vai trò chuẩn */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="p-4 rounded-xl border border-slate-200 bg-[#F6F5F0]/40">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold uppercase tracking-wider text-[#D95D39]">MANAGER</span>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-[#FFF3EE] text-[#D95D39]">Toàn quyền</span>
+                  </div>
+                  <div className="font-bold text-sm text-slate-900 mb-1">Quản lý Chiến dịch</div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Khởi tạo chiến dịch, phân bổ ngân sách, cấu hình khóa AI BYOK, phê duyệt bài viết và cấp phát tài khoản nhân sự.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl border border-slate-200 bg-[#F6F5F0]/40">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold uppercase tracking-wider text-[#0F766E]">MARKETER</span>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-teal-50 text-[#0F766E]">Mặc định khi tự đăng ký</span>
+                  </div>
+                  <div className="font-bold text-sm text-slate-900 mb-1">Chuyên viên Nội dung</div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Sử dụng Xưởng AI đa kênh, kiểm tra mùi AI & chính sách quảng cáo, soạn bản nháp và gửi vào hàng đợi chờ duyệt.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl border border-slate-200 bg-[#F6F5F0]/40">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-800">CLIENT_APPROVER</span>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-800">Do Quản lý cấp</span>
+                  </div>
+                  <div className="font-bold text-sm text-slate-900 mb-1">Khách hàng Duyệt bài</div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Kiểm tra chất lượng bài viết, đối chiếu quy tắc thương hiệu, bấm Duyệt xuất bản hoặc Yêu cầu chỉnh sửa.
+                  </p>
+                </div>
+              </div>
+
+              {/* Form tạo tài khoản mới — chỉ hiển thị thao tác cho MANAGER / ADMIN / Owner */}
+              {isManagerOrAdmin ? (
+                <form
+                  onSubmit={handleProvisionAccount}
+                  className="p-5 rounded-xl border border-slate-200 bg-[#F6F5F0]/70 space-y-4"
+                >
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <UserPlus className="w-4 h-4 text-[#D95D39]" />
+                      <h4 className="text-sm font-bold text-slate-900">
+                        Cấp phát Tài khoản Mới hoặc Gán Quyền theo Email
+                      </h4>
+                    </div>
+                    <span className="text-[11px] text-slate-500">
+                      Tài khoản tạo tại đây đăng nhập được ngay lập tức tại màn hình Đăng nhập
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Họ và tên nhân sự</label>
+                      <input
+                        type="text"
+                        value={provFullName}
+                        onChange={(e) => setProvFullName(e.target.value)}
+                        placeholder="VD: Nguyễn Minh Anh"
+                        className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Email đăng nhập</label>
+                      <input
+                        type="email"
+                        value={provEmail}
+                        onChange={(e) => setProvEmail(e.target.value)}
+                        placeholder="minhanh@company.vn"
+                        className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Mật khẩu khởi tạo</label>
+                      <input
+                        type="password"
+                        value={provPassword}
+                        onChange={(e) => setProvPassword(e.target.value)}
+                        placeholder="Tối thiểu 6 ký tự"
+                        minLength={6}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Vai trò phân quyền (Role)</label>
+                      <select
+                        value={provRole}
+                        onChange={(e) => setProvRole(e.target.value as 'MANAGER' | 'MARKETER' | 'CLIENT_APPROVER')}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                      >
+                        <option value="MARKETER">MARKETER — Chuyên viên Nội dung</option>
+                        <option value="CLIENT_APPROVER">CLIENT_APPROVER — Khách hàng Duyệt bài</option>
+                        <option value="MANAGER">MANAGER — Quản lý Chiến dịch</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
+                    <p className="text-xs text-slate-500">
+                      Mẹo: Nếu email đã tồn tại trong hệ thống, thao tác này sẽ tự động cập nhật vai trò mới và thêm vào Workspace hiện tại.
+                    </p>
+                    <button
+                      type="submit"
+                      disabled={isProvisioning}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#D95D39] hover:bg-[#C04E2C] text-white text-sm font-semibold transition-colors disabled:opacity-50 shadow-sm"
+                    >
+                      {isProvisioning ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                      Tạo Tài Khoản & Gán Quyền
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70 text-xs text-amber-900 flex items-center gap-2.5">
+                  <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+                  <span>
+                    Bạn đang đăng nhập với vai trò <strong>{currentUser?.role}</strong>. Chỉ tài khoản <strong>MANAGER</strong> hoặc Chủ sở hữu Workspace mới có quyền tạo tài khoản mới và thay đổi phân quyền nhân sự.
+                  </span>
+                </div>
+              )}
+
+              {/* Bảng danh sách thành viên trong Workspace */}
+              {membersError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{membersError}</span>
+                </div>
+              )}
+
+              <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-[#F6F5F0] text-slate-600 uppercase text-[11px] font-bold border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-3">Nhân sự</th>
+                      <th className="px-4 py-3">Email đăng nhập</th>
+                      <th className="px-4 py-3">Vai trò hiện tại</th>
+                      <th className="px-4 py-3">Trạng thái</th>
+                      <th className="px-4 py-3 text-right">Điều chỉnh Phân quyền</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {isLoadingMembers && members.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-8 text-center text-xs text-slate-400">
+                          Đang tải danh sách nhân sự Workspace...
+                        </td>
+                      </tr>
+                    ) : members.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-8 text-center text-xs text-slate-400">
+                          Chưa có thành viên nào trong danh sách.
+                        </td>
+                      </tr>
+                    ) : (
+                      members.map((m) => {
+                        const effectiveRole =
+                          m.system_role === 'MANAGER' || m.workspace_role === 'AGENCY_MANAGER'
+                            ? 'MANAGER'
+                            : m.system_role === 'CLIENT_APPROVER' || m.workspace_role === 'CLIENT_APPROVER'
+                              ? 'CLIENT_APPROVER'
+                              : 'MARKETER';
+                        return (
+                          <tr key={`${m.user_id}-${m.id}`} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="px-4 py-3.5 font-semibold text-slate-900 flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-lg bg-slate-900 text-white text-xs font-bold flex items-center justify-center shrink-0">
+                                {(m.full_name || m.email || 'U')[0].toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span>{m.full_name}</span>
+                                  {m.is_owner && (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">
+                                      <Crown className="w-3 h-3" />
+                                      Owner
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[11px] text-slate-400 font-normal">ID #{m.user_id}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3.5 font-mono text-xs text-slate-700">{m.email}</td>
+                            <td className="px-4 py-3.5">
+                              <span
+                                className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                                  effectiveRole === 'MANAGER'
+                                    ? 'bg-[#FFF3EE] text-[#D95D39] border border-[#F5D0C5]'
+                                    : effectiveRole === 'CLIENT_APPROVER'
+                                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                      : 'bg-teal-50 text-[#0F766E] border border-teal-200'
+                                }`}
+                              >
+                                {effectiveRole}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-xs font-medium rounded-full">
+                                {m.status || 'ACTIVE'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3.5 text-right">
+                              {isManagerOrAdmin && !m.is_owner ? (
+                                <div className="inline-flex items-center gap-2">
+                                  <select
+                                    aria-label={`Đổi vai trò của ${m.email}`}
+                                    disabled={updatingUserId === m.user_id}
+                                    value={effectiveRole}
+                                    onChange={(e) =>
+                                      void handleRoleChange(
+                                        m,
+                                        e.target.value as 'MANAGER' | 'MARKETER' | 'CLIENT_APPROVER',
+                                      )
+                                    }
+                                    className="px-2.5 py-1 rounded-lg border border-slate-300 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                                  >
+                                    <option value="MARKETER">MARKETER</option>
+                                    <option value="CLIENT_APPROVER">CLIENT_APPROVER</option>
+                                    <option value="MANAGER">MANAGER</option>
+                                  </select>
+                                  <button
+                                    type="button"
+                                    disabled={updatingUserId === m.user_id}
+                                    onClick={() => void handleRemoveMember(m)}
+                                    className="p-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors"
+                                    title="Gỡ khỏi Workspace"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-slate-400">
+                                  {m.is_owner ? 'Chủ sở hữu cố định' : 'Chỉ xem'}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1301,25 +1689,33 @@ const handleTestConnection = async () => {
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
           <div className="flex items-center justify-between pb-6 border-b border-slate-100">
             <div>
-              <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider block mb-1">
+              <span className="text-xs font-bold text-[#D95D39] uppercase tracking-wider block mb-1">
                 Không gian làm việc hiện tại
               </span>
               <h2 className="text-xl font-bold text-slate-900">{currentWorkspace?.name || 'Default Agency Workspace'}</h2>
-              <p className="text-slate-500 text-sm mt-0.5">{currentWorkspace?.description || 'Không gian làm việc điều phối chiến dịch tiếp thị tổng lực'}</p>
+              <p className="text-slate-500 text-sm mt-0.5">{currentWorkspace?.description || 'Không gian làm việc điều phối chiến dịch tiếp thị'}</p>
             </div>
             <span className="px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full">
               {currentWorkspace?.status || 'ACTIVE'}
             </span>
           </div>
 
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm space-y-2">
+          <div className="p-4 bg-[#F6F5F0] rounded-xl border border-slate-200 text-sm space-y-2">
             <div className="font-bold text-slate-800 flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-indigo-600" />
+              <Building2 className="w-4 h-4 text-[#0F766E]" />
               Cách ly Dữ liệu Đa khách hàng (Multi-Tenancy Isolation)
             </div>
             <p className="text-slate-600 text-xs leading-relaxed">
-              Mỗi Workspace sở hữu Brand Kit, Chiến dịch, Hàng đợi Duyệt bài và Khóa AI BYOK tách biệt hoàn toàn. 
-              Các thành viên chỉ có thể truy xuất dữ liệu thuộc Workspace được phân quyền.
+              Mỗi Workspace sở hữu Tờ giấy Quy tắc Thương hiệu (Brand Kit), Chiến dịch, Hàng đợi Duyệt bài và Khóa AI BYOK tách biệt hoàn toàn.
+              Để thêm nhân sự hoặc cấp phát tài khoản mới cho Workspace này, chuyển sang tab{' '}
+              <button
+                type="button"
+                onClick={() => setActiveTab('profile')}
+                className="font-bold text-[#D95D39] underline hover:opacity-80"
+              >
+                Hồ sơ & Phân quyền RBAC
+              </button>
+              .
             </p>
           </div>
         </div>

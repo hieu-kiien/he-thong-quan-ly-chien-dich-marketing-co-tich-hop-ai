@@ -11,6 +11,7 @@ import { AIJobProgress } from '../components/AIJobProgress';
 import { useToast } from '../components/Toast';
 
 import { ComplianceAlertBadge } from '../components/ComplianceAlertBadge';
+import { AntiAiCopyLinterCard } from '../components/AntiAiCopyLinterCard';
 import { MCPAgentStudio } from '../components/MCPAgentStudio';
 
 import { FacebookPreviewCard, TikTokPhoneMockup, EmailInboxPreview } from '../components/previews';
@@ -1211,7 +1212,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
         khả dụng thấp hơn nhiều so với viewport — ở viewport 929px nội dung chỉ
         còn ~667px, `md:flex-row` vẫn kích hoạt và ép bộ chuyển mục xuống
         259px, cắt mất nút "Đơn giản hoá". `lg:` (1024px) mới đủ chỗ. */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white shadow-xl flex flex-col lg:flex-row lg:flex-wrap items-start lg:items-center justify-between gap-4 no-print">
+      <div className="bg-[#121316] border border-slate-800 rounded-2xl p-6 text-white shadow-xl flex flex-col lg:flex-row lg:flex-wrap items-start lg:items-center justify-between gap-4 no-print">
 
         <div>
 
@@ -1234,7 +1235,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
           </div>
 
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight">AI Marketing Copilot & Performance Doctor</h1>
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight">Xưởng Sáng Tạo Đa Kênh &amp; Chẩn Đoán Chiến Dịch</h1>
 
           <p className="text-xs sm:text-sm text-indigo-200 mt-1 max-w-2xl">
 
@@ -1258,7 +1259,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
               studioSection === 'omnichannel'
 
-                ? 'bg-gradient-to-r from-amber-500 to-indigo-600 text-white shadow-sm'
+                ? 'bg-[#D95D39] text-white shadow-sm'
 
                 : 'text-slate-300 hover:text-white'
 
@@ -1266,7 +1267,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
           >
 
-            <Zap className="w-3.5 h-3.5 text-amber-300" /> ⚡ Đa kênh 3-in-1 (R2)
+            <Zap className="w-3.5 h-3.5 text-amber-300" /> Đa kênh 3-trong-1
 
           </button>
 
@@ -1286,7 +1287,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
           >
 
-            <Sparkles className="w-3.5 h-3.5" /> 🎯 Đơn kênh (AIDA/PAS)
+            <Sparkles className="w-3.5 h-3.5" /> Đơn kênh (AIDA / PAS)
 
           </button>
 
@@ -1306,7 +1307,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
           >
 
-            <Stethoscope className="w-3.5 h-3.5" /> 🩺 Bác sĩ AI Khám Bệnh
+            <Stethoscope className="w-3.5 h-3.5" /> Bác sĩ Chẩn đoán Chiến dịch
 
           </button>
 
@@ -1315,11 +1316,11 @@ export const AIStudio: React.FC<AIStudioProps> = ({
             onClick={() => setStudioSection('mcp')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
               studioSection === 'mcp'
-                ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm'
+                ? 'bg-[#0F766E] text-white shadow-sm'
                 : 'text-slate-300 hover:text-white'
             }`}
           >
-            <Bot className="w-3.5 h-3.5 text-amber-300" /> 🤖 MCP &amp; Agentic Copilot
+            <Bot className="w-3.5 h-3.5 text-amber-300" /> Điều phối Tự động (MCP)
           </button>
 
         </div>
@@ -1994,6 +1995,32 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
 
 
+                    {omniData.facebook && (
+                      <div className="px-4 pb-2">
+                        <AntiAiCopyLinterCard
+                          title={omniData.facebook.headline || omniData.facebook.title || ''}
+                          body={omniData.facebook.primary_text || omniData.facebook.body || ''}
+                          cta={omniData.facebook.cta || ''}
+                          onApplyCleanCopy={(next) =>
+                            setOmniData((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    facebook: {
+                                      ...prev.facebook,
+                                      title: next.title,
+                                      headline: next.title,
+                                      body: next.body,
+                                      primary_text: next.body,
+                                      cta: next.cta,
+                                    },
+                                  }
+                                : prev,
+                            )
+                          }
+                        />
+                      </div>
+                    )}
                     {omniCompliance['facebook'] && (
 
                       <div className="px-4 pb-2">
@@ -3504,6 +3531,21 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
 
 
+                      {/* Bộ Soi Mùi AI & Bài Thử Xóa Tên Thương Hiệu (5 Luật Viết Chữ) */}
+                      <AntiAiCopyLinterCard
+                        title={draftData.title}
+                        body={draftData.body}
+                        cta={draftData.cta}
+                        onApplyCleanCopy={(next) =>
+                          setDraftData({
+                            ...draftData,
+                            title: next.title,
+                            body: next.body,
+                            cta: next.cta,
+                          })
+                        }
+                      />
+
                       {/* Compliance Result Badge */}
 
                       {complianceResult && (
@@ -3515,10 +3557,10 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                                 type="button"
                                 onClick={handleMCPAutoFixAll}
                                 disabled={isCheckingCompliance}
-                                className="text-xs font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 px-3.5 py-1.5 rounded-lg shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                                className="text-xs font-bold text-white bg-[#D95D39] hover:bg-[#C04E2C] px-3.5 py-1.5 rounded-lg shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
                               >
-                                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                                <span>✨ AI Tự động Sửa Toàn bộ Vi phạm (MCP Guardrail 100/100)</span>
+                                <Sparkles className="w-3.5 h-3.5" />
+                                <span>AI Tự động Sửa Toàn bộ Vi phạm (MCP Guardrail 100/100)</span>
                               </button>
                             </div>
                           )}

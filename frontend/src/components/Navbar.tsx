@@ -221,9 +221,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           onClick={onOpenBrandKit}
           aria-label="Cấu hình Brand Kit"
           className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition-all shadow-sm"
-          title="Cấu hình Brand Kit"
+          title="Tờ Giấy Quy Tắc Thiết Kế & Giọng Văn (Brand Kit)"
         >
-          <Palette className="w-3.5 h-3.5 text-violet-400" />
+          <Palette className="w-3.5 h-3.5 text-[#F08A6C]" />
           <span>Brand Kit</span>
         </button>
 
@@ -231,10 +231,10 @@ export const Navbar: React.FC<NavbarProps> = ({
         <button
           onClick={onOpenAIDrawer}
           aria-label="Mở AI Copilot"
-          className="flex items-center gap-1.5 sm:gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-semibold px-2 sm:px-3 py-1.5 rounded-xl shadow-md shadow-indigo-600/20 transition-all active:scale-95 shrink-0"
+          className="flex items-center gap-1.5 sm:gap-2 bg-[#D95D39] hover:bg-[#C04E2C] text-white text-xs font-semibold px-2 sm:px-3 py-1.5 rounded-xl shadow-md shadow-[#D95D39]/20 transition-all active:scale-95 shrink-0"
         >
-          <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-          <span className="hidden sm:inline">AI Copilot</span>
+          <Sparkles className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Trợ lý AI</span>
         </button>
 
         {/* Centralized Notification Center */}

@@ -25,7 +25,16 @@
 
 @layer base {
   body {
-    @apply bg-[#F8FAFC] text-slate-900;
+    @apply bg-[#F6F5F0] text-[#121316] antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Con số tài chính, ngân sách, ROAS dùng khoảng cách chữ số đều nhau (tabular-nums) */
+  .font-mono,
+  [data-numeric="true"],
+  table td,
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -128,7 +137,7 @@
 /* WCAG 2.2 AA Focus Visibility Normalization */
 @layer utilities {
   :focus-visible {
-    outline: 2px solid #6366f1;
+    outline: 2px solid #D95D39;
     outline-offset: 2px;
   }
 }

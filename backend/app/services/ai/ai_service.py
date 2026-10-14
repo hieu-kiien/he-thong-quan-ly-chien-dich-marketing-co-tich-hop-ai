@@ -941,6 +941,31 @@ class AIService:
                     target_ws_id = camp.workspace_id
             except Exception:
                 pass
+
+        # Bơm "Tờ giấy quy tắc Giọng văn & Thiết kế (Anti-AI Design & Voice Sheet)" từ BrandKit vào system_prompt
+        if target_ws_id is not None and task_code in ("IDEA", "DRAFT", "OMNICHANNEL"):
+            try:
+                from app.models.entities import BrandKit
+                bk = db.query(BrandKit).filter(BrandKit.workspace_id == target_ws_id).first()
+                if bk and (bk.target_audience or bk.brand_guidelines):
+                    anti_ai_rules = [
+                        "\n\n[TỜ GIẤY QUY TẮC KHỬ MÙI AI & GIỌNG VĂN THƯƠNG HIỆU — BẮT BUỘC TUÂN THỦ]:"
+                    ]
+                    if bk.target_audience:
+                        anti_ai_rules.append(f"- Chân dung người đọc cụ thể (1 câu): {bk.target_audience}")
+                    if bk.brand_guidelines:
+                        anti_ai_rules.append(f"- Quy tắc viết chữ & thiết kế của thương hiệu:\n{bk.brand_guidelines}")
+                    anti_ai_rules.append(
+                        "- 5 LUẬT VIẾT CHỮ ĐẦU NGÀNH (KHỬ MÙI AI):\n"
+                        "  1. Bài thử xóa tên thương hiệu: Nội dung phải có chi tiết/số liệu riêng của sản phẩm, không viết chung chung đến mức thay tên đối thủ vào vẫn đúng.\n"
+                        "  2. Cấm từ tự khen sáo rỗng: Tuyệt đối tránh 'tận tâm', 'hàng đầu', 'toàn diện', 'đáng tin cậy', 'giải pháp tối ưu'.\n"
+                        "  3. Lời khen phải có chủ ngữ bên thứ 3 hoặc con số đo được.\n"
+                        "  4. Nút bấm (CTA) phải là hành động cụ thể ngay lập tức (CẤM dùng 'Tìm hiểu thêm').\n"
+                        "  5. Câu ngắn, nhịp gọn, dùng từ tiếng Việt đời thường (đổi 'build' -> 'làm', 'output' -> 'kết quả', 'optimize' -> 'tối ưu chi phí')."
+                    )
+                    system_prompt = system_prompt + "\n".join(anti_ai_rules)
+            except Exception:
+                pass
         if self._api_key is not None:
             # 1. Test fixture override (Bảo tồn 100% zero regression cho 499 existing unit tests)
             active_key = self._api_key

@@ -27,8 +27,24 @@ export interface BrandKit {
   usp: string;
   tone_of_voice: string;
   banned_keywords: string[];
+  target_audience?: string | null;
+  brand_guidelines?: string | null;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface WorkspaceMemberItem {
+  id: number;
+  workspace_id: number;
+  user_id: number;
+  email: string;
+  full_name: string;
+  workspace_role: UserRole;
+  system_role: UserRole | 'ADMIN';
+  status: string;
+  is_owner: boolean;
+  created_new_user?: boolean;
+  created_at?: string;
 }
 
 export interface Campaign {

@@ -499,6 +499,10 @@ export function startScene(): Cleanup {
     if (host) {
       observer.observe(host);
     }
+    const cardEl = document.querySelector('.login-card');
+    if (cardEl) {
+      observer.observe(cardEl);
+    }
     resize();
     cleanups.push(() => observer.disconnect());
   }

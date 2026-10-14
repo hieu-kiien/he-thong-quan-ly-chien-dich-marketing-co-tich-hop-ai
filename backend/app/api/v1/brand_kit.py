@@ -106,7 +106,9 @@ def update_brand_kit(
             workspace_id=target_ws_id,
             brand_name=req.brand_name or workspace.name,
             usp=req.usp or "",
-            tone_of_voice=req.tone_of_voice or "Chuyên nghiệp, hiện đại, tin cậy",
+            tone_of_voice=req.tone_of_voice or "Câu ngắn nhịp gọn, đi thẳng vào con số và lợi ích cụ thể",
+            target_audience=req.target_audience,
+            brand_guidelines=req.brand_guidelines,
             banned_keywords_json=json.dumps(req.banned_keywords or [], ensure_ascii=False)
         )
         db.add(brand_kit)
@@ -117,6 +119,10 @@ def update_brand_kit(
             brand_kit.usp = req.usp
         if req.tone_of_voice is not None:
             brand_kit.tone_of_voice = req.tone_of_voice
+        if req.target_audience is not None:
+            brand_kit.target_audience = req.target_audience
+        if req.brand_guidelines is not None:
+            brand_kit.brand_guidelines = req.brand_guidelines
         if req.banned_keywords is not None:
             brand_kit.banned_keywords_json = json.dumps(req.banned_keywords, ensure_ascii=False)
 

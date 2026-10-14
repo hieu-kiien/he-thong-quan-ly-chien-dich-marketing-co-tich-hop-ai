@@ -111,11 +111,37 @@ class WorkspaceResponse(WorkspaceBase):
     owner: Optional[UserResponse] = None
     model_config = ConfigDict(from_attributes=True)
 
+class WorkspaceAccountProvision(BaseModel):
+    full_name: str = Field(..., min_length=2, max_length=255, description="Họ và tên nhân sự hoặc đối tác")
+    email: EmailStr = Field(..., description="Email đăng nhập")
+    password: Optional[str] = Field(None, min_length=6, max_length=128, description="Mật khẩu khởi tạo (nếu tạo tài khoản mới)")
+    role: str = Field(
+        "MARKETER",
+        pattern="^(MANAGER|AGENCY_MANAGER|MARKETER|CLIENT_APPROVER)$",
+        description="Quyền được cấp: MANAGER, MARKETER hoặc CLIENT_APPROVER",
+    )
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.lower().strip()
+
+
+class WorkspaceRoleUpdate(BaseModel):
+    role: str = Field(
+        ...,
+        pattern="^(MANAGER|AGENCY_MANAGER|MARKETER|CLIENT_APPROVER)$",
+        description="Vai trò mới cần cập nhật",
+    )
+
+
 # --- BRAND KIT ---
 class BrandKitBase(BaseModel):
     brand_name: str = Field(..., min_length=2, max_length=255, description="Tên thương hiệu")
     usp: Optional[str] = Field(None, description="Lợi thế bán hàng độc nhất / Định vị sản phẩm")
     tone_of_voice: Optional[str] = Field("Chuyên nghiệp, hiện đại", max_length=255, description="Giọng văn nhận diện thương hiệu")
+    target_audience: Optional[str] = Field(None, description="Mô tả cụ thể khách hàng mục tiêu (1-2 câu thực tế)")
+    brand_guidelines: Optional[str] = Field(None, description="Tờ giấy quy tắc thiết kế & luật viết chữ (JSON)")
     banned_keywords: List[str] = Field(
         default_factory=list, 
         description="Danh sách từ khóa cấm kỵ, vi phạm chính sách quảng cáo"
@@ -129,6 +155,8 @@ class BrandKitUpdate(BaseModel):
     brand_name: Optional[str] = Field(None, min_length=2, max_length=255)
     usp: Optional[str] = None
     tone_of_voice: Optional[str] = Field(None, max_length=255)
+    target_audience: Optional[str] = None
+    brand_guidelines: Optional[str] = None
     banned_keywords: Optional[List[str]] = None
 
 class BrandKitResponse(BrandKitBase):
@@ -161,6 +189,8 @@ class BrandKitResponse(BrandKitBase):
                 "brand_name": getattr(data, "brand_name"),
                 "usp": getattr(data, "usp"),
                 "tone_of_voice": getattr(data, "tone_of_voice"),
+                "target_audience": getattr(data, "target_audience", None),
+                "brand_guidelines": getattr(data, "brand_guidelines", None),
                 "banned_keywords": banned_list,
                 "created_at": getattr(data, "created_at"),
                 "updated_at": getattr(data, "updated_at"),

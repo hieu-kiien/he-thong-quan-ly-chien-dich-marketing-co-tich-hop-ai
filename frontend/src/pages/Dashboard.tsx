@@ -179,7 +179,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Command Center Điều Phối</h2>
+            <h2 className="text-2xl font-black text-[#121316] tracking-tight">Bảng Điều Phối Chiến Dịch &amp; Việc Hôm Nay</h2>
             <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
               Vận hành thời gian thực
             </span>
@@ -200,7 +200,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           <button
             onClick={handleOpenAICopilot}
-            className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-md shadow-indigo-500/20 transition-all active:scale-95 cursor-pointer"
+            className="flex items-center gap-2 bg-[#D95D39] hover:bg-[#C04E2C] text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-md shadow-[#D95D39]/20 transition-all active:scale-95 cursor-pointer"
           >
             <Sparkles className="w-4 h-4 animate-pulse" />
             <span>AI Copilot Điều Phối</span>

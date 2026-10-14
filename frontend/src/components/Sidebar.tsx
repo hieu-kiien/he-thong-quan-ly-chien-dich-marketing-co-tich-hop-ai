@@ -76,12 +76,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Brand Header */}
         <div className="p-5 flex items-center justify-between border-b border-slate-800/80">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-500/30">
+            <div className="w-9 h-9 rounded-xl bg-[#D95D39] flex items-center justify-center text-white font-bold shadow-lg shadow-[#D95D39]/25">
               <Layers className="w-5 h-5" />
             </div>
             <div>
               <h1 className="font-bold text-white text-base tracking-tight">MarketFlow AI</h1>
-              <p className="text-[11px] text-indigo-400 font-semibold tracking-wide">Enterprise Omnichannel</p>
+              <p className="text-[11px] text-[#F08A6C] font-semibold tracking-wide">Điều phối Chiến dịch Đa kênh</p>
             </div>
           </div>
 
@@ -134,12 +134,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   isActive
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-semibold'
+                    ? 'bg-[#D95D39] text-white shadow-md shadow-[#D95D39]/20 font-semibold'
                     : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-white' : item.highlight ? 'text-indigo-400' : 'text-slate-400'}`} />
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-white' : item.highlight ? 'text-[#F08A6C]' : 'text-slate-400'}`} />
                   <span>{item.label}</span>
                 </div>
                 {item.badge && (

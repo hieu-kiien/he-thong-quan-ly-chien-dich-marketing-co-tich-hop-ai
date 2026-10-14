@@ -498,6 +498,29 @@ export const workspaceApi = {
   addMember: async (id: number, data: { email: string; role: string }): Promise<any> => {
     const res = await apiClient.post(`/workspaces/${id}/members`, data);
     return res.data;
+  },
+  getMembers: async (workspaceId: number): Promise<import('../types').WorkspaceMemberItem[]> => {
+    const res = await apiClient.get(`/workspaces/${workspaceId}/members`);
+    return res.data?.items || [];
+  },
+  provisionAccount: async (
+    workspaceId: number,
+    data: { email: string; full_name: string; password: string; role: 'MANAGER' | 'MARKETER' | 'CLIENT_APPROVER' },
+  ): Promise<import('../types').WorkspaceMemberItem> => {
+    const res = await apiClient.post(`/workspaces/${workspaceId}/provision-account`, data);
+    return res.data;
+  },
+  updateMemberRole: async (
+    workspaceId: number,
+    memberUserId: number,
+    role: 'MANAGER' | 'MARKETER' | 'CLIENT_APPROVER',
+  ): Promise<import('../types').WorkspaceMemberItem> => {
+    const res = await apiClient.patch(`/workspaces/${workspaceId}/members/${memberUserId}/role`, { role });
+    return res.data;
+  },
+  removeMember: async (workspaceId: number, memberUserId: number): Promise<{ status: string; user_id: number }> => {
+    const res = await apiClient.delete(`/workspaces/${workspaceId}/members/${memberUserId}`);
+    return res.data;
   }
 };
 
