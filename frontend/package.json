@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
+    "@e2e-dev/web": "^0.14.0",
     "@playwright/test": "^1.63.0",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
@@ -29,6 +30,7 @@
     "@typescript-eslint/parser": "^7.18.0",
     "@vitejs/plugin-react": "^4.3.2",
     "autoprefixer": "^10.4.20",
+    "e2e": "^0.20.0",
     "eslint": "^8.57.1",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react": "^7.37.5",

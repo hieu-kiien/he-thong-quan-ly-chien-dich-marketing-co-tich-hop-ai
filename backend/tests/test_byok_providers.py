@@ -19,14 +19,14 @@ from app.core.crypto import encrypt_api_key, decrypt_api_key
 def test_schema_valid_providers():
     """Verify AIKeyTestRequest and AIKeyCreate accept every registered provider with a valid model."""
     sample_models = {
-        "gemini": "gemini-3.8-flash",
+        "gemini": "gemini-2.5-flash",
         "openrouter": "openrouter/free",
-        "openai": "gpt-6.1-sol",
-        "anthropic": "claude-sonnet-5-5",
-        "groq": "meta-llama/llama-4-maverick-17b-128e-instruct",
-        "xai": "grok-4.7",
-        "huggingface": "Qwen/Qwen3-235B-A22B",
-        "ollama": "qwen3.6:27b",
+        "openai": "gpt-4.1",
+        "anthropic": "claude-sonnet-4-0",
+        "groq": "llama-3.3-70b-versatile",
+        "xai": "grok-3",
+        "huggingface": "Qwen/Qwen2.5-72B-Instruct",
+        "ollama": "qwen3:8b",
         "opencode": "space-bunny-free",
     }
     for prov, model in sample_models.items():

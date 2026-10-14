@@ -155,14 +155,14 @@ def test_13_schema_ai_key_test_request_unsupported_provider():
 def test_13b_schema_ai_key_test_request_accepts_all_supported_providers():
     """Mọi provider đăng ký trong sổ đăng ký đều qua được validator."""
     supported = {
-        "gemini": ("AIzaSyTest", "gemini-3.8-flash"),
+        "gemini": ("AIzaSyTest", "gemini-2.5-flash"),
         "openrouter": ("sk-or-test", "openrouter/free"),
-        "openai": ("sk-test", "gpt-6.1-sol"),
-        "anthropic": ("sk-ant-test", "claude-sonnet-5-5"),
-        "groq": ("gsk_test", "meta-llama/llama-4-maverick-17b-128e-instruct"),
-        "xai": ("xai-test", "grok-4.7"),
-        "huggingface": ("hf_test", "Qwen/Qwen3-235B-A22B"),
-        "ollama": ("", "qwen3.6:27b"),
+        "openai": ("sk-test", "gpt-4.1"),
+        "anthropic": ("sk-ant-test", "claude-sonnet-4-0"),
+        "groq": ("gsk_test", "llama-3.3-70b-versatile"),
+        "xai": ("xai-test", "grok-3"),
+        "huggingface": ("hf_test", "Qwen/Qwen2.5-72B-Instruct"),
+        "ollama": ("", "qwen3:8b"),
         "opencode": ("sk-test", "space-bunny-free"),
     }
     for prov, (key, model) in supported.items():
