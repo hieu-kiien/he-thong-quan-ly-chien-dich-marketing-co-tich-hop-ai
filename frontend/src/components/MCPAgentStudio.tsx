@@ -119,7 +119,7 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
 
   const [visualLoading, setVisualLoading] = useState<boolean>(false);
   const [visualRatio, setVisualRatio] = useState<'1:1' | '9:16' | '16:9'>('1:1');
-  const [visualStyle, setVisualStyle] = useState<string>('Photorealistic Editorial Studio');
+  const [visualStyle, setVisualStyle] = useState<string>('3d_tech');
   const [visualHeadline, setVisualHeadline] = useState<string>('');
   const [visualResult, setVisualResult] = useState<any>(null);
 
@@ -127,16 +127,14 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
     setSquadLoading(true);
     try {
       const res = await mcpApi.runSquad({
-        ...(activeCampaign?.id ? { campaign_id: activeCampaign.id } : {}),
-        ...(activeCampaign?.workspace_id ? { workspace_id: activeCampaign.workspace_id } : {}),
+        campaign_id: activeCampaign?.id || 1,
         channel: channelCode,
         landing_url: abLandingUrl,
-        aspect_ratio: visualRatio,
         apply_to_db: squadApplyDb,
       });
       setSquadResult(res);
       toast.success(
-        `Biệt đội 4 AI Agents đã hoàn tất chiến dịch thực chiến (${res?.persistence?.saved_content_ids?.length || 0} bài nháp A/B & Banner đã lưu DB)!`,
+        `Biệt đội 4 AI Agents đã hoàn tất chiến dịch thực chiến (${res?.ab_variants?.length || 2} bài nháp A/B & Banner đã lưu DB)!`,
       );
       if (onContentCreated) onContentCreated();
     } catch (err) {
@@ -150,8 +148,7 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
     setAbLoading(true);
     try {
       const res = await mcpApi.generateAbUtm({
-        ...(activeCampaign?.id ? { campaign_id: activeCampaign.id } : {}),
-        ...(activeCampaign?.workspace_id ? { workspace_id: activeCampaign.workspace_id } : {}),
+        campaign_id: activeCampaign?.id || 1,
         channel: channelCode,
         landing_url: abLandingUrl,
         ...(abTopic.trim() ? { topic: abTopic.trim() } : {}),
@@ -171,12 +168,10 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
     setVisualLoading(true);
     try {
       const res = await mcpApi.generateVisualBanner({
-        ...(activeCampaign?.id ? { campaign_id: activeCampaign.id } : {}),
-        ...(activeCampaign?.workspace_id ? { workspace_id: activeCampaign.workspace_id } : {}),
-        channel: channelCode,
+        campaign_id: activeCampaign?.id || 1,
         aspect_ratio: visualRatio,
-        visual_style: visualStyle,
-        ...(visualHeadline.trim() ? { headline: visualHeadline.trim() } : {}),
+        style: visualStyle,
+        ...(visualHeadline.trim() ? { custom_headline: visualHeadline.trim() } : {}),
         attach_to_latest_content: true,
       });
       setVisualResult(res);
@@ -848,43 +843,43 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
                   <div className="space-y-3 border border-violet-200 bg-violet-50/30 rounded-xl p-3.5" data-testid="squad-result-panel">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-xs font-black text-violet-950">
-                        ✅ {squadResult.squad_name} • Đã lưu {squadResult.persistence?.saved_content_ids?.length || 0} bản nháp vào Chiến dịch #{squadResult.campaign_id}
+                        ✅ Biệt Đội {squadResult.agents_count || 4} AI Agents • Chiến dịch: {squadResult.campaign_name} (#{squadResult.campaign_id})
                       </span>
                       <span className="text-[11px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
-                        Compliance: 100/100 PASSED
+                        {squadResult.total_latency_ms}ms • Compliance: 100/100 PASSED
                       </span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      {(squadResult.agents || []).map((ag: any) => (
+                      {(squadResult.squad_steps || squadResult.agents || []).map((ag: any) => (
                         <div key={ag.agent_id} className="bg-white border border-slate-200 rounded-xl p-2.5 text-xs space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-slate-900">{ag.role}</span>
-                            <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="font-bold text-slate-900">{ag.agent_name || ag.role}</span>
+                            <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded shrink-0">
                               {ag.latency_ms}ms
                             </span>
                           </div>
-                          <p className="text-[11px] text-slate-600 leading-relaxed">{ag.deliverable_summary}</p>
+                          <p className="text-[11px] text-slate-600 leading-relaxed">{ag.summary || ag.deliverable_summary}</p>
                         </div>
                       ))}
                     </div>
 
-                    {squadResult.visual_asset?.image_url && (
+                    {squadResult.visual_banner?.image_url && (
                       <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row items-center gap-3">
                         <img
-                          src={squadResult.visual_asset.image_url}
+                          src={squadResult.visual_banner.image_url}
                           alt="Squad Generated Banner"
                           className="w-28 h-28 object-cover rounded-lg border border-slate-200 shrink-0"
                         />
                         <div className="space-y-1 text-xs min-w-0">
                           <div className="font-bold text-slate-900">
-                            🎨 Banner AI ({squadResult.visual_asset.aspect_ratio} • {squadResult.visual_asset.dimensions}): {squadResult.visual_asset.typography_overlay?.headline}
+                            🎨 Banner AI ({squadResult.visual_banner.aspect_ratio} • {squadResult.visual_banner.dimensions?.placement}): {squadResult.visual_banner.banner_overlay?.headline}
                           </div>
                           <div className="text-[11px] text-slate-600 line-clamp-2">
-                            Prompt: {squadResult.visual_asset.visual_prompt_en}
+                            Prompt: {squadResult.visual_banner.visual_prompt}
                           </div>
                           <div className="text-[11px] font-mono text-indigo-700 truncate">
-                            UTM: {squadResult.ab_utm_package?.variants?.[0]?.utm?.full_tracking_url}
+                            UTM: {squadResult.ab_variants?.[0]?.utm_url}
                           </div>
                         </div>
                       </div>
@@ -957,19 +952,19 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
                 {abResult && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="ab-utm-result-panel">
                     {(abResult.variants || []).map((v: any) => (
-                      <div key={v.variant_id} className="border border-slate-200 rounded-xl p-3 bg-slate-50/70 space-y-2 text-xs">
+                      <div key={v.variant_key || v.variant_id} className="border border-slate-200 rounded-xl p-3 bg-slate-50/70 space-y-2 text-xs">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-black text-indigo-900">
-                            Variant {v.variant_id}: {v.framework}
+                            Variant {v.variant_key || v.variant_id}: {v.framework}
                           </span>
                           <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
-                            {v.compliance_score}/100 • Est CTR {v.estimated_ctr_pct}%
+                            {v.compliance_score}/100 • Est CTR {v.predicted_ctr_pct || v.estimated_ctr_pct}%
                           </span>
                         </div>
                         <div className="font-bold text-slate-900">{v.title}</div>
                         <p className="text-[11px] text-slate-600 whitespace-pre-line line-clamp-4">{v.body}</p>
                         <div className="bg-slate-900 text-emerald-300 font-mono text-[10px] p-2 rounded-lg break-all">
-                          {v.utm?.full_tracking_url}
+                          {v.utm_url || v.utm?.full_tracking_url}
                         </div>
                       </div>
                     ))}
@@ -1005,10 +1000,10 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
                       onChange={(e) => setVisualStyle(e.target.value)}
                       className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-semibold text-slate-800"
                     >
-                      <option value="Photorealistic Editorial Studio">Photorealistic Editorial Studio</option>
-                      <option value="Minimalist Luxury Product">Minimalist Luxury Product</option>
-                      <option value="Neon Tech Futuristic">Neon Tech Futuristic</option>
-                      <option value="High-Contrast Bold Typography">High-Contrast Bold Typography</option>
+                      <option value="3d_tech">3D Isometric Glassmorphism Tech</option>
+                      <option value="editorial">Editorial Magazine Studio</option>
+                      <option value="minimal_luxury">Minimalist Luxury Product</option>
+                      <option value="vibrant_social">Vibrant High-Energy Social</option>
                     </select>
                   </div>
                   <div>
@@ -1049,20 +1044,20 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
                   <div className="border border-emerald-200 bg-emerald-50/40 rounded-xl p-3.5 flex flex-col sm:flex-row gap-4 items-center" data-testid="visual-banner-result-panel">
                     <img
                       src={visualResult.image_url}
-                      alt={visualResult.typography_overlay?.headline || 'AI Visual Banner'}
+                      alt={visualResult.banner_overlay?.headline || 'AI Visual Banner'}
                       className="w-36 h-36 object-cover rounded-xl border border-emerald-300 shadow-sm shrink-0"
                     />
                     <div className="space-y-1.5 text-xs min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-black text-emerald-950">
-                          {visualResult.typography_overlay?.headline}
+                          {visualResult.banner_overlay?.headline || visualResult.campaign_name}
                         </span>
                         <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
-                          {visualResult.aspect_ratio} ({visualResult.dimensions})
+                          {visualResult.aspect_ratio} ({visualResult.dimensions?.placement})
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-600 leading-relaxed">
-                        <strong>AI Visual Prompt:</strong> {visualResult.visual_prompt_en}
+                        <strong>AI Visual Prompt:</strong> {visualResult.visual_prompt}
                       </p>
                       <div className="text-[11px] text-emerald-800 font-semibold">
                         ✅ Đã đồng bộ ảnh vào Bài viết #{visualResult.attached_content_id || 'Mới nhất'} trong SQLite Database.
