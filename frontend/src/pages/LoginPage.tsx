@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getApiErrorMessage, isOfflineDemoEnabled } from '../services/api';
+import { getApiErrorMessage } from '../services/api';
 import { startHalloweenScene } from '../features/halloween-login';
 import '../features/halloween-login/halloween.css';
 
@@ -138,8 +138,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     }
   };
 
-  const showQuickLogin = isOfflineDemoEnabled();
-
   return (
     <div className="halloween-login-root">
       {/* Cảnh nền full màn hình */}
@@ -189,217 +187,273 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <span data-svg="images/icon-sun.svg" aria-hidden="true" />
               <span data-svg="images/icon-moon.svg" aria-hidden="true" />
             </button>
-            <div className="scene-copy scene-copy-animated">
-              <h2 id="welcome-title">{isRegister ? 'Tạo không gian mới' : 'Không gian của bạn'}</h2>
-              <p>
-                {isRegister
-                  ? 'Khởi tạo tài khoản Chuyên viên kèm Không gian làm việc và Tờ giấy Quy tắc Thương hiệu ngay sau 1 bước.'
-                  : 'Đăng nhập để điều phối chiến dịch, kiểm duyệt nội dung và theo dõi số liệu thực đo tại một nơi.'}
-              </p>
+            <div className="scene-copy-stage">
+              <div
+                className={`scene-copy-layer ${!isRegister ? 'is-visible' : 'is-hidden-left'}`}
+                aria-hidden={isRegister}
+              >
+                <h2 id={!isRegister ? 'welcome-title' : undefined}>Không gian của bạn</h2>
+                <p>
+                  Đăng nhập để điều phối chiến dịch, kiểm duyệt nội dung và theo dõi số liệu thực đo tại một nơi.
+                </p>
+              </div>
+              <div
+                className={`scene-copy-layer ${isRegister ? 'is-visible' : 'is-hidden-right'}`}
+                aria-hidden={!isRegister}
+              >
+                <h2 id={isRegister ? 'welcome-title' : undefined}>Tạo không gian mới</h2>
+                <p>
+                  Khởi tạo tài khoản Chuyên viên kèm Không gian làm việc và Tờ giấy Quy tắc Thương hiệu ngay sau 1 bước.
+                </p>
+              </div>
             </div>
           </section>
 
           <section className="form-panel">
             <form className="login-form" id="login-form" onSubmit={handleSubmit}>
-              <div
-                className={`auth-mode-switch ${isRegister ? 'is-register-mode' : ''}`}
-                role="tablist"
-                aria-label="Chế độ xác thực"
-              >
-                <span className="auth-mode-pill" aria-hidden="true" />
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={!isRegister}
-                  className={!isRegister ? 'is-active' : ''}
-                  onClick={() => switchMode('login')}
+              <div>
+                <div
+                  className={`auth-mode-switch ${isRegister ? 'is-register-mode' : ''}`}
+                  role="tablist"
+                  aria-label="Chế độ xác thực"
                 >
-                  Đăng nhập
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={isRegister}
-                  className={isRegister ? 'is-active' : ''}
-                  onClick={() => switchMode('register')}
-                >
-                  Đăng ký tài khoản
-                </button>
+                  <span className="auth-mode-pill" aria-hidden="true" />
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={!isRegister}
+                    className={!isRegister ? 'is-active' : ''}
+                    onClick={() => switchMode('login')}
+                  >
+                    Đăng nhập
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={isRegister}
+                    className={isRegister ? 'is-active' : ''}
+                    onClick={() => switchMode('register')}
+                  >
+                    Đăng ký tài khoản
+                  </button>
+                </div>
+
+                {/* Khung tiêu đề 2 lớp trượt GPU — không tháo lắp DOM */}
+                <div className="auth-title-stage">
+                  <h1
+                    id={!isRegister ? 'login-title' : undefined}
+                    aria-hidden={isRegister}
+                    className={`auth-title-layer ${!isRegister ? 'is-visible' : 'is-hidden-up'}`}
+                  >
+                    Đăng nhập
+                  </h1>
+                  <h1
+                    id={isRegister ? 'login-title' : undefined}
+                    aria-hidden={!isRegister}
+                    className={`auth-title-layer ${isRegister ? 'is-visible' : 'is-hidden-down'}`}
+                  >
+                    Đăng ký tài khoản
+                  </h1>
+                </div>
+
+                {/* 2 trường cốt lõi (#email kèm cú mèo & #password kèm đèn pin) CỐ ĐỊNH VỊ TRÍ TUYỆT ĐỐI ở cả 2 chế độ */}
+                <div className="field">
+                  <label className="sr-only" htmlFor="email">
+                    Email
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder={isRegister ? 'Địa chỉ Email (VD: ban@congty.vn)' : 'Email'}
+                    autoComplete="username"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                  <div className="email-owl" id="email-owl" aria-hidden="true">
+                    <span data-svg="images/owl.svg" aria-hidden="true" />
+                  </div>
+                </div>
+
+                <div className="field password">
+                  <label className="sr-only" htmlFor="password">
+                    Mật khẩu
+                  </label>
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    placeholder={isRegister ? 'Mật khẩu (tối thiểu 6 ký tự)' : 'Mật khẩu'}
+                    autoComplete={isRegister ? 'new-password' : 'current-password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    className="eye"
+                    id="show-password"
+                    type="button"
+                    aria-label="Hiện mật khẩu"
+                    aria-pressed="false"
+                    aria-controls="password"
+                  >
+                    <img src="/halloween/images/icon-eye.svg" alt="" width={18} height={18} />
+                  </button>
+                </div>
+
+                {/* Sân khấu chuyển đổi chiều cao cố định (Zero-Reflow 60fps GPU Stage) */}
+                <div className="auth-morph-stage">
+                  {/* Tầng 1: Khay chức năng chế độ Đăng nhập */}
+                  <div
+                    className={`auth-morph-deck ${!isRegister ? 'is-active' : 'is-inactive-left'}`}
+                    aria-hidden={isRegister}
+                  >
+                    {recentRegistered ? (
+                      <button
+                        type="button"
+                        className="recent-registered-chip"
+                        onClick={handleFillRecentAccount}
+                        tabIndex={!isRegister ? 0 : -1}
+                        title="Điền nhanh email tài khoản bạn vừa đăng ký"
+                      >
+                        <span className="truncate">
+                          Vừa đăng ký: <strong>{recentRegistered.full_name}</strong> ({recentRegistered.email})
+                        </span>
+                        <span className="shrink-0">Điền →</span>
+                      </button>
+                    ) : (
+                      <div className="register-role-badge">
+                        <strong>Truy cập theo Phân quyền RBAC 3 Vai trò</strong>
+                        <span>
+                          Hỗ trợ đầy đủ <b>Quản lý (Manager)</b>, <b>Chuyên viên (Marketer)</b> và <b>Khách hàng duyệt bài (Approver)</b>.
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="quick-login">
+                      <p>Điền nhanh tài khoản mẫu (1-Click Demo):</p>
+                      <div className="quick-login-grid">
+                        <button
+                          type="button"
+                          tabIndex={!isRegister ? 0 : -1}
+                          onClick={() => handleQuickLogin('manager@gmail.com', 'Manager@123')}
+                        >
+                          Quản lý
+                        </button>
+                        <button
+                          type="button"
+                          tabIndex={!isRegister ? 0 : -1}
+                          onClick={() => handleQuickLogin('marketer@gmail.com', 'Marketer@123')}
+                        >
+                          Marketer
+                        </button>
+                        <button
+                          type="button"
+                          tabIndex={!isRegister ? 0 : -1}
+                          onClick={() => handleQuickLogin('approver@gmail.com', 'Approver@123')}
+                        >
+                          Duyệt bài
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tầng 2: Khay chức năng chế độ Đăng ký */}
+                  <div
+                    className={`auth-morph-deck ${isRegister ? 'is-active' : 'is-inactive-right'}`}
+                    aria-hidden={!isRegister}
+                  >
+                    <div className="register-inline-grid">
+                      <div className="field">
+                        <label className="sr-only" htmlFor="register-fullname">
+                          Họ và tên
+                        </label>
+                        <input
+                          id="register-fullname"
+                          name="fullName"
+                          type="text"
+                          placeholder="Họ và tên của bạn"
+                          autoComplete="name"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          disabled={!isRegister}
+                          tabIndex={isRegister ? 0 : -1}
+                          required={isRegister}
+                        />
+                      </div>
+
+                      <div className="field password">
+                        <label className="sr-only" htmlFor="confirmPassword">
+                          Xác nhận mật khẩu
+                        </label>
+                        <input
+                          id="confirmPassword"
+                          name="confirmPassword"
+                          type="password"
+                          placeholder="Nhập lại mật khẩu"
+                          autoComplete="new-password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          disabled={!isRegister}
+                          tabIndex={isRegister ? 0 : -1}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="register-role-badge">
+                      <strong>Phân quyền bảo mật 2 tầng (RBAC)</strong>
+                      <span>
+                        • <b>Tự đăng ký:</b> Cấp quyền <b>Marketer</b> + Không gian riêng.
+                        <br />
+                        • <b>Quyền Quản lý / Duyệt bài:</b> Cấp trong <i>Cài đặt → Phân quyền</i>.
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="auth-title-stage">
-                <h1 id="login-title">{isRegister ? 'Đăng ký tài khoản' : 'Đăng nhập'}</h1>
-              </div>
+              <div>
+                {error && (
+                  <p className="status status-error" id="status" role="alert">
+                    {error}
+                  </p>
+                )}
 
-              {!isRegister && recentRegistered && (
-                <button
-                  type="button"
-                  className="recent-registered-chip"
-                  onClick={handleFillRecentAccount}
-                  title="Điền nhanh email tài khoản bạn vừa đăng ký"
-                >
+                {statusNote && !error && (
+                  <p className="status" role="status">
+                    {statusNote}
+                  </p>
+                )}
+
+                <p className={error || statusNote ? 'sr-only' : 'status'} role="status" aria-live="polite">
+                  {isLoading ? (isRegister ? 'Đang khởi tạo tài khoản & Workspace...' : 'Đang xác thực...') : ''}
+                </p>
+
+                <button className="submit" type="submit" disabled={isLoading}>
                   <span>
-                    Vừa đăng ký: <strong>{recentRegistered.full_name}</strong> ({recentRegistered.email})
-                  </span>
-                  <span>Điền →</span>
+                    {isLoading
+                      ? isRegister
+                        ? 'Đang khởi tạo...'
+                        : 'Đang xác thực...'
+                      : isRegister
+                      ? 'Hoàn tất Đăng ký & Vào Hệ thống'
+                      : 'Đăng nhập'}
+                  </span>{' '}
+                  <img src="/halloween/images/icon-arrow.svg" alt="" width={17} height={17} />
                 </button>
-              )}
 
-              {/* Trường Họ và tên: mở mượt khi ở chế độ Đăng ký */}
-              <div className={`auth-expandable ${isRegister ? 'is-open' : ''}`} aria-hidden={!isRegister}>
-                <div className="auth-expandable-inner">
-                  <div className="field">
-                    <label className="sr-only" htmlFor="register-fullname">
-                      Họ và tên
-                    </label>
-                    <input
-                      id="register-fullname"
-                      name="fullName"
-                      type="text"
-                      placeholder="Họ và tên (VD: Nguyễn Văn A)"
-                      autoComplete="name"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      disabled={!isRegister}
-                      tabIndex={isRegister ? 0 : -1}
-                      required={isRegister}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="field">
-                <label className="sr-only" htmlFor="email">
-                  Email
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder={isRegister ? 'Địa chỉ Email (VD: ban@congty.vn)' : 'Email'}
-                  autoComplete="username"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-                <div className="email-owl" id="email-owl" aria-hidden="true">
-                  <span data-svg="images/owl.svg" aria-hidden="true" />
-                </div>
-              </div>
-
-              <div className="field password">
-                <label className="sr-only" htmlFor="password">
-                  Mật khẩu
-                </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  placeholder={isRegister ? 'Mật khẩu (tối thiểu 6 ký tự)' : 'Mật khẩu'}
-                  autoComplete={isRegister ? 'new-password' : 'current-password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-                <button
-                  className="eye"
-                  id="show-password"
-                  type="button"
-                  aria-label="Hiện mật khẩu"
-                  aria-pressed="false"
-                  aria-controls="password"
-                >
-                  <img src="/halloween/images/icon-eye.svg" alt="" width={18} height={18} />
-                </button>
-              </div>
-
-              {/* Trường Xác nhận mật khẩu & Quyền tài khoản: mở mượt khi ở chế độ Đăng ký */}
-              <div className={`auth-expandable ${isRegister ? 'is-open' : ''}`} aria-hidden={!isRegister}>
-                <div className="auth-expandable-inner">
-                  <div className="field password">
-                    <label className="sr-only" htmlFor="confirmPassword">
-                      Xác nhận mật khẩu
-                    </label>
-                    <input
-                      id="confirmPassword"
-                      name="confirmPassword"
-                      type="password"
-                      placeholder="Nhập lại mật khẩu xác nhận"
-                      autoComplete="new-password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      disabled={!isRegister}
-                      tabIndex={isRegister ? 0 : -1}
-                    />
-                  </div>
-
-                  <div className="register-role-badge">
-                    <strong>Phân quyền tài khoản chuẩn bảo mật (2 tầng)</strong>
-                    <span>
-                      • <b>Tự đăng ký công khai:</b> Cấp quyền <b>Chuyên viên (Marketer)</b> + Không gian làm việc riêng (chống tự ý nâng đặc quyền).
-                      <br />
-                      • <b>Cấp quyền Quản lý / Duyệt bài:</b> Do Quản trị viên tạo hoặc nâng quyền tại mục <i>Cài đặt → Nhân sự &amp; Phân quyền</i>.
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {error && (
-                <p className="status status-error" id="status" role="alert">
-                  {error}
+                <p className="signup-row">
+                  <span>{isRegister ? 'Đã có tài khoản?' : 'Chưa có tài khoản?'}</span>{' '}
+                  <button
+                    className="text-action"
+                    type="button"
+                    onClick={() => switchMode(isRegister ? 'login' : 'register')}
+                  >
+                    {isRegister ? 'Đăng nhập ngay' : 'Đăng ký'}
+                  </button>
                 </p>
-              )}
-
-              {statusNote && !error && (
-                <p className="status" role="status">
-                  {statusNote}
-                </p>
-              )}
-
-              <p className={error || statusNote ? 'sr-only' : 'status'} role="status" aria-live="polite">
-                {isLoading ? (isRegister ? 'Đang khởi tạo tài khoản & Workspace...' : 'Đang xác thực...') : ''}
-              </p>
-
-              <button className="submit" type="submit" disabled={isLoading}>
-                <span>
-                  {isLoading
-                    ? isRegister
-                      ? 'Đang khởi tạo...'
-                      : 'Đang xác thực...'
-                    : isRegister
-                    ? 'Hoàn tất Đăng ký & Vào Hệ thống'
-                    : 'Đăng nhập'}
-                </span>{' '}
-                <img src="/halloween/images/icon-arrow.svg" alt="" width={17} height={17} />
-              </button>
-
-              {!isRegister && showQuickLogin && (
-                <div className="quick-login">
-                  <p>Chọn nhanh tài khoản kiểm thử:</p>
-                  <div className="quick-login-grid">
-                    <button type="button" onClick={() => handleQuickLogin('manager@gmail.com', 'Manager@123')}>
-                      Manager
-                    </button>
-                    <button type="button" onClick={() => handleQuickLogin('marketer@gmail.com', 'Marketer@123')}>
-                      Marketer
-                    </button>
-                    <button type="button" onClick={() => handleQuickLogin('approver@gmail.com', 'Approver@123')}>
-                      Approver
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <p className="signup-row">
-                <span>{isRegister ? 'Đã có tài khoản?' : 'Chưa có tài khoản?'}</span>{' '}
-                <button
-                  className="text-action"
-                  type="button"
-                  onClick={() => switchMode(isRegister ? 'login' : 'register')}
-                >
-                  {isRegister ? 'Đăng nhập ngay' : 'Đăng ký'}
-                </button>
-              </p>
+              </div>
             </form>
           </section>
         </main>

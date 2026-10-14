@@ -1090,21 +1090,7 @@ class AIKeyTestRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_provider_and_model_compatibility(self) -> "AIKeyTestRequest":
-        prov = (self.provider or "gemini").lower().strip()
-        m = (self.model or "").lower().strip()
-        if prov == "gemini":
-            if not m.startswith("gemini"):
-                raise ValueError(f"Mô hình '{self.model}' không thuộc hệ sinh thái Google Gemini.")
-        elif prov == "openai":
-            valid_prefixes = ("gpt-", "o1", "o3", "text-embedding-", "chatgpt-")
-            if not any(m.startswith(p) for p in valid_prefixes):
-                raise ValueError(f"Mô hình '{self.model}' không thuộc hệ sinh thái OpenAI.")
-        elif prov == "openrouter":
-            if "/" not in self.model or len(self.model) < 3:
-                raise ValueError(f"Mô hình '{self.model}' không hợp lệ cho OpenRouter.")
-        elif prov == "opencode":
-            if len(self.model) < 2:
-                raise ValueError(f"Mô hình '{self.model}' không hợp lệ cho OpenCode.")
+        self.model = validate_model_for(self.provider, self.model)
         return self
 
 

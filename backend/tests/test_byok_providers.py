@@ -1,4 +1,4 @@
-﻿"""Comprehensive BYOK Multi-Provider Expansion Test Suite (Worker M4).
+"""Comprehensive BYOK Multi-Provider Expansion Test Suite (Worker M4).
 
 Validates schema validation, multi-provider model validation (Gemini, OpenRouter, OpenAI,
 Anthropic, HuggingFace, Ollama), multi-tier key resolution, live connection test endpoint,
@@ -19,12 +19,14 @@ from app.core.crypto import encrypt_api_key, decrypt_api_key
 def test_schema_valid_providers():
     """Verify AIKeyTestRequest and AIKeyCreate accept every registered provider with a valid model."""
     sample_models = {
-        "gemini": "gemini-2.5-flash",
-        "openrouter": "meta-llama/llama-3.3-70b-instruct",
-        "openai": "gpt-4o",
-        "anthropic": "claude-3-5-haiku-latest",
-        "huggingface": "meta-llama/Llama-3.1-8B-Instruct",
-        "ollama": "llama3.2",
+        "gemini": "gemini-3.8-flash",
+        "openrouter": "anthropic/claude-sonnet-4-6",
+        "openai": "gpt-6.1-sol",
+        "anthropic": "claude-sonnet-4-6",
+        "groq": "llama-3.3-70b-versatile",
+        "xai": "grok-4",
+        "huggingface": "Qwen/Qwen3-235B-A22B",
+        "ollama": "qwen3:8b",
         "opencode": "space-bunny-free",
     }
     for prov, model in sample_models.items():

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Sparkles, CheckCircle2, Clock, AlertTriangle, Loader2, Check, Calendar, ChevronRight, ShieldAlert, Activity, ListTodo } from 'lucide-react';
+import { Sparkles, CheckCircle2, Clock, AlertTriangle, Loader2, Check, Calendar, ChevronRight, ShieldAlert, Activity, ListTodo, Layers, Cpu, Target, ShieldCheck, Stethoscope } from 'lucide-react';
 import { CampaignTable } from '../components/CampaignTable';
 import { KPIGrid9, AttributionTrendChart, AIDoctorWidget } from '../components/analytics';
 import { Campaign, MarketingContent, CommandCenterResponse, TaskStatus } from '../types';
@@ -152,6 +152,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const pendingContents = contents.filter(c => c.status === 'IN_REVIEW');
+  const approvedContents = contents.filter(c => c.status === 'APPROVED' || c.status === 'PUBLISHED');
 
   // Nhịp chi tiêu = chi phí thực đo / ngân sách, tính từ `campaign_spend`.
   // Chiến dịch chưa có bản ghi CampaignMetric thì KHÔNG có phần tử trong map —
@@ -172,27 +173,107 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const campaignsHealth = commandCenter?.campaigns_health || [];
   const summaryCounts = commandCenter?.summary_counts;
 
+  const lifecycleStages = [
+    {
+      step: '01',
+      title: 'Định vị & Hạ tầng AI',
+      aiLayer: 'AI Tầng 1 · Brand Memory & 9-Provider BYOK',
+      desc: 'Chuẩn hóa giọng văn thương hiệu, từ khóa cấm & định tuyến 9 hãng AI (Gemini 2.5, GPT-6.1/5.4, Claude 4.6, DeepSeek R1, Qwen 3, Grok 4, Groq LPU).',
+      badge: '9 Hãng AI · 2026',
+      accent: 'from-violet-600 to-indigo-600',
+      bgLight: 'bg-violet-50 text-violet-700 border-violet-200',
+      icon: Cpu,
+      actionLabel: 'Cấu hình AI & Brand',
+      onClick: () => onNavigateTab?.('settings'),
+    },
+    {
+      step: '02',
+      title: 'Hoạch định & Ngân sách',
+      aiLayer: 'AI Tầng 2 · Dự báo KPI & Chia việc',
+      desc: 'Thiết lập mục tiêu chiến dịch, định mức ngân sách VND theo kênh (Facebook, TikTok, Google, Email) và tự động phân rã tác vụ.',
+      badge: `${campaigns.length} chiến dịch`,
+      accent: 'from-blue-600 to-cyan-600',
+      bgLight: 'bg-blue-50 text-blue-700 border-blue-200',
+      icon: Target,
+      actionLabel: 'Quản lý Chiến dịch',
+      onClick: () => onNavigateTab?.('campaigns'),
+    },
+    {
+      step: '03',
+      title: 'Sáng tạo Đa kênh & MCP',
+      aiLayer: 'AI Tầng 3 · Co-Creator + Khử mùi AI',
+      desc: 'Sinh nội dung đa kênh kết hợp MCP Tools truy xuất dữ liệu thật trong DB và bộ lọc Anti-AI Linter chấm điểm tự nhiên trước khi lưu.',
+      badge: `${contents.length} bản thảo`,
+      accent: 'from-orange-500 to-amber-500',
+      bgLight: 'bg-orange-50 text-orange-700 border-orange-200',
+      icon: Sparkles,
+      actionLabel: 'Mở AI Studio',
+      onClick: () => onNavigateTab?.('ai_studio'),
+    },
+    {
+      step: '04',
+      title: 'Phê duyệt RBAC & Lịch đăng',
+      aiLayer: 'AI Tầng 4 · Chốt chặn Con người (HITL)',
+      desc: 'Kiểm soát 2 tầng quyền rõ ràng: Chuyên viên gửi duyệt bản thảo đạt chuẩn, Quản lý phê duyệt và xếp lịch xuất bản đa kênh.',
+      badge: `${pendingContents.length} chờ duyệt · ${approvedContents.length} đã duyệt`,
+      accent: 'from-emerald-600 to-teal-600',
+      bgLight: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      icon: ShieldCheck,
+      actionLabel: 'Hàng đợi Duyệt bài',
+      onClick: () => onNavigateTab?.('reviews'),
+    },
+    {
+      step: '05',
+      title: 'Đo lường & Bác sĩ AI',
+      aiLayer: 'AI Tầng 5 · Chẩn đoán Điểm nghẽn ROAS',
+      desc: 'Đối chiếu chi phí thực chi với doanh thu mang về, tự động phát hiện bất thường ở phễu CTR → CVR → CPA và đề xuất tối ưu.',
+      badge: dashboardKpi?.roas ? `ROAS ${Number(dashboardKpi.roas).toFixed(2)}x` : 'Chẩn đoán 24/7',
+      accent: 'from-rose-600 to-pink-600',
+      bgLight: 'bg-rose-50 text-rose-700 border-rose-200',
+      icon: Stethoscope,
+      actionLabel: 'Khám sức khỏe chiến dịch',
+      onClick: () => {
+        const el = document.getElementById('ai-doctor-hub');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        else onNavigateTab?.('workflow');
+      },
+    },
+  ];
+
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-7 max-w-7xl mx-auto">
       
       {/* Page Title & Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-2xl font-black text-[#121316] tracking-tight">Bảng Điều Phối Chiến Dịch &amp; Việc Hôm Nay</h2>
-            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-xl sm:text-2xl font-black text-[#121316] tracking-tight">
+              Trung Tâm Điều Phối Chiến Dịch &amp; Hiệu Suất AI
+            </h2>
+            <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
               Vận hành thời gian thực
+            </span>
+            <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+              5 Tầng AI · 9 Providers
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Hệ thống quản lý và điều phối vận hành chiến dịch Marketing B2B: Việc cần chú ý, tác vụ hôm nay và sức khỏe chiến dịch.
+            Hệ thống quản lý chiến dịch Marketing khép kín từ Định vị thương hiệu, Hoạch định ngân sách, Sáng tạo đa kênh (MCP + Anti-AI Linter), Phê duyệt RBAC đến Đo lường ROAS &amp; Bác sĩ AI.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <button
+            onClick={() => onNavigateTab?.('settings')}
+            className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold px-3.5 py-2.5 rounded-xl transition-all cursor-pointer"
+          >
+            <Cpu className="w-4 h-4 text-violet-600" />
+            <span>Model AI &amp; BYOK</span>
+          </button>
+
           <button
             onClick={() => onNavigateTab?.('my_tasks')}
-            className="flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold px-3.5 py-2.5 rounded-lg shadow-sm transition-all cursor-pointer"
+            className="flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold px-3.5 py-2.5 rounded-xl shadow-sm transition-all cursor-pointer"
           >
             <ListTodo className="w-4 h-4 text-indigo-600" />
             <span>Tác vụ của tôi ({summaryCounts?.total_my_tasks ?? 0})</span>
@@ -200,7 +281,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           <button
             onClick={handleOpenAICopilot}
-            className="flex items-center gap-2 bg-[#D95D39] hover:bg-[#C04E2C] text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-md shadow-[#D95D39]/20 transition-all active:scale-95 cursor-pointer"
+            className="flex items-center gap-2 bg-[#D95D39] hover:bg-[#C04E2C] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md shadow-[#D95D39]/20 transition-all active:scale-95 cursor-pointer"
           >
             <Sparkles className="w-4 h-4 animate-pulse" />
             <span>AI Copilot Điều Phối</span>
@@ -208,20 +289,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* CẢNH BÁO NGUỒN GỐC SỐ LIỆU.
-
-          Dashboard tổng hợp ROAS / lượt xem / chi phí thẳng từ bảng
-          `campaign_metrics`. Bảng đó có thể chứa dòng do dữ liệu MẪU nạp vào,
-          không phải số đo thật từ Facebook/TikTok/Google. Nếu không nói rõ,
-          người dùng và khách hàng sẽ đọc "15.700 lượt xem" là kết quả thật.
-
-          Backend báo `data_provenance.has_demo_data`; hiển thị ở đây để con số
-          luôn đi kèm nguồn gốc. Đây là điều kiện tiên quyết để bán sản phẩm
-          này cho người dùng thật. */}
+      {/* CẢNH BÁO NGUỒN GỐC SỐ LIỆU */}
       {(dataProvenance?.has_demo_data || dataProvenance?.has_unverified_data) && (
         <div
           role="status"
-          className="flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900"
+          className="flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50/90 px-4 py-3 text-amber-900"
         >
           <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" aria-hidden="true" />
           <div className="text-xs leading-relaxed">
@@ -253,7 +325,93 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
-      {/* SECTION 1: WHAT NEEDS ATTENTION (VIỆC CẦN CHÚ Ý) */}
+      {/* SECTION 1 (ABOVE THE FOLD): 9-KPI PERFORMANCE METRICS BENTO */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Activity className="w-4 h-4 text-indigo-600" />
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+              Chỉ Số Hiệu Quả Chiến Dịch Toàn Hệ Thống (Executive KPIs)
+            </h3>
+          </div>
+          <button
+            onClick={() => onNavigateTab?.('campaigns')}
+            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+          >
+            Ghi nhận chỉ số thực tế &rarr;
+          </button>
+        </div>
+        <KPIGrid9
+          kpi={dashboardKpi}
+          loading={loading}
+          error={kpiError}
+          onRetry={() => void loadData()}
+        />
+      </div>
+
+      {/* SECTION 2: 5-STAGE MARKETING CAMPAIGN LIFECYCLE & 5-TIER AI INTEGRATION ARCHITECTURE */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3.5">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-sm">
+              <Layers className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">
+                Chu Trình 5 Bước Chiến Dịch Khép Kín &amp; Kiến Trúc 5 Tầng AI Can Thiệp
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                Bấm vào từng giai đoạn để thao tác trực tiếp — AI đóng vai trò trợ lý thông minh ở cả 5 khâu nhưng quyền quyết định cuối cùng luôn thuộc về con người (Human-in-the-Loop).
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3.5">
+          {lifecycleStages.map((stage) => {
+            const IconComponent = stage.icon;
+            return (
+              <div
+                key={stage.step}
+                onClick={stage.onClick}
+                className="group relative rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-white hover:border-indigo-300 hover:shadow-md p-3.5 flex flex-col justify-between transition-all cursor-pointer"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md border ${stage.bgLight}`}>
+                      <IconComponent className="w-3 h-3" />
+                      Bước {stage.step}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-600 bg-white border border-slate-200/80 px-2 py-0.5 rounded-full truncate">
+                      {stage.badge}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-extrabold text-slate-900 group-hover:text-indigo-700 transition-colors">
+                      {stage.title}
+                    </h4>
+                    <p className="text-[10px] font-bold text-indigo-600 mt-0.5">
+                      {stage.aiLayer}
+                    </p>
+                  </div>
+
+                  <p className="text-[11px] text-slate-600 leading-relaxed line-clamp-3">
+                    {stage.desc}
+                  </p>
+                </div>
+
+                <div className="pt-2.5 mt-2.5 border-t border-slate-200/60 flex items-center justify-between text-[11px] font-bold text-slate-700 group-hover:text-indigo-600">
+                  <span>{stage.actionLabel}</span>
+                  <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* SECTION 3: WHAT NEEDS ATTENTION (VIỆC CẦN CHÚ Ý NGAY) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -361,7 +519,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         )}
       </div>
 
-      {/* SECTION 2: OPERATIONAL SPLIT GRID (MY WORK TODAY + ACTIVE CAMPAIGNS HEALTH) */}
+      {/* SECTION 4: OPERATIONAL SPLIT GRID (MY WORK TODAY + ACTIVE CAMPAIGNS HEALTH) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Left Column (6/12): MY WORK TODAY */}
@@ -518,9 +676,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       {/* Progress / Budget Stats */}
                       <div className="space-y-1">
                         <div className="flex items-center justify-between text-[11px] text-slate-500">
-                          {/* Tiền trong hệ thống là VND; trước đây gắn ký hiệu `$` và
-                              gọi toLocaleString() không kèm locale nên 15000000 ra
-                              "15,000,000 $". */}
                           <span>Ngân sách: {formatVND(ch.spent)} / {formatVND(ch.budget)}</span>
                           <span className="font-semibold">{ch.budget_utilization_pct}% đã chi</span>
                         </div>
@@ -564,21 +719,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       </div>
 
-      {/* SECTION 3: 9-KPI GRID (ANALYTICS BENTO TOP) */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-          Chỉ Số Hiệu Quả Chiến Dịch (Performance Metrics)
-        </h3>
-        <KPIGrid9
-          kpi={dashboardKpi}
-          loading={loading}
-          error={kpiError}
-          onRetry={() => void loadData()}
-        />
-      </div>
-
-      {/* SECTION 4: ANALYTICS & DOCTOR HUB */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* SECTION 5: ANALYTICS & DOCTOR HUB */}
+      <div id="ai-doctor-hub" className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Left Column (8/12 - 67%): Attribution Trend & Campaigns Table */}
         <div className="lg:col-span-8 space-y-6">
@@ -621,10 +763,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 onOpenWorkflow={onOpenWorkflow}
                 onOpenAIForCampaign={onOpenAI}
                 onRequestDeleteCampaign={setConfirmDeleteId}
-                // Trước đây prop này tồn tại nhưng KHÔNG được truyền, nên bảng
-                // luôn hiện "chưa ghi nhận chi phí" dù Dashboard ngay phía trên đã
-                // tính ra tổng chi phí — hai phần của cùng một màn hình nói
-                // hai sự thật khác nhau.
                 spendPercentByCampaign={campaignSpendPercent}
                 userRole={userRole}
               />
@@ -636,7 +774,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="lg:col-span-4 space-y-5">
           <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
             <Sparkles className="w-4 h-4 text-violet-600" />
-            <span>AI Doctor & Chẩn Đoán</span>
+            <span>AI Doctor &amp; Chẩn Đoán</span>
           </h3>
 
           {commandCenterError ? (
@@ -649,8 +787,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           ) : (
             <AIDoctorWidget
-              // Trước đây luôn chẩn đoán campaigns[0] bất kể người dùng đang xem
-              // chiến dịch nào; nay ưu tiên chiến dịch đang chọn.
               campaignId={
                 campaigns.find((c) => c.status === 'ACTIVE')?.id ??
                 campaigns[0]?.id

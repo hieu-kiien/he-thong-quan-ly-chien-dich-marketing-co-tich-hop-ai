@@ -1,4 +1,4 @@
-﻿"""Unit & Integration Test Suite cho Enterprise Settings & BYOK Custom AI API Key (M6 - R6).
+"""Unit & Integration Test Suite cho Enterprise Settings & BYOK Custom AI API Key (M6 - R6).
 Bao gồm 30 test cases: Mã hóa Fernet, Chống can thiệp Ciphertext, Masking, Pydantic Schemas,
 REST Endpoints, Multi-tier Key Resolver, và RBAC.
 """
@@ -155,12 +155,14 @@ def test_13_schema_ai_key_test_request_unsupported_provider():
 def test_13b_schema_ai_key_test_request_accepts_all_supported_providers():
     """Mọi provider đăng ký trong sổ đăng ký đều qua được validator."""
     supported = {
-        "gemini": ("AIzaSyTest", "gemini-2.5-flash"),
-        "openrouter": ("sk-or-test", "meta-llama/llama-3.3-70b-instruct"),
-        "openai": ("sk-test", "gpt-4o"),
-        "anthropic": ("sk-ant-test", "claude-3-5-haiku-latest"),
-        "huggingface": ("hf_test", "meta-llama/Llama-3.1-8B-Instruct"),
-        "ollama": ("", "llama3.2"),
+        "gemini": ("AIzaSyTest", "gemini-3.8-flash"),
+        "openrouter": ("sk-or-test", "anthropic/claude-sonnet-4-6"),
+        "openai": ("sk-test", "gpt-6.1-sol"),
+        "anthropic": ("sk-ant-test", "claude-sonnet-4-6"),
+        "groq": ("gsk_test", "llama-3.3-70b-versatile"),
+        "xai": ("xai-test", "grok-4"),
+        "huggingface": ("hf_test", "Qwen/Qwen3-235B-A22B"),
+        "ollama": ("", "qwen3:8b"),
         "opencode": ("sk-test", "space-bunny-free"),
     }
     for prov, (key, model) in supported.items():

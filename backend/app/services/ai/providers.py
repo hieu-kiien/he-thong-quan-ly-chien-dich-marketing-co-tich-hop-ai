@@ -44,9 +44,10 @@ PROTOCOL_ANTHROPIC = "anthropic"
 
 # Quy tắc kiểm tra tên model theo provider
 MODEL_RULE_GEMINI = "gemini"        # phải bắt đầu bằng "gemini"
-MODEL_RULE_OPENAI = "openai"        # phải bắt đầu bằng gpt-/o1/o3/text-embedding-/chatgpt-
+MODEL_RULE_OPENAI = "openai"        # phải bắt đầu bằng gpt-/o1/o3/o4/text-embedding-/chatgpt-
 MODEL_RULE_OPENROUTER = "openrouter"  # phải có dấu "/" (tác giả/tên-mô-hình)
 MODEL_RULE_ANTHROPIC = "anthropic"  # phải bắt đầu bằng "claude"
+MODEL_RULE_XAI = "xai"              # phải bắt đầu bằng "grok"
 MODEL_RULE_FREE = "free"            # slug tự do, chỉ kiểm tra độ dài tối thiểu
 
 
@@ -66,7 +67,7 @@ class AIProviderSpec:
     # Ghi đè base_url bằng biến môi trường riêng.
     #
     # CỐ Ý DÙNG TÊN CÓ TIỀN TỐ `MARKETFLOW_`, KHÔNG dùng `ANTHROPIC_BASE_URL` /
-    # `OLLAMA_BASE_URL` / `HF_BASE_URL` như tài liệu của các hãng gợi ý. Lý do
+    # `OLLAMA_BASE_URL` / `HF_BASE_URL` như tài liệu của hãng gợi ý. Lý do
     # đo được ngay trên máy phát triển: biến `ANTHROPIC_BASE_URL` đã có sẵn
     # trong môi trường hệ thống của nhiều người dùng (đặc biệt là người cấu
     # hình công cụ AI cục bộ) và trỏ tới một endpoint hoàn toàn khác. Nếu đọc
@@ -83,7 +84,7 @@ class AIProviderSpec:
     # Path ping dùng cho endpoint "Test API Connection".
     ping_path: str = "/models"
     min_model_len: int = 2
-    # --- Phần "tàng free + catalog", học từ cách 9Router gom nhà cung cấp ---
+    # --- Phần "tầng free + catalog", học từ cách 9Router gom nhà cung cấp ---
     #
     # `free_tier` đánh dấu provider chạy được KHÔNG cần khoá hoặc có tầng miễn
     # phí khả dụng. UI dùng để gắn nhãn cho người dùng chọn, khác với bản mẫu
@@ -118,11 +119,9 @@ class AIProviderSpec:
 
 #: Danh sách provider. Thứ tự quyết định thứ tự hiển thị trong UI.
 #
-# CẬP NHẬT MODEL MẶC ĐỊNH (2026-10): bản trước đó ghim `gemini-2.5-flash`,
-# `gpt-4o`, `claude-3-5-haiku-latest` — đã lỗi thời một thế hệ. Tên model mới
-# kiểm chứng trên trang chính thức của từng hãng (ai.google.dev/docs/models,
-# developers.openai.com/api/docs/models, docs.anthropic.com + Bedrock model
-# card). Không đoán: đây là ID đã thấy bằng chứng.
+# CẬP NHẬT DANH MỤC NHÀ CUNG CẤP & MODEL THẾ HỆ MỚI (2026-10):
+# Hỗ trợ 9 nhà cung cấp hiện đại: Google Gemini, OpenRouter, OpenAI, Anthropic,
+# Groq LPU, xAI (Grok), Hugging Face Router, Ollama Local và OpenCode Zen.
 PROVIDERS: Tuple[AIProviderSpec, ...] = (
     AIProviderSpec(
         slug="gemini",
@@ -134,7 +133,13 @@ PROVIDERS: Tuple[AIProviderSpec, ...] = (
         env_key_names=("GEMINI_API_KEY",),
         aliases=("google",),
         extra_headers={"HTTP-Referer": "http://localhost:5173", "X-Title": "MarketFlow AI"},
-        candidate_models=("gemini-3.8-flash", "gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.1-pro-preview", "gemini-2.5-flash"),
+        candidate_models=(
+            "gemini-3.8-flash",
+            "gemini-3.5-flash",
+            "gemini-3.1-pro-preview",
+            "gemini-2.5-pro",
+            "gemini-2.5-flash",
+        ),
         ping_path="",  # ping dùng URL riêng, xem _ping_request_for()
     ),
     AIProviderSpec(
@@ -148,7 +153,16 @@ PROVIDERS: Tuple[AIProviderSpec, ...] = (
         extra_headers={"HTTP-Referer": "https://marketflow.ai", "X-Title": "MarketFlow AI"},
         # Có model `:free` nên đây là cửa ngõ rẻ nhất để thử nhiều hãng một chỗ.
         free_tier=True,
-        free_note="Có hàng loạt model đuôi :free, cần key miễn phí",
+        free_note="Có hàng loạt model đuôi :free (DeepSeek R1, V3, Qwen3 235B), cần key miễn phí",
+        candidate_models=(
+            "anthropic/claude-sonnet-4-6",
+            "deepseek/deepseek-r1-0528:free",
+            "deepseek/deepseek-chat-v3-0324:free",
+            "qwen/qwen3-235b-a22b:free",
+            "google/gemini-3.8-flash",
+            "openai/gpt-6.1-sol",
+            "meta-llama/llama-4-maverick",
+        ),
     ),
     AIProviderSpec(
         slug="openai",
@@ -159,7 +173,7 @@ PROVIDERS: Tuple[AIProviderSpec, ...] = (
         base_url="https://api.openai.com/v1",
         env_key_names=("OPENAI_API_KEY",),
         aliases=("gpt",),
-        candidate_models=("gpt-6.1-sol", "gpt-6-luna", "gpt-5.5", "gpt-5.4"),
+        candidate_models=("gpt-6.1-sol", "gpt-6-luna", "o4-mini", "gpt-5.4", "gpt-4.1", "gpt-4o"),
     ),
     AIProviderSpec(
         slug="anthropic",
@@ -177,26 +191,65 @@ PROVIDERS: Tuple[AIProviderSpec, ...] = (
         candidate_models=("claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"),
     ),
     AIProviderSpec(
+        slug="groq",
+        display_name="Groq LPU (Siêu tốc)",
+        protocol=PROTOCOL_OPENAI,
+        default_model="llama-3.3-70b-versatile",
+        model_rule=MODEL_RULE_FREE,
+        base_url="https://api.groq.com/openai/v1",
+        env_key_names=("GROQ_API_KEY",),
+        base_url_env="MARKETFLOW_GROQ_BASE_URL",
+        aliases=("groqcloud", "lpu"),
+        free_tier=True,
+        free_note="GroqCloud có tầng Free Tier tốc độ ~800 token/s trên phần cứng LPU",
+        candidate_models=(
+            "llama-3.3-70b-versatile",
+            "meta-llama/llama-4-scout-17b-16e-instruct",
+            "qwen/qwen3-32b",
+            "deepseek-r1-distill-llama-70b",
+        ),
+    ),
+    AIProviderSpec(
+        slug="xai",
+        display_name="xAI (Grok)",
+        protocol=PROTOCOL_OPENAI,
+        default_model="grok-4",
+        model_rule=MODEL_RULE_XAI,
+        base_url="https://api.x.ai/v1",
+        env_key_names=("XAI_API_KEY", "GROK_API_KEY"),
+        base_url_env="MARKETFLOW_XAI_BASE_URL",
+        aliases=("grok",),
+        candidate_models=("grok-4", "grok-3", "grok-3-mini"),
+    ),
+    AIProviderSpec(
         slug="huggingface",
         display_name="Hugging Face",
         protocol=PROTOCOL_OPENAI,
-        default_model="meta-llama/Llama-3.1-8B-Instruct",
+        default_model="Qwen/Qwen3-235B-A22B",
         model_rule=MODEL_RULE_FREE,
         # Router OpenAI-compatible chính thức của HuggingFace. Có thể trỏ sang
-        # endpoint suy luận tự phục vụ qua HF_BASE_URL.
+        # endpoint suy luận tự phục vụ qua MARKETFLOW_HF_BASE_URL.
         base_url="https://router.huggingface.co/v1",
         requires_api_key=False,
         env_key_names=("HUGGINGFACE_API_KEY", "HF_TOKEN", "HF_API_TOKEN"),
         base_url_env="MARKETFLOW_HF_BASE_URL",
         aliases=("hf", "hugging_face", "huggingface-inference"),
         free_tier=True,
-        free_note="Router miễn phí cho model công khai",
+        free_note="Router miễn phí cho model mở thế hệ mới (Qwen3, DeepSeek V3/R1, Llama 4)",
+        candidate_models=(
+            "Qwen/Qwen3-235B-A22B",
+            "deepseek-ai/DeepSeek-V3-0324",
+            "meta-llama/Llama-4-Maverick-17B-128E-Instruct",
+            "deepseek-ai/DeepSeek-R1-0528",
+            "Qwen/Qwen3-32B",
+            "meta-llama/Llama-3.3-70B-Instruct",
+        ),
     ),
     AIProviderSpec(
         slug="ollama",
         display_name="Ollama (chạy cục bộ)",
         protocol=PROTOCOL_OPENAI,
-        default_model="llama3.2",
+        default_model="qwen3:8b",
         model_rule=MODEL_RULE_FREE,
         # Ollama mặc định nghe ở cổng 11434 và nói đúng giao thức OpenAI.
         base_url="http://localhost:11434/v1",
@@ -205,7 +258,8 @@ PROVIDERS: Tuple[AIProviderSpec, ...] = (
         base_url_env="MARKETFLOW_OLLAMA_BASE_URL",
         aliases=("local", "llama"),
         free_tier=True,
-        free_note="Chạy hoàn toàn trên máy mình, không tốn tiền",
+        free_note="Chạy hoàn toàn trên máy mình (Qwen3, DeepSeek-R1, Gemma 3, Llama 3.3), không tốn tiền",
+        candidate_models=("qwen3:8b", "deepseek-r1:8b", "gemma3:12b", "llama3.3", "llama3.2"),
     ),
     AIProviderSpec(
         slug="opencode",
@@ -216,15 +270,21 @@ PROVIDERS: Tuple[AIProviderSpec, ...] = (
         # Endpoint OpenAI-compatible của opencode zen, lấy từ cấu hình để có
         # thể trỏ sang endpoint opencode khác.
         base_url_from_settings=True,
-        # OpenCode Zen t?n mi?n phí `space-bunny-free` ch?y KHÔNG c?n khoá.
-        # Khai báo sai là bắt buộc key s? khi?n `ai_service` r? xu?ng fallback gia
-        # ngay c? khi endpoint th?t s? g?i du?c. Key (n?u có) v?n dùng du?c.
         requires_api_key=False,
         env_key_names=("OPENCODE_API_KEY",),
         aliases=("oc", "zen"),
         extra_headers={"HTTP-Referer": "http://localhost:5173", "X-Title": "MarketFlow AI"},
         free_tier=True,
         free_note="Tầng free không cần khoá; danh sách model tự đổi theo thời gian",
+        candidate_models=(
+            "space-bunny-free",
+            "nemotron-3.5-lightning-free",
+            "mimo-v2.6-flash-free",
+            "step-5-preview-free",
+            "longcat-2.5-preview-free",
+            "muse-spark-1.3-contributor-free",
+            "claude-fable-5-1",
+        ),
     ),
 )
 
@@ -325,7 +385,7 @@ def validate_model_for(slug: str, model: Optional[str]) -> str:
             raise ValueError(f"Mô hình '{model}' không thuộc hệ sinh thái Google Gemini.")
         return lowered
     if rule == MODEL_RULE_OPENAI:
-        valid_prefixes = ("gpt-", "o1", "o3", "text-embedding-", "chatgpt-")
+        valid_prefixes = ("gpt-", "o1", "o3", "o4", "text-embedding-", "chatgpt-")
         if not any(lowered.startswith(p) for p in valid_prefixes):
             raise ValueError(f"Mô hình '{model}' không thuộc hệ sinh thái OpenAI.")
         return lowered
@@ -339,6 +399,10 @@ def validate_model_for(slug: str, model: Optional[str]) -> str:
     if rule == MODEL_RULE_ANTHROPIC:
         if not lowered.startswith("claude"):
             raise ValueError(f"Mô hình '{model}' không thuộc hệ sinh thái Anthropic Claude.")
+        return lowered
+    if rule == MODEL_RULE_XAI:
+        if not lowered.startswith("grok"):
+            raise ValueError(f"Mô hình '{model}' không thuộc hệ sinh thái xAI Grok.")
         return lowered
     # MODEL_RULE_FREE: slug tự do, chỉ kiểm tra độ dài tối thiểu.
     if len(cleaned) < spec.min_model_len:

@@ -495,16 +495,20 @@ export function startScene(): Cleanup {
       }
     }
 
-    const observer = new ResizeObserver(resize);
+    let resizeRaf = 0;
+    const scheduleResize = (): void => {
+      cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(resize);
+    };
+    const observer = new ResizeObserver(scheduleResize);
     if (host) {
       observer.observe(host);
     }
-    const cardEl = document.querySelector('.login-card');
-    if (cardEl) {
-      observer.observe(cardEl);
-    }
     resize();
-    cleanups.push(() => observer.disconnect());
+    cleanups.push(() => {
+      cancelAnimationFrame(resizeRaf);
+      observer.disconnect();
+    });
   }
 
   async function loadVines(): Promise<void> {

@@ -427,14 +427,25 @@ class AIService:
         """
         if key_to_use and key_to_use.startswith("sk-ant-"):
             return "anthropic"
+        if key_to_use and key_to_use.startswith("gsk_"):
+            return "groq"
+        if key_to_use and key_to_use.startswith("xai-"):
+            return "xai"
         if key_to_use and (key_to_use.startswith("sk-or-") or (model_to_use and "/" in model_to_use)):
             return "openrouter"
         if key_to_use and (key_to_use.startswith("sk-proj-") or key_to_use.startswith("sk-")) and not key_to_use.startswith("sk-or-"):
             return "openai"
-        if model_to_use and (model_to_use.startswith("gpt-") or model_to_use.startswith("o1") or model_to_use.startswith("o3")):
+        if model_to_use and (
+            model_to_use.startswith("gpt-")
+            or model_to_use.startswith("o1")
+            or model_to_use.startswith("o3")
+            or model_to_use.startswith("o4")
+        ):
             return "openai"
         if model_to_use and model_to_use.lower().startswith("claude"):
             return "anthropic"
+        if model_to_use and model_to_use.lower().startswith("grok"):
+            return "xai"
         if (model_to_use and "gemini" in model_to_use.lower()) or (key_to_use and key_to_use.startswith("AIzaSy")):
             return "gemini"
         return "gemini"

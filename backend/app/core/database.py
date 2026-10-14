@@ -175,38 +175,34 @@ def _backfill_tenant_workspace_ids(db_engine=engine, conn=None):
 
 
 def _migrate_custom_api_key_provider_constraint(db_engine, conn) -> None:
-    """Dựng lại bảng `custom_api_keys` nếu CHECK constraint provider chưa chứa 'opencode'.
+    """Dựng lại bảng `custom_api_keys` nếu CHECK constraint provider chưa chứa đủ SUPPORTED_PROVIDER_SLUGS."""
+    import re
+    from app.services.ai.providers import SUPPORTED_PROVIDER_SLUGS
 
-    SQLite không hỗ trợ ALTER CONSTRAINT, nên phải tạo bảng mới -> chép dữ liệu ->
-    đổi tên -> xoá bảng cũ. Thao tác chạy trong một transaction của `conn` (ngoại
-    trừ của hàm này quản lý), nên nếu bước nào lỗi thì bảng cũ vẫn còn nguyên.
-
-    Idempotent: nếu SQL của bảng đã chứa 'opencode' thì thoát ngay.
-    """
     row = conn.exec_driver_sql(
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='custom_api_keys'"
     ).fetchone()
     if not row or not row[0]:
         return
     table_sql = row[0]
-    if "'opencode'" in table_sql:
+    if all(f"'{slug}'" in table_sql for slug in SUPPORTED_PROVIDER_SLUGS):
         return
 
-    logger.info("Migrating custom_api_keys provider constraint to include 'opencode'")
-    # Giữ nguyên tên constraint và cấu trúc cột; chỉ nới danh sách provider.
-    new_sql = table_sql.replace(
-        "'gemini', 'openrouter', 'openai')",
-        "'gemini', 'openrouter', 'openai', 'opencode')",
+    allowed_sql = ", ".join(f"'{slug}'" for slug in SUPPORTED_PROVIDER_SLUGS)
+    new_sql = re.sub(
+        r"provider\s+IN\s*\([^)]+\)",
+        f"provider IN ({allowed_sql})",
+        table_sql,
+        count=1,
+        flags=re.IGNORECASE,
     )
     if new_sql == table_sql:
-        # CSDL ghi CHECK theo cách khác -> không đoán, bỏ qua thay vì dựng lại bảng
-        # với DDL sai. Constraint cũ chỉ chặn provider mới, các provider cũ vẫn
-        # hoạt động bình thường.
         logger.warning(
             "Khong nhan dang CHECK constraint cua custom_api_keys trong DDL; bo qua migration."
         )
         return
 
+    logger.info("Migrating custom_api_keys provider constraint to include all SUPPORTED_PROVIDER_SLUGS")
     conn.exec_driver_sql("ALTER TABLE custom_api_keys RENAME TO custom_api_keys_legacy")
     conn.exec_driver_sql(new_sql)
     conn.exec_driver_sql(
@@ -551,6 +547,30 @@ def ensure_postgres_schema_compatibility(db_engine=engine) -> None:
         except Exception:
             logger.warning(
                 "Migration FAILED to extend ai_jobs kind CHECK constraint",
+                exc_info=True,
+            )
+
+    with db_engine.begin() as conn:
+        try:
+            from app.services.ai.providers import SUPPORTED_PROVIDER_SLUGS
+            row = conn.execute(
+                text(
+                    "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+                    "WHERE conname = 'chk_api_key_provider' "
+                    "AND conrelid = 'custom_api_keys'::regclass"
+                )
+            ).fetchone()
+            if row is None or not all(f"'{slug}'" in row[0] for slug in SUPPORTED_PROVIDER_SLUGS):
+                allowed_sql = ", ".join(f"'{slug}'" for slug in SUPPORTED_PROVIDER_SLUGS)
+                conn.exec_driver_sql("ALTER TABLE custom_api_keys DROP CONSTRAINT IF EXISTS chk_api_key_provider")
+                conn.exec_driver_sql(
+                    f"ALTER TABLE custom_api_keys ADD CONSTRAINT chk_api_key_provider "
+                    f"CHECK (provider IN ({allowed_sql}))"
+                )
+                logger.info("Migration: chk_api_key_provider synced with SUPPORTED_PROVIDER_SLUGS")
+        except Exception:
+            logger.warning(
+                "Migration FAILED to sync custom_api_keys provider CHECK constraint",
                 exc_info=True,
             )
 
