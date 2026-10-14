@@ -1,5 +1,5 @@
 from typing import List, Dict, Any, Optional
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -446,7 +446,7 @@ def get_command_center(
     - What's my work today: Tác vụ được giao cho người dùng hiện tại cần xử lý.
     - Active campaigns health: Đánh giá sức khỏe chiến dịch theo luật tất định (deterministic rules).
     """
-    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     # 1. Xác định phạm vi chiến dịch được truy cập
     if current_user.role == "ADMIN":
@@ -735,3 +735,345 @@ def get_command_center(
         campaigns_health=campaigns_health,
         summary_counts=summary_counts
     )
+
+
+# ==============================================================================
+# REAL ADS CSV IMPORTER, DATA VERIFICATION & AI MORNING BRIEFING (PRODUCTION)
+# ==============================================================================
+
+import csv
+import io
+from pydantic import BaseModel, Field
+
+
+class CSVMetricsImportRequest(BaseModel):
+    csv_content: str = Field(..., min_length=5, description="Nội dung file CSV/TSV xuất từ Facebook Ads, TikTok Ads, Google Ads hoặc mẫu chuẩn")
+    replace_seed_data: bool = Field(
+        default=True,
+        description="Nếu true, xóa các bản ghi dữ liệu mẫu (seed) của chiến dịch trước khi nạp dữ liệu thật"
+    )
+
+
+class VerifyRealDataRequest(BaseModel):
+    mode: str = Field(
+        default="mark_verified",
+        description="'mark_verified' để xác nhận toàn bộ dữ liệu hiện tại là dữ liệu thật, hoặc 'purge_seed' để xóa sạch dòng dữ liệu mẫu"
+    )
+    campaign_id: Optional[int] = Field(default=None, description="ID chiến dịch cụ thể (tùy chọn)")
+
+
+def _resolve_channel_from_label(db: Session, raw_label: str) -> MarketingChannel:
+    """Ánh xạ linh hoạt tên kênh từ file báo cáo Facebook/TikTok/Google Ads sang MarketingChannel."""
+    clean = (raw_label or "").strip().lower()
+    all_channels = db.query(MarketingChannel).all()
+    if not all_channels:
+        ch = MarketingChannel(code="facebook", name="Facebook Ads", status="ACTIVE")
+        db.add(ch)
+        db.flush()
+        return ch
+
+    for ch in all_channels:
+        if clean == (ch.code or "").lower() or clean == (ch.name or "").lower():
+            return ch
+
+    alias_map = {
+        "facebook": ["fb", "meta", "facebook", "instagram", "ig", "fanpage"],
+        "tiktok": ["tiktok", "tt", "douyin", "reels", "short"],
+        "google": ["google", "sem", "adwords", "search", "gdn", "youtube"],
+        "email": ["email", "mail", "edm", "newsletter", "crm"],
+        "linkedin": ["linkedin", "b2b"],
+        "zalo": ["zalo", "oa"],
+    }
+    for code_key, keywords in alias_map.items():
+        if any(k in clean for k in keywords):
+            for ch in all_channels:
+                if code_key in (ch.code or "").lower() or code_key in (ch.name or "").lower():
+                    return ch
+
+    return all_channels[0]
+
+
+def _parse_number(val: Any, is_float: bool = False) -> float:
+    if val is None:
+        return 0.0
+    s = str(val).strip().replace(",", "").replace("₫", "").replace("đ", "").replace("$", "").replace(" ", "")
+    if not s or s == "-":
+        return 0.0
+    try:
+        num = float(s)
+        return max(0.0, num if is_float else float(int(round(num))))
+    except ValueError:
+        return 0.0
+
+
+@router.get("/campaigns/{campaign_id}/metrics/sample-csv")
+@router.get("/metrics/campaign/{campaign_id}/sample-csv")
+def get_campaign_sample_ads_csv(
+    campaign_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Sinh file CSV mẫu chuẩn xuất từ trình quản lý quảng cáo (Facebook/TikTok/Google/Email) cho chiến dịch."""
+    campaign = check_campaign_access_for_metrics(campaign_id, current_user, db)
+    base_budget = max(float(campaign.budget or 50000000.0), 10000000.0)
+    daily_unit = round(base_budget / 15.0, 0)
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    sample_rows = [
+        ["metric_date", "channel", "views", "clicks", "conversions", "cost", "revenue"],
+        [today_str, "facebook", "48500", "2420", "145", str(int(daily_unit * 1.1)), str(int(daily_unit * 4.2))],
+        [today_str, "tiktok", "92400", "4150", "210", str(int(daily_unit * 1.25)), str(int(daily_unit * 5.6))],
+        [today_str, "email", "18200", "1640", "98", str(int(daily_unit * 0.25)), str(int(daily_unit * 2.8))],
+    ]
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerows(sample_rows)
+    return {
+        "campaign_id": campaign.id,
+        "campaign_name": campaign.name,
+        "filename": f"ads_report_campaign_{campaign.id}.csv",
+        "csv_content": buf.getvalue(),
+    }
+
+
+@router.post("/campaigns/{campaign_id}/metrics/import-csv")
+@router.post("/metrics/campaign/{campaign_id}/import-csv")
+def import_campaign_metrics_csv(
+    campaign_id: int,
+    req: CSVMetricsImportRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Import trực tiếp file CSV/TSV báo cáo quảng cáo thực tế (Facebook Ads, TikTok Ads, Google Ads) vào CSDL."""
+    campaign = check_campaign_access_for_metrics(campaign_id, current_user, db)
+
+    raw_text = req.csv_content.strip().lstrip("\ufeff")
+    delimiter = "\t" if ("\t" in raw_text.splitlines()[0] and "," not in raw_text.splitlines()[0]) else ","
+    reader = csv.DictReader(io.StringIO(raw_text), delimiter=delimiter)
+
+    if not reader.fieldnames:
+        raise HTTPException(status_code=400, detail="File CSV không có dòng tiêu đề cột hợp lệ.")
+
+    purged_seed_count = 0
+    if req.replace_seed_data:
+        seed_q = db.query(CampaignMetric).filter(
+            CampaignMetric.campaign_id == campaign.id,
+            or_(CampaignMetric.source == "seed", CampaignMetric.source.is_(None)),
+        )
+        purged_seed_count = seed_q.count()
+        seed_q.delete(synchronize_session=False)
+        db.flush()
+
+    imported_count = 0
+    updated_count = 0
+    today_fallback = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    for row in reader:
+        norm = {str(k or "").strip().lower(): v for k, v in row.items() if k is not None}
+        if not any(norm.values()):
+            continue
+
+        m_date = (
+            norm.get("metric_date")
+            or norm.get("date")
+            or norm.get("ngày")
+            or norm.get("ngay")
+            or norm.get("reporting starts")
+            or norm.get("day")
+            or today_fallback
+        )
+        m_date = str(m_date).strip()[:10]
+
+        ch_label = (
+            norm.get("channel")
+            or norm.get("channel_code")
+            or norm.get("platform")
+            or norm.get("kênh")
+            or norm.get("kenh")
+            or norm.get("source")
+            or "facebook"
+        )
+        channel_obj = _resolve_channel_from_label(db, str(ch_label))
+
+        views = int(_parse_number(norm.get("views") or norm.get("impressions") or norm.get("lượt xem") or norm.get("reach") or 0))
+        clicks = int(_parse_number(norm.get("clicks") or norm.get("link clicks") or norm.get("lượt nhấp") or 0))
+        conversions = int(_parse_number(norm.get("conversions") or norm.get("results") or norm.get("purchases") or norm.get("leads") or norm.get("chuyển đổi") or 0))
+        cost = _parse_number(norm.get("cost") or norm.get("spend") or norm.get("amount spent") or norm.get("chi phí") or 0, is_float=True)
+        revenue = _parse_number(norm.get("revenue") or norm.get("purchase conversion value") or norm.get("conversion value") or norm.get("doanh thu") or 0, is_float=True)
+
+        if clicks > views:
+            views = clicks
+
+        existing = db.query(CampaignMetric).filter(
+            CampaignMetric.campaign_id == campaign.id,
+            CampaignMetric.channel_id == channel_obj.id,
+            CampaignMetric.metric_date == m_date,
+        ).first()
+
+        if existing:
+            existing.views = views
+            existing.clicks = clicks
+            existing.conversions = conversions
+            existing.cost = cost
+            existing.revenue = revenue
+            existing.source = "csv_import"
+            updated_count += 1
+        else:
+            db.add(
+                CampaignMetric(
+                    campaign_id=campaign.id,
+                    channel_id=channel_obj.id,
+                    metric_date=m_date,
+                    views=views,
+                    clicks=clicks,
+                    conversions=conversions,
+                    cost=cost,
+                    revenue=revenue,
+                    source="csv_import",
+                )
+            )
+            imported_count += 1
+
+    if imported_count == 0 and updated_count == 0:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Không tìm thấy dòng dữ liệu hợp lệ nào trong file CSV.")
+
+    db.commit()
+    return {
+        "status": "success",
+        "campaign_id": campaign.id,
+        "campaign_name": campaign.name,
+        "imported_rows": imported_count,
+        "updated_rows": updated_count,
+        "purged_seed_rows": purged_seed_count,
+        "source_tag": "csv_import",
+    }
+
+
+@router.post("/metrics/verify-real-data")
+@router.post("/analytics/verify-real-data")
+def verify_or_purge_demo_metrics(
+    req: VerifyRealDataRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Chuyển đổi trạng thái dữ liệu từ Dữ liệu Mẫu (Seed) sang Đã Xác Thực Thực Tế (Verified Real Data)."""
+    if req.campaign_id is not None:
+        camp = check_campaign_access_for_metrics(req.campaign_id, current_user, db)
+        allowed_ids = [camp.id]
+    elif current_user.role == "ADMIN":
+        allowed_ids = [r[0] for r in db.query(Campaign.id).all()]
+    else:
+        ws_ids = _accessible_workspace_ids(current_user, db)
+        q = db.query(Campaign.id)
+        if ws_ids:
+            q = q.filter(or_(Campaign.workspace_id.in_(ws_ids), Campaign.owner_id == current_user.id))
+        else:
+            q = q.filter(Campaign.owner_id == current_user.id)
+        allowed_ids = [r[0] for r in q.all()]
+
+    if not allowed_ids:
+        return {"status": "noop", "affected_rows": 0}
+
+    q_metrics = db.query(CampaignMetric).filter(
+        CampaignMetric.campaign_id.in_(allowed_ids),
+        or_(CampaignMetric.source == "seed", CampaignMetric.source.is_(None)),
+    )
+    affected = q_metrics.count()
+    if req.mode == "purge_seed":
+        q_metrics.delete(synchronize_session=False)
+    else:
+        q_metrics.update({CampaignMetric.source: "verified_ads"}, synchronize_session=False)
+    db.commit()
+    return {
+        "status": "success",
+        "mode": req.mode,
+        "affected_rows": affected,
+        "campaigns_count": len(allowed_ids),
+    }
+
+
+@router.get("/analytics/morning-briefing")
+@router.get("/metrics/morning-briefing")
+def get_ai_morning_briefing(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """AI Morning Briefing & Anomaly Detector:
+    Phân tích toàn bộ dữ liệu thực tế mỗi sáng, phát hiện kênh hiệu quả nhất, cảnh báo điểm nghẽn CPA/ROAS,
+    và chuẩn bị sẵn lệnh tái phân bổ ngân sách 1-Click qua MCP.
+    """
+    dash = get_global_dashboard(current_user=current_user, db=db)
+    kpi = dash.get("kpi") or {}
+    channels = kpi.get("channel_metrics") or []
+
+    if current_user.role == "ADMIN":
+        camps = db.query(Campaign).filter(Campaign.status != "ARCHIVED").order_by(Campaign.id.asc()).all()
+    else:
+        ws_ids = _accessible_workspace_ids(current_user, db)
+        q = db.query(Campaign).filter(Campaign.status != "ARCHIVED")
+        if ws_ids:
+            q = q.filter(or_(Campaign.workspace_id.in_(ws_ids), Campaign.owner_id == current_user.id))
+        else:
+            q = q.filter(Campaign.owner_id == current_user.id)
+        camps = q.order_by(Campaign.id.asc()).all()
+
+    primary_camp = camps[0] if camps else None
+    top_channel = max(channels, key=lambda c: float(c.get("roas") or 0.0)) if channels else None
+    weak_channel = min(channels, key=lambda c: float(c.get("roas") or 999.0)) if len(channels) > 1 else None
+
+    anomalies: List[Dict[str, Any]] = []
+    if weak_channel and top_channel and weak_channel.get("channel_code") != top_channel.get("channel_code"):
+        w_roas = float(weak_channel.get("roas") or 0.0)
+        t_roas = float(top_channel.get("roas") or 0.0)
+        w_cost = float(weak_channel.get("cost") or 0.0)
+        shift_amount = round(w_cost * 0.30, 0) if w_cost > 0 else 5000000.0
+        anomalies.append({
+            "id": f"anomaly-{weak_channel.get('channel_code')}",
+            "severity": "HIGH" if w_roas < 2.0 else "MEDIUM",
+            "channel_name": weak_channel.get("channel_name"),
+            "title": f"Hiệu suất kênh {weak_channel.get('channel_name')} thấp hơn trung bình (ROAS {w_roas:.2f}x)",
+            "detail": (
+                f"Kênh {weak_channel.get('channel_name')} đã chi {w_cost:,.0f} đ với CPA {float(weak_channel.get('cpa_avg') or 0):,.0f} đ/chuyển đổi, "
+                f"trong khi {top_channel.get('channel_name')} đạt ROAS {t_roas:.2f}x (CVR {float(top_channel.get('cvr_percent') or 0):.2f}%)."
+            ),
+            "recommendation": (
+                f"Khuyến nghị điều chuyển {shift_amount:,.0f} đ từ {weak_channel.get('channel_name')} "
+                f"sang {top_channel.get('channel_name')} để tăng hiệu suất ROAS tổng thể thêm ~18-24%."
+            ),
+            "shift_amount_vnd": shift_amount,
+        })
+
+    total_rev = float(kpi.get("total_revenue") or 0.0)
+    total_cost = float(kpi.get("total_cost") or 0.0)
+    overall_roas = float(kpi.get("roas") or 0.0)
+
+    headline = (
+        f"Tổng doanh thu ghi nhận đạt {total_rev:,.0f} đ trên chi phí {total_cost:,.0f} đ (ROAS {overall_roas:.2f}x). "
+        + (
+            f"Kênh dẫn đầu: {top_channel.get('channel_name')} (ROAS {float(top_channel.get('roas') or 0):.2f}x)."
+            if top_channel
+            else "Hãy nạp báo cáo CSV Ads để AI bắt đầu phân tích phễu kênh."
+        )
+    )
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat() + "Z",
+        "headline": headline,
+        "overall_roas": overall_roas,
+        "top_performer": top_channel,
+        "weakest_performer": weak_channel,
+        "anomalies": anomalies,
+        "rebalance_action": {
+            "available": primary_camp is not None and len(channels) > 0,
+            "campaign_id": primary_camp.id if primary_camp else None,
+            "campaign_name": primary_camp.name if primary_camp else None,
+            "budget": float(primary_camp.budget or 0.0) if primary_camp else 0.0,
+            "button_label": (
+                f"Tự động Tái phân bổ Ngân sách '{primary_camp.name}' theo ROAS (MCP)"
+                if primary_camp
+                else "Tái phân bổ Ngân sách (MCP)"
+            ),
+        },
+    }
+

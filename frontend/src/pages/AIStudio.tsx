@@ -1080,11 +1080,12 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                           cta={omniData.facebook.cta || ''}
                           onApplyCleanCopy={(next) =>
                             setOmniData((prev) =>
-                              prev
+                              prev && prev.facebook
                                 ? {
                                     ...prev,
                                     facebook: {
                                       ...prev.facebook,
+                                      hashtags: prev.facebook.hashtags || [],
                                       title: next.title,
                                       headline: next.title,
                                       body: next.body,

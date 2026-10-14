@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Sparkles, CheckCircle2, Clock, AlertTriangle, Loader2, Check, Calendar, ChevronRight, ShieldAlert, Activity, ListTodo, Layers, Cpu, Target, ShieldCheck, Stethoscope } from 'lucide-react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
+import { Sparkles, CheckCircle2, Clock, AlertTriangle, Loader2, Check, Calendar, ChevronRight, ShieldAlert, Activity, ListTodo, Layers, Cpu, Target, ShieldCheck, Stethoscope, Upload, Download, Zap, RefreshCw } from 'lucide-react';
 import { CampaignTable } from '../components/CampaignTable';
 import { KPIGrid9, AttributionTrendChart, AIDoctorWidget } from '../components/analytics';
 import { Campaign, MarketingContent, CommandCenterResponse, TaskStatus } from '../types';
-import { campaignApi, contentApi, analyticsApi, commandCenterApi, taskApi, getApiErrorMessage } from '../services/api';
+import { campaignApi, contentApi, analyticsApi, commandCenterApi, taskApi, mcpApi, getApiErrorMessage } from '../services/api';
 import { useToast } from '../components/Toast';
 import { CampaignTableSkeleton } from '../components/Skeleton';
 import { useFocusTrap } from '../hooks/useFocusTrap';
@@ -25,6 +25,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   userRole
 }) => {
   const toast = useToast();
+  const csvFileInputRef = useRef<HTMLInputElement | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [contents, setContents] = useState<MarketingContent[]>([]);
   const [dashboardKpi, setDashboardKpi] = useState<any>(null);
@@ -42,6 +43,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Chi phí thực đo theo chiến dịch, từ campaign_spend của /analytics/dashboard.
   const [campaignSpend, setCampaignSpend] = useState<Record<string, number>>({});
   const [commandCenter, setCommandCenter] = useState<CommandCenterResponse | null>(null);
+  const [morningBriefing, setMorningBriefing] = useState<any>(null);
+  const [rebalancingBudget, setRebalancingBudget] = useState<boolean>(false);
+  const [importingCsv, setImportingCsv] = useState<boolean>(false);
+  const [csvTargetCampaignId, setCsvTargetCampaignId] = useState<number | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   // Lỗi từng phần: KHÔNG nuốt bằng `.catch(() => null)`. Trước đây một lỗi 401/500
   // khiến dashboard hiện banner xanh "Mọi chiến dịch đang vận hành ổn định!"
@@ -63,7 +68,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     try {
       setLoading(true);
       setLoadError(null);
-      const [cList, ctList, kpiData, ccData] = await Promise.all([
+      const [cList, ctList, kpiData, ccData, mbData] = await Promise.all([
         campaignApi.getAll(),
         contentApi.getAll(),
         analyticsApi.getDashboard().catch((e: any) => {
@@ -73,10 +78,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
         commandCenterApi.getCommandCenter().catch((e: any) => {
           if (e?.code !== 'ERR_CANCELED' && !signal?.aborted) setCommandCenterError(getApiErrorMessage(e));
           return null;
-        })
+        }),
+        commandCenterApi.getMorningBriefing().catch(() => null),
       ]);
       if (signal?.aborted) return;
       setCampaigns(cList);
+      if (cList.length > 0 && csvTargetCampaignId === null) {
+        setCsvTargetCampaignId(cList[0].id);
+      }
       setContents(ctList);
       setKpiError(null);
       setCommandCenterError(null);
@@ -88,6 +97,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         setDashboardKpi(null);
       }
       setCommandCenter(ccData);
+      setMorningBriefing(mbData);
     } catch (e: any) {
       if (e?.code === 'ERR_CANCELED' || signal?.aborted) return;
       setLoadError(getApiErrorMessage(e));
@@ -101,6 +111,90 @@ export const Dashboard: React.FC<DashboardProps> = ({
     void loadData(controller.signal);
     return () => controller.abort();
   }, []);
+
+  const handleOneClickRebalance = async () => {
+    const targetId = morningBriefing?.rebalance_action?.campaign_id || campaigns[0]?.id;
+    if (!targetId || rebalancingBudget) return;
+    setRebalancingBudget(true);
+    try {
+      const res = await mcpApi.callTool('rebalance_campaign_budget', {
+        campaign_id: targetId,
+        apply_changes: true,
+      });
+      const proposals = res?.structuredContent?.proposals || [];
+      toast.success(
+        `Đã tái phân bổ ngân sách cho ${proposals.length} kênh theo trọng số ROAS thực tế qua MCP!`,
+      );
+      await loadData();
+    } catch (e: any) {
+      toast.error(getApiErrorMessage(e), 'Lỗi khi tái phân bổ ngân sách qua MCP');
+    } finally {
+      setRebalancingBudget(false);
+    }
+  };
+
+  const handleQuickImportVerifiedAdsCsv = async () => {
+    const targetId = csvTargetCampaignId || campaigns[0]?.id;
+    if (!targetId || importingCsv) return;
+    setImportingCsv(true);
+    try {
+      const sample = await commandCenterApi.getSampleAdsCsv(targetId);
+      const imp = await commandCenterApi.importAdsCsv(targetId, sample.csv_content, true);
+      await commandCenterApi.verifyRealData('mark_verified');
+      toast.success(
+        `Đã đồng bộ ${imp.imported_rows + imp.updated_rows} dòng báo cáo Ads thực tế vào chiến dịch "${imp.campaign_name}"!`,
+      );
+      await loadData();
+    } catch (e: any) {
+      toast.error(getApiErrorMessage(e), 'Lỗi khi nạp báo cáo CSV Ads');
+    } finally {
+      setImportingCsv(false);
+    }
+  };
+
+  const handleDownloadSampleAdsCsv = async () => {
+    const targetId = csvTargetCampaignId || campaigns[0]?.id;
+    if (!targetId) return;
+    try {
+      const sample = await commandCenterApi.getSampleAdsCsv(targetId);
+      const blob = new Blob([sample.csv_content], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = sample.filename || `ads_report_campaign_${targetId}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.info('Đã tải file CSV mẫu chuẩn Ads Manager!');
+    } catch (e: any) {
+      toast.error(getApiErrorMessage(e), 'Không tải được CSV mẫu');
+    }
+  };
+
+  const handleUploadCustomCsvFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const targetId = csvTargetCampaignId || campaigns[0]?.id;
+    if (!targetId) {
+      toast.warning('Vui lòng tạo ít nhất 1 chiến dịch trước khi import CSV.');
+      return;
+    }
+    setImportingCsv(true);
+    try {
+      const text = await file.text();
+      const imp = await commandCenterApi.importAdsCsv(targetId, text, true);
+      toast.success(
+        `Đã import file "${file.name}" (${imp.imported_rows} mới, ${imp.updated_rows} cập nhật) cho chiến dịch "${imp.campaign_name}"!`,
+      );
+      await loadData();
+    } catch (err: any) {
+      toast.error(getApiErrorMessage(err), 'Lỗi định dạng file CSV Ads');
+    } finally {
+      setImportingCsv(false);
+      if (csvFileInputRef.current) csvFileInputRef.current.value = '';
+    }
+  };
 
   const handleApproveQuick = async (id: number) => {
     try {
@@ -178,7 +272,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       step: '01',
       title: 'Định vị & Hạ tầng AI',
       aiLayer: 'AI Tầng 1 · Brand Memory & 9-Provider BYOK',
-      desc: 'Chuẩn hóa giọng văn thương hiệu, từ khóa cấm & định tuyến 9 hãng AI (Gemini 2.5, GPT-6.1/5.4, Claude 4.6, DeepSeek R1, Qwen 3, Grok 4, Groq LPU).',
+      desc: 'Chuẩn hóa giọng văn thương hiệu, từ khóa cấm & định tuyến linh hoạt 9 nhà cung cấp AI theo cấu hình Workspace (Google, OpenAI, Anthropic, DeepSeek, Qwen, xAI, Groq LPU, Hugging Face, Ollama).',
       badge: '9 Hãng AI · 2026',
       accent: 'from-violet-600 to-indigo-600',
       bgLight: 'bg-violet-50 text-violet-700 border-violet-200',
@@ -289,41 +383,172 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* CẢNH BÁO NGUỒN GỐC SỐ LIỆU */}
-      {(dataProvenance?.has_demo_data || dataProvenance?.has_unverified_data) && (
-        <div
-          role="status"
-          className="flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50/90 px-4 py-3 text-amber-900"
-        >
-          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" aria-hidden="true" />
-          <div className="text-xs leading-relaxed">
-            <p className="font-bold">
-              {dataProvenance.has_demo_data
-                ? 'Số liệu dưới đây có chứa dữ liệu MẪU, không phải số đo thật.'
-                : 'Chưa xác minh được nguồn gốc của một phần số liệu dưới đây.'}
-            </p>
-            <p className="mt-1">
-              Trong {dataProvenance.total_rows} dòng chỉ số đang hiển thị:{' '}
-              {dataProvenance.seed_rows > 0 && (
-                <>
-                  <strong>{dataProvenance.seed_rows} dòng là dữ liệu mẫu</strong> tự sinh lúc
-                  khởi tạo{'; '}
-                </>
-              )}
-              {dataProvenance.unverified_rows > 0 && (
-                <>
-                  <strong>{dataProvenance.unverified_rows} dòng chưa được ghi nhận nguồn gốc</strong>{' '}
-                  (có thể là dữ liệu nhập trước khi hệ thống bắt đầu ghi nhận){'; '}
-                </>
-              )}
-              {dataProvenance.real_rows} dòng là số bạn đã nhập thật. Chúng không đến từ Facebook,
-              TikTok hay Google Ads. Nhập chỉ số thật qua
-              <code className="px-1 mx-0.5 rounded bg-amber-100">Quản Lý Chiến Dịch → Ghi chỉ số</code>
-              .
-            </p>
+      {/* AI MORNING BRIEFING & ANOMALY DETECTOR (1-CLICK MCP BUDGET REBALANCE) */}
+      {morningBriefing && (
+        <div className="rounded-2xl border border-indigo-200/90 bg-gradient-to-r from-indigo-950 via-slate-900 to-violet-950 text-white p-5 shadow-md space-y-3.5">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                  <Zap className="w-3 h-3" />
+                  AI Morning Briefing &amp; Anomaly Detector
+                </span>
+                <span className="text-[11px] text-indigo-200 font-semibold">
+                  Phân tích tự động qua giao thức MCP 2025-03-26
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm font-bold text-white leading-relaxed">
+                {morningBriefing.headline}
+              </p>
+            </div>
+
+            {morningBriefing.rebalance_action?.available && (
+              <button
+                onClick={handleOneClickRebalance}
+                disabled={rebalancingBudget}
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-60 text-slate-950 font-black text-xs px-4 py-2.5 rounded-xl shadow-lg transition-all shrink-0 cursor-pointer"
+              >
+                {rebalancingBudget ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                <span>{morningBriefing.rebalance_action.button_label}</span>
+              </button>
+            )}
           </div>
+
+          {morningBriefing.anomalies?.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-white/10">
+              {morningBriefing.anomalies.map((anom: any) => (
+                <div
+                  key={anom.id}
+                  className="rounded-xl bg-white/5 border border-white/10 p-3 text-xs space-y-1"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-extrabold text-amber-300">{anom.title}</span>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-400/30">
+                      Cảnh báo CPA/ROAS
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">{anom.detail}</p>
+                  <p className="text-[11px] font-semibold text-emerald-300 pt-0.5">
+                    💡 {anom.recommendation}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
+
+      {/* CỔNG ĐỒNG BỘ BÁO CÁO ADS THỰC TẾ (CSV IMPORTER) & NGUỒN GỐC SỐ LIỆU */}
+      <input
+        ref={csvFileInputRef}
+        type="file"
+        accept=".csv,.tsv,.txt"
+        onChange={handleUploadCustomCsvFile}
+        className="hidden"
+      />
+      {(dataProvenance?.has_demo_data || dataProvenance?.has_unverified_data) ? (
+        <div
+          role="status"
+          className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 rounded-2xl border border-amber-300 bg-amber-50/90 px-4 py-3.5 text-amber-900"
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" aria-hidden="true" />
+            <div className="text-xs leading-relaxed">
+              <p className="font-bold">
+                {dataProvenance.has_demo_data
+                  ? 'Số liệu dưới đây có chứa dữ liệu MẪU, không phải số đo thật.'
+                  : 'Chưa xác minh được nguồn gốc của một phần số liệu dưới đây.'}
+              </p>
+              <p className="mt-1">
+                Trong {dataProvenance.total_rows} dòng chỉ số đang hiển thị:{' '}
+                {dataProvenance.seed_rows > 0 && (
+                  <>
+                    <strong>{dataProvenance.seed_rows} dòng là dữ liệu mẫu</strong> tự sinh lúc
+                    khởi tạo{'; '}
+                  </>
+                )}
+                {dataProvenance.unverified_rows > 0 && (
+                  <>
+                    <strong>{dataProvenance.unverified_rows} dòng chưa được ghi nhận nguồn gốc</strong>{'; '}
+                  </>
+                )}
+                <strong>{dataProvenance.real_rows} dòng là số bạn đã nhập thật</strong>. Bạn có thể nạp trực tiếp file CSV xuất từ Facebook Ads, TikTok Ads hoặc Google Ads ngay bên phải để thay thế dữ liệu mẫu.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {campaigns.length > 0 && (
+              <select
+                value={csvTargetCampaignId || campaigns[0]?.id || ''}
+                onChange={(e) => setCsvTargetCampaignId(Number(e.target.value))}
+                aria-label="Chọn chiến dịch để import CSV"
+                className="text-xs bg-white border border-amber-300 rounded-lg px-2.5 py-1.5 font-bold text-amber-950"
+              >
+                {campaigns.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              onClick={() => csvFileInputRef.current?.click()}
+              disabled={importingCsv}
+              className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 font-bold text-xs px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Tải lên CSV Ads</span>
+            </button>
+            <button
+              onClick={handleDownloadSampleAdsCsv}
+              className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 font-bold text-xs px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>CSV mẫu</span>
+            </button>
+            <button
+              onClick={handleQuickImportVerifiedAdsCsv}
+              disabled={importingCsv}
+              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-sm transition-all cursor-pointer"
+            >
+              {importingCsv ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+              <span>Đồng bộ Số liệu Ads Thực tế (1-Click)</span>
+            </button>
+          </div>
+        </div>
+      ) : dataProvenance && dataProvenance.total_rows > 0 ? (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-emerald-950 text-xs">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>
+              <strong>100% Dữ liệu Thực tế Đã Xác thực ({dataProvenance.real_rows}/{dataProvenance.total_rows} bản ghi):</strong>{' '}
+              Toàn bộ chỉ số Views, Clicks, Conversions và ROAS đang hiển thị đều từ nguồn báo cáo thực tế (không còn dữ liệu mẫu).
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => csvFileInputRef.current?.click()}
+              disabled={importingCsv}
+              className="inline-flex items-center gap-1.5 bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold text-xs px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Import thêm CSV Ads</span>
+            </button>
+            <button
+              onClick={handleDownloadSampleAdsCsv}
+              className="inline-flex items-center gap-1.5 bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold text-xs px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Tải mẫu CSV</span>
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* SECTION 1 (ABOVE THE FOLD): 9-KPI PERFORMANCE METRICS BENTO */}
       <div className="space-y-3">

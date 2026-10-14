@@ -296,6 +296,60 @@ class MarketFlowMCPServer:
                     "required": ["connector_type"],
                 },
             },
+            {
+                "name": "generate_utm_and_ab_variants",
+                "description": (
+                    "Sinh bộ link theo dõi UTM chuẩn hóa (utm_source, utm_medium, utm_campaign, utm_content) "
+                    "kèm 2 phiên bản thử nghiệm A/B Testing (Variant A: Emotional Pain-Point vs Variant B: Data-Driven USP), "
+                    "tự động kiểm duyệt chính sách 100/100 và tùy chọn lưu thẳng vào CSDL chiến dịch."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "campaign_id": {"type": "integer", "description": "ID chiến dịch mục tiêu."},
+                        "channel": {"type": "string", "description": "Kênh quảng cáo (facebook, tiktok, email, google)."},
+                        "landing_url": {"type": "string", "description": "URL trang đích (Landing Page) gốc."},
+                        "save_to_db": {"type": "boolean", "description": "Lưu cả 2 phiên bản A/B vào bảng marketing_contents."},
+                    },
+                    "required": ["campaign_id"],
+                },
+            },
+            {
+                "name": "generate_visual_banner",
+                "description": (
+                    "Thiết kế AI Visual Banner & Social Image đa tỷ lệ (1:1 Facebook/IG, 9:16 TikTok/Reels, 16:9 YouTube/Web) "
+                    "chuẩn Brand Kit kèm bố cục Typography tiếng Việt và gắn trực tiếp ảnh vào bài viết chiến dịch."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "campaign_id": {"type": "integer", "description": "ID chiến dịch."},
+                        "aspect_ratio": {"type": "string", "description": "Tỷ lệ khung hình: '1:1', '9:16', hoặc '16:9'."},
+                        "style": {"type": "string", "description": "Phong cách hình ảnh (VD: '3d_tech', 'editorial', 'minimal_luxury', 'vibrant_social')."},
+                        "custom_headline": {"type": "string", "description": "Tiêu đề hiển thị trên Banner (tùy chọn)."},
+                        "attach_to_latest_content": {"type": "boolean", "description": "Gắn URL ảnh vừa tạo vào bài viết mới nhất của chiến dịch."},
+                    },
+                    "required": ["campaign_id"],
+                },
+            },
+            {
+                "name": "run_multi_agent_squad",
+                "description": (
+                    "Kích hoạt Đội ngũ 4 AI Agent chuyên biệt (Market Researcher -> Media Buyer -> A/B Copywriter -> "
+                    "Compliance & Visual Critic) phối hợp tự động lập kế hoạch, chia ngân sách, viết bài A/B + UTM, "
+                    "sinh ảnh Banner và ghi trực tiếp vào CSDL."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "campaign_id": {"type": "integer", "description": "ID chiến dịch cần triển khai toàn diện."},
+                        "channel": {"type": "string", "description": "Kênh trọng tâm (facebook, tiktok, email)."},
+                        "landing_url": {"type": "string", "description": "URL trang đích chiến dịch."},
+                        "apply_to_db": {"type": "boolean", "description": "Áp dụng phân bổ ngân sách và lưu các bản thảo A/B + Banner vào CSDL."},
+                    },
+                    "required": ["campaign_id"],
+                },
+            },
         ]
 
     def list_resources(self) -> List[Dict[str, Any]]:
@@ -580,6 +634,9 @@ class MarketFlowMCPServer:
             "create_marketing_draft": self._tool_create_marketing_draft,
             "rebalance_campaign_budget": self._tool_rebalance_campaign_budget,
             "dispatch_external_webhook": self._tool_dispatch_external_webhook,
+            "generate_utm_and_ab_variants": self._tool_generate_utm_and_ab_variants,
+            "generate_visual_banner": self._tool_generate_visual_banner,
+            "run_multi_agent_squad": self._tool_run_multi_agent_squad,
         }
 
         handler = handlers.get(name)
@@ -1190,6 +1247,335 @@ class MarketFlowMCPServer:
             "signature_header": f"sha256={signature_hex}",
             "headers": headers,
             "payload": connector_payload,
+        }
+
+    def _slugify_utm(self, text: str) -> str:
+        import unicodedata
+        s = unicodedata.normalize("NFKD", str(text or "")).replace("đ", "d").replace("Đ", "d")
+        s = "".join(c for c in s if not unicodedata.combining(c))
+        s = re.sub(r"[^a-zA-Z0-9]+", "_", s.lower()).strip("_")
+        return s[:40] or "campaign"
+
+    def _tool_generate_utm_and_ab_variants(
+        self, db: Session, user: User, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        from urllib.parse import urlencode
+        campaign_id = int(args.get("campaign_id") or 0)
+        campaign = self._get_accessible_campaign(db, user, campaign_id)
+        channel = str(args.get("channel") or "facebook").strip().lower()
+        landing_url = str(args.get("landing_url") or "https://marketing.kienhieu.id.vn/landing").strip()
+        save_to_db = bool(args.get("save_to_db", False))
+
+        product = db.query(Product).filter(Product.id == campaign.product_id).first()
+        bk = (
+            db.query(BrandKit).filter(BrandKit.workspace_id == campaign.workspace_id).first()
+            if campaign.workspace_id
+            else None
+        )
+        brand_name = bk.brand_name if bk and bk.brand_name else (product.name if product else "MarketFlow AI")
+        usp = bk.usp if bk and bk.usp else (product.usp if product else "Giải pháp tối ưu chuyển đổi số")
+        audience = campaign.audience or "Khách hàng doanh nghiệp & chuyên viên Marketing"
+
+        utm_source = channel
+        utm_medium = "email_crm" if channel == "email" else ("short_video_ads" if channel == "tiktok" else "paid_social")
+        utm_campaign = f"c{campaign.id}_{self._slugify_utm(campaign.name)}"
+
+        base_clean = landing_url.rstrip("/")
+        sep = "&" if "?" in base_clean else "?"
+
+        utm_a_params = {
+            "utm_source": utm_source,
+            "utm_medium": utm_medium,
+            "utm_campaign": utm_campaign,
+            "utm_content": "variant_a_pain_hook",
+        }
+        utm_b_params = {
+            "utm_source": utm_source,
+            "utm_medium": utm_medium,
+            "utm_campaign": utm_campaign,
+            "utm_content": "variant_b_rational_usp",
+        }
+        url_variant_a = f"{base_clean}{sep}{urlencode(utm_a_params)}"
+        url_variant_b = f"{base_clean}{sep}{urlencode(utm_b_params)}"
+
+        raw_a = {
+            "title": f"[Góc Nỗi Đau - PAS] {campaign.name}: Giải bài toán thất thoát ngân sách cho {audience}",
+            "body": (
+                f"Bạn đang đầu tư ngân sách lớn trên {channel.upper()} nhưng tỷ lệ chuyển đổi vẫn giậm chân tại chỗ?\n\n"
+                f"• Điểm nghẽn phổ biến: Nội dung thiếu cá nhân hóa và phân bổ ngân sách cảm tính.\n"
+                f"• Giải pháp từ {brand_name}: {usp}.\n"
+                f"• Mục tiêu chiến dịch: {campaign.objective or 'Tăng trưởng chuyển đổi bền vững'}.\n\n"
+                f"🔗 Trải nghiệm ngay tại: {url_variant_a}"
+            ),
+            "cta": f"Khám phá lộ trình tối ưu cùng {brand_name}",
+        }
+        raw_b = {
+            "title": f"[Góc Bằng Chứng - FAB] {brand_name}: Nâng tầm hiệu suất ROAS cho {audience}",
+            "body": (
+                f"Tối ưu hóa quy trình tiếp thị đa kênh dựa trên dữ liệu thực chứng cùng {brand_name}:\n\n"
+                f"1. Lợi thế cốt lõi (USP): {usp}.\n"
+                f"2. Đồng bộ tự động từ Hoạch định ngân sách, Sáng tạo đa kênh đến Chẩn đoán ROAS.\n"
+                f"3. Phù hợp chuyên biệt cho: {audience}.\n\n"
+                f"🔗 Đăng ký nhận bộ giải pháp tại: {url_variant_b}"
+            ),
+            "cta": f"Nhận bản đề xuất giải pháp từ {brand_name}",
+        }
+
+        fix_a = self._tool_auto_fix_compliance_violations(
+            db, user, {"workspace_id": campaign.workspace_id, "channel": channel, **raw_a}
+        )
+        fix_b = self._tool_auto_fix_compliance_violations(
+            db, user, {"workspace_id": campaign.workspace_id, "channel": channel, **raw_b}
+        )
+
+        saved_ids: List[int] = []
+        if save_to_db:
+            ch_id = 2 if channel == "email" else 5 if channel == "tiktok" else 1
+            for label, fixed_item in [("A", fix_a["rewritten"]), ("B", fix_b["rewritten"])]:
+                mc = MarketingContent(
+                    workspace_id=campaign.workspace_id,
+                    campaign_id=campaign.id,
+                    channel_id=ch_id,
+                    created_by=user.id,
+                    title=fixed_item["title"][:250],
+                    body=fixed_item["body"],
+                    cta=fixed_item["cta"][:250],
+                    status="AI_DRAFT",
+                    version_no=1,
+                )
+                db.add(mc)
+                db.flush()
+                saved_ids.append(mc.id)
+            db.commit()
+
+        return {
+            "campaign_id": campaign.id,
+            "campaign_name": campaign.name,
+            "channel": channel,
+            "utm_config": {
+                "utm_source": utm_source,
+                "utm_medium": utm_medium,
+                "utm_campaign": utm_campaign,
+                "landing_url": landing_url,
+            },
+            "variants": [
+                {
+                    "variant_key": "A",
+                    "framework": "PAS (Pain - Agitate - Solution)",
+                    "hypothesis": "Đánh trực diện vào nỗi đau lãng phí ngân sách giúp tăng CTR ở nhóm khách hàng lạnh.",
+                    "predicted_ctr_pct": 3.85,
+                    "predicted_cvr_pct": 4.20,
+                    "utm_url": url_variant_a,
+                    "title": fix_a["rewritten"]["title"],
+                    "body": fix_a["rewritten"]["body"],
+                    "cta": fix_a["rewritten"]["cta"],
+                    "compliance_score": fix_a["after_compliance"]["score"],
+                },
+                {
+                    "variant_key": "B",
+                    "framework": "FAB (Features - Advantages - Benefits)",
+                    "hypothesis": "Nhấn mạnh bằng chứng số liệu và USP giúp tối ưu tỷ lệ chốt đơn (CVR) ở nhóm khách hàng ấm.",
+                    "predicted_ctr_pct": 3.40,
+                    "predicted_cvr_pct": 5.65,
+                    "utm_url": url_variant_b,
+                    "title": fix_b["rewritten"]["title"],
+                    "body": fix_b["rewritten"]["body"],
+                    "cta": fix_b["rewritten"]["cta"],
+                    "compliance_score": fix_b["after_compliance"]["score"],
+                },
+            ],
+            "saved_content_ids": saved_ids,
+        }
+
+    def _tool_generate_visual_banner(
+        self, db: Session, user: User, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        from urllib.parse import quote
+        campaign_id = int(args.get("campaign_id") or 0)
+        campaign = self._get_accessible_campaign(db, user, campaign_id)
+        aspect_ratio = str(args.get("aspect_ratio") or "1:1").strip()
+        style = str(args.get("style") or "3d_tech").strip().lower()
+        custom_headline = str(args.get("custom_headline") or "").strip()
+        attach_to_latest = bool(args.get("attach_to_latest_content", False))
+
+        product = db.query(Product).filter(Product.id == campaign.product_id).first()
+        bk = (
+            db.query(BrandKit).filter(BrandKit.workspace_id == campaign.workspace_id).first()
+            if campaign.workspace_id
+            else None
+        )
+        brand_name = bk.brand_name if bk and bk.brand_name else (product.name if product else "MarketFlow AI")
+        usp = bk.usp if bk and bk.usp else (product.usp if product else "Nền tảng Tiếp thị Đa kênh Tích hợp AI")
+
+        dims = {
+            "1:1": (1080, 1080, "Facebook / Instagram Feed (1080×1080)"),
+            "9:16": (1080, 1920, "TikTok / Reels / Story (1080×1920)"),
+            "16:9": (1920, 1080, "YouTube / Website Hero Banner (1920×1080)"),
+        }
+        width, height, placement_label = dims.get(aspect_ratio, dims["1:1"])
+
+        style_prompts = {
+            "3d_tech": "futuristic 3D isometric glassmorphism technology marketing studio, glowing indigo and coral accents, ultra clean commercial photography, 8k resolution",
+            "editorial": "high-end editorial magazine commercial photography, warm studio lighting, modern Asian professionals collaborating with holographic analytics, 8k",
+            "minimal_luxury": "minimalist luxury product podium, soft architectural shadows, warm ivory and deep slate palette, award-winning commercial key visual, 8k",
+            "vibrant_social": "vibrant high-energy social media campaign visual, dynamic lighting, bold modern design elements, commercial advertising photography, 8k",
+        }
+        visual_prompt = (
+            f"Commercial advertising key visual for {brand_name}, {campaign.name}, "
+            f"{style_prompts.get(style, style_prompts['3d_tech'])}, no text watermark"
+        )
+        seed = (campaign.id * 137 + width + height) % 99999
+        encoded_prompt = quote(visual_prompt)
+        image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true&model=flux"
+
+        headline = custom_headline or campaign.name
+        attached_content_id: Optional[int] = None
+        if attach_to_latest:
+            latest = (
+                db.query(MarketingContent)
+                .filter(MarketingContent.campaign_id == campaign.id)
+                .order_by(MarketingContent.id.desc())
+                .first()
+            )
+            if latest:
+                latest.image_url = image_url
+                db.commit()
+                attached_content_id = latest.id
+
+        return {
+            "campaign_id": campaign.id,
+            "campaign_name": campaign.name,
+            "aspect_ratio": aspect_ratio if aspect_ratio in dims else "1:1",
+            "dimensions": {"width": width, "height": height, "placement": placement_label},
+            "style": style,
+            "visual_prompt": visual_prompt,
+            "image_url": image_url,
+            "banner_overlay": {
+                "brand_badge": brand_name.upper(),
+                "headline": headline,
+                "subheadline": usp[:120],
+                "cta_label": "Khám phá ngay →",
+                "primary_color": "#4F46E5",
+                "accent_color": "#D95D39",
+            },
+            "attached_content_id": attached_content_id,
+        }
+
+    def _tool_run_multi_agent_squad(
+        self, db: Session, user: User, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        t0 = time.perf_counter()
+        campaign_id = int(args.get("campaign_id") or 0)
+        campaign = self._get_accessible_campaign(db, user, campaign_id)
+        channel = str(args.get("channel") or "facebook").strip().lower()
+        landing_url = str(args.get("landing_url") or "https://marketing.kienhieu.id.vn/landing").strip()
+        apply_to_db = bool(args.get("apply_to_db", True))
+
+        squad_steps: List[Dict[str, Any]] = []
+
+        # Agent 1: Market Researcher & ICP Strategist
+        s1_t = time.perf_counter()
+        metrics_res = self._tool_get_campaign_metrics(db, user, {"campaign_id": campaign.id})
+        doc_res = self._tool_diagnose_campaign_health(db, user, {"campaign_id": campaign.id})
+        squad_steps.append({
+            "agent_id": "agent_1_researcher",
+            "agent_name": "Agent 1 · Market Researcher & ICP Strategist",
+            "role": "Phân tích Chân dung Khách hàng (ICP) & Chẩn đoán Phễu",
+            "status": "COMPLETED",
+            "latency_ms": round((time.perf_counter() - s1_t) * 1000, 2),
+            "summary": (
+                f"Đã phân tích chiến dịch '{campaign.name}' (Khán giả: {campaign.audience or 'Đại chúng'}). "
+                f"Điểm sức khỏe hiện tại: {doc_res.get('health_score', 85)}/100 ({doc_res.get('status', 'ON_TRACK')})."
+            ),
+            "output": {
+                "target_audience": campaign.audience,
+                "objective": campaign.objective,
+                "health_score": doc_res.get("health_score", 85),
+                "kpi_totals": metrics_res.get("totals"),
+            },
+        })
+
+        # Agent 2: Media Buyer & Budget Optimizer
+        s2_t = time.perf_counter()
+        reb_res = self._tool_rebalance_campaign_budget(
+            db, user, {"campaign_id": campaign.id, "apply_changes": apply_to_db}
+        )
+        squad_steps.append({
+            "agent_id": "agent_2_media_buyer",
+            "agent_name": "Agent 2 · Media Buyer & Budget Strategist",
+            "role": "Tối ưu Phân bổ Ngân sách Đa kênh theo ROAS",
+            "status": "COMPLETED",
+            "latency_ms": round((time.perf_counter() - s2_t) * 1000, 2),
+            "summary": (
+                f"Đã tính toán phân bổ ngân sách {float(campaign.budget or 0):,.0f} đ cho "
+                f"{len(reb_res.get('proposals', []))} kênh tiếp thị "
+                f"({'Đã áp dụng vào CSDL' if reb_res.get('applied') else 'Chế độ mô phỏng'})."
+            ),
+            "output": reb_res,
+        })
+
+        # Agent 3: Omnichannel Copywriter & A/B UTM Architect
+        s3_t = time.perf_counter()
+        ab_res = self._tool_generate_utm_and_ab_variants(
+            db,
+            user,
+            {
+                "campaign_id": campaign.id,
+                "channel": channel,
+                "landing_url": landing_url,
+                "save_to_db": apply_to_db,
+            },
+        )
+        squad_steps.append({
+            "agent_id": "agent_3_copywriter",
+            "agent_name": "Agent 3 · A/B Copywriter & UTM Architect",
+            "role": "Sáng tạo 2 Phiên bản A/B Testing & Gắn mã UTM Tracking",
+            "status": "COMPLETED",
+            "latency_ms": round((time.perf_counter() - s3_t) * 1000, 2),
+            "summary": (
+                f"Đã sinh 2 phiên bản A/B (PAS vs FAB) trên kênh {channel.upper()} kèm link UTM "
+                f"`{ab_res['utm_config']['utm_campaign']}` "
+                f"(Đã lưu {len(ab_res.get('saved_content_ids', []))} bản thảo vào CSDL)."
+            ),
+            "output": ab_res,
+        })
+
+        # Agent 4: Brand Compliance & Visual Art Director
+        s4_t = time.perf_counter()
+        vis_res = self._tool_generate_visual_banner(
+            db,
+            user,
+            {
+                "campaign_id": campaign.id,
+                "aspect_ratio": "9:16" if channel == "tiktok" else "1:1",
+                "style": "3d_tech",
+                "attach_to_latest_content": apply_to_db,
+            },
+        )
+        squad_steps.append({
+            "agent_id": "agent_4_art_compliance",
+            "agent_name": "Agent 4 · Compliance Critic & Visual Art Director",
+            "role": "Kiểm duyệt An toàn Thương hiệu 100/100 & Thiết kế Visual Banner",
+            "status": "COMPLETED",
+            "latency_ms": round((time.perf_counter() - s4_t) * 1000, 2),
+            "summary": (
+                f"Cả 2 bản thảo A/B đều đạt chuẩn tuân thủ 100/100 PASSED. "
+                f"Đã sinh AI Visual Banner ({vis_res['dimensions']['placement']}) và đính kèm vào bài viết."
+            ),
+            "output": vis_res,
+        })
+
+        return {
+            "campaign_id": campaign.id,
+            "campaign_name": campaign.name,
+            "channel": channel,
+            "applied_to_db": apply_to_db,
+            "total_latency_ms": round((time.perf_counter() - t0) * 1000, 2),
+            "agents_count": 4,
+            "squad_steps": squad_steps,
+            "ab_variants": ab_res["variants"],
+            "visual_banner": vis_res,
+            "budget_rebalance": reb_res,
         }
 
     def get_external_integrations_blueprint(

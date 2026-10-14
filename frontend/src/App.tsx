@@ -20,7 +20,6 @@ const MyTasksPage = lazy(() => import('./pages/MyTasksPage').then(m => ({ defaul
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
 const MarketingCalendar = lazy(() => import('./components/MarketingCalendar').then(m => ({ default: m.MarketingCalendar })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
-const RegisterPage = lazy(() => import('./pages/RegisterPage').then(m => ({ default: m.RegisterPage })));
 
 const PageFallback: React.FC = () => (
   <div className="flex h-full w-full min-h-[400px] items-center justify-center p-12">

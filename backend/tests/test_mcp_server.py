@@ -12,13 +12,13 @@ from app.models.entities import Campaign
 
 
 def test_mcp_manifest_returns_tools_resources_prompts(client, marketer_headers):
-    """GET /api/v1/mcp/manifest trả về đầy đủ 8 Tools, 3 Resources và 3 Prompts chuẩn MCP."""
+    """GET /api/v1/mcp/manifest trả về đầy đủ 11 Tools, 3 Resources và 3 Prompts chuẩn MCP."""
     resp = client.get("/api/v1/mcp/manifest", headers=marketer_headers)
     assert resp.status_code == 200
     data = resp.json()
     assert data["server"]["protocolVersion"] == "2025-03-26"
     assert data["server"]["name"] == "marketflow-mcp-server"
-    assert len(data["tools"]) == 8
+    assert len(data["tools"]) == 11
     assert len(data["resources"]) == 3
     assert len(data["prompts"]) == 3
 
@@ -32,6 +32,9 @@ def test_mcp_manifest_returns_tools_resources_prompts(client, marketer_headers):
         "create_marketing_draft",
         "rebalance_campaign_budget",
         "dispatch_external_webhook",
+        "generate_utm_and_ab_variants",
+        "generate_visual_banner",
+        "run_multi_agent_squad",
     }.issubset(tool_names)
 
 
@@ -204,4 +207,54 @@ def test_rbac_demo_role_switcher(client, marketer_headers):
         body = res.json()
         assert body["access_token"]
         assert body["user"]["role"] == expected_role
+
+
+def test_mcp_squad_ab_utm_visual_and_csv_import(client, db_session, marketer_headers):
+    """Kiểm thử thực chiến: 4-Agent Squad, A/B UTM Lab, Visual Banner, CSV Ads Import & AI Morning Briefing."""
+    alpha_campaign = db_session.query(Campaign).filter(Campaign.workspace_id == 1).first()
+    assert alpha_campaign is not None
+
+    # 1. Sample CSV & Import Real Ads CSV
+    sample_res = client.get(
+        f"/api/v1/campaigns/{alpha_campaign.id}/metrics/sample-csv",
+        headers=marketer_headers,
+    )
+    assert sample_res.status_code == 200
+    csv_text = sample_res.json()["csv_content"]
+    assert "metric_date,channel,views,clicks,conversions,cost,revenue" in csv_text
+
+    imp_res = client.post(
+        f"/api/v1/campaigns/{alpha_campaign.id}/metrics/import-csv",
+        headers=marketer_headers,
+        json={"csv_content": csv_text, "replace_seed_data": True},
+    )
+    assert imp_res.status_code == 200
+    assert imp_res.json()["imported_rows"] >= 3
+    assert imp_res.json()["source_tag"] == "csv_import"
+
+    # 2. AI Morning Briefing
+    mb_res = client.get("/api/v1/analytics/morning-briefing", headers=marketer_headers)
+    assert mb_res.status_code == 200
+    assert "headline" in mb_res.json()
+    assert mb_res.json()["rebalance_action"]["available"] is True
+
+    # 3. 4-Agent Autonomous Squad
+    squad_res = client.post(
+        "/api/v1/mcp/squad/run",
+        headers=marketer_headers,
+        json={
+            "campaign_id": alpha_campaign.id,
+            "channel": "facebook",
+            "landing_url": "https://marketing.kienhieu.id.vn/tuyen-sinh",
+            "apply_to_db": True,
+        },
+    )
+    assert squad_res.status_code == 200
+    sq = squad_res.json()
+    assert sq["agents_count"] == 4
+    assert len(sq["squad_steps"]) == 4
+    assert len(sq["ab_variants"]) == 2
+    assert "utm_source=facebook" in sq["ab_variants"][0]["utm_url"]
+    assert sq["visual_banner"]["image_url"].startswith("https://image.pollinations.ai/prompt/")
+
 

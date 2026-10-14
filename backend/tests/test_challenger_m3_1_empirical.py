@@ -287,6 +287,7 @@ class TestEmpiricalAdversarialEvasionsAndHardening:
     def test_adversarial_tenant_isolation_banned_keywords(self, client: TestClient, auth_headers, db_session):
         """Kiểm tra cô lập từ cấm đa Workspace (Tenant Isolation): Từ cấm của WS 1 không làm ảnh hưởng WS 2."""
         # Tạo Workspace 2 độc lập
+        from app.models.entities import WorkspaceMember
         ws2 = Workspace(
             id=2,
             name="Client B Workspace",
@@ -295,6 +296,8 @@ class TestEmpiricalAdversarialEvasionsAndHardening:
             status="ACTIVE"
         )
         db_session.add(ws2)
+        db_session.commit()
+        db_session.add(WorkspaceMember(workspace_id=2, user_id=2, role="MARKETER"))
         db_session.commit()
 
         # Tạo Brand Kit riêng cho WS 2 với từ cấm duy nhất: "siêu phẩm số 1 châu á"

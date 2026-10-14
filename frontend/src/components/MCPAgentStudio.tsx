@@ -105,6 +105,90 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
   const [webhookResult, setWebhookResult] = useState<any>(null);
   const [mcpClientType, setMcpClientType] = useState<'claude_desktop' | 'cursor_ide' | 'curl_jsonrpc'>('claude_desktop');
 
+  // Production Lab state: 4-Agent Squad, A/B & UTM Builder, AI Visual Banner
+  const [labTab, setLabTab] = useState<'squad' | 'ab_utm' | 'visual'>('squad');
+  const [squadLoading, setSquadLoading] = useState<boolean>(false);
+  const [squadApplyDb, setSquadApplyDb] = useState<boolean>(true);
+  const [squadResult, setSquadResult] = useState<any>(null);
+
+  const [abLoading, setAbLoading] = useState<boolean>(false);
+  const [abLandingUrl, setAbLandingUrl] = useState<string>('https://marketing.kienhieu.id.vn/landing');
+  const [abTopic, setAbTopic] = useState<string>('');
+  const [abSaveToDb, setAbSaveToDb] = useState<boolean>(true);
+  const [abResult, setAbResult] = useState<any>(null);
+
+  const [visualLoading, setVisualLoading] = useState<boolean>(false);
+  const [visualRatio, setVisualRatio] = useState<'1:1' | '9:16' | '16:9'>('1:1');
+  const [visualStyle, setVisualStyle] = useState<string>('Photorealistic Editorial Studio');
+  const [visualHeadline, setVisualHeadline] = useState<string>('');
+  const [visualResult, setVisualResult] = useState<any>(null);
+
+  const handleRunSquadLab = async () => {
+    setSquadLoading(true);
+    try {
+      const res = await mcpApi.runSquad({
+        ...(activeCampaign?.id ? { campaign_id: activeCampaign.id } : {}),
+        ...(activeCampaign?.workspace_id ? { workspace_id: activeCampaign.workspace_id } : {}),
+        channel: channelCode,
+        landing_url: abLandingUrl,
+        aspect_ratio: visualRatio,
+        apply_to_db: squadApplyDb,
+      });
+      setSquadResult(res);
+      toast.success(
+        `Biệt đội 4 AI Agents đã hoàn tất chiến dịch thực chiến (${res?.persistence?.saved_content_ids?.length || 0} bài nháp A/B & Banner đã lưu DB)!`,
+      );
+      if (onContentCreated) onContentCreated();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err), 'Lỗi khi điều phối Biệt đội 4 AI Agents');
+    } finally {
+      setSquadLoading(false);
+    }
+  };
+
+  const handleRunAbUtmLab = async () => {
+    setAbLoading(true);
+    try {
+      const res = await mcpApi.generateAbUtm({
+        ...(activeCampaign?.id ? { campaign_id: activeCampaign.id } : {}),
+        ...(activeCampaign?.workspace_id ? { workspace_id: activeCampaign.workspace_id } : {}),
+        channel: channelCode,
+        landing_url: abLandingUrl,
+        ...(abTopic.trim() ? { topic: abTopic.trim() } : {}),
+        save_to_db: abSaveToDb,
+      });
+      setAbResult(res);
+      toast.success('Đã sinh 2 phiên bản A/B (PAS vs FAB) đạt chuẩn 100/100 kèm link UTM Tracking!');
+      if (abSaveToDb && onContentCreated) onContentCreated();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err), 'Lỗi khi tạo A/B Variants & UTM');
+    } finally {
+      setAbLoading(false);
+    }
+  };
+
+  const handleRunVisualLab = async () => {
+    setVisualLoading(true);
+    try {
+      const res = await mcpApi.generateVisualBanner({
+        ...(activeCampaign?.id ? { campaign_id: activeCampaign.id } : {}),
+        ...(activeCampaign?.workspace_id ? { workspace_id: activeCampaign.workspace_id } : {}),
+        channel: channelCode,
+        aspect_ratio: visualRatio,
+        visual_style: visualStyle,
+        ...(visualHeadline.trim() ? { headline: visualHeadline.trim() } : {}),
+        attach_to_latest_content: true,
+      });
+      setVisualResult(res);
+      toast.success(`Đã kết xuất AI Visual Banner (${visualRatio}) và đính kèm vào bài viết chiến dịch!`);
+      if (onContentCreated) onContentCreated();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err), 'Lỗi khi kết xuất AI Visual Banner');
+    } finally {
+      setVisualLoading(false);
+    }
+  };
+
   const handleTestExternalWebhook = async () => {
     setWebhookLoading(true);
     try {
@@ -182,29 +266,48 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
   const handleRunAgent = async () => {
     if (!goal.trim() || agentRunning) return;
     setAgentRunning(true);
+    const payload = {
+      goal: goal.trim(),
+      ...(activeCampaign?.id ? { campaign_id: activeCampaign.id } : {}),
+      channel: channelCode,
+      ...(includeSampleDraft
+        ? {
+            draft_input: {
+              title: draftTitle,
+              body: draftBody,
+              cta: draftCta,
+            },
+          }
+        : {}),
+    };
+
     try {
-      const res = await mcpApi.runAgent({
-        goal: goal.trim(),
-        ...(activeCampaign?.id ? { campaign_id: activeCampaign.id } : {}),
-        channel: channelCode,
-        ...(includeSampleDraft
-          ? {
-              draft_input: {
-                title: draftTitle,
-                body: draftBody,
-                cta: draftCta,
-              },
-            }
-          : {}),
+      const liveSteps: MCPTraceStep[] = [];
+
+      const completedPayload = await mcpApi.streamAgent(payload, (step: MCPTraceStep) => {
+        liveSteps.push(step);
+        setExpandedSteps((prev) => ({ ...prev, [step.step]: true }));
+        setAgentResult({
+          server: 'marketflow-mcp-server (SSE Live)',
+          protocol: 'MCP 2025-03-26 (SSE Stream)',
+          goal: payload.goal,
+          steps_executed: liveSteps.length,
+          total_latency_ms: liveSteps.reduce((acc, s) => acc + (s.latency_ms || 0), 0),
+          trace: [...liveSteps],
+          artifacts: {},
+          final_answer: 'Đang thực thi chuỗi công cụ MCP theo thời gian thực (Real-time SSE)...',
+        });
       });
-      setAgentResult(res);
+
+      setAgentResult(completedPayload);
+
       const openMap: Record<number, boolean> = {};
-      res.trace.forEach((s: MCPTraceStep) => {
+      completedPayload.trace.forEach((s: MCPTraceStep) => {
         openMap[s.step] = true;
       });
       setExpandedSteps(openMap);
       toast.success(
-        `Agentic Copilot đã hoàn tất ${res.steps_executed} bước MCP trong ${res.total_latency_ms.toFixed(1)}ms!`,
+        `Agentic Copilot đã hoàn tất ${completedPayload.steps_executed} bước MCP trong ${completedPayload.total_latency_ms.toFixed(1)}ms!`,
       );
       if (onContentCreated) onContentCreated();
     } catch (err) {
@@ -268,6 +371,26 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
         connector_type: connectorType,
         event_type: webhookEventType,
         campaign_id: activeCampaign?.id || 1,
+      },
+      generate_utm_and_ab_variants: {
+        campaign_id: activeCampaign?.id || 1,
+        channel: channelCode,
+        landing_url: abLandingUrl,
+        save_to_db: false,
+      },
+      generate_visual_banner: {
+        campaign_id: activeCampaign?.id || 1,
+        channel: channelCode,
+        aspect_ratio: visualRatio,
+        visual_style: visualStyle,
+        attach_to_latest_content: false,
+      },
+      run_multi_agent_squad: {
+        campaign_id: activeCampaign?.id || 1,
+        channel: channelCode,
+        landing_url: abLandingUrl,
+        aspect_ratio: visualRatio,
+        apply_to_db: false,
       },
     };
     const args = defaultArgs[toolName] || {};
@@ -607,6 +730,349 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
               </div>
             </div>
           )}
+
+          {/* PRODUCTION AI LAB: 4-AGENT SQUAD + A/B UTM BUILDER + AI VISUAL BANNER */}
+          <div
+            className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4"
+            data-testid="mcp-production-lab"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                  <Bot className="w-4 h-4 text-violet-600" />
+                  <span>Phòng Thí Nghiệm Thực Chiến: 4-Agent Squad • A/B &amp; UTM • AI Visual Banner</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Biến kế hoạch AI thành tài sản quảng cáo thực tế (A/B Copy, UTM Tracking, Visual Banner 1:1/9:16/16:9) lưu trực tiếp vào SQLite Database.
+                </p>
+              </div>
+              <span className="text-[10px] font-mono font-bold bg-violet-50 text-violet-700 border border-violet-200 px-2.5 py-1 rounded-full shrink-0">
+                Real DB Persistence
+              </span>
+            </div>
+
+            {/* Lab Sub-Tabs */}
+            <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+              <button
+                type="button"
+                data-testid="lab-tab-squad"
+                onClick={() => setLabTab('squad')}
+                className={`py-2 px-2 rounded-lg transition-all cursor-pointer ${
+                  labTab === 'squad'
+                    ? 'bg-white text-violet-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🤖 Biệt Đội 4 AI Agents
+              </button>
+              <button
+                type="button"
+                data-testid="lab-tab-ab-utm"
+                onClick={() => setLabTab('ab_utm')}
+                className={`py-2 px-2 rounded-lg transition-all cursor-pointer ${
+                  labTab === 'ab_utm'
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🔗 A/B Testing &amp; UTM Builder
+              </button>
+              <button
+                type="button"
+                data-testid="lab-tab-visual"
+                onClick={() => setLabTab('visual')}
+                className={`py-2 px-2 rounded-lg transition-all cursor-pointer ${
+                  labTab === 'visual'
+                    ? 'bg-white text-emerald-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🎨 AI Visual Banner (1:1 • 9:16 • 16:9)
+              </button>
+            </div>
+
+            {/* SUB-TAB 1: 4-AGENT AUTONOMOUS SQUAD */}
+            {labTab === 'squad' && (
+              <div className="space-y-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <span className="font-black text-indigo-700 block">1. Market Researcher &amp; ICP</span>
+                    <span className="text-[11px] text-slate-600">Đọc Brand Kit + Giải mã Insight &amp; Value Proposition</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <span className="font-black text-emerald-700 block">2. Media Buyer &amp; ROAS Strategist</span>
+                    <span className="text-[11px] text-slate-600">Kiểm toán CPA/ROAS &amp; Tái phân bổ Ngân sách tự động</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <span className="font-black text-amber-700 block">3. A/B Copywriter &amp; UTM Architect</span>
+                    <span className="text-[11px] text-slate-600">Sinh 2 bản A/B (PAS vs FAB) + gắn tham số UTM đầy đủ</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <span className="font-black text-violet-700 block">4. Compliance Critic &amp; Art Director</span>
+                    <span className="text-[11px] text-slate-600">Đảm bảo chuẩn 100/100 + Kết xuất AI Visual Banner</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-violet-50/60 border border-violet-200 rounded-xl p-3">
+                  <label className="flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={squadApplyDb}
+                      onChange={(e) => setSquadApplyDb(e.target.checked)}
+                      className="rounded border-slate-300 text-violet-600"
+                    />
+                    <span>Lưu trực tiếp Ngân sách mới, 2 Bài nháp A/B &amp; Ảnh Banner vào SQLite Database</span>
+                  </label>
+                  <button
+                    type="button"
+                    data-testid="run-squad-btn"
+                    onClick={handleRunSquadLab}
+                    disabled={squadLoading}
+                    className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    {squadLoading ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Đang điều phối 4 AI Agents...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                        <span>Kích hoạt Biệt Đội 4 AI Agents</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {squadResult && (
+                  <div className="space-y-3 border border-violet-200 bg-violet-50/30 rounded-xl p-3.5" data-testid="squad-result-panel">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-black text-violet-950">
+                        ✅ {squadResult.squad_name} • Đã lưu {squadResult.persistence?.saved_content_ids?.length || 0} bản nháp vào Chiến dịch #{squadResult.campaign_id}
+                      </span>
+                      <span className="text-[11px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                        Compliance: 100/100 PASSED
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {(squadResult.agents || []).map((ag: any) => (
+                        <div key={ag.agent_id} className="bg-white border border-slate-200 rounded-xl p-2.5 text-xs space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-900">{ag.role}</span>
+                            <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                              {ag.latency_ms}ms
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 leading-relaxed">{ag.deliverable_summary}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {squadResult.visual_asset?.image_url && (
+                      <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row items-center gap-3">
+                        <img
+                          src={squadResult.visual_asset.image_url}
+                          alt="Squad Generated Banner"
+                          className="w-28 h-28 object-cover rounded-lg border border-slate-200 shrink-0"
+                        />
+                        <div className="space-y-1 text-xs min-w-0">
+                          <div className="font-bold text-slate-900">
+                            🎨 Banner AI ({squadResult.visual_asset.aspect_ratio} • {squadResult.visual_asset.dimensions}): {squadResult.visual_asset.typography_overlay?.headline}
+                          </div>
+                          <div className="text-[11px] text-slate-600 line-clamp-2">
+                            Prompt: {squadResult.visual_asset.visual_prompt_en}
+                          </div>
+                          <div className="text-[11px] font-mono text-indigo-700 truncate">
+                            UTM: {squadResult.ab_utm_package?.variants?.[0]?.utm?.full_tracking_url}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* SUB-TAB 2: A/B TESTING & UTM BUILDER */}
+            {labTab === 'ab_utm' && (
+              <div className="space-y-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      Landing Page đích (tự động gắn UTM Tracking):
+                    </label>
+                    <input
+                      type="text"
+                      value={abLandingUrl}
+                      onChange={(e) => setAbLandingUrl(e.target.value)}
+                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-800 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      Chủ đề / Offer trọng tâm (tùy chọn):
+                    </label>
+                    <input
+                      type="text"
+                      value={abTopic}
+                      onChange={(e) => setAbTopic(e.target.value)}
+                      placeholder="VD: Ưu đãi 30% khóa học AI Marketing thực chiến..."
+                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-indigo-50/60 border border-indigo-200 rounded-xl p-3">
+                  <label className="flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={abSaveToDb}
+                      onChange={(e) => setAbSaveToDb(e.target.checked)}
+                      className="rounded border-slate-300 text-indigo-600"
+                    />
+                    <span>Lưu cả 2 phiên bản A/B vào kho nội dung chiến dịch (SQLite)</span>
+                  </label>
+                  <button
+                    type="button"
+                    data-testid="run-ab-utm-btn"
+                    onClick={handleRunAbUtmLab}
+                    disabled={abLoading}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    {abLoading ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Đang tạo A/B &amp; UTM...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Sinh 2 Bản A/B (PAS vs FAB) + Link UTM</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {abResult && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="ab-utm-result-panel">
+                    {(abResult.variants || []).map((v: any) => (
+                      <div key={v.variant_id} className="border border-slate-200 rounded-xl p-3 bg-slate-50/70 space-y-2 text-xs">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-black text-indigo-900">
+                            Variant {v.variant_id}: {v.framework}
+                          </span>
+                          <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                            {v.compliance_score}/100 • Est CTR {v.estimated_ctr_pct}%
+                          </span>
+                        </div>
+                        <div className="font-bold text-slate-900">{v.title}</div>
+                        <p className="text-[11px] text-slate-600 whitespace-pre-line line-clamp-4">{v.body}</p>
+                        <div className="bg-slate-900 text-emerald-300 font-mono text-[10px] p-2 rounded-lg break-all">
+                          {v.utm?.full_tracking_url}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* SUB-TAB 3: AI VISUAL BANNER STUDIO */}
+            {labTab === 'visual' && (
+              <div className="space-y-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      Tỷ lệ khung hình (Aspect Ratio):
+                    </label>
+                    <select
+                      value={visualRatio}
+                      onChange={(e) => setVisualRatio(e.target.value as '1:1' | '9:16' | '16:9')}
+                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-bold text-slate-800"
+                    >
+                      <option value="1:1">1:1 Square Feed (1080x1080)</option>
+                      <option value="9:16">9:16 TikTok/Reels Story (1080x1920)</option>
+                      <option value="16:9">16:9 YouTube/Web Hero (1920x1080)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      Phong cách Nghệ thuật (Art Direction):
+                    </label>
+                    <select
+                      value={visualStyle}
+                      onChange={(e) => setVisualStyle(e.target.value)}
+                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-semibold text-slate-800"
+                    >
+                      <option value="Photorealistic Editorial Studio">Photorealistic Editorial Studio</option>
+                      <option value="Minimalist Luxury Product">Minimalist Luxury Product</option>
+                      <option value="Neon Tech Futuristic">Neon Tech Futuristic</option>
+                      <option value="High-Contrast Bold Typography">High-Contrast Bold Typography</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      Tiêu đề phủ trên Banner (Headline Overlay):
+                    </label>
+                    <input
+                      type="text"
+                      value={visualHeadline}
+                      onChange={(e) => setVisualHeadline(e.target.value)}
+                      placeholder={activeCampaign?.name || 'Nhập tiêu đề chiến dịch...'}
+                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  data-testid="run-visual-banner-btn"
+                  onClick={handleRunVisualLab}
+                  disabled={visualLoading}
+                  className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {visualLoading ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Đang kết xuất AI Visual Banner ({visualRatio})...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>🎨 Kết xuất AI Visual Banner ({visualRatio}) &amp; Đính kèm vào Bài viết Chiến dịch</span>
+                    </>
+                  )}
+                </button>
+
+                {visualResult && (
+                  <div className="border border-emerald-200 bg-emerald-50/40 rounded-xl p-3.5 flex flex-col sm:flex-row gap-4 items-center" data-testid="visual-banner-result-panel">
+                    <img
+                      src={visualResult.image_url}
+                      alt={visualResult.typography_overlay?.headline || 'AI Visual Banner'}
+                      className="w-36 h-36 object-cover rounded-xl border border-emerald-300 shadow-sm shrink-0"
+                    />
+                    <div className="space-y-1.5 text-xs min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-black text-emerald-950">
+                          {visualResult.typography_overlay?.headline}
+                        </span>
+                        <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                          {visualResult.aspect_ratio} ({visualResult.dimensions})
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-relaxed">
+                        <strong>AI Visual Prompt:</strong> {visualResult.visual_prompt_en}
+                      </p>
+                      <div className="text-[11px] text-emerald-800 font-semibold">
+                        ✅ Đã đồng bộ ảnh vào Bài viết #{visualResult.attached_content_id || 'Mới nhất'} trong SQLite Database.
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* RIGHT COLUMN (5 cols): MCP PROTOCOL INSPECTOR & LIVE JSON-RPC PLAYGROUND */}

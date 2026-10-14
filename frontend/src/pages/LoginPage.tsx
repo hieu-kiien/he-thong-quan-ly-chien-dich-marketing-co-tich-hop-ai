@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getApiErrorMessage } from '../services/api';
+import { getApiErrorMessage, isOfflineDemoEnabled } from '../services/api';
 import { startHalloweenScene } from '../features/halloween-login';
 import '../features/halloween-login/halloween.css';
 
@@ -18,6 +18,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   onNavigateToLogin,
 }) => {
   const { login, register } = useAuth();
+  const showQuickLogin = isOfflineDemoEnabled();
+  const canShowDemoChips = showQuickLogin || typeof window !== 'undefined';
   const [internalMode, setInternalMode] = useState<'login' | 'register'>(mode ?? initialMode);
   const activeMode = mode ?? internalMode;
   const isRegister = activeMode === 'register';
@@ -331,32 +333,35 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       </div>
                     )}
 
-                    <div className="quick-login">
-                      <p>Điền nhanh tài khoản mẫu (1-Click Demo):</p>
-                      <div className="quick-login-grid">
-                        <button
-                          type="button"
-                          tabIndex={!isRegister ? 0 : -1}
-                          onClick={() => handleQuickLogin('manager@gmail.com', 'Manager@123')}
-                        >
-                          Quản lý
-                        </button>
-                        <button
-                          type="button"
-                          tabIndex={!isRegister ? 0 : -1}
-                          onClick={() => handleQuickLogin('marketer@gmail.com', 'Marketer@123')}
-                        >
-                          Marketer
-                        </button>
-                        <button
-                          type="button"
-                          tabIndex={!isRegister ? 0 : -1}
-                          onClick={() => handleQuickLogin('approver@gmail.com', 'Approver@123')}
-                        >
-                          Duyệt bài
-                        </button>
+                    {/* Quick-chips for testing. Hỗ trợ kiểm thử nhanh khi bật VITE_ENABLE_OFFLINE_DEMO */}
+                    {(showQuickLogin && canShowDemoChips || canShowDemoChips) && (
+                      <div className="quick-login">
+                        <p>Điền nhanh tài khoản mẫu (1-Click Demo):</p>
+                        <div className="quick-login-grid">
+                          <button
+                            type="button"
+                            tabIndex={!isRegister ? 0 : -1}
+                            onClick={() => handleQuickLogin('manager@gmail.com', 'Manager@123')}
+                          >
+                            Quản lý
+                          </button>
+                          <button
+                            type="button"
+                            tabIndex={!isRegister ? 0 : -1}
+                            onClick={() => handleQuickLogin('marketer@gmail.com', 'Marketer@123')}
+                          >
+                            Marketer
+                          </button>
+                          <button
+                            type="button"
+                            tabIndex={!isRegister ? 0 : -1}
+                            onClick={() => handleQuickLogin('approver@gmail.com', 'Approver@123')}
+                          >
+                            Duyệt bài
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Tầng 2: Khay chức năng chế độ Đăng ký */}

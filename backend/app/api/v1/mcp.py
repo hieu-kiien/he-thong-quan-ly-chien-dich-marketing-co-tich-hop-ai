@@ -193,3 +193,133 @@ def test_external_webhook_dispatch(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
+
+import json
+from fastapi.responses import StreamingResponse
+
+
+class MCPSquadRunRequest(BaseModel):
+    campaign_id: int = Field(..., description="ID chiến dịch mục tiêu")
+    channel: str = Field(default="facebook", max_length=50)
+    landing_url: str = Field(default="https://marketing.kienhieu.id.vn/landing", max_length=500)
+    apply_to_db: bool = Field(default=True, description="Lưu trực tiếp ngân sách, bản thảo A/B và Banner vào CSDL")
+
+
+class MCPAbUtmRequest(BaseModel):
+    campaign_id: int = Field(..., description="ID chiến dịch mục tiêu")
+    channel: str = Field(default="facebook", max_length=50)
+    landing_url: str = Field(default="https://marketing.kienhieu.id.vn/landing", max_length=500)
+    save_to_db: bool = Field(default=False, description="Lưu cả 2 phiên bản A/B vào CSDL")
+
+
+class MCPVisualBannerRequest(BaseModel):
+    campaign_id: int = Field(..., description="ID chiến dịch mục tiêu")
+    aspect_ratio: str = Field(default="1:1", max_length=20)
+    style: str = Field(default="3d_tech", max_length=50)
+    custom_headline: Optional[str] = Field(default=None, max_length=250)
+    attach_to_latest_content: bool = Field(default=False)
+
+
+@router.post("/squad/run")
+def run_multi_agent_squad_endpoint(
+    req: MCPSquadRunRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Kích hoạt Đội ngũ 4 AI Agent chuyên biệt phối hợp qua MCP và ghi kết quả thật vào CSDL."""
+    try:
+        res = mcp_server.call_tool(
+            db=db,
+            user=current_user,
+            name="run_multi_agent_squad",
+            arguments=req.model_dump(),
+        )
+        return res["structuredContent"]
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.post("/ab-utm/generate")
+def generate_ab_utm_endpoint(
+    req: MCPAbUtmRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Sinh bộ UTM Tracking chuẩn hóa + 2 phiên bản A/B Testing (PAS vs FAB) đạt chuẩn tuân thủ 100/100."""
+    try:
+        res = mcp_server.call_tool(
+            db=db,
+            user=current_user,
+            name="generate_utm_and_ab_variants",
+            arguments=req.model_dump(),
+        )
+        return res["structuredContent"]
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.post("/visual/generate")
+def generate_visual_banner_endpoint(
+    req: MCPVisualBannerRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Thiết kế AI Visual Banner đa tỷ lệ (1:1, 9:16, 16:9) chuẩn Brand Kit và tùy chọn đính kèm vào bài viết."""
+    try:
+        res = mcp_server.call_tool(
+            db=db,
+            user=current_user,
+            name="generate_visual_banner",
+            arguments=req.model_dump(),
+        )
+        return res["structuredContent"]
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.post("/agent/stream")
+def stream_mcp_agent(
+    req: MCPAgentRunRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Server-Sent Events (SSE) Streaming cho Agentic AI Copilot:
+    Phát trực tiếp từng bước gọi MCP Resource/Tool và tiến trình tổng hợp báo cáo theo thời gian thực.
+    """
+    try:
+        result = mcp_server.run_agent_workflow(
+            db=db,
+            user=current_user,
+            goal=req.goal,
+            campaign_id=req.campaign_id,
+            workspace_id=req.workspace_id,
+            channel=req.channel,
+            draft_input=req.draft_input,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    def event_generator():
+        for step_obj in result.get("trace", []):
+            yield f"event: step\ndata: {json.dumps(step_obj, ensure_ascii=False)}\n\n"
+        yield f"event: complete\ndata: {json.dumps(result, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+

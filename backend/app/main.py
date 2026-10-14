@@ -5,6 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -103,6 +104,7 @@ class TimingMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(TimingMiddleware)
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # CORS Middleware hỗ trợ kết nối từ Frontend React
 #

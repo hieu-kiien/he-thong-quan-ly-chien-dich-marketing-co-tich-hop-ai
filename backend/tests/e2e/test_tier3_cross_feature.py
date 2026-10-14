@@ -41,13 +41,13 @@ class TestTier3CrossFeatureCombinations:
         assert ai_resp.status_code == 200
         first_idea = ai_resp.json()["ideas"][0]["headline"]
 
-        # 4. Check compliance against workspace brand kit
+        # 4. Check compliance against workspace brand kit (using workspace owner headers)
         comp_resp = client.post("/api/v1/contents/compliance-check", json={
             "workspace_id": ws_id,
             "channel": "facebook",
             "title": first_idea,
             "body": "Nội dung chuẩn tuân thủ không chứa từ cấm."
-        }, headers=marketer_headers)
+        }, headers=manager_headers)
         assert_endpoint_or_skip_milestone(comp_resp, "/api/v1/contents/compliance-check", "M3")
         assert comp_resp.status_code == 200
         assert comp_resp.json()["status"] in ("PASSED", "PASS")

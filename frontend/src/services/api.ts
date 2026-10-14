@@ -2367,7 +2367,33 @@ export const commandCenterApi = {
         }
       };
     }
-  }
+  },
+
+  getMorningBriefing: async (): Promise<any> => {
+    const res = await apiClient.get('/analytics/morning-briefing');
+    return res.data;
+  },
+
+  getSampleAdsCsv: async (campaignId: number): Promise<{ campaign_id: number; campaign_name: string; filename: string; csv_content: string }> => {
+    const res = await apiClient.get(`/campaigns/${campaignId}/metrics/sample-csv`);
+    return res.data;
+  },
+
+  importAdsCsv: async (campaignId: number, csvContent: string, replaceSeedData = true): Promise<any> => {
+    const res = await apiClient.post(`/campaigns/${campaignId}/metrics/import-csv`, {
+      csv_content: csvContent,
+      replace_seed_data: replaceSeedData,
+    });
+    return res.data;
+  },
+
+  verifyRealData: async (mode: 'mark_verified' | 'purge_seed' = 'mark_verified', campaignId?: number): Promise<any> => {
+    const res = await apiClient.post('/metrics/verify-real-data', {
+      mode,
+      ...(campaignId ? { campaign_id: campaignId } : {}),
+    });
+    return res.data;
+  },
 };
 
 
@@ -2502,6 +2528,21 @@ export const mcpApi = {
             description: 'Bắn sự kiện Outbound Webhook chuẩn ký số HMAC-SHA256 ra hệ thống bên ngoài (n8n, Zapier, Telegram, Slack/Discord, Meta, WordPress).',
             inputSchema: { type: 'object', properties: { connector_type: { type: 'string' }, event_type: { type: 'string' } } },
           },
+          {
+            name: 'generate_utm_and_ab_variants',
+            description: 'Sinh bộ link theo dõi UTM chuẩn hóa kèm 2 phiên bản A/B Testing (PAS vs FAB).',
+            inputSchema: { type: 'object', properties: { campaign_id: { type: 'integer' }, channel: { type: 'string' } } },
+          },
+          {
+            name: 'generate_visual_banner',
+            description: 'Thiết kế AI Visual Banner đa tỷ lệ (1:1, 9:16, 16:9) chuẩn Brand Kit.',
+            inputSchema: { type: 'object', properties: { campaign_id: { type: 'integer' }, aspect_ratio: { type: 'string' } } },
+          },
+          {
+            name: 'run_multi_agent_squad',
+            description: 'Kích hoạt Đội ngũ 4 AI Agent chuyên biệt phối hợp tự động lập kế hoạch, chia ngân sách, viết bài A/B + UTM và sinh ảnh Banner.',
+            inputSchema: { type: 'object', properties: { campaign_id: { type: 'integer' } } },
+          },
         ],
         resources: [
           {
@@ -2564,6 +2605,105 @@ export const mcpApi = {
     return res.data;
   },
 
+  streamAgent: async (
+    data: {
+      goal: string;
+      campaign_id?: number;
+      workspace_id?: number;
+      channel?: string;
+      draft_input?: { title: string; body: string; cta: string };
+    },
+    onStep?: (step: MCPTraceStep) => void,
+  ): Promise<MCPAgentRunResponse> => {
+    const token = localStorage.getItem('access_token');
+    const wsId = localStorage.getItem('mf_active_workspace_id');
+    const baseUrl = apiClient.defaults.baseURL || '/api/v1';
+    const response = await fetch(`${baseUrl}/mcp/agent/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(wsId ? { 'X-Workspace-Id': wsId } : {}),
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok || !response.body) {
+      return mcpApi.runAgent(data);
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalRes: MCPAgentRunResponse | null = null;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const blocks = buffer.split('\n\n');
+      buffer = blocks.pop() || '';
+      for (const block of blocks) {
+        const lines = block.trim().split('\n');
+        let evType = '';
+        let evData = '';
+        for (const l of lines) {
+          if (l.startsWith('event:')) evType = l.slice(6).trim();
+          if (l.startsWith('data:')) evData += l.slice(5).trim();
+        }
+        if (!evData) continue;
+        try {
+          const parsed = JSON.parse(evData);
+          if (evType === 'step' && onStep) {
+            onStep(parsed as MCPTraceStep);
+          } else if (evType === 'complete') {
+            finalRes = parsed as MCPAgentRunResponse;
+          }
+        } catch {
+          // ignore malformed chunk
+        }
+      }
+    }
+    if (finalRes) return finalRes;
+    return mcpApi.runAgent(data);
+  },
+
+  runSquad: async (data: {
+    campaign_id?: number;
+    workspace_id?: number;
+    channel?: string;
+    landing_url?: string;
+    aspect_ratio?: string;
+    apply_to_db?: boolean;
+  }): Promise<any> => {
+    const res = await apiClient.post('/mcp/squad/run', data);
+    return res.data;
+  },
+
+  generateAbUtm: async (data: {
+    campaign_id?: number;
+    workspace_id?: number;
+    channel?: string;
+    landing_url?: string;
+    topic?: string;
+    save_to_db?: boolean;
+  }): Promise<any> => {
+    const res = await apiClient.post('/mcp/ab-utm/generate', data);
+    return res.data;
+  },
+
+  generateVisualBanner: async (data: {
+    campaign_id?: number;
+    workspace_id?: number;
+    channel?: string;
+    aspect_ratio?: string;
+    style?: string;
+    visual_style?: string;
+    headline?: string;
+    custom_headline?: string;
+    attach_to_latest_content?: boolean;
+  }): Promise<any> => {
+    const res = await apiClient.post('/mcp/visual/generate', data);
+    return res.data;
+  },
+
   autoFixCompliance: async (data: {
     workspace_id?: number;
     channel?: string;
@@ -2602,4 +2742,5 @@ export const mcpApi = {
     return res.data;
   },
 };
+
 
