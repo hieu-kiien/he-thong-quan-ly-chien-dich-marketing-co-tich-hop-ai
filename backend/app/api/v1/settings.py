@@ -324,7 +324,7 @@ def store_custom_ai_key(
 
         if existing:
             existing.encrypted_key = encrypted
-            existing.model = req.model or "gemini-2.5-flash"
+            existing.model = req.model or default_model_for(req.provider)
             existing.is_active = True if req.is_active is None else req.is_active
             existing.user_id = current_user.id
             db.commit()
@@ -348,7 +348,7 @@ def store_custom_ai_key(
                 workspace_id=target_ws_id,
                 provider=req.provider,
                 encrypted_key=encrypted,
-                model=req.model or "gemini-2.5-flash",
+                model=req.model or default_model_for(req.provider),
                 is_active=True if req.is_active is None else req.is_active
             )
             db.add(new_key)
@@ -377,7 +377,7 @@ def store_custom_ai_key(
 
         if existing:
             existing.encrypted_key = encrypted
-            existing.model = req.model or "gemini-2.5-flash"
+            existing.model = req.model or default_model_for(req.provider)
             existing.is_active = True if req.is_active is None else req.is_active
             db.commit()
             db.refresh(existing)
@@ -400,7 +400,7 @@ def store_custom_ai_key(
                 workspace_id=None,
                 provider=req.provider,
                 encrypted_key=encrypted,
-                model=req.model or "gemini-2.5-flash",
+                model=req.model or default_model_for(req.provider),
                 is_active=True if req.is_active is None else req.is_active
             )
             db.add(new_key)
@@ -488,7 +488,7 @@ def get_custom_ai_keys(
     return AIKeyResponse(
         id=None,
         provider="gemini",
-        model="gemini-2.5-flash",
+        model="gemini-3.8-flash",
         masked_key="",
         is_active=False,
         workspace_id=workspace_id,

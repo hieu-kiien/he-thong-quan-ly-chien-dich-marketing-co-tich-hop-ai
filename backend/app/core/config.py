@@ -95,7 +95,7 @@ class Settings(BaseSettings):
     AI_PROVIDER: str = "gemini"
     AI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai"
     AI_API_KEY: str = ""
-    AI_MODEL: str = "gemini-2.5-flash"
+    AI_MODEL: str = "gemini-3.8-flash"
     # Mặc định 60s (khớp .env.example). CI/production nên set cao hơn
     # (420s) — mỗi hop chuỗi fallback tự nhận ít nhất 15s nên giá trị này
     # là ngân sách tổng, không phải timeout mỗi lần gọi.

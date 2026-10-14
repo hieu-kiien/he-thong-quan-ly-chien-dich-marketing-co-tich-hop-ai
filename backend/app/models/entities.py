@@ -399,7 +399,7 @@ class CustomApiKey(Base):
     workspace_id = Column(Integer, ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=True, index=True)
     provider = Column(String(50), nullable=False, default="gemini")
     encrypted_key = Column(Text, nullable=False)
-    model = Column(String(100), nullable=False, default="gemini-2.5-flash")
+    model = Column(String(100), nullable=False, default="gemini-3.8-flash")
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, default=utc_now, nullable=False)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)

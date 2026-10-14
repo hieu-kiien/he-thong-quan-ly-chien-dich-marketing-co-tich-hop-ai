@@ -20,13 +20,13 @@ def test_schema_valid_providers():
     """Verify AIKeyTestRequest and AIKeyCreate accept every registered provider with a valid model."""
     sample_models = {
         "gemini": "gemini-3.8-flash",
-        "openrouter": "anthropic/claude-sonnet-4-6",
+        "openrouter": "openrouter/free",
         "openai": "gpt-6.1-sol",
-        "anthropic": "claude-sonnet-4-6",
-        "groq": "llama-3.3-70b-versatile",
-        "xai": "grok-4",
+        "anthropic": "claude-sonnet-5-5",
+        "groq": "meta-llama/llama-4-maverick-17b-128e-instruct",
+        "xai": "grok-4.7",
         "huggingface": "Qwen/Qwen3-235B-A22B",
-        "ollama": "qwen3:8b",
+        "ollama": "qwen3.6:27b",
         "opencode": "space-bunny-free",
     }
     for prov, model in sample_models.items():

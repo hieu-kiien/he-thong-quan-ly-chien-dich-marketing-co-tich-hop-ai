@@ -1837,7 +1837,7 @@ const res = await apiClient.post('/settings/test-ai-connection', data);
         : list[0];
       return found || {
         provider: 'gemini',
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.8-flash',
         masked_key: '',
         is_active: false,
         scope: 'personal',
@@ -1881,7 +1881,7 @@ const res = await apiClient.post('/settings/test-ai-connection', data);
       const newKey: CustomApiKey = {
         id: Date.now(),
         provider: data.provider || 'gemini',
-        model: data.model || 'gemini-2.5-flash',
+        model: data.model || 'gemini-3.8-flash',
         masked_key: masked,
         is_active: data.is_active !== undefined ? data.is_active : true,
         workspace_id: data.workspace_id || null,
