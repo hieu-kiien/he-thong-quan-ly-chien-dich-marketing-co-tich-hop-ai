@@ -42,6 +42,7 @@ function AppContent() {
   const [contents, setContents] = useState<MarketingContent[]>([]);
   const [myTasksCount, setMyTasksCount] = useState<number>(0);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  const [drawerCampaignRequest, setDrawerCampaignRequest] = useState<Campaign | null>(null);
   // Truy vấn tìm kiếm từ ô trên Navbar, truyền xuống Campaigns.
   const [campaignSearch, setCampaignSearch] = useState<string>('');
 
@@ -233,7 +234,8 @@ function AppContent() {
               <Dashboard
                 onSelectCampaign={(c) => {
                   setSelectedCampaign(c);
-                  setCurrentTab('workflow');
+                  setDrawerCampaignRequest(c);
+                  setCurrentTab('campaigns');
                 }}
                 onOpenWorkflow={handleOpenWorkflow}
                 onOpenAI={handleOpenAI}
@@ -246,7 +248,6 @@ function AppContent() {
               <Campaigns
                 onSelectCampaign={(c) => {
                   setSelectedCampaign(c);
-                  setCurrentTab('workflow');
                 }}
                 onOpenWorkflow={handleOpenWorkflow}
                 onOpenAI={handleOpenAI}
@@ -255,6 +256,8 @@ function AppContent() {
                 userRole={userRole || undefined}
                 initialSearchTerm={campaignSearch}
                 searchTermSync={campaignSearch}
+                initialDrawerCampaign={drawerCampaignRequest}
+                onClearInitialDrawerCampaign={() => setDrawerCampaignRequest(null)}
               />
             )}
 

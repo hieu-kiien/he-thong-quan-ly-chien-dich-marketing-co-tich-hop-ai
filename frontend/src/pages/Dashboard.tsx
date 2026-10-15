@@ -18,7 +18,7 @@ import {
   Megaphone
 } from 'lucide-react';
 import { CampaignTable } from '../components/CampaignTable';
-import { KPIGrid9, AttributionTrendChart, AIDoctorWidget } from '../components/analytics';
+import { KPIGrid9, AttributionTrendChart } from '../components/analytics';
 import { Campaign, MarketingContent, CommandCenterResponse, TaskStatus, PortfolioAnomalyItem, WinningPatternItem } from '../types';
 import { campaignApi, contentApi, analyticsApi, commandCenterApi, taskApi, mcpApi, getApiErrorMessage } from '../services/api';
 import { useToast } from '../components/Toast';
@@ -448,6 +448,95 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
+      {/* QUY TRÌNH 4 BƯỚC QUẢN LÝ CHIẾN DỊCH TỪ A-Z */}
+      <div className="bg-white rounded-xl border border-[#E4E2DD] p-4">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[11px] font-black uppercase tracking-wider text-[#5A5E66]">
+            Quy trình quản lý chiến dịch thực tế (4 bước nối tiếp nhau)
+          </span>
+          <span className="text-[11px] text-[#5A5E66] hidden sm:inline">
+            Bấm vào bước bất kỳ để mở đúng màn hình thao tác
+          </span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <button
+            type="button"
+            onClick={() => onNavigateTab?.('campaigns')}
+            className="text-left p-3 rounded-xl bg-[#F6F5F0]/70 hover:bg-[#F6F5F0] border border-[#E4E2DD] hover:border-[#D95D39] transition-all cursor-pointer group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#121316] text-white">
+                Bước 1
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-[#5A5E66] group-hover:text-[#D95D39]" />
+            </div>
+            <p className="text-xs font-extrabold text-[#121316] mt-2">
+              Lập chiến dịch &amp; Ngân sách
+            </p>
+            <p className="text-[11px] text-[#5A5E66] mt-0.5 leading-snug">
+              Chọn sản phẩm cần bán, đặt ngân sách tổng và thời gian chạy ({campaigns.length} chiến dịch).
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigateTab?.('ai_studio')}
+            className="text-left p-3 rounded-xl bg-[#F6F5F0]/70 hover:bg-[#F6F5F0] border border-[#E4E2DD] hover:border-[#D95D39] transition-all cursor-pointer group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#D95D39] text-white">
+                Bước 2
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-[#5A5E66] group-hover:text-[#D95D39]" />
+            </div>
+            <p className="text-xs font-extrabold text-[#121316] mt-2">
+              Soạn bài &amp; Mẫu quảng cáo
+            </p>
+            <p className="text-[11px] text-[#5A5E66] mt-0.5 leading-snug">
+              Tự viết hoặc nhờ AI viết bài đăng Facebook, kịch bản TikTok và thư chào hàng.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigateTab?.('reviews')}
+            className="text-left p-3 rounded-xl bg-[#F6F5F0]/70 hover:bg-[#F6F5F0] border border-[#E4E2DD] hover:border-[#D95D39] transition-all cursor-pointer group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#15803D] text-white">
+                Bước 3
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-[#5A5E66] group-hover:text-[#D95D39]" />
+            </div>
+            <p className="text-xs font-extrabold text-[#121316] mt-2">
+              Quét từ cấm &amp; Duyệt đăng
+            </p>
+            <p className="text-[11px] text-[#5A5E66] mt-0.5 leading-snug">
+              Kiểm tra từ nhạy cảm dễ bị khóa tài khoản và duyệt bài trước khi chạy ({pendingContents.length} chờ duyệt).
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsSmartCsvModalOpen(true)}
+            className="text-left p-3 rounded-xl bg-[#F6F5F0]/70 hover:bg-[#F6F5F0] border border-[#E4E2DD] hover:border-[#D95D39] transition-all cursor-pointer group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#B45309] text-white">
+                Bước 4
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-[#5A5E66] group-hover:text-[#D95D39]" />
+            </div>
+            <p className="text-xs font-extrabold text-[#121316] mt-2">
+              Nhập số liệu &amp; Tối ưu Lời/Lỗ
+            </p>
+            <p className="text-[11px] text-[#5A5E66] mt-0.5 leading-snug">
+              Ghi nhận chi phí, đơn hàng, doanh thu mỗi ngày để tắt chiến dịch lỗ, tăng tiền chiến dịch lãi.
+            </p>
+          </button>
+        </div>
+      </div>
+
       {/* THÔNG BÁO NGUỒN SỐ LIỆU (CHỈ HIỆN 1 THANH GỌN KHI ĐANG XEM SỐ LIỆU MẪU) */}
       {(dataProvenance?.has_demo_data || dataProvenance?.has_unverified_data) && (
         <div
@@ -815,24 +904,45 @@ export const Dashboard: React.FC<DashboardProps> = ({
             )}
           </div>
 
-          {/* Chẩn đoán chi tiết 1 chiến dịch */}
+          {/* Cập nhật nhanh kết quả chạy quảng cáo */}
           {commandCenterError ? (
             <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3.5">
               <p className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5" />
-                Không tải được sức khỏe chiến dịch
+                Không tải được thông tin việc cần làm
               </p>
               <p className="text-[11px] text-amber-800 mt-0.5">{commandCenterError}</p>
             </div>
           ) : (
-            <AIDoctorWidget
-              campaignId={
-                campaigns.find((c) => c.status === 'ACTIVE')?.id ??
-                campaigns[0]?.id
-              }
-              compact={true}
-              onOpenAIStudio={handleOpenAICopilot}
-            />
+            <div className="bg-white rounded-xl border border-[#E4E2DD] p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <Upload className="w-4 h-4 text-[#D95D39]" />
+                <h3 className="text-xs font-black uppercase tracking-wider text-[#121316]">
+                  Cập nhật số liệu chạy quảng cáo
+                </h3>
+              </div>
+              <p className="text-xs text-[#5A5E66] leading-relaxed">
+                Bạn có thể tải file báo cáo xuất từ Facebook/TikTok/Google lên hệ thống, hoặc bấm vào từng chiến dịch để nhập trực tiếp số tiền đã chi và doanh thu hôm nay.
+              </p>
+              <div className="flex flex-col gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsSmartCsvModalOpen(true)}
+                  className="w-full py-2 px-3 rounded-lg bg-[#121316] hover:bg-[#26282D] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Tải file báo cáo CSV lên</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigateTab?.('campaigns')}
+                  className="w-full py-2 px-3 rounded-lg bg-[#F6F5F0] hover:bg-[#EAE8E1] text-[#121316] border border-[#D0CEC7] text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Megaphone className="w-3.5 h-3.5" />
+                  <span>Nhập tay trong từng chiến dịch</span>
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>

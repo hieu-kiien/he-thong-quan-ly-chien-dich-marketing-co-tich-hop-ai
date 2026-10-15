@@ -62,58 +62,54 @@ const EMPTY_AGGREGATE: CampaignAggregate = {
 };
 
 interface CampaignsProps {
-  // `onSelectCampaign`, `onOpenWorkflow`, `onNavigateTab` được App truyền xuống để
-  // giữ API component ổn định, nhưng bản Campaigns hiện tại tự quản lý điều
-  // hướng qua drawer + wizard nên không dùng tới. Giữ trong interface (optional)
-  // để không phá call site hiện có.
   onSelectCampaign?: (campaign: Campaign) => void;
   onOpenWorkflow?: (campaign: Campaign) => void;
   onOpenAI: (campaign: Campaign) => void;
   onNavigateTab?: (tab: string) => void;
   onRefreshData?: () => void;
   userRole?: string;
-  /** Truyền từ ô tìm kiếm trên Navbar; trước đây Navbar ném mất giá trị này. */
   initialSearchTerm?: string;
-  /** Đồng bộ truy vấn tìm kiếm khi Navbar gửi xuống lần nữa mà không remount. */
   searchTermSync?: string;
+  initialDrawerCampaign?: Campaign | null;
+  onClearInitialDrawerCampaign?: () => void;
 }
 
-// Preset objectives matching Meta & Google Ads taxonomy
+// Preset objectives matching Meta & Google Ads taxonomy in plain Vietnamese
 const CAMPAIGN_OBJECTIVES = [
   {
     id: 'SALES',
     title: 'Doanh số & Chuyển đổi',
-    subtitle: 'Tối ưu hóa đơn hàng, doanh thu và ROAS (BoFU)',
+    subtitle: 'Tập trung chốt đơn hàng, tăng doanh thu và lợi nhuận',
     icon: TrendingUp,
     badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    defaultAudience: 'Khách hàng có ý định mua sắm cao, khách hàng cũ (Retargeting)',
+    defaultAudience: 'Khách hàng có nhu cầu mua sắm cao, khách hàng cũ mua lại',
     funnelStage: 'BoFU'
   },
   {
     id: 'LEADS',
     title: 'Khách hàng tiềm năng',
-    subtitle: 'Thu thập form đăng ký, tin nhắn và thông tin tư vấn (MoFU)',
+    subtitle: 'Thu thập số điện thoại, tin nhắn và đăng ký nhận tư vấn',
     icon: Users,
     badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
-    defaultAudience: 'Người quan tâm đến giải pháp, chủ doanh nghiệp, chuyên viên',
+    defaultAudience: 'Người quan tâm đến dịch vụ, chủ cửa hàng, khách cần tư vấn',
     funnelStage: 'MoFU'
   },
   {
     id: 'TRAFFIC',
     title: 'Lưu lượng & Tương tác',
-    subtitle: 'Tăng lượt truy cập website, bài viết và tương tác đa kênh (ToFU)',
+    subtitle: 'Kéo khách vào xem website, bài đăng và nhắn tin fanpage',
     icon: Zap,
     badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
-    defaultAudience: 'Người dùng quan tâm đến xu hướng công nghệ & giải pháp kinh doanh',
+    defaultAudience: 'Người dùng quan tâm đến sản phẩm mới và chương trình ưu đãi',
     funnelStage: 'ToFU'
   },
   {
     id: 'AWARENESS',
     title: 'Nhận diện thương hiệu',
-    subtitle: 'Tiếp cận tối đa khách hàng mục tiêu trong phân khúc (ToFU)',
+    subtitle: 'Phủ sóng hình ảnh sản phẩm tới nhiều khách hàng mới nhất',
     icon: Megaphone,
     badgeColor: 'bg-amber-50 text-amber-700 border-amber-200',
-    defaultAudience: 'Phân khúc thị trường rộng, khách hàng tiềm năng thế hệ mới',
+    defaultAudience: 'Khách hàng mới trong khu vực hoặc độ tuổi mục tiêu',
     funnelStage: 'ToFU'
   }
 ];
@@ -123,26 +119,20 @@ export const Campaigns: React.FC<CampaignsProps> = ({
   onRefreshData,
   userRole,
   initialSearchTerm,
-  searchTermSync
+  searchTermSync,
+  initialDrawerCampaign,
+  onClearInitialDrawerCampaign
 }) => {
   const toast = useToast();
   const isManager = userRole === 'MANAGER' || userRole === 'AGENCY_MANAGER' || userRole === 'ADMIN';
-  // Backend giới hạn DELETE /campaigns/{id} cho MANAGER/AGENCY_MANAGER (xem
-  // campaigns.py). Trước đây isManager còn nhận ADMIN nên ADMIN thấy nút Xóa rồi
-  // nhận 403. Tách riêng hai khả năng để UI khớp đúng với server.
   const canDeleteCampaign = userRole === 'MANAGER' || userRole === 'AGENCY_MANAGER';
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [brandKit, setBrandKit] = useState<BrandKit | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  // Lỗi hạn mứng gói miễn phí (429). Giữ thành state thay vì chỉ báo toast để người
-  // dùng đọc kịp trần, số đã dùng và thời điểm hết hạn trước khi thử lại.
   const [quotaError, setQuotaError] = useState<QuotaErrorDetail | null>(null);
 
-  // Chỉ số thực đo theo chiến dịch. Trước đây bảng chiến dịch hiển thị các
-  // literal cố định (3.82x ROAS / 2.450 clicks / 4.1% CVR / 68.4% pacing) cho
-  // mọi dòng; đây là nguồn số liệu thật thay cho chúng.
   const [campaignMetrics, setCampaignMetrics] = useState<Record<number, CampaignAggregate>>({});
   const [loadingMetrics, setLoadingMetrics] = useState<boolean>(false);
   const [metricsError, setMetricsError] = useState<string | null>(null);
@@ -153,15 +143,11 @@ export const Campaigns: React.FC<CampaignsProps> = ({
   const [objectiveFilter, setObjectiveFilter] = useState<string>('ALL');
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
 
-  // Phân trang: server lọc + cắt trang, nên `campaignPage.total` là tổng của tập
-  // đã lọc và khớp đúng với những gì bảng đang hiện.
   const [campaignPage, setCampaignPage] = useState<Page<Campaign>>({
     items: [], total: 0, page: 1, page_size: 20, total_pages: 0, has_next: false, has_prev: false,
   });
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(20);
-  // Khoá sắp xếp gửi lên server (allowlist ở backend). `newest` là mặc định
-  // và cũng là thứ tự cũ, nên hành vi mặc định không đổi.
   const [sortOrder, setSortOrder] = useState<CampaignSort>('newest');
 
   // Slide-over Detail Drawer
@@ -179,8 +165,18 @@ export const Campaigns: React.FC<CampaignsProps> = ({
   const [isApplyingBudget, setIsApplyingBudget] = useState<boolean>(false);
   const [isUpdatingStatusId, setIsUpdatingStatusId] = useState<number | null>(null);
 
-  // Trình soạn thảo thủ công (đường tạo nội dung KHÔNG dùng AI). Mở từ tab
-  // "Mẫu Quảng Cáo & Creatives" của drawer chiến dịch.
+  // Form nhập nhanh số liệu Chi phí & Doanh thu ngay trong Drawer chiến dịch
+  const [quickMetricForm, setQuickMetricForm] = useState({
+    channel_code: 'facebook',
+    metric_date: todayLocalISO(),
+    views: 15000,
+    cost: 1500000,
+    clicks: 350,
+    conversions: 15,
+    revenue: 4800000,
+  });
+  const [isRecordingMetric, setIsRecordingMetric] = useState<boolean>(false);
+
   const [isManualComposerOpen, setIsManualComposerOpen] = useState<boolean>(false);
 
   // 4-Step Creation Wizard Modal
@@ -385,17 +381,22 @@ export const Campaigns: React.FC<CampaignsProps> = ({
     if (hasEnrichedSummary) {
       const grouped: Record<number, CampaignAggregate> = {};
       campaignList.forEach((c) => {
-        const ms = c.metrics_summary;
+        const ms = c.metrics_summary as Record<string, any> | null | undefined;
         if (ms) {
+          const views = Number(ms.views ?? ms.total_views) || 0;
+          const clicks = Number(ms.clicks ?? ms.total_clicks) || 0;
+          const conversions = Number(ms.conversions ?? ms.total_conversions) || 0;
+          const cost = Number(ms.cost ?? ms.total_cost) || 0;
+          const revenue = Number(ms.revenue ?? ms.total_revenue) || 0;
           grouped[c.id] = {
-            views: Number(ms.views) || 0,
-            clicks: Number(ms.clicks) || 0,
-            conversions: Number(ms.conversions) || 0,
-            cost: Number(ms.cost) || 0,
-            revenue: Number(ms.revenue) || 0,
+            views,
+            clicks,
+            conversions,
+            cost,
+            revenue,
             rowCount: ms.row_count !== undefined
               ? Number(ms.row_count)
-              : (Number(ms.views) + Number(ms.clicks) + Number(ms.cost) + Number(ms.revenue) > 0 ? 1 : 0),
+              : (views + clicks + cost + revenue > 0 ? 1 : 0),
           };
         } else {
           grouped[c.id] = { ...EMPTY_AGGREGATE };
@@ -518,6 +519,14 @@ export const Campaigns: React.FC<CampaignsProps> = ({
     setPage(1);
   };
 
+  // Mở thẳng ngăn kéo chi tiết khi người dùng bấm từ trang Tổng quan sang
+  useEffect(() => {
+    if (initialDrawerCampaign) {
+      setSelectedDrawerCampaign(initialDrawerCampaign);
+      onClearInitialDrawerCampaign?.();
+    }
+  }, [initialDrawerCampaign, onClearInitialDrawerCampaign]);
+
   // Load details when Drawer opens
   useEffect(() => {
     if (selectedDrawerCampaign) {
@@ -577,6 +586,38 @@ export const Campaigns: React.FC<CampaignsProps> = ({
     })();
     return () => { cancelled = true; };
   }, [selectedDrawerCampaign]);
+
+  const handleRecordQuickMetric = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedDrawerCampaign || isRecordingMetric) return;
+    const cid = selectedDrawerCampaign.id;
+    const chId = channelIdByCode(quickMetricForm.channel_code) ?? 1;
+    setIsRecordingMetric(true);
+    try {
+      await metricsApi.recordCampaignMetric(cid, {
+        channel_id: chId,
+        metric_date: quickMetricForm.metric_date,
+        views: Math.max(0, Number(quickMetricForm.views) || 0),
+        clicks: Math.max(0, Number(quickMetricForm.clicks) || 0),
+        conversions: Math.max(0, Number(quickMetricForm.conversions) || 0),
+        cost: Math.max(0, Number(quickMetricForm.cost) || 0),
+        revenue: Math.max(0, Number(quickMetricForm.revenue) || 0),
+      });
+      toast.success('Đã lưu số liệu chạy quảng cáo của ngày ' + quickMetricForm.metric_date);
+      await Promise.all([
+        loadDrawerDetails(cid),
+        budgetApi.getBudgetAllocations(cid).then(setDrawerBudgetAllocations).catch(() => {}),
+        campaignApi.getKpi(cid).then(setDrawerKpi).catch(() => {}),
+        budgetApi.getBudgetSummary(cid).then(setDrawerBudgetSummary).catch(() => {}),
+        loadData(),
+      ]);
+      onRefreshData?.();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err), 'Không thể lưu số liệu quảng cáo');
+    } finally {
+      setIsRecordingMetric(false);
+    }
+  };
 
   // Tăng ngân sách là thay đổi tiền thật nên phải có bước xác nhận, không "1-Click".
   const handleApplyBudgetIncrease = async () => {
@@ -2297,7 +2338,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                   }`}
                 >
                   <Layers className="w-4 h-4" />
-                  <span>Mẫu Quảng Cáo & Creatives ({drawerContents.length})</span>
+                  <span>Mẫu quảng cáo ({drawerContents.length})</span>
                 </button>
 
                 <button
@@ -2309,7 +2350,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                   }`}
                 >
                   <BarChart3 className="w-4 h-4" />
-                  <span>Phân bổ Kênh & ROI</span>
+                  <span>Số liệu & Nhập kết quả</span>
                 </button>
 
                 <button
@@ -2321,7 +2362,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                   }`}
                 >
                   <Sparkles className="w-4 h-4 text-amber-500" />
-                  <span>Bác sĩ AI Chẩn đoán</span>
+                  <span>Đánh giá & Tối ưu</span>
                 </button>
 
                 <button
@@ -2333,7 +2374,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                   }`}
                 >
                   <Sliders className="w-4 h-4" />
-                  <span>Cấu hình</span>
+                  <span>Cài đặt</span>
                 </button>
               </div>
 
@@ -2346,12 +2387,6 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                       <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                         Danh sách Mẫu Quảng Cáo trong Chiến dịch
                       </span>
-                      {/*
-                          Hai đường tạo nội dung ngang hàng: tự viết và dùng AI.
-                          Trước đây chỉ có nút "Thêm mẫu QC mới" gọi thẳng AI
-                          Studio, nên người không dùng được AI không thêm được
-                          mẫu nào từ màn hình này.
-                        */}
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => setIsManualComposerOpen(true)}
@@ -2385,8 +2420,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         <FileText className="w-8 h-8 text-slate-400 mx-auto mb-2" />
                         <p className="text-xs font-semibold text-slate-700">Chưa có Mẫu Quảng Cáo nào được liên kết</p>
                         <p className="text-[11px] text-slate-500 mt-0.5">
-                          Tự viết nội dung, hoặc nhờ AI Copilot sinh kịch bản TikTok, Facebook Ad và
-                          Email marketing.
+                          Tự viết nội dung, hoặc nhờ AI sinh kịch bản TikTok, bài Facebook Ad và Email.
                         </p>
                         <div className="mt-4 flex items-center justify-center gap-2">
                           <button
@@ -2425,7 +2459,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                               item.status === 'IN_REVIEW' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
                               'bg-slate-100 text-slate-600'
                             }`}>
-                              {item.status}
+                              {item.status === 'APPROVED' ? 'ĐÃ DUYỆT' : item.status === 'IN_REVIEW' ? 'CHỜ DUYỆT' : 'NHÁP'}
                             </span>
                           </div>
 
@@ -2441,10 +2475,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                           )}
 
                           <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-<button
+                            <button
                               type="button"
                               onClick={async () => {
-                                // Không báo "Đã sao chép" khi clipboard thực tế bị từ chối.
                                 const ok = await copyToClipboardWithFormatting(
                                   `${item.title}\n\n${item.body}\n\nCTA: ${item.cta || ''}`
                                 );
@@ -2464,7 +2497,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                                 className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] flex items-center gap-1"
                               >
                                 <CheckCircle2 className="w-3 h-3" />
-                                <span>Phê duyệt (Approve)</span>
+                                <span>Phê duyệt đăng</span>
                               </button>
                             )}
                           </div>
@@ -2474,12 +2507,153 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                   </div>
                 )}
 
-                {/* TAB 2: CHANNELS & ROI */}
+                {/* TAB 2: CHANNELS & ROI + QUICK METRIC ENTRY */}
                 {drawerTab === 'channels' && (
                   <div className="space-y-4">
+                    {/* Quick Metric Entry Form */}
+                    <form
+                      onSubmit={handleRecordQuickMetric}
+                      className="bg-white p-4 rounded-2xl border border-slate-200 space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                            Nhập nhanh kết quả chạy quảng cáo
+                          </h4>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Cập nhật chi phí tiêu tốn, số đơn và doanh thu theo ngày để hệ thống tự tính ROAS & cảnh báo lỗ.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2.5 text-xs">
+                        <div>
+                          <label htmlFor="qm-channel" className="block text-[11px] font-semibold text-slate-600 mb-1">
+                            Kênh chạy
+                          </label>
+                          <select
+                            id="qm-channel"
+                            value={quickMetricForm.channel_code}
+                            onChange={(e) => setQuickMetricForm((prev) => ({ ...prev, channel_code: e.target.value as any }))}
+                            className="w-full px-2.5 py-2 rounded-lg border border-slate-200 bg-slate-50 font-semibold text-slate-800"
+                          >
+                            <option value="facebook">Facebook / Instagram Ads</option>
+                            <option value="tiktok">TikTok Ads / Shop</option>
+                            <option value="email">Email / CRM</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label htmlFor="qm-date" className="block text-[11px] font-semibold text-slate-600 mb-1">
+                            Ngày báo cáo
+                          </label>
+                          <input
+                            id="qm-date"
+                            type="date"
+                            value={quickMetricForm.metric_date}
+                            onChange={(e) => setQuickMetricForm((prev) => ({ ...prev, metric_date: e.target.value }))}
+                            className="w-full px-2.5 py-2 rounded-lg border border-slate-200 bg-slate-50 font-mono text-slate-800"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2.5 text-xs">
+                        <div>
+                          <label htmlFor="qm-cost" className="block text-[11px] font-semibold text-slate-600 mb-1">
+                            Chi phí đã tiêu (VNĐ)
+                          </label>
+                          <input
+                            id="qm-cost"
+                            type="number"
+                            min="0"
+                            step="50000"
+                            value={quickMetricForm.cost}
+                            onChange={(e) => setQuickMetricForm((prev) => ({ ...prev, cost: Number(e.target.value) || 0 }))}
+                            className="w-full px-2.5 py-2 rounded-lg border border-slate-200 bg-slate-50 font-mono font-semibold text-slate-900"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="qm-revenue" className="block text-[11px] font-semibold text-slate-600 mb-1">
+                            Doanh thu thu về (VNĐ)
+                          </label>
+                          <input
+                            id="qm-revenue"
+                            type="number"
+                            min="0"
+                            step="50000"
+                            value={quickMetricForm.revenue}
+                            onChange={(e) => setQuickMetricForm((prev) => ({ ...prev, revenue: Number(e.target.value) || 0 }))}
+                            className="w-full px-2.5 py-2 rounded-lg border border-slate-200 bg-slate-50 font-mono font-semibold text-emerald-700"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div>
+                          <label htmlFor="qm-views" className="block text-[10px] font-semibold text-slate-500 mb-1">
+                            Lượt hiển thị
+                          </label>
+                          <input
+                            id="qm-views"
+                            type="number"
+                            min="0"
+                            value={quickMetricForm.views}
+                            onChange={(e) => setQuickMetricForm((prev) => ({ ...prev, views: Number(e.target.value) || 0 }))}
+                            className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-slate-50 font-mono text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="qm-clicks" className="block text-[10px] font-semibold text-slate-500 mb-1">
+                            Lượt click
+                          </label>
+                          <input
+                            id="qm-clicks"
+                            type="number"
+                            min="0"
+                            value={quickMetricForm.clicks}
+                            onChange={(e) => setQuickMetricForm((prev) => ({ ...prev, clicks: Number(e.target.value) || 0 }))}
+                            className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-slate-50 font-mono text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="qm-cv" className="block text-[10px] font-semibold text-slate-500 mb-1">
+                            Số đơn hàng
+                          </label>
+                          <input
+                            id="qm-cv"
+                            type="number"
+                            min="0"
+                            value={quickMetricForm.conversions}
+                            onChange={(e) => setQuickMetricForm((prev) => ({ ...prev, conversions: Number(e.target.value) || 0 }))}
+                            className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-slate-50 font-mono text-slate-800"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isRecordingMetric}
+                        className="w-full py-2 bg-[#121316] hover:bg-[#2A2C32] text-[#F6F5F0] rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                      >
+                        {isRecordingMetric ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Đang lưu số liệu...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Lưu số liệu vào chiến dịch</span>
+                          </>
+                        )}
+                      </button>
+                    </form>
+
                     <div className="bg-white p-4 rounded-2xl border border-slate-200">
                       <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">
-                        Phân bổ Ngân sách theo Kênh
+                        Tình hình Ngân sách & Chi tiêu theo Kênh
                       </h4>
                       {drawerBudgetSummary && (
                         <div className="mb-3 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1">
@@ -2553,11 +2727,10 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                           })()}
                         </div>
                       ) : (
-                        <div className="py-6 text-center">
-                          <p className="text-xs text-slate-600 font-semibold">Chưa có phân bổ ngân sách theo kênh</p>
+                        <div className="py-4 text-center">
+                          <p className="text-xs text-slate-600 font-semibold">Chưa chia ngân sách riêng cho từng kênh</p>
                           <p className="text-[11px] text-slate-500 mt-0.5">
-                            Trước đây khung này hiển thị tỷ lệ 50/35/15 cố định không liên quan tới dữ liệu thật.
-                            Hãy khai báo phân bổ qua <code>PUT /campaigns/{'${id}'}/budget-allocations</code>.
+                            Chi phí thực tế vẫn được cộng dồn tự động từ số liệu các kênh bên dưới.
                           </p>
                         </div>
                       )}
@@ -2565,36 +2738,33 @@ export const Campaigns: React.FC<CampaignsProps> = ({
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-white p-3.5 rounded-2xl border border-slate-200 text-xs">
-                        <span className="text-slate-600 font-bold uppercase text-[10px]">CPA thực đo</span>
+                        <span className="text-slate-600 font-bold uppercase text-[10px]">Chi phí / 1 Đơn (CPA)</span>
                         <div className="text-base font-black text-slate-900 font-mono mt-1">
                           {drawerKpi && Number(drawerKpi.cpa_avg) > 0
-                            ? `${formatNumber(drawerKpi.cpa_avg)} đ / chuyển đổi`
+                            ? `${formatNumber(drawerKpi.cpa_avg)} đ / đơn`
                             : <span className="text-slate-400 text-xs font-normal italic">Chưa đủ dữ liệu</span>}
                         </div>
                       </div>
                       <div className="bg-white p-3.5 rounded-2xl border border-slate-200 text-xs">
-                        <span className="text-slate-600 font-bold uppercase text-[10px]">Tỷ lệ chuyển đổi (CVR)</span>
+                        <span className="text-slate-600 font-bold uppercase text-[10px]">Tỷ lệ chốt đơn (CVR)</span>
                         <div className="text-base font-black text-slate-900 font-mono mt-1">
                           {drawerKpi ? `${formatRatio(drawerKpi.cvr_percent, 1)}%` : <span className="text-slate-400 text-xs font-normal italic">Chưa đủ dữ liệu</span>}
                         </div>
                       </div>
                     </div>
 
-                    {/* Attribution theo kênh — dùng đúng dữ liệu từ
-                        /campaigns/{id}/attribution. Trước đây endpoint này được gọi
-                        nhưng kết quả bị bỏ không, tab chỉ hiện tỷ lệ 50/35/15 bịa đặt. */}
                     <div className="bg-white p-4 rounded-2xl border border-slate-200">
                       <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">
-                        Phân bổ hiệu quả theo kênh (đo được)
+                        Hiệu quả thực tế theo kênh
                       </h4>
                       {drawerAttributions.length > 0 ? (
-                        <div className="overflow-x-auto" role="region" aria-label="Bảng attribution theo kênh" tabIndex={0}>
+                        <div className="overflow-x-auto" role="region" aria-label="Bảng hiệu quả theo kênh" tabIndex={0}>
                           <table className="w-full text-xs">
                             <thead>
                               <tr className="border-b border-slate-200 text-slate-500 text-[10px] uppercase">
                                 <th className="py-1.5 pr-2 text-left font-bold">Kênh</th>
                                 <th className="py-1.5 px-1.5 text-right font-bold">Clicks</th>
-                                <th className="py-1.5 px-1.5 text-right font-bold">CV</th>
+                                <th className="py-1.5 px-1.5 text-right font-bold">Đơn</th>
                                 <th className="py-1.5 px-1.5 text-right font-bold">Chi phí</th>
                                 <th className="py-1.5 pl-1.5 text-right font-bold">ROAS</th>
                               </tr>
@@ -2626,8 +2796,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         </div>
                       ) : (
                         <p className="text-[11px] text-slate-500 italic">
-                          Chưa có CampaignMetric cho chiến dịch này nên chưa tính được
-                          attribution theo kênh.
+                          Chưa có số liệu cho chiến dịch này. Hãy nhập kết quả ở khung phía trên để xem hiệu quả từng kênh.
                         </p>
                       )}
                     </div>
@@ -2643,7 +2812,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <Sparkles className="w-5 h-5 text-amber-400" />
-                              <span className="font-bold text-sm">Chẩn đoán Sức khỏe Chiến dịch</span>
+                              <span className="font-bold text-sm">Đánh giá Hiệu quả Chiến dịch</span>
                             </div>
                             <span
                               className={`px-2.5 py-1 rounded-full font-mono font-bold text-xs border ${
@@ -2654,7 +2823,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                                     : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
                               }`}
                             >
-                              {drawerDoctorReport.health_score}/100 Tối ưu
+                              {drawerDoctorReport.health_score}/100 điểm
                             </span>
                           </div>
                           <p className="text-xs text-slate-200 mt-2">
@@ -2664,7 +2833,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
 
                         <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-3">
                           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                            Đề xuất Tối ưu hóa (Bác sĩ Chiến dịch AI)
+                            Khuyến nghị tối ưu ngân sách & nội dung
                           </h4>
                           {drawerDoctorReport.recommendations.length > 0 ? (
                             <div className="space-y-2 text-xs">
@@ -2704,7 +2873,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                             </div>
                           ) : (
                             <p className="text-[11px] text-slate-500 italic">
-                              Bác sĩ AI không đưa ra đề xuất nào cho chiến dịch này.
+                              Các chỉ số hiện tại đang ổn định, chưa có cảnh báo bất thường.
                             </p>
                           )}
 
@@ -2722,10 +2891,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                     ) : (
                       <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center">
                         <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-2" />
-                        <p className="text-xs font-semibold text-slate-700">Chưa có báo cáo chẩn đoán</p>
+                        <p className="text-xs font-semibold text-slate-700">Chưa đủ dữ liệu để đánh giá</p>
                         <p className="text-[11px] text-slate-500 mt-0.5">
-                          Không tải được báo cáo từ <code>/campaigns/{'${id}'}/ai-doctor</code>. Nếu chiến dịch chưa có
-                          chỉ số, hãy nhập CampaignMetric trước rồi thử lại.
+                          Hãy nhập số liệu chi phí và doanh thu ở tab &ldquo;Số liệu & Nhập kết quả&rdquo; rồi bấm Thử lại.
                         </p>
                         <button
                           type="button"
@@ -3520,35 +3688,58 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                 </button>
 
                 {wizardStep < 4 ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (wizardStep === 1 && !wizardData.name.trim()) {
-                        toast.warning('Vui lòng nhập tên chiến dịch');
-                        return;
-                      }
-                      // Validate ngày/ngân sách ngay tại bước 1-2. Trước đây chỉ có
-                      // tên được kiểm tra, còn `end_date < start_date` tới tận
-                      // backend mới trả 422 — sau khi người dùng điền đủ 4 bước.
-                      if (!wizardData.start_date || !wizardData.end_date) {
-                        toast.warning('Vui lòng chọn đầy đủ ngày bắt đầu và ngày kết thúc');
-                        return;
-                      }
-                      if (wizardData.end_date < wizardData.start_date) {
-                        toast.warning('Ngày kết thúc phải sau hoặc bằng ngày bắt đầu', 'Khoảng thời gian không hợp lệ');
-                        return;
-                      }
-                      if (Number(wizardData.budget) <= 0) {
-                        toast.warning('Ngân sách phải lớn hơn 0', 'Ngân sách không hợp lệ');
-                        return;
-                      }
-                      setWizardStep(prev => Math.min(prev + 1, 4));
-                    }}
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
-                  >
-                    <span>Tiếp theo</span>
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => {
+                        if (!wizardData.name.trim()) {
+                          toast.warning('Vui lòng nhập tên chiến dịch');
+                          return;
+                        }
+                        if (!wizardData.start_date || !wizardData.end_date || wizardData.end_date < wizardData.start_date) {
+                          toast.warning('Khoảng thời gian chiến dịch không hợp lệ');
+                          return;
+                        }
+                        if (Number(wizardData.budget) <= 0) {
+                          toast.warning('Ngân sách phải lớn hơn 0');
+                          return;
+                        }
+                        void handleFinishWizard();
+                      }}
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 rounded-xl text-xs font-bold transition-all"
+                      title="Lưu và tạo chiến dịch ngay mà không cần qua các bước phụ"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>Tạo chiến dịch ngay</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (wizardStep === 1 && !wizardData.name.trim()) {
+                          toast.warning('Vui lòng nhập tên chiến dịch');
+                          return;
+                        }
+                        if (!wizardData.start_date || !wizardData.end_date) {
+                          toast.warning('Vui lòng chọn đầy đủ ngày bắt đầu và ngày kết thúc');
+                          return;
+                        }
+                        if (wizardData.end_date < wizardData.start_date) {
+                          toast.warning('Ngày kết thúc phải sau hoặc bằng ngày bắt đầu', 'Khoảng thời gian không hợp lệ');
+                          return;
+                        }
+                        if (Number(wizardData.budget) <= 0) {
+                          toast.warning('Ngân sách phải lớn hơn 0', 'Ngân sách không hợp lệ');
+                          return;
+                        }
+                        setWizardStep(prev => Math.min(prev + 1, 4));
+                      }}
+                      className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                    >
+                      <span>Tiếp theo (Phân bổ & Soạn bài)</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 ) : (
                   <button
                     type="button"

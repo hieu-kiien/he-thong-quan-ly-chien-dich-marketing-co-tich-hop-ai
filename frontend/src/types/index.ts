@@ -84,6 +84,11 @@ export interface Campaign {
     conversions: number;
     cost: number;
     revenue: number;
+    total_views?: number;
+    total_clicks?: number;
+    total_conversions?: number;
+    total_cost?: number;
+    total_revenue?: number;
     roas?: number;
     ctr_percent?: number;
     cvr_percent?: number;

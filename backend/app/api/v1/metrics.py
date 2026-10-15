@@ -4,7 +4,7 @@ import csv
 import io
 import logging
 import re
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -110,6 +110,7 @@ def get_campaign_metrics(
 def record_campaign_metric(
     campaign_id: int,
     req: MetricCreate,
+    upsert: bool = Query(False, description="Nếu True, ghi đè chỉ số đã có của cùng ngày và kênh"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -126,6 +127,15 @@ def record_campaign_metric(
         CampaignMetric.metric_date == req.metric_date
     ).first()
     if existing_metric:
+        if upsert:
+            existing_metric.views = req.views
+            existing_metric.clicks = req.clicks
+            existing_metric.conversions = req.conversions
+            existing_metric.cost = req.cost
+            existing_metric.revenue = req.revenue
+            db.commit()
+            db.refresh(existing_metric)
+            return MetricResponse.model_validate(existing_metric)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Chỉ số cho chiến dịch {campaign_id}, kênh {req.channel_id} vào ngày {req.metric_date} đã tồn tại."

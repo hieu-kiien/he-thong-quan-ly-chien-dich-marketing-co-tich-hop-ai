@@ -218,6 +218,12 @@ def _bulk_content_and_metric_enrichment(
         if ch_code:
             content_info[cid]["channels"].add(str(ch_code).lower())
 
+    channel_code_by_id = {
+        ch_id: str(ch_code).lower()
+        for ch_id, ch_code in db.query(MarketingChannel.id, MarketingChannel.code).all()
+        if ch_code
+    }
+
     metric_rows = (
         db.query(CampaignMetric)
         .filter(CampaignMetric.campaign_id.in_(campaign_ids))
@@ -227,6 +233,9 @@ def _bulk_content_and_metric_enrichment(
     for m in metric_rows:
         if m.campaign_id in metrics_by_cid:
             metrics_by_cid[m.campaign_id].append(m)
+            ch_code = channel_code_by_id.get(m.channel_id)
+            if ch_code and m.campaign_id in content_info:
+                content_info[m.campaign_id]["channels"].add(ch_code)
 
     metrics_summary_by_cid: dict[int, dict] = {}
     for camp in campaigns:
@@ -262,6 +271,12 @@ def _bulk_content_and_metric_enrichment(
             health_status = "HEALTHY"
 
         metrics_summary_by_cid[cid] = {
+            "views": views,
+            "clicks": clicks,
+            "conversions": conversions,
+            "cost": round(cost, 2),
+            "revenue": round(revenue, 2),
+            "row_count": len(m_list),
             "total_views": views,
             "total_clicks": clicks,
             "total_conversions": conversions,

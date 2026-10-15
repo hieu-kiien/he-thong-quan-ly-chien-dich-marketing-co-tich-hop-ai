@@ -1997,6 +1997,21 @@ export const metricsApi = {
       return [];
     }
   },
+  recordCampaignMetric: async (
+    campaignId: number,
+    payload: {
+      channel_id: number;
+      metric_date: string;
+      views: number;
+      clicks: number;
+      conversions: number;
+      cost: number;
+      revenue: number;
+    }
+  ): Promise<any> => {
+    const res = await apiClient.post(`/campaigns/${campaignId}/metrics?upsert=true`, payload);
+    return res.data;
+  },
   getCampaignKpi: async (campaignId: number): Promise<KPISummary> => {
     return campaignApi.getKpi(campaignId);
   },

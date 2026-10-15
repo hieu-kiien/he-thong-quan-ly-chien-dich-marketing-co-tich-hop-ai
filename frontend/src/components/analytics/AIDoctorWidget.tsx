@@ -169,12 +169,11 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Bác Sĩ Chiến Dịch AI (AI Doctor)
+                Đánh Giá Hiệu Quả Chiến Dịch
               </h3>
               
-              {/* Zero Hallucination Pill */}
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                Zero Hallucination
+                100% Số liệu thực tế
               </span>
 
               {/* R5: Demo Mode Warning Pill Badge */}
@@ -186,12 +185,12 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
                   title="Dữ liệu mẫu: Hệ thống đang chạy chế độ mô phỏng do chiến dịch chưa tích lũy đủ số liệu thực tế"
                 >
                   <AlertCircle className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0" aria-hidden="true" />
-                  <span>Dữ liệu Mẫu / Demo Mode</span>
+                  <span>Dữ liệu Mẫu</span>
                 </span>
               )}
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-              Đánh giá sức khỏe chiến dịch và kê đơn hành động 1-click dựa trên số liệu thực tế CSDL
+              Tự động chấm điểm hiệu quả chi phí — doanh thu và gợi ý điều chỉnh ngân sách
             </p>
           </div>
         </div>
@@ -204,7 +203,7 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
             className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shrink-0 self-start sm:self-auto focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-indigo-600' : ''}`} />
-            <span>{loading ? 'Đang khám số liệu...' : 'Khám & Chẩn đoán lại'}</span>
+            <span>{loading ? 'Đang tính toán...' : 'Tính toán lại'}</span>
           </button>
         )}
       </div>
