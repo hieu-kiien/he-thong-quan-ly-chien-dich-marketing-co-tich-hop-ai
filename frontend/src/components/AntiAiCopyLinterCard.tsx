@@ -166,8 +166,8 @@ export const AntiAiCopyLinterCard: React.FC<AntiAiCopyLinterCardProps> = ({
     }
 
     // Bỏ bớt emoji đầu dòng kiểu AI-slop nếu có
-    nextTitle = nextTitle.replace(/^[🔥✨🚀💡🎯]+\s*/g, '');
-    nextCta = nextCta.replace(/^[👉🔥✨🚀]+\s*/g, '');
+    nextTitle = nextTitle.replace(/^[🔥✨🚀💡🎯]+\s*/gu, '');
+    nextCta = nextCta.replace(/^[👉🔥✨🚀]+\s*/gu, '');
 
     if (!/\d+/.test(nextBody)) {
       nextBody = `${nextBody.trim()}\n\nSố liệu thực tế: Triển khai trong 3 bước, tiết kiệm trung bình 35% thời gian biên tập mỗi tuần.`;

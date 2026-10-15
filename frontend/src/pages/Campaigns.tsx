@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Megaphone, Plus, Search, DollarSign, CheckCircle2, AlertTriangle, TrendingUp, BarChart3, Sparkles, Trash2, Copy, Eye, X, Loader2, LayoutGrid, Table as TableIcon, Users, Sliders, ShieldCheck, Zap, Layers, Mail, FileText, ChevronRight, RefreshCw, ArrowUpRight, Check, Package, Clock, PencilLine } from 'lucide-react';
+import { Megaphone, Plus, Search, DollarSign, CheckCircle2, AlertTriangle, TrendingUp, BarChart3, Sparkles, Trash2, Copy, Eye, X, Loader2, LayoutGrid, Table as TableIcon, Users, Sliders, ShieldCheck, Zap, Layers, Mail, FileText, ChevronRight, RefreshCw, ArrowUpRight, Check, Package, Clock, PencilLine, FileSpreadsheet, Flame, Play, Pause, Archive } from 'lucide-react';
 import { 
   Campaign, 
   Product, 
@@ -35,6 +35,7 @@ import { CampaignCardSkeleton, CampaignTableSkeleton } from '../components/Skele
 import { Pagination } from '../components/Pagination';
 import { QuotaBadge, QuotaErrorCard } from '../components/QuotaBadge';
 import { ManualContentComposer } from '../components/ManualContentComposer';
+import { GlobalCsvImportModal } from '../components/GlobalCsvImportModal';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useAIJob } from '../hooks/useAIJob';
 import { AIJobProgress } from '../components/AIJobProgress';
@@ -357,16 +358,55 @@ export const Campaigns: React.FC<CampaignsProps> = ({
     }
   }, [searchTermSync]);
 
+  // Enterprise High-Density Data Grid States
+  const [isGlobalCsvModalOpen, setIsGlobalCsvModalOpen] = useState(false);
+  const [smartViewFilter, setSmartViewFilter] = useState<'ALL' | 'ACTIVE_NOW' | 'OVER_PACING' | 'AD_FATIGUE' | 'LOW_ROAS'>('ALL');
+  const [selectedCampaignIds, setSelectedCampaignIds] = useState<number[]>([]);
+  const [lastClickedRowIdx, setLastClickedRowIdx] = useState<number | null>(null);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [bulkBudgetModalOpen, setBulkBudgetModalOpen] = useState(false);
+  const [bulkBudgetMode, setBulkBudgetMode] = useState<'PERCENT_CHANGE' | 'SET'>('PERCENT_CHANGE');
+  const [bulkBudgetValue, setBulkBudgetValue] = useState<number>(15);
+  const [editingBudgetId, setEditingBudgetId] = useState<number | null>(null);
+  const [editingBudgetValue, setEditingBudgetValue] = useState<string>('');
+
   /**
-   * Gom /campaigns/{id}/metrics của từng chiến dịch thành map theo id.
-   * Backend chưa có endpoint tổng hợp nên vẫn phải gọi N lần, nhưng kết quả
-   * được hiển thị đúng với dữ liệu thay vì hằng số bịa đặt.
+   * Gom chỉ số thực đo của từng chiến dịch thành map theo id.
+   * Ưu tiên đọc trực tiếp từ `c.metrics_summary` (Enriched API - 0 request phụ)
+   * để triệt tiêu hoàn toàn lỗi N+1 query; chỉ fallback sang `getAllCampaignsMetrics`
+   * khi backend chưa đính kèm `metrics_summary`.
    */
   const loadCampaignMetrics = useCallback(async (campaignList: Campaign[], signal?: AbortSignal) => {
     if (campaignList.length === 0) {
       setCampaignMetrics({});
       return;
     }
+    const hasEnrichedSummary = campaignList.some((c) => c.metrics_summary !== undefined);
+    if (hasEnrichedSummary) {
+      const grouped: Record<number, CampaignAggregate> = {};
+      campaignList.forEach((c) => {
+        const ms = c.metrics_summary;
+        if (ms) {
+          grouped[c.id] = {
+            views: Number(ms.views) || 0,
+            clicks: Number(ms.clicks) || 0,
+            conversions: Number(ms.conversions) || 0,
+            cost: Number(ms.cost) || 0,
+            revenue: Number(ms.revenue) || 0,
+            rowCount: ms.row_count !== undefined
+              ? Number(ms.row_count)
+              : (Number(ms.views) + Number(ms.clicks) + Number(ms.cost) + Number(ms.revenue) > 0 ? 1 : 0),
+          };
+        } else {
+          grouped[c.id] = { ...EMPTY_AGGREGATE };
+        }
+      });
+      setCampaignMetrics(grouped);
+      setMetricsError(null);
+      setLoadingMetrics(false);
+      return;
+    }
+
     setLoadingMetrics(true);
     setMetricsError(null);
     try {
@@ -736,6 +776,28 @@ export const Campaigns: React.FC<CampaignsProps> = ({
         status: wizardData.launchStatus
       });
 
+      // 1b. Persist Budget Allocations from Wizard Step 2 (Fixes bug where budgetSplit was discarded)
+      try {
+        const splitEntries: { channel_id: number; planned_amount: number }[] = [];
+        const totalBudgetNum = Number(wizardData.budget) || 0;
+        (['facebook', 'tiktok', 'email'] as const).forEach((code) => {
+          if (!wizardData.channels.includes(code)) return;
+          const chId = channelIdByCode(code);
+          const pct = Number(wizardData.budgetSplit[code]) || 0;
+          if (chId !== null && pct > 0 && totalBudgetNum > 0) {
+            splitEntries.push({
+              channel_id: chId,
+              planned_amount: Math.round((totalBudgetNum * pct) / 100),
+            });
+          }
+        });
+        if (splitEntries.length > 0) {
+          await budgetApi.updateBudgetAllocations(newCamp.id, splitEntries);
+        }
+      } catch (allocErr) {
+        console.warn('Không lưu được phân bổ ngân sách từ Wizard:', allocErr);
+      }
+
       // 2. Persist Generated Creatives if available (Starting at AI_DRAFT per state machine)
       if (generatedCreatives) {
         const creativePromises: Promise<any>[] = [];
@@ -823,6 +885,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
       setIsDeleting(true);
       await campaignApi.delete(id);
       setCampaigns(prev => prev.filter(c => c.id !== id));
+      setSelectedCampaignIds(prev => prev.filter(x => x !== id));
       if (selectedDrawerCampaign?.id === id) {
         setSelectedDrawerCampaign(null);
       }
@@ -836,17 +899,169 @@ export const Campaigns: React.FC<CampaignsProps> = ({
     }
   };
 
-  // Server đã lọc + sắp xếp + cắt trang (`loadData`), nên `campaigns` chính là nội
-  // dung trang hiện tại. Lọc lần nữa ở client sẽ làm `total` của envelope lệch với
-  // danh sách đang hiện — đúng cái mâu thuẫn phải tránh.
-  const filteredCampaigns = useMemo(() => campaigns, [campaigns]);
+  // Tính nhịp chi tiêu (Spend Pacing vs Time Elapsed) & trạng thái Ad Fatigue cho mỗi chiến dịch
+  const getCampaignPacingAndFatigue = useCallback((c: Campaign) => {
+    const agg = campaignMetrics[c.id] ?? EMPTY_AGGREGATE;
+    const spendAmt = agg.cost;
+    const budgetAmt = Number(c.budget) || 0;
+    const budgetPct = c.pacing?.budget_pct !== undefined
+      ? Number(c.pacing.budget_pct)
+      : (budgetAmt > 0 ? Math.min(150, (spendAmt / budgetAmt) * 100) : 0);
+
+    let timePct = c.pacing?.time_pct;
+    if (timePct === undefined) {
+      const startMs = new Date(c.start_date).getTime();
+      const endMs = new Date(c.end_date).getTime();
+      const nowMs = Date.now();
+      if (!Number.isNaN(startMs) && !Number.isNaN(endMs) && endMs > startMs) {
+        timePct = Math.max(0, Math.min(100, ((nowMs - startMs) / (endMs - startMs)) * 100));
+      } else {
+        timePct = 50;
+      }
+    }
+
+    const isOverPacing =
+      c.pacing?.status === 'OVER_PACING' ||
+      (budgetPct > 65 && budgetPct - (timePct || 0) >= 20);
+
+    const ctrPct = agg.views > 0 ? (agg.clicks / agg.views) * 100 : null;
+    const isFatigued =
+      Boolean(c.creative_fatigue?.is_fatigued) ||
+      (agg.views >= 30000 && ctrPct !== null && ctrPct < 1.2);
+
+    const roas = agg.rowCount > 0 && agg.cost > 0 ? agg.revenue / agg.cost : null;
+    const isLowRoas = roas !== null && roas < 1.5;
+
+    return {
+      budgetPct,
+      timePct: Number(timePct || 0),
+      isOverPacing,
+      isFatigued,
+      ctrDropPct: c.creative_fatigue?.ctr_drop_pct,
+      roas,
+      isLowRoas,
+    };
+  }, [campaignMetrics]);
+
+  // Lọc theo Saved Views (Smart Triage Pills) kết hợp dữ liệu trang hiện tại
+  const filteredCampaigns = useMemo(() => {
+    if (smartViewFilter === 'ALL') return campaigns;
+    return campaigns.filter((c) => {
+      const info = getCampaignPacingAndFatigue(c);
+      if (smartViewFilter === 'ACTIVE_NOW') return c.status === 'ACTIVE';
+      if (smartViewFilter === 'OVER_PACING') return info.isOverPacing;
+      if (smartViewFilter === 'AD_FATIGUE') return info.isFatigued;
+      if (smartViewFilter === 'LOW_ROAS') return info.isLowRoas;
+      return true;
+    });
+  }, [campaigns, smartViewFilter, getCampaignPacingAndFatigue]);
+
+  // Multi-select Checkbox + Shift+Click Range Selection
+  const handleRowSelect = (campaignId: number, rowIdx: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (e.shiftKey && lastClickedRowIdx !== null && filteredCampaigns.length > 0) {
+      const start = Math.min(lastClickedRowIdx, rowIdx);
+      const end = Math.max(lastClickedRowIdx, rowIdx);
+      const rangeIds = filteredCampaigns.slice(start, end + 1).map((item) => item.id);
+      setSelectedCampaignIds((prev) => Array.from(new Set([...prev, ...rangeIds])));
+    } else {
+      setSelectedCampaignIds((prev) =>
+        prev.includes(campaignId) ? prev.filter((id) => id !== campaignId) : [...prev, campaignId]
+      );
+    }
+    setLastClickedRowIdx(rowIdx);
+  };
+
+  const handleSelectAllDisplayed = () => {
+    const displayedIds = filteredCampaigns.map((c) => c.id);
+    const allSelected = displayedIds.length > 0 && displayedIds.every((id) => selectedCampaignIds.includes(id));
+    if (allSelected) {
+      setSelectedCampaignIds((prev) => prev.filter((id) => !displayedIds.includes(id)));
+    } else {
+      setSelectedCampaignIds((prev) => Array.from(new Set([...prev, ...displayedIds])));
+    }
+  };
+
+  // Inline Budget Edit Save
+  const handleSaveInlineBudget = async (c: Campaign) => {
+    const parsed = Number(String(editingBudgetValue).replace(/[^0-9.-]/g, ''));
+    setEditingBudgetId(null);
+    if (Number.isNaN(parsed) || parsed < 0 || parsed === Number(c.budget)) return;
+    const prevBudget = c.budget;
+    setCampaigns((prev) => prev.map((item) => (item.id === c.id ? { ...item, budget: parsed } : item)));
+    try {
+      await campaignApi.update(c.id, { budget: parsed });
+      toast.success(`Đã cập nhật ngân sách "${c.name}" → ${formatNumber(parsed)} đ`);
+      if (onRefreshData) onRefreshData();
+    } catch (err) {
+      setCampaigns((prev) => prev.map((item) => (item.id === c.id ? { ...item, budget: prevBudget } : item)));
+      toast.error(getApiErrorMessage(err), 'Không thể cập nhật ngân sách trực tiếp');
+    }
+  };
+
+  // Bulk Action Handler (Activate, Pause, Archive, Delete, Adjust Budget)
+  const handleExecuteBulkAction = async (
+    action: 'ACTIVATE' | 'PAUSE' | 'ARCHIVE' | 'DELETE' | 'ADJUST_BUDGET',
+    opts?: { budget_mode?: 'SET' | 'PERCENT_CHANGE'; budget_value?: number }
+  ) => {
+    if (selectedCampaignIds.length === 0 || isBulkProcessing) return;
+    setIsBulkProcessing(true);
+    try {
+      const res = await campaignApi.bulkAction({
+        campaign_ids: selectedCampaignIds,
+        action,
+        budget_mode: opts?.budget_mode,
+        budget_value: opts?.budget_value,
+      });
+      const count = res.updated_count || res.deleted_count || selectedCampaignIds.length;
+      toast.success(`Đã thực thi thao tác hàng loạt (${action}) cho ${count} chiến dịch!`);
+      setBulkBudgetModalOpen(false);
+      setSelectedCampaignIds([]);
+      await loadData();
+      if (onRefreshData) onRefreshData();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err), 'Không thể thực thi thao tác hàng loạt');
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  // Sticky Summary Footer Aggregate across displayed rows (or selected rows if any selected)
+  const tableFooterSummary = useMemo(() => {
+    const targetList =
+      selectedCampaignIds.length > 0
+        ? filteredCampaigns.filter((c) => selectedCampaignIds.includes(c.id))
+        : filteredCampaigns;
+    let totalBudget = 0;
+    let totalSpend = 0;
+    let totalRevenue = 0;
+    let totalClicks = 0;
+    let totalConversions = 0;
+    targetList.forEach((c) => {
+      totalBudget += Number(c.budget) || 0;
+      const agg = campaignMetrics[c.id] ?? EMPTY_AGGREGATE;
+      totalSpend += agg.cost;
+      totalRevenue += agg.revenue;
+      totalClicks += agg.clicks;
+      totalConversions += agg.conversions;
+    });
+    const weightedRoas = totalSpend > 0 ? totalRevenue / totalSpend : null;
+    const avgCvr = totalClicks > 0 ? (totalConversions / totalClicks) * 100 : null;
+    return {
+      count: targetList.length,
+      isSelectionSubset: selectedCampaignIds.length > 0,
+      totalBudget,
+      totalSpend,
+      totalRevenue,
+      totalClicks,
+      totalConversions,
+      weightedRoas,
+      avgCvr,
+    };
+  }, [filteredCampaigns, selectedCampaignIds, campaignMetrics]);
 
   // Thẻ số liệu phải là TỔNG THỰC TẾ của tenant, không phải tổng của trang hiện
   // tại. Nguồn là `/analytics/dashboard` (đã giới hạn tenant sẵn ở backend).
-  // Trước khi có phân trang, các thẻ này cộng trên danh sách đã tải và vì thế đúng;
-  // bỏ qua bước này thì "Ngân sách đang chạy" trên trang 2 sẽ là ngân sách của
-  // riêng 20 dòng của trang 2 — một con số sai mà người dùng không có cách nào
-  // phát hiện.
   const [scorecard, setScorecard] = useState<{
     activeBudget: number;
     activeCount: number;
@@ -880,28 +1095,55 @@ export const Campaigns: React.FC<CampaignsProps> = ({
   }, [page, pageSize, searchTerm, statusFilter, objectiveFilter]);
 
   // Số nội dung + danh sách kênh theo chiến dịch, dùng cho cột "Mẫu QC" và cột
-// "Kênh" thay vì các literal cố định ("3 Mẫu QC", luôn hiện icon FB/TT/Email).
-const [contentStats, setContentStats] = useState<Record<number, { count: number; channels: string[] }>>({});
+  // "Kênh". Ưu tiên đọc trực tiếp từ `c.contents_count` và `c.channels` (Enriched API)
+  // để loại bỏ hoàn toàn N+1 query `getContents(c.id)`!
+  const [contentStats, setContentStats] = useState<Record<number, { count: number; channels: string[] }>>({});
 
-useEffect(() => {
+  useEffect(() => {
     if (campaigns.length === 0) {
       setContentStats({});
       return;
     }
+    const allHaveEnrichedCounts = campaigns.every(
+      (c) => typeof c.contents_count === 'number' || Array.isArray(c.channels)
+    );
+    if (allHaveEnrichedCounts) {
+      const stats: Record<number, { count: number; channels: string[] }> = {};
+      campaigns.forEach((c) => {
+        stats[c.id] = {
+          count: Number(c.contents_count ?? 0),
+          channels: Array.isArray(c.channels) ? c.channels : [],
+        };
+      });
+      setContentStats(stats);
+      return;
+    }
+
     let cancelled = false;
     (async () => {
       try {
         const lists = await Promise.all(
-          campaigns.map((c) => campaignApi.getContents(c.id).catch(() => [] as MarketingContent[]))
+          campaigns.map((c) =>
+            typeof c.contents_count === 'number' && Array.isArray(c.channels)
+              ? Promise.resolve(null)
+              : campaignApi.getContents(c.id).catch(() => [] as MarketingContent[])
+          )
         );
         if (cancelled) return;
         const stats: Record<number, { count: number; channels: string[] }> = {};
         campaigns.forEach((c, i) => {
-          const list = lists[i] ?? [];
-          stats[c.id] = {
-            count: list.length,
-            channels: Array.from(new Set(list.map((ct) => channelCodeById(ct.channel_id)))),
-          };
+          const list = lists[i];
+          if (list === null) {
+            stats[c.id] = {
+              count: Number(c.contents_count ?? 0),
+              channels: Array.isArray(c.channels) ? c.channels : [],
+            };
+          } else {
+            stats[c.id] = {
+              count: (list ?? []).length,
+              channels: Array.from(new Set((list ?? []).map((ct) => channelCodeById(ct.channel_id)))),
+            };
+          }
         });
         setContentStats(stats);
       } catch (e) {
@@ -1020,34 +1262,41 @@ useEffect(() => {
       {/* `flex-wrap` + `min-w-0` bên trái: trước đây tiêu đề dài không co được nên
             vùng nút bên phải bị bóp, và chữ "Tạo Chiến Dịch Mới" vỡ thành 4 dòng
             ở viewport ~929px. */}
-      <div className="flex flex-col md:flex-row md:flex-wrap md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
+      <div className="flex flex-col md:flex-row md:flex-wrap md:items-center justify-between gap-4 border-b border-[#E4E2DD] pb-5">
         <div className="min-w-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-700 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#121316] flex items-center justify-center text-white">
               <Megaphone className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                <span>Quản trị Chiến dịch Tiếp thị</span>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                  Meta & Google Ads Standard
-                </span>
+              <h1 className="text-xl sm:text-2xl font-black text-[#121316] tracking-tight">
+                Danh sách chiến dịch quảng cáo
               </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Quản trị ngân sách tập trung, điều phối phân bổ đa kênh, 1-click Bật/Tắt phân phối và sinh trọn bộ Mẫu Quảng Cáo AI.
+              <p className="text-xs text-[#5A5E66] mt-0.5">
+                Bật hoặc tắt chiến dịch, bấm vào số tiền để sửa nhanh ngân sách và lọc các chiến dịch đang lỗ.
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <button
             onClick={() => loadData()}
             aria-label="Làm mới dữ liệu từ server"
             title="Làm mới dữ liệu từ server"
-            className="p-2.5 text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-colors shadow"
+            className="p-2.5 text-[#5A5E66] hover:text-[#121316] bg-white hover:bg-[#F6F5F0] border border-[#D0CEC7] rounded-xl transition-colors"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-indigo-600' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#D95D39]' : ''}`} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsGlobalCsvModalOpen(true)}
+            data-testid="open-global-csv-import-btn"
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 bg-white hover:bg-[#F6F5F0] text-[#121316] border border-[#D0CEC7] text-xs font-bold rounded-xl transition-all whitespace-nowrap shrink-0"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-[#D95D39] shrink-0" />
+            <span>Nhập file báo cáo (CSV)</span>
           </button>
 
           <button
@@ -1055,107 +1304,99 @@ useEffect(() => {
               setWizardStep(1);
               setIsWizardOpen(true);
             }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-500/25 transition-all transform active:scale-95 whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#D95D39] hover:bg-[#C04E2C] text-white text-xs font-bold rounded-xl transition-all transform active:scale-95 whitespace-nowrap shrink-0"
           >
             <Plus className="w-4 h-4 shrink-0" />
-            <span className="whitespace-nowrap">Tạo Chiến Dịch Mới</span>
+            <span className="whitespace-nowrap">Tạo chiến dịch mới</span>
           </button>
         </div>
       </div>
 
-      {/* 2. Top Metric Performance Cards (Meta Ads Manager Overview) */}
+      {/* 2. Top Metric Performance Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Active Budget */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow hover:shadow-sm transition-shadow">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Ngân sách đang chạy</span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+        <div className="bg-white p-4 rounded-xl border border-[#E4E2DD]">
+          <div className="flex items-center justify-between text-[#5A5E66] mb-2">
+            <span className="text-xs font-bold">Tổng ngân sách đang bật</span>
+            <div className="w-7 h-7 rounded-lg bg-[#F6F5F0] text-[#121316] flex items-center justify-center border border-[#E4E2DD]">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-xl font-black text-slate-900 font-mono tracking-tight">
+          <div className="text-xl font-black text-[#121316] font-mono tabular-nums tracking-tight">
             {aggregateMetrics.activeBudget !== null
               ? aggregateMetrics.activeBudget.toLocaleString('vi-VN')
-              : '—'} <span className="text-xs font-medium text-slate-500">VNĐ</span>
+              : '—'} <span className="text-xs font-medium text-[#5A5E66]">đ</span>
           </div>
-          <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1.5">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>{aggregateMetrics.activeCount ?? '—'} chiến dịch đang phân phối</span>
+          <div className="text-[11px] text-[#5A5E66] mt-1 flex items-center gap-1.5">
+            <span className="inline-block w-2 h-2 rounded-full bg-[#15803D]"></span>
+            <span>{aggregateMetrics.activeCount ?? '—'} chiến dịch đang chạy</span>
           </div>
         </div>
 
         {/* Card 2: Spend Pacing */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow hover:shadow-sm transition-shadow">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Chi tiêu thực tế (Pacing)</span>
-            <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+        <div className="bg-white p-4 rounded-xl border border-[#E4E2DD]">
+          <div className="flex items-center justify-between text-[#5A5E66] mb-2">
+            <span className="text-xs font-bold">Số tiền thực tế đã chi</span>
+            <div className="w-7 h-7 rounded-lg bg-[#F6F5F0] text-[#121316] flex items-center justify-center border border-[#E4E2DD]">
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-xl font-black text-slate-900 font-mono tracking-tight">
+          <div className="text-xl font-black text-[#121316] font-mono tabular-nums tracking-tight">
             {aggregateMetrics.realizedSpend !== null
               ? aggregateMetrics.realizedSpend.toLocaleString('vi-VN')
-              : '—'} <span className="text-xs font-medium text-slate-500">VNĐ</span>
+              : '—'} <span className="text-xs font-medium text-[#5A5E66]">đ</span>
           </div>
-          <div className="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+          <div className="mt-2 w-full bg-[#F0EFEA] rounded-full h-1.5 overflow-hidden">
             <div 
-              className="bg-indigo-600 h-1.5 rounded-full transition-all duration-500" 
+              className="bg-[#121316] h-1.5 rounded-full transition-all duration-500" 
               style={{ width: `${Math.min(Number(aggregateMetrics.pacingPercent), 100)}%` }}
             ></div>
           </div>
-          <div className="text-[10px] text-slate-600 font-medium mt-1 flex justify-between">
-            <span>Tiến độ ngân sách: {aggregateMetrics.pacingPercent}%</span>
+          <div className="text-[10px] text-[#5A5E66] font-medium mt-1 flex justify-between">
+            <span>Đã dùng: {aggregateMetrics.pacingPercent}% ngân sách</span>
             <span>Chu kỳ 30 ngày</span>
           </div>
         </div>
 
         {/* Card 3: Clicks & Traffic */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow hover:shadow-sm transition-shadow">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Lượt nhấp & Tương tác</span>
-            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+        <div className="bg-white p-4 rounded-xl border border-[#E4E2DD]">
+          <div className="flex items-center justify-between text-[#5A5E66] mb-2">
+            <span className="text-xs font-bold">Tổng lượt bấm vào xem</span>
+            <div className="w-7 h-7 rounded-lg bg-[#F6F5F0] text-[#121316] flex items-center justify-center border border-[#E4E2DD]">
               <Zap className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-xl font-black text-slate-900 font-mono tracking-tight">
+          <div className="text-xl font-black text-[#121316] font-mono tabular-nums tracking-tight">
             {aggregateMetrics.totalClicks !== null
               ? aggregateMetrics.totalClicks.toLocaleString('vi-VN')
-              : '—'} <span className="text-xs font-medium text-slate-500">Clicks</span>
+              : '—'} <span className="text-xs font-medium text-[#5A5E66]">lượt bấm</span>
           </div>
-          <div className="text-[11px] text-emerald-700 mt-1 flex items-center gap-1 font-semibold">
-            <TrendingUp className="w-3.5 h-3.5" />
-            <span>CTR trung bình 4.2% (Vượt benchmark +15%)</span>
+          <div className="text-[11px] text-[#5A5E66] mt-1">
+            <span>Tổng số lần khách nhấp vào quảng cáo</span>
           </div>
         </div>
 
         {/* Card 4: Overall ROAS */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow hover:shadow-sm transition-shadow">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">ROAS Đa Kênh Tổng Thể</span>
-            <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+        <div className="bg-white p-4 rounded-xl border border-[#E4E2DD]">
+          <div className="flex items-center justify-between text-[#5A5E66] mb-2">
+            <span className="text-xs font-bold">Hệ số thu hồi vốn (ROAS)</span>
+            <div className="w-7 h-7 rounded-lg bg-[#F6F5F0] text-[#D95D39] flex items-center justify-center border border-[#E4E2DD]">
               <BarChart3 className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-xl font-black text-emerald-700 font-mono tracking-tight">
-            {/* `avgRoas` là số thô (tổng doanh thu / tổng chi phí) nên phải
-                làm tròn 2 chữ số thập phân — hiển thị thẳng ra sẽ ra
-                "5.1063829787234045x". Khi chưa có chi phí thực thì `avgRoas`
-                là `null`; in `{null}x` sẽ ra mỗi chữ "x" trơ trọi, nên hiện "—". */}
+          <div className="text-xl font-black text-[#15803D] font-mono tabular-nums tracking-tight">
             {aggregateMetrics.avgRoas !== null
               ? `${aggregateMetrics.avgRoas.toFixed(2)}x`
               : '—'}{' '}
-            <span className="text-xs font-medium text-slate-500">Doanh thu/Chi phí</span>
+            <span className="text-xs font-medium text-[#5A5E66]">Doanh thu / Chi phí</span>
           </div>
-          <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
-            <span>Được kiểm định bởi Bác sĩ AI</span>
+          <div className="text-[11px] text-[#5A5E66] mt-1">
+            <span>Từ 3.0x là lãi tốt · Dưới 1.5x là đang lỗ</span>
           </div>
         </div>
       </div>
 
-      {/* Hạn mức gói miễn phí: cho người dùng thấy "còn N/25 chiến dịch" TRƯỚC khi
-          bấm Tạo mới, thay vì chỉ biết sau khi thao tác đã thất bại. Chỉ là lớp
-          hiển thị — hạn mức thật thực thi ở server. */}
+      {/* Hạn mức gói miễn phí */}
       <div className="flex justify-end">
         <QuotaBadge
           workspaceId={Number(localStorage.getItem('active_workspace_id')) || null}
@@ -1164,99 +1405,132 @@ useEffect(() => {
         />
       </div>
 
-      {/* 3. Filter & Search Toolbar (Meta Ads Control Bar) */}
-      {/* `min-w-0` + `flex-wrap`: ở ~768px nội dung chỉ ~440px, ô tìm kiếm +
-          select mục tiêu không co lại được nên tràn ngang. */}
-      <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow flex flex-col lg:flex-row lg:flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto flex-1 min-w-0">
-          {/* Search Box */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              aria-label="Tìm theo tên chiến dịch, sản phẩm, đối tượng"
-              placeholder="Tìm theo tên chiến dịch, sản phẩm, đối tượng..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-indigo-500 rounded-xl transition-all outline-none font-medium text-slate-800 placeholder-slate-400"
-            />
+      {/* 3. Filter & Search Toolbar */}
+      <div className="bg-white p-3.5 rounded-xl border border-[#E4E2DD] space-y-2.5">
+        <div className="flex flex-col lg:flex-row lg:flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto flex-1 min-w-0">
+            {/* Search Box */}
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                aria-label="Tìm theo tên chiến dịch, sản phẩm, đối tượng"
+                placeholder="Tìm theo tên chiến dịch, mã chiến dịch, sản phẩm..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 text-xs bg-[#F6F5F0]/70 hover:bg-white focus:bg-white border border-[#D0CEC7] focus:border-[#D95D39] rounded-xl transition-all outline-none font-medium text-[#121316] placeholder-slate-400"
+              />
+            </div>
+
+            {/* Objective Filter */}
+            <select
+              value={objectiveFilter}
+              onChange={(e) => setObjectiveFilter(e.target.value)}
+              aria-label="Lọc theo mục tiêu chiến dịch"
+              className="text-xs bg-[#F6F5F0]/70 border border-[#D0CEC7] rounded-xl px-3 py-2 font-medium text-[#121316] outline-none hover:bg-white"
+            >
+              <option value="ALL">Mọi mục tiêu</option>
+              {CAMPAIGN_OBJECTIVES.map(obj => (
+                <option key={obj.id} value={obj.id}>{obj.title}</option>
+              ))}
+            </select>
+
+            {/* Sắp xếp */}
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as CampaignSort)}
+              aria-label="Sắp xếp chiến dịch"
+              data-testid="campaign-sort"
+              className="text-xs bg-[#F6F5F0]/70 border border-[#D0CEC7] rounded-xl px-3 py-2 font-medium text-[#121316] outline-none hover:bg-white"
+            >
+              <option value="newest">Mới nhất</option>
+              <option value="oldest">Cũ nhất</option>
+              <option value="name_asc">Tên A → Z</option>
+              <option value="name_desc">Tên Z → A</option>
+              <option value="budget_desc">Ngân sách cao → thấp</option>
+              <option value="budget_asc">Ngân sách thấp → cao</option>
+            </select>
           </div>
 
-          {/* Objective Filter */}
-          <select
-            value={objectiveFilter}
-            onChange={(e) => setObjectiveFilter(e.target.value)}
-            aria-label="Lọc theo mục tiêu chiến dịch"
-            className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-medium text-slate-700 outline-none hover:bg-white"
-          >
-            <option value="ALL">Mọi Mục Tiêu</option>
-            {CAMPAIGN_OBJECTIVES.map(obj => (
-              <option key={obj.id} value={obj.id}>{obj.title}</option>
-            ))}
-          </select>
+          {/* Status Filters & View Toggle */}
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-between md:justify-end">
+            <div className="flex items-center p-1 bg-[#F6F5F0] rounded-xl gap-1 text-[11px] font-semibold border border-[#E4E2DD]">
+              {[
+                { id: 'ALL', label: 'Tất cả' },
+                { id: 'ACTIVE', label: 'Đang chạy' },
+                { id: 'PAUSED', label: 'Tạm dừng' },
+                { id: 'DRAFT', label: 'Bản nháp' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setStatusFilter(tab.id)}
+                  className={`px-2.5 py-1.5 rounded-lg transition-all ${
+                    statusFilter === tab.id
+                      ? 'bg-white text-[#121316] shadow-xs font-bold'
+                      : 'text-[#5A5E66] hover:text-[#121316]'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
 
-          {/* Sắp xếp — allowlist khớp hệt với backend (`_CAMPAIGN_SORT_KEYS`).
-              Gửi khoá lạ thì server trả 422, nên chỉ liệt kê các giá trị hợp lệ. */}
-          <select
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value as CampaignSort)}
-            aria-label="Sắp xếp chiến dịch"
-            data-testid="campaign-sort"
-            className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-medium text-slate-700 outline-none hover:bg-white"
-          >
-            <option value="newest">Mới nhất</option>
-            <option value="oldest">Cũ nhất</option>
-            <option value="name_asc">Tên A → Z</option>
-            <option value="name_desc">Tên Z → A</option>
-            <option value="budget_desc">Ngân sách cao → thấp</option>
-            <option value="budget_asc">Ngân sách thấp → cao</option>
-          </select>
-        </div>
-
-        {/* Status Filters & View Toggle */}
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-between md:justify-end">
-          <div className="flex items-center p-1 bg-slate-100 rounded-xl gap-1 text-[11px] font-semibold">
-            {[
-              { id: 'ALL', label: 'Tất cả' },
-              { id: 'ACTIVE', label: 'Đang chạy' },
-              { id: 'PAUSED', label: 'Tạm dừng' },
-              { id: 'DRAFT', label: 'Bản nháp' }
-            ].map(tab => (
+            <div className="flex items-center p-1 bg-[#F6F5F0] rounded-xl border border-[#E4E2DD]">
               <button
-                key={tab.id}
-                onClick={() => setStatusFilter(tab.id)}
-                className={`px-2.5 py-1.5 rounded-lg transition-all ${
-                  statusFilter === tab.id
-                    ? 'bg-white text-indigo-700 shadow font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
+                onClick={() => setViewMode('table')}
+                aria-label="Chế độ bảng dữ liệu"
+                title="Xem dạng bảng chi tiết"
+                className={`p-1.5 rounded-lg transition-all ${
+                  viewMode === 'table' ? 'bg-white text-[#121316] shadow-xs' : 'text-[#5A5E66] hover:text-[#121316]'
                 }`}
               >
-                {tab.label}
+                <TableIcon className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                aria-label="Chế độ thẻ trực quan"
+                title="Xem dạng ô thẻ"
+                className={`p-1.5 rounded-lg transition-all ${
+                  viewMode === 'grid' ? 'bg-white text-[#121316] shadow-xs' : 'text-[#5A5E66] hover:text-[#121316]'
+                }`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Bộ lọc tình trạng nhanh (Không dùng Emoji, giải thích trực diện) */}
+        <div className="pt-2.5 border-t border-[#F0EFEA] flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-bold text-[#5A5E66] mr-1">
+              Lọc nhanh theo tình trạng:
+            </span>
+            {[
+              { id: 'ALL' as const, label: `Tất cả (${campaigns.length})` },
+              { id: 'ACTIVE_NOW' as const, label: 'Đang bật chạy' },
+              { id: 'OVER_PACING' as const, label: 'Tiêu tiền quá nhanh' },
+              { id: 'AD_FATIGUE' as const, label: 'Khách nhàm quảng cáo' },
+              { id: 'LOW_ROAS' as const, label: 'Đang lỗ (ROAS < 1.5x)' },
+            ].map((pill) => (
+              <button
+                key={pill.id}
+                type="button"
+                onClick={() => setSmartViewFilter(pill.id)}
+                data-testid={`saved-view-${pill.id.toLowerCase()}`}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all border ${
+                  smartViewFilter === pill.id
+                    ? 'bg-[#121316] text-white border-[#121316]'
+                    : 'bg-[#F6F5F0]/60 hover:bg-[#EAE8E1] text-[#121316] border-[#E4E2DD]'
+                }`}
+              >
+                {pill.label}
               </button>
             ))}
           </div>
 
-          <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200">
-            <button
-              onClick={() => setViewMode('table')}
-              aria-label="Chế độ bảng dữ liệu"
-              title="Chế độ Bảng Dữ Liệu Chuyên Sâu (Meta Ads Data Table)"
-              className={`p-1.5 rounded-lg transition-all ${
-                viewMode === 'table' ? 'bg-white text-indigo-700 shadow' : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <TableIcon className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('grid')}
-              aria-label="Chế độ thẻ trực quan"
-              title="Chế độ Thẻ Trực Quan (Grid Cards)"
-              className={`p-1.5 rounded-lg transition-all ${
-                viewMode === 'grid' ? 'bg-white text-indigo-700 shadow' : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
+          <div className="text-[11px] text-[#5A5E66] hidden sm:flex items-center gap-2">
+            <span>Giữ phím <kbd className="px-1.5 py-0.5 bg-[#F6F5F0] border border-[#D0CEC7] rounded text-[10px] font-mono">Shift + Nhấp chuột</kbd> để chọn nhiều dòng · Bấm vào số tiền để sửa ngân sách</span>
           </div>
         </div>
       </div>
@@ -1271,8 +1545,8 @@ useEffect(() => {
           </div>
           <h3 className="text-base font-bold text-slate-800">Không tìm thấy chiến dịch phù hợp</h3>
           <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-            {searchTerm || statusFilter !== 'ALL' || objectiveFilter !== 'ALL'
-              ? 'Thử điều chỉnh lại bộ lọc tìm kiếm hoặc trạng thái phân phối.'
+            {searchTerm || statusFilter !== 'ALL' || objectiveFilter !== 'ALL' || smartViewFilter !== 'ALL'
+              ? 'Thử điều chỉnh lại bộ lọc tìm kiếm, trạng thái phân phối hoặc Saved Views.'
               : 'Hãy bắt đầu thiết lập chiến dịch đầu tiên theo quy trình chuẩn Meta Ads & Google Ads.'}
           </p>
           <button
@@ -1280,6 +1554,7 @@ useEffect(() => {
               setSearchTerm('');
               setStatusFilter('ALL');
               setObjectiveFilter('ALL');
+              setSmartViewFilter('ALL');
               setIsWizardOpen(true);
             }}
             className="mt-5 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm"
@@ -1337,10 +1612,6 @@ useEffect(() => {
                   </div>
 
                   <div>
-                    {/* Tên chiến dịch là nút thật thay vì bấm vào cả thẻ: thẻ chứa
-                        switch trạng thái và các nút hành động khác, nên bọc nó trong
-                        `role="button"` tạo ra `nested-interactive` (WCAG serious) và
-                        chặn trình đọc màn hình. */}
                     <button
                       type="button"
                       onClick={() => setSelectedDrawerCampaign(c)}
@@ -1441,8 +1712,6 @@ useEffect(() => {
 
           {/* Desktop Data Table (>=768px) */}
           <div className="hidden md:block bg-white rounded-2xl border border-slate-200 overflow-hidden shadow">
-            {/* Vùng cuộn ngang: đặt tabIndex=0 để người dùng bàn phím cuộn được
-                bằng phím mũi tên — kỹ thuật WCAG 2.1.1 cho nội dung cuộn. */}
             <div
               className="overflow-x-auto"
               role="region"
@@ -1452,44 +1721,79 @@ useEffect(() => {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
-                    <th className="py-3 px-4 w-28">Phân phối</th>
+                    <th className="py-3 pl-4 pr-2 w-10 text-center">
+                      <input
+                        type="checkbox"
+                        aria-label="Chọn tất cả chiến dịch đang hiển thị"
+                        checked={
+                          filteredCampaigns.length > 0 &&
+                          filteredCampaigns.every((c) => selectedCampaignIds.includes(c.id))
+                        }
+                        onChange={handleSelectAllDisplayed}
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      />
+                    </th>
+                    <th className="py-3 px-3 w-24">Trạng thái</th>
                     <th className="py-3 px-4 min-w-[240px]">Chiến dịch & Sản phẩm</th>
-                    <th className="py-3 px-4 min-w-[130px]">Kênh</th>
-                    <th className="py-3 px-4 min-w-[170px]">Ngân sách & Chi tiêu</th>
-                    <th className="py-3 px-4 min-w-[140px]">Chỉ số Hiệu suất</th>
-                    <th className="py-3 px-4 min-w-[140px]">Mẫu QC & Duyệt</th>
-                    <th className="py-3 px-4 w-28 text-center">Bác sĩ AI</th>
+                    <th className="py-3 px-3 min-w-[115px]">Kênh</th>
+                    <th className="py-3 px-4 min-w-[185px]">Ngân sách & Đã chi</th>
+                    <th className="py-3 px-4 min-w-[140px]">Doanh thu & ROAS</th>
+                    <th className="py-3 px-3 min-w-[140px]">Bài viết</th>
+                    <th className="py-3 px-3 w-28 text-center">Kiểm tra</th>
                     <th className="py-3 px-4 w-32 text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {filteredCampaigns.map((c) => {
+                  {filteredCampaigns.map((c, rowIdx) => {
                     const isActive = c.status === 'ACTIVE';
                     const isPaused = c.status === 'PAUSED';
                     const isUpdating = isUpdatingStatusId === c.id;
+                    const isSelected = selectedCampaignIds.includes(c.id);
                     const agg = campaignMetrics[c.id] ?? EMPTY_AGGREGATE;
                     const hasMetrics = agg.rowCount > 0;
                     const rowRoas = hasMetrics && agg.cost > 0 ? agg.revenue / agg.cost : null;
                     const rowCvr = agg.clicks > 0 ? (agg.conversions / agg.clicks) * 100 : null;
-                    // Nhịp chi tiêu = chi phí thực đo / ngân sách. Trước đây dùng
-                    // hằng số Math.min(68.4, 100) cho mọi dòng.
                     const spendAmt = agg.cost;
                     const spendPercent = Number(c.budget) > 0
                       ? Math.min((spendAmt / Number(c.budget)) * 100, 100)
                       : 0;
+                    const pacingInfo = getCampaignPacingAndFatigue(c);
                     const creativeCount = contentStats[c.id]?.count ?? 0;
                     const channelCodes = (contentStats[c.id]?.channels ?? []).filter(
                       (code) => code !== 'unknown'
                     );
+                    const campCode = c.campaign_code || `CMP_${String(c.id).padStart(3, '0')}`;
+                    const funnelStage = c.funnel_stage || (c.objective?.toLowerCase().includes('nhận diện') ? 'ToFU' : c.objective?.toLowerCase().includes('doanh số') ? 'BoFU' : 'MoFU');
+                    const funnelLabel = funnelStage === 'BoFU' || funnelStage === 'BOFU'
+                      ? 'Chốt đơn (BoFU)'
+                      : funnelStage === 'ToFU' || funnelStage === 'TOFU'
+                      ? 'Tiếp cận mới (ToFU)'
+                      : 'Tư vấn (MoFU)';
 
                     return (
                       <tr 
                         key={c.id} 
                         onClick={() => setSelectedDrawerCampaign(c)}
-                        className="hover:bg-indigo-50/30 transition-colors group cursor-pointer"
+                        className={`transition-colors group cursor-pointer ${
+                          isSelected ? 'bg-[#F6F5F0]' : 'hover:bg-[#F6F5F0]/60'
+                        }`}
                       >
+                        {/* Column 0: Multi-select Checkbox with Shift+Click */}
+                        <td
+                          className="py-3.5 pl-4 pr-2 text-center"
+                          onClick={(e) => handleRowSelect(c.id, rowIdx, e)}
+                        >
+                          <input
+                            type="checkbox"
+                            aria-label={`Chọn chiến dịch ${c.name}`}
+                            checked={isSelected}
+                            onChange={() => {}}
+                            className="rounded border-slate-300 text-[#D95D39] focus:ring-[#D95D39] cursor-pointer"
+                          />
+                        </td>
+
                         {/* Column 1: Delivery Toggle Switch */}
-                        <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
+                        <td className="py-3.5 px-3" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
@@ -1500,7 +1804,7 @@ useEffect(() => {
                               role="switch"
                               aria-checked={isActive}
                               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 ${
-                                isActive ? 'bg-emerald-500' : 'bg-slate-300'
+                                isActive ? 'bg-[#15803D]' : 'bg-slate-300'
                               }`}
                             >
                               <span
@@ -1511,32 +1815,48 @@ useEffect(() => {
                             </button>
                             
                             <span className={`text-[10px] font-bold ${
-                              isActive ? 'text-emerald-700' : isPaused ? 'text-slate-600' : 'text-slate-600'
+                              isActive ? 'text-[#15803D]' : isPaused ? 'text-slate-600' : 'text-slate-600'
                             }`}>
                               {isActive ? 'BẬT' : isPaused ? 'TẮT' : c.status}
                             </span>
                           </div>
                         </td>
 
-                        {/* Column 2: Campaign & Product Hierarchy */}
+                        {/* Column 2: Campaign & Product Hierarchy + Standardized Code & Funnel Stage */}
                         <td className="py-3.5 px-4">
-                          <div className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors text-xs flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="px-1.5 py-0.5 rounded bg-[#F6F5F0] text-[#5A5E66] font-mono text-[9px] font-bold border border-[#E4E2DD]">
+                              {campCode}
+                            </span>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                funnelStage === 'BoFU' || funnelStage === 'BOFU'
+                                  ? 'bg-[#F0FDF4] text-[#15803D] border border-[#BBF7D0]'
+                                  : funnelStage === 'ToFU' || funnelStage === 'TOFU'
+                                  ? 'bg-sky-50 text-sky-700 border border-sky-200'
+                                  : 'bg-[#FFFBEB] text-[#B45309] border border-[#FDE68A]'
+                              }`}
+                            >
+                              {funnelLabel}
+                            </span>
+                          </div>
+                          <div className="font-bold text-[#121316] group-hover:text-[#D95D39] transition-colors text-xs flex items-center gap-1.5 mt-1">
                             <span>{c.name}</span>
-                            <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 text-indigo-600 transition-opacity" />
+                            <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 text-[#D95D39] transition-opacity" />
                           </div>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                              <Package className="w-3 h-3 text-slate-500" />
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#5A5E66] bg-[#F6F5F0] px-2 py-0.5 rounded-md border border-[#E4E2DD]">
+                              <Package className="w-3 h-3 text-[#5A5E66]" />
                               <span>{c.product?.name || `Sản phẩm #${c.product_id}`}</span>
                             </span>
-                            <span className="text-[10px] font-medium text-slate-500 truncate max-w-[180px]">
+                            <span className="text-[10px] font-medium text-[#5A5E66] truncate max-w-[160px]">
                               {c.objective}
                             </span>
                           </div>
                         </td>
 
                         {/* Column 3: Channels — dẫn xuất từ nội dung thực tế */}
-                        <td className="py-3.5 px-4">
+                        <td className="py-3.5 px-3">
                           {channelCodes.length > 0 ? (
                             <div className="flex items-center gap-1.5">
                               {channelCodes.map((code) => {
@@ -1558,22 +1878,66 @@ useEffect(() => {
                           )}
                         </td>
 
-                        {/* Column 4: Budget & Spend Pacing */}
-                        <td className="py-3.5 px-4">
-                          <div className="font-mono font-bold text-slate-900 text-xs">
-                            {formatNumber(c.budget)} <span className="text-[10px] font-normal text-slate-500">đ</span>
-                          </div>
+                        {/* Column 4: Budget (Inline Edit) & Spend vs Time Pacing */}
+                        <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
+                          {editingBudgetId === c.id ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                autoFocus
+                                value={editingBudgetValue}
+                                onChange={(e) => setEditingBudgetValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') void handleSaveInlineBudget(c);
+                                  if (e.key === 'Escape') setEditingBudgetId(null);
+                                }}
+                                onBlur={() => void handleSaveInlineBudget(c)}
+                                className="w-28 px-2 py-1 text-xs font-mono font-bold border border-[#D95D39] rounded-lg bg-white text-[#121316] focus:outline-none focus:ring-2 focus:ring-[#D95D39]"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => void handleSaveInlineBudget(c)}
+                                className="p-1 rounded bg-[#D95D39] text-white hover:bg-[#C04E2C]"
+                                title="Lưu ngân sách"
+                              >
+                                <Check className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingBudgetId(c.id);
+                                setEditingBudgetValue(String(c.budget || 0));
+                              }}
+                              title="Nhấp để sửa nhanh Ngân sách"
+                              className="group/budget inline-flex items-center gap-1.5 font-mono font-bold text-[#121316] hover:text-[#D95D39] text-xs text-left"
+                            >
+                              <span>{formatNumber(c.budget)}</span>
+                              <span className="text-[10px] font-normal text-[#5A5E66]">đ</span>
+                              <PencilLine className="w-3 h-3 text-slate-400 opacity-0 group-hover/budget:opacity-100 transition-opacity" />
+                            </button>
+                          )}
+
                           <div className="mt-1 flex items-center gap-2">
-                            <div className="flex-1 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                            <div className="flex-1 bg-[#F0EFEA] rounded-full h-1.5 overflow-hidden relative">
                               <div 
-                                className="bg-indigo-600 h-1.5 rounded-full" 
+                                className={`h-1.5 rounded-full ${
+                                  pacingInfo.isOverPacing ? 'bg-[#BE123C]' : 'bg-[#121316]'
+                                }`}
                                 style={{ width: `${spendPercent.toFixed(1)}%` }}
                               ></div>
                             </div>
-                            <span className="text-[10px] font-mono text-slate-500">
-                              {hasMetrics ? `${spendPercent.toFixed(1)}%` : 'chưa có chi phí'}
+                            <span className="text-[10px] font-mono text-[#5A5E66]">
+                              {hasMetrics ? `${spendPercent.toFixed(1)}%` : 'chưa chi'}
                             </span>
                           </div>
+                          {pacingInfo.isOverPacing && (
+                            <div className="mt-1 inline-flex items-center gap-1 text-[9px] font-bold text-[#BE123C] bg-[#FFF1F2] px-1.5 py-0.5 rounded border border-[#FECDD3]">
+                              <Flame className="w-2.5 h-2.5 text-[#BE123C]" />
+                              <span>Tiêu nhanh ({pacingInfo.budgetPct.toFixed(0)}% tiền / {pacingInfo.timePct.toFixed(0)}% ngày)</span>
+                            </div>
+                          )}
                         </td>
 
                         {/* Column 5: Performance Metrics — từ CampaignMetric thật */}
@@ -1583,38 +1947,53 @@ useEffect(() => {
                               <div className="flex items-center gap-1.5">
                                 <span
                                   className={`px-2 py-0.5 rounded-md font-mono font-bold text-[11px] border ${
-                                    rowRoas !== null && rowRoas >= 1
-                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                                    rowRoas !== null && rowRoas >= 1.5
+                                      ? 'bg-[#F0FDF4] text-[#15803D] border-[#BBF7D0]'
+                                      : 'bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]'
                                   }`}
                                 >
                                   {rowRoas !== null ? `${rowRoas.toFixed(2)}x ROAS` : 'Chưa có chi phí'}
                                 </span>
                               </div>
-                              <div className="text-[10px] text-slate-500 mt-1">
-                                {formatNumber(agg.clicks)} Clicks{rowCvr !== null ? ` • ${rowCvr.toFixed(1)}% CVR` : ''}
+                              <div className="text-[10px] text-[#5A5E66] mt-1">
+                                {formatNumber(agg.clicks)} lượt bấm{rowCvr !== null ? ` · ${rowCvr.toFixed(1)}% chốt đơn` : ''}
                               </div>
                             </>
                           ) : (
-                            // `text-slate-400` trên nền trắng chỉ đạt ~2.6:1, dưới
-                            // ngưỡng 4.5:1 của WCAG AA cho chữ 10px. Dùng
-                            // `text-slate-500` (~4.8:1) — vẫn là chữ nhỏ chìm về
-                            // thị giác nhưng đọc được bằng công cụ hỗ trợ.
                             <span className="text-[10px] text-slate-500 italic">Chưa ghi nhận chỉ số</span>
                           )}
                         </td>
 
-                        {/* Column 6: Creatives & Approval Ratio — số lượng thật */}
-                        <td className="py-3.5 px-4">
-                          <div className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-lg">
-                            <Layers className="w-3.5 h-3.5 text-indigo-600" />
-                            <span>{creativeCount} Mẫu QC</span>
+                        {/* Column 6: Creatives & Ad Fatigue Indicator */}
+                        <td className="py-3.5 px-3">
+                          <div className="inline-flex items-center gap-1 text-[11px] font-bold text-[#121316] bg-[#F6F5F0] border border-[#E4E2DD] px-2 py-1 rounded-lg">
+                            <Layers className="w-3.5 h-3.5 text-[#5A5E66]" />
+                            <span>{creativeCount} bài viết</span>
                           </div>
+                          {pacingInfo.isFatigued && (
+                            <div className="mt-1">
+                              <span className="inline-flex items-center gap-1 text-[9px] font-bold text-[#B45309] bg-[#FFFBEB] border border-[#FDE68A] px-1.5 py-0.5 rounded">
+                                <AlertTriangle className="w-2.5 h-2.5 text-[#B45309]" />
+                                <span>Khách nhàm QC</span>
+                              </span>
+                            </div>
+                          )}
                         </td>
 
-                        {/* Column 7: AI Doctor Health — không có báo cáo thì không hiện điểm bịa */}
-                        <td className="py-3.5 px-4 text-center">
-                          <span className="text-[10px] text-slate-500 italic">Mở Bác sĩ AI</span>
+                        {/* Column 7: AI Doctor Health */}
+                        <td className="py-3.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedDrawerCampaign(c);
+                              setDrawerTab('ai_doctor');
+                            }}
+                            data-testid={`open-ai-doctor-btn-${c.id}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold text-[#121316] bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#D0CEC7] transition-colors"
+                          >
+                            <Sparkles className="w-3 h-3 text-[#D95D39]" />
+                            <span>Khám bệnh</span>
+                          </button>
                         </td>
 
                         {/* Column 8: Quick Actions */}
@@ -1663,6 +2042,43 @@ useEffect(() => {
                     );
                   })}
                 </tbody>
+
+                {/* Sticky Summary Footer (Meta Ads Manager Total Row Standard) */}
+                <tfoot className="bg-slate-900 text-white border-t-2 border-slate-800 text-xs font-bold">
+                  <tr>
+                    <td colSpan={4} className="py-3 px-4">
+                      <div className="flex items-center gap-2">
+                        <span className="uppercase tracking-wider text-[10px] text-indigo-300">
+                          {tableFooterSummary.isSelectionSubset
+                            ? `Đang chọn ${tableFooterSummary.count} chiến dịch:`
+                            : `Tổng hợp ${tableFooterSummary.count} chiến dịch hiển thị:`}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 font-mono">
+                      <div className="text-white">
+                        NS: {formatNumber(tableFooterSummary.totalBudget)} đ
+                      </div>
+                      <div className="text-[10px] text-indigo-300 font-normal">
+                        Đã chi: {formatNumber(tableFooterSummary.totalSpend)} đ
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 font-mono">
+                      <div className="text-emerald-400">
+                        {tableFooterSummary.weightedRoas !== null
+                          ? `${tableFooterSummary.weightedRoas.toFixed(2)}x ROAS TB`
+                          : '— ROAS'}
+                      </div>
+                      <div className="text-[10px] text-slate-300 font-normal">
+                        DT: {formatNumber(tableFooterSummary.totalRevenue)} đ • {formatNumber(tableFooterSummary.totalConversions)} đơn
+                      </div>
+                    </td>
+                    <td colSpan={3} className="py-3 px-4 text-right text-[11px] text-slate-300 font-normal">
+                      {formatNumber(tableFooterSummary.totalClicks)} Clicks
+                      {tableFooterSummary.avgCvr !== null ? ` • ${tableFooterSummary.avgCvr.toFixed(1)}% CVR TB` : ''}
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
 
@@ -2661,24 +3077,70 @@ useEffect(() => {
               {/* STEP 2: CHANNELS & AUDIENCE */}
               {wizardStep === 2 && (
                 <div className="space-y-4">
-                  {/* Channel Selection & Budget Breakdown */}
+                  {/* Channel Selection & Interactive Budget Breakdown */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
-                      2. Kênh Phân phối & Phân bổ Ngân sách
-                    </label>
-                    <div className="grid grid-cols-3 gap-3">
-                      {[
-                        { id: 'facebook', label: 'Facebook Feed & Ads', icon: 'FB', share: wizardData.budgetSplit.facebook },
-                        { id: 'tiktok', label: 'TikTok Video 9:16', icon: 'TT', share: wizardData.budgetSplit.tiktok },
-                        { id: 'email', label: 'Email Newsletter', icon: 'Mail', share: wizardData.budgetSplit.email }
-                      ].map(ch => (
-                        <div key={ch.id} className="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs">
-                          <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+                        2. Kênh Phân phối & Thanh trượt Phân bổ Ngân sách
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                            wizardData.budgetSplit.facebook + wizardData.budgetSplit.tiktok + wizardData.budgetSplit.email === 100
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}
+                        >
+                          Tổng: {wizardData.budgetSplit.facebook + wizardData.budgetSplit.tiktok + wizardData.budgetSplit.email}%
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setWizardData((prev) => ({
+                              ...prev,
+                              budgetSplit: { facebook: 50, tiktok: 35, email: 15 },
+                            }))
+                          }
+                          className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 underline"
+                        >
+                          Chuẩn 50/35/15%
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {(
+                        [
+                          { id: 'facebook' as const, label: 'Facebook Feed & Ads', share: wizardData.budgetSplit.facebook },
+                          { id: 'tiktok' as const, label: 'TikTok Video 9:16', share: wizardData.budgetSplit.tiktok },
+                          { id: 'email' as const, label: 'Email Newsletter', share: wizardData.budgetSplit.email },
+                        ]
+                      ).map((ch) => (
+                        <div key={ch.id} className="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-2">
+                          <div className="flex items-center justify-between">
                             <span className="font-bold text-slate-800">{ch.label}</span>
                             <span className="font-mono text-indigo-600 font-black">{ch.share}%</span>
                           </div>
-                          <div className="text-[11px] font-mono text-slate-500 mt-1">
-                            {((wizardData.budget * ch.share) / 100).toLocaleString('vi-VN')} đ
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            step={5}
+                            value={ch.share}
+                            aria-label={`Tỷ lệ ngân sách ${ch.label}`}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setWizardData((prev) => ({
+                                ...prev,
+                                budgetSplit: {
+                                  ...prev.budgetSplit,
+                                  [ch.id]: val,
+                                },
+                              }));
+                            }}
+                            className="w-full accent-indigo-600 cursor-pointer"
+                          />
+                          <div className="text-[11px] font-mono text-slate-600 font-semibold">
+                            {Math.round((wizardData.budget * ch.share) / 100).toLocaleString('vi-VN')} đ
                           </div>
                         </div>
                       ))}
@@ -3233,13 +3695,230 @@ useEffect(() => {
           campaignId={selectedDrawerCampaign.id}
           onClose={() => setIsManualComposerOpen(false)}
           onCreated={() => {
-            // Nạp lại nội dung của chiến dịch để bài vừa tạo hiện ngay trong
-            // drawer, rồi báo lên App để các bảng khác cập nhật theo.
             void loadDrawerDetails(selectedDrawerCampaign.id);
             onRefreshData?.();
           }}
         />
       )}
+
+      {/* 8. FLOATING BULK ACTION BAR (Meta Ads Manager / Smartly.io Scale UX) */}
+      {selectedCampaignIds.length > 0 && (
+        <div
+          data-testid="campaigns-bulk-action-bar"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 flex flex-wrap items-center gap-3 max-w-4xl w-[94vw] sm:w-auto animate-in fade-in slide-in-from-bottom-4 duration-200"
+        >
+          <div className="flex items-center gap-2 pr-3 border-r border-slate-700">
+            <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-extrabold flex items-center justify-center">
+              {selectedCampaignIds.length}
+            </span>
+            <span className="text-xs font-bold whitespace-nowrap">chiến dịch đã chọn</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={isBulkProcessing}
+              onClick={() => void handleExecuteBulkAction('ACTIVATE')}
+              data-testid="bulk-activate-btn"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors disabled:opacity-50"
+            >
+              <Play className="w-3.5 h-3.5" />
+              <span>Kích hoạt</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isBulkProcessing}
+              onClick={() => void handleExecuteBulkAction('PAUSE')}
+              data-testid="bulk-pause-btn"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition-colors disabled:opacity-50"
+            >
+              <Pause className="w-3.5 h-3.5" />
+              <span>Tạm dừng</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isBulkProcessing}
+              onClick={() => setBulkBudgetModalOpen(true)}
+              data-testid="bulk-budget-btn"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors disabled:opacity-50"
+            >
+              <DollarSign className="w-3.5 h-3.5" />
+              <span>Tăng/Giảm Ngân sách</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isBulkProcessing}
+              onClick={() => void handleExecuteBulkAction('ARCHIVE')}
+              data-testid="bulk-archive-btn"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-100 text-xs font-bold transition-colors disabled:opacity-50"
+            >
+              <Archive className="w-3.5 h-3.5" />
+              <span>Lưu trữ</span>
+            </button>
+
+            {canDeleteCampaign && (
+              <button
+                type="button"
+                disabled={isBulkProcessing}
+                onClick={() => void handleExecuteBulkAction('DELETE')}
+                data-testid="bulk-delete-btn"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600/90 hover:bg-rose-600 text-white text-xs font-bold transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Xóa</span>
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setSelectedCampaignIds([])}
+            className="ml-auto p-1.5 text-slate-400 hover:text-white rounded-lg"
+            title="Bỏ chọn tất cả"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* 9. BULK BUDGET ADJUSTMENT MODAL (Learning Phase Guardrail) */}
+      {bulkBudgetModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-base font-bold text-slate-900">
+                Điều chỉnh Ngân sách Hàng loạt ({selectedCampaignIds.length} chiến dịch)
+              </h4>
+              <button
+                type="button"
+                onClick={() => setBulkBudgetModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => {
+                  setBulkBudgetMode('PERCENT_CHANGE');
+                  setBulkBudgetValue(15);
+                }}
+                className={`py-2 rounded-lg transition-all ${
+                  bulkBudgetMode === 'PERCENT_CHANGE' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600'
+                }`}
+              >
+                Tăng/Giảm theo %
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBulkBudgetMode('SET');
+                  setBulkBudgetValue(15000000);
+                }}
+                className={`py-2 rounded-lg transition-all ${
+                  bulkBudgetMode === 'SET' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600'
+                }`}
+              >
+                Đặt mức cố định (VNĐ)
+              </button>
+            </div>
+
+            {bulkBudgetMode === 'PERCENT_CHANGE' ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  {[-20, -15, 15, 20, 30].map((pct) => (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => setBulkBudgetValue(pct)}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-mono font-bold border ${
+                        bulkBudgetValue === pct
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {pct > 0 ? `+${pct}%` : `${pct}%`}
+                    </button>
+                  ))}
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Nhập tỷ lệ % thay đổi (ví dụ: 15 hoặc -15):
+                  </label>
+                  <input
+                    type="number"
+                    value={bulkBudgetValue}
+                    onChange={(e) => setBulkBudgetValue(Number(e.target.value))}
+                    className="w-full p-2.5 text-xs font-mono font-bold bg-slate-50 border border-slate-200 rounded-xl"
+                  />
+                </div>
+                {Math.abs(bulkBudgetValue) > 25 && (
+                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <strong>Cảnh báo Bảo vệ Giai đoạn Máy học (Learning Phase):</strong> Thay đổi ngân sách vượt quá ±25% trong 1 lần có thể làm thuật toán Meta/TikTok Ads reset lại giai đoạn học (Learning Limited). Khuyến nghị mức ±15% đến ±20%.
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Đặt ngân sách mới cho từng chiến dịch (VNĐ):
+                </label>
+                <input
+                  type="number"
+                  step={1000000}
+                  value={bulkBudgetValue}
+                  onChange={(e) => setBulkBudgetValue(Number(e.target.value))}
+                  className="w-full p-2.5 text-xs font-mono font-bold bg-slate-50 border border-slate-200 rounded-xl"
+                />
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setBulkBudgetModalOpen(false)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={isBulkProcessing}
+                onClick={() =>
+                  void handleExecuteBulkAction('ADJUST_BUDGET', {
+                    budget_mode: bulkBudgetMode,
+                    budget_value: bulkBudgetValue,
+                  })
+                }
+                data-testid="confirm-bulk-budget-btn"
+                className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm disabled:opacity-50"
+              >
+                {isBulkProcessing ? 'Đang áp dụng...' : 'Áp dụng Hàng loạt'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 10. GLOBAL SMART CSV MULTI-CAMPAIGN IMPORTER MODAL */}
+      <GlobalCsvImportModal
+        isOpen={isGlobalCsvModalOpen}
+        onClose={() => setIsGlobalCsvModalOpen(false)}
+        campaigns={campaigns}
+        workspaceId={Number(localStorage.getItem('active_workspace_id')) || undefined}
+        onSuccess={() => {
+          void loadData();
+          if (onRefreshData) onRefreshData();
+        }}
+      />
     </div>
   );
 };

@@ -237,6 +237,11 @@ class CampaignBase(BaseModel):
     primary_cta: Optional[str] = None
     target_kpi_name: Optional[str] = None
     target_kpi_value: Optional[float] = None
+    campaign_code: Optional[str] = None
+    funnel_stage: Optional[str] = "BoFU"
+    daily_budget_cap: Optional[float] = Field(None, ge=0.0)
+    tags_json: Optional[str] = "[]"
+    tags: Optional[List[str]] = Field(default_factory=list)
 
     @field_validator("start_date", "end_date")
     @classmethod
@@ -275,6 +280,11 @@ class CampaignUpdate(BaseModel):
     primary_cta: Optional[str] = None
     target_kpi_name: Optional[str] = None
     target_kpi_value: Optional[float] = None
+    campaign_code: Optional[str] = None
+    funnel_stage: Optional[str] = None
+    daily_budget_cap: Optional[float] = Field(None, ge=0.0)
+    tags_json: Optional[str] = None
+    tags: Optional[List[str]] = None
 
     @field_validator("start_date", "end_date")
     @classmethod
@@ -374,11 +384,27 @@ class CampaignResponse(CampaignBase):
     updated_at: datetime
     # % hoàn thành theo task (None khi chưa có task — không bịa số).
     progress_pct: Optional[int] = None
+    contents_count: int = 0
+    approved_contents_count: int = 0
+    channels: List[str] = Field(default_factory=list)
+    metrics_summary: Optional[Dict[str, Any]] = None
     owner: Optional[UserResponse] = None
     product: Optional[ProductResponse] = None
     budget_allocations: Optional[List[BudgetAllocationResponse]] = None
     kpi_targets: Optional[List[KPITargetResponse]] = None
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="after")
+    def hydrate_tags(self):
+        if not self.tags and self.tags_json:
+            import json as _json
+            try:
+                parsed = _json.loads(self.tags_json)
+                if isinstance(parsed, list):
+                    self.tags = [str(t) for t in parsed if t]
+            except Exception:
+                self.tags = []
+        return self
 
 # --- CAMPAIGN TASKS ---
 class TaskBase(BaseModel):
@@ -450,6 +476,10 @@ class ContentCreate(BaseModel):
     image_url: Optional[str] = Field(None, max_length=1024, description="URL ảnh sản phẩm hoặc banner chiến dịch")
     status: Optional[str] = Field("DRAFT", pattern="^(DRAFT|AI_DRAFT|IN_REVIEW|APPROVED|REJECTED|PUBLISHED)$")
     warnings_json: Optional[str] = None
+    creative_angle: Optional[str] = None
+    hook_variant: Optional[str] = None
+    utm_params: Optional[str] = None
+    ai_metadata_json: Optional[str] = "{}"
 
     @field_validator("image_url")
     @classmethod
@@ -471,6 +501,10 @@ class ContentUpdate(BaseModel):
     image_url: Optional[str] = Field(None, max_length=1024, description="URL hình ảnh sản phẩm/banner mới (hoặc chuỗi rỗng để gỡ ảnh)")
     # status KHONG duoc cap nhat qua PUT. Moi chuyen trang thai phai qua cac endpoint chuyen trang thai: /submit, /approve, /reject, /publish.
     warnings_json: Optional[str] = None
+    creative_angle: Optional[str] = None
+    hook_variant: Optional[str] = None
+    utm_params: Optional[str] = None
+    ai_metadata_json: Optional[str] = None
 
     # extra="allow": giu lai truong "status" do client gui len de endpoint PUT co the
     # tu choi ro rang bang HTTP 400 thay vi bo qua im lang. Endpoint chi doc cac
@@ -504,6 +538,10 @@ class ContentResponse(BaseModel):
     version_no: int
     source_ids_json: str
     warnings_json: Optional[str] = "[]"
+    creative_angle: Optional[str] = None
+    hook_variant: Optional[str] = None
+    utm_params: Optional[str] = None
+    ai_metadata_json: Optional[str] = "{}"
 
     created_at: datetime
     updated_at: datetime
@@ -582,6 +620,7 @@ class ScheduleResponse(BaseModel):
 class MetricCreate(BaseModel):
     campaign_id: int
     channel_id: int
+    content_id: Optional[int] = None
     metric_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$") # YYYY-MM-DD
     views: int = Field(0, ge=0)
     clicks: int = Field(0, ge=0)
@@ -651,6 +690,7 @@ class AIDoctorResponse(BaseModel):
     campaign_id: Optional[int] = None
     campaign_name: Optional[str] = None
     health_status: str = Field(..., description="HEALTHY | NEEDS_ATTENTION | CRITICAL")
+    overall_status: Optional[str] = None
     health_score: int = Field(..., ge=0, le=100)
     diagnosis_summary: str
     key_bottlenecks: List[str] = Field(default_factory=list)
@@ -659,6 +699,13 @@ class AIDoctorResponse(BaseModel):
     metrics_analyzed: Optional[Dict[str, Any]] = None
     channel_breakdown: Optional[List[ChannelAttributionResponse]] = Field(default_factory=list)
     is_sparse_data: bool = False
+    funnel_stage: Optional[str] = "BoFU"
+    pacing_ratio: Optional[float] = None
+    pacing_status: Optional[str] = "ON_TRACK"
+    fatigue_detected: bool = False
+    fatigue_detail: Optional[str] = None
+    learning_phase_protected: bool = False
+    channel_benchmarks: Optional[Dict[str, Any]] = None
     generated_at: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
@@ -1315,3 +1362,357 @@ class CommandCenterResponse(BaseModel):
     my_work_today: List[CommandCenterMyWorkItem]
     campaigns_health: List[CommandCenterCampaignHealth]
     summary_counts: Dict[str, int]
+
+
+# --- ENTERPRISE 1,000-CAMPAIGN GRID & AI UPGRADE SCHEMAS ---
+class CampaignGridSummaryResponse(BaseModel):
+    total_campaigns: int = 0
+    status_counts: Dict[str, int] = Field(default_factory=dict)
+    funnel_counts: Dict[str, int] = Field(default_factory=dict)
+    total_budget: float = 0.0
+    total_spent: float = 0.0
+    total_revenue: float = 0.0
+    overall_roas: float = 0.0
+    anomaly_counts: Dict[str, int] = Field(default_factory=dict)
+
+
+class CampaignBulkActionRequest(BaseModel):
+    campaign_ids: List[int] = Field(..., min_length=1, max_length=500)
+    action: str = Field(
+        ...,
+        pattern="^(PAUSE|ACTIVATE|ARCHIVE|COMPLETE|DELETE|ADJUST_BUDGET|SET_DAILY_CAP|ADD_TAGS|ADD_TAG|ASSIGN_TAGS)$",
+        description="PAUSE | ACTIVATE | ARCHIVE | COMPLETE | DELETE | ADJUST_BUDGET | SET_DAILY_CAP | ADD_TAGS | ADD_TAG | ASSIGN_TAGS",
+    )
+    budget_delta_pct: Optional[float] = Field(
+        None, ge=-90.0, le=500.0, description="Phần trăm điều chỉnh ngân sách (VD: 20 hoặc -15)"
+    )
+    budget_mode: Optional[str] = Field(None, description="SET | PERCENT_CHANGE")
+    budget_value: Optional[float] = None
+    daily_budget_cap: Optional[float] = Field(None, ge=0.0)
+    tags: Optional[List[str]] = None
+    tag: Optional[str] = None
+
+
+class CampaignBulkActionResponse(BaseModel):
+    status: str = "ok"
+    action: str
+    requested_count: int
+    updated_count: int
+    deleted_count: int = 0
+    updated_ids: List[int] = Field(default_factory=list)
+    skipped_ids: List[int] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    message: str
+
+
+class SeedAngleMatrixRequest(BaseModel):
+    channel_ids: Optional[List[int]] = None
+    channel_id: Optional[int] = None
+    channel_code: Optional[str] = None
+    variants: Optional[List[Dict[str, Any]]] = None
+    angles: Optional[List[str]] = None
+    hooks_per_angle: int = Field(3, ge=1, le=3)
+    persist_to_db: bool = True
+    target_status: str = Field("AI_DRAFT", pattern="^(DRAFT|AI_DRAFT|IN_REVIEW)$")
+    preferred_provider: Optional[str] = None
+    preferred_model: Optional[str] = None
+
+
+class SeedAngleMatrixResponse(BaseModel):
+    status: str = "ok"
+    campaign_id: int
+    created_count: int
+    content_ids: List[int] = Field(default_factory=list)
+    contents: List[ContentResponse] = Field(default_factory=list)
+    matrix_summary: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ContentBulkReviewRequest(BaseModel):
+    content_ids: List[int] = Field(..., min_length=1, max_length=500)
+    action: str = Field(..., pattern="^(APPROVE|REJECT|SUBMIT|DELETE)$")
+    reason: Optional[str] = Field("Phê duyệt/xử lý hàng loạt trên Enterprise Grid")
+    feedback: Optional[str] = None
+    rejection_reason: Optional[str] = None
+
+
+class ContentBulkReviewResponse(BaseModel):
+    status: str = "ok"
+    action: str
+    requested_count: int
+    processed_count: int
+    updated_count: int = 0
+    deleted_count: int = 0
+    skipped_count: int = 0
+    processed_ids: List[int] = Field(default_factory=list)
+    skipped_ids: List[int] = Field(default_factory=list)
+    errors: List[str] = Field(default_factory=list)
+    failed_items: List[Dict[str, Any]] = Field(default_factory=list)
+    message: str = ""
+
+
+class ContentBatchAutoFixRequest(BaseModel):
+    content_ids: Optional[List[int]] = None
+    apply_immediately: bool = True
+    preferred_provider: Optional[str] = None
+    preferred_model: Optional[str] = None
+
+
+class ContentBatchAutoFixItem(BaseModel):
+    content_id: int
+    original_score: int = 0
+    old_score: int = 0
+    new_score: int = 100
+    can_submit: bool = True
+    status_before: str = "WARNING"
+    status_after: str = "PASSED"
+    fixed_violations_count: int = 0
+    fixed_violations: List[str] = Field(default_factory=list)
+    rewritten_title: str = ""
+    rewritten_body: str = ""
+    rewritten_cta: Optional[str] = None
+    title: str = ""
+    body: str = ""
+    cta: Optional[str] = None
+
+
+class ContentBatchAutoFixResponse(BaseModel):
+    status: str = "ok"
+    requested_count: int = 0
+    processed_count: int = 0
+    fixed_count: int = 0
+    items: List[ContentBatchAutoFixItem] = Field(default_factory=list)
+    fixed_items: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class SmartCSVAnalyzeRequest(BaseModel):
+    csv_text: Optional[str] = Field(None, description="Nội dung file CSV dạng text")
+    csv_content: Optional[str] = Field(None, description="Alias từ Frontend")
+    workspace_id: Optional[int] = None
+    default_campaign_id: Optional[int] = None
+    default_channel_id: Optional[int] = None
+    default_channel_code: Optional[str] = "facebook"
+
+
+class SmartCSVAnalyzeResponse(BaseModel):
+    status: str = "ok"
+    detected_platform: str
+    column_mapping: Dict[str, Optional[str]] = Field(default_factory=dict)
+    detected_headers: List[str] = Field(default_factory=list)
+    total_rows: int
+    valid_rows: int = 0
+    valid_rows_count: int = 0
+    anomaly_rows: int = 0
+    matched_campaigns_count: int = 0
+    matched_count: int = 0
+    unmatched_count: int = 0
+    unmatched_campaigns: List[str] = Field(default_factory=list)
+    campaign_matches: List[Dict[str, Any]] = Field(default_factory=list)
+    anomalies: List[Dict[str, Any]] = Field(default_factory=list)
+    preview_rows: List[Dict[str, Any]] = Field(default_factory=list)
+    sample_rows: List[Dict[str, Any]] = Field(default_factory=list)
+    summary: Optional[Dict[str, Any]] = None
+
+
+class SmartCSVCommitRow(BaseModel):
+    campaign_id: Optional[int] = None
+    campaign_code: Optional[str] = None
+    campaign_name: Optional[str] = None
+    channel_id: Optional[int] = None
+    channel_code: Optional[str] = None
+    channel_name: Optional[str] = None
+    content_id: Optional[int] = None
+    metric_date: str
+    views: int = 0
+    clicks: int = 0
+    conversions: int = 0
+    cost: float = 0.0
+    revenue: float = 0.0
+
+
+class SmartCSVCommitRequest(BaseModel):
+    workspace_id: Optional[int] = None
+    default_campaign_id: Optional[int] = None
+    default_channel_id: Optional[int] = None
+    default_channel_code: Optional[str] = "facebook"
+    rows: Optional[List[SmartCSVCommitRow]] = None
+    csv_text: Optional[str] = None
+    csv_content: Optional[str] = None
+    column_mapping: Optional[Dict[str, Optional[str]]] = None
+    campaign_mapping: Optional[Dict[str, int]] = None
+    auto_create_campaigns: bool = True
+    replace_seed_data: bool = False
+
+
+class SmartCSVCommitResponse(BaseModel):
+    status: str = "success"
+    imported_rows: int = 0
+    updated_rows: int = 0
+    skipped_rows: int = 0
+    inserted_or_updated: int = 0
+    skipped_count: int = 0
+    updated_campaigns_count: int = 0
+    created_campaigns_count: int = 0
+    replaced_seed_rows: int = 0
+    affected_campaign_ids: List[int] = Field(default_factory=list)
+    campaigns_touched: List[int] = Field(default_factory=list)
+    errors: List[Any] = Field(default_factory=list)
+    message: str = "Đã đồng bộ dữ liệu báo cáo đa chiến dịch thành công."
+
+
+class AIAngleMatrixRequest(BaseModel):
+    campaign_id: Optional[int] = None
+    product_id: Optional[int] = None
+    workspace_id: Optional[int] = None
+    channel: Optional[str] = "facebook"
+    channel_code: Optional[str] = "facebook"
+    funnel_stage: Optional[str] = None
+    product_name: Optional[str] = None
+    product_usp: Optional[str] = None
+    objective: Optional[str] = None
+    audience: Optional[str] = None
+    target_audience: Optional[str] = None
+    tone: Optional[str] = None
+    brief: Optional[str] = None
+    key_message: Optional[str] = None
+    angles: Optional[List[str]] = None
+    hooks_per_angle: int = Field(3, ge=1, le=3)
+    prompt_version: str = "v3"
+    preferred_provider: Optional[str] = None
+    preferred_model: Optional[str] = None
+    chain_id: Optional[int] = None
+
+
+class AIAngleMatrixVariant(BaseModel):
+    id: Optional[str] = None
+    angle: str
+    angle_code: str = ""
+    creative_angle: str = ""
+    angle_label: str
+    funnel_stage: str = "BoFU"
+    hook_type: str
+    hook_variant: str = ""
+    hook_text: str
+    hook_3s: str = ""
+    title: str
+    body: str
+    cta: str
+    ab_hypothesis: str
+    predicted_ctr_pct: float
+    predicted_cvr_pct: float
+    compliance_score: int = 100
+    compliance_status: str = "PASSED"
+    utm_params: str
+
+
+class AIAngleMatrixResponse(BaseModel):
+    campaign_id: Optional[int] = None
+    product_name: str = ""
+    channel: str
+    funnel_stage: str = "BoFU"
+    total_variants: int
+    variants_count: int = 0
+    angles_count: int = 4
+    strategy_summary: str = ""
+    variants: List[AIAngleMatrixVariant] = Field(default_factory=list)
+    provider_used: Optional[str] = None
+    model_used: Optional[str] = None
+    fallback_used: bool = False
+
+
+class AIPrelaunchPersonaCritique(BaseModel):
+    persona_id: str
+    persona_name: str
+    persona_role: str = ""
+    avatar_emoji: str = "🧐"
+    score: int = Field(..., ge=0, le=100)
+    verdict: str
+    critique: str
+    fix_suggestion: str
+    actionable_fix: str = ""
+
+
+class AIPrelaunchCriticRequest(BaseModel):
+    workspace_id: Optional[int] = None
+    campaign_id: Optional[int] = None
+    content_id: Optional[int] = None
+    channel: Optional[str] = "facebook"
+    channel_code: Optional[str] = "facebook"
+    funnel_stage: Optional[str] = None
+    objective: Optional[str] = None
+    title: Optional[str] = ""
+    body: str = Field(..., min_length=1)
+    cta: Optional[str] = None
+    audience: Optional[str] = None
+    target_audience: Optional[str] = None
+    product_name: Optional[str] = None
+    product_usp: Optional[str] = None
+    prompt_version: str = "v3"
+    preferred_provider: Optional[str] = None
+    preferred_model: Optional[str] = None
+    chain_id: Optional[int] = None
+
+
+class AIPrelaunchCriticResponse(BaseModel):
+    overall_readiness_score: int = Field(..., ge=0, le=100)
+    thumb_stop_score: int = Field(..., ge=0, le=100)
+    conversion_friction_score: int = Field(..., ge=0, le=100)
+    compliance_score: int = Field(100, ge=0, le=100)
+    verdict: str
+    verdict_label: str = ""
+    launch_recommendation: str = "READY_TO_LAUNCH"
+    weakest_sentence: str
+    weakest_reason: str
+    personas: List[AIPrelaunchPersonaCritique] = Field(default_factory=list)
+    persona_critiques: List[AIPrelaunchPersonaCritique] = Field(default_factory=list)
+    improved_title: str
+    improved_body: str
+    improved_cta: str
+    rewritten_version: Optional[Dict[str, Any]] = None
+    provider_used: Optional[str] = None
+    model_used: Optional[str] = None
+    fallback_used: bool = False
+
+
+class PortfolioTriageAnomaly(BaseModel):
+    id: Optional[str] = None
+    campaign_id: int
+    campaign_code: Optional[str] = None
+    campaign_name: str
+    funnel_stage: str = "BoFU"
+    anomaly_type: str
+    severity: str
+    health_score: int
+    total_cost: float
+    total_revenue: float
+    roas: float
+    pacing_ratio: Optional[float] = None
+    fatigue_detected: bool = False
+    title: str = ""
+    detail: str = ""
+    metric_highlight: str = ""
+    action_type: str = "ADJUST_BUDGET"
+    summary: str
+    recommended_action: str
+
+
+class PortfolioTriageResponse(BaseModel):
+    total_scanned: int
+    healthy_count: int
+    attention_count: int
+    critical_count: int
+    anomalies: List[PortfolioTriageAnomaly] = Field(default_factory=list)
+    summary: Optional[Dict[str, Any]] = None
+
+
+class WinningPatternsResponse(BaseModel):
+    workspace_id: int
+    campaigns_analyzed: int
+    contents_analyzed: int
+    top_channel: Optional[Dict[str, Any]] = None
+    top_creative_angle: Optional[Dict[str, Any]] = None
+    angle_leaderboard: List[Dict[str, Any]] = Field(default_factory=list)
+    channel_leaderboard: List[Dict[str, Any]] = Field(default_factory=list)
+    playbook_recommendations: List[str] = Field(default_factory=list)
+    patterns: List[Dict[str, Any]] = Field(default_factory=list)
+
+

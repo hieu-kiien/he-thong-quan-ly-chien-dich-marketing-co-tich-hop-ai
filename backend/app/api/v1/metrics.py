@@ -1,13 +1,20 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, date, timezone
+import csv
+import io
 import logging
+import re
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func, or_, and_
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.entities import CampaignMetric, Campaign, MarketingChannel, User, CampaignMember, Workspace, WorkspaceMember, Task, MarketingContent
+from app.models.entities import (
+    CampaignMetric, Campaign, MarketingChannel, User, CampaignMember,
+    Workspace, WorkspaceMember, Task, MarketingContent, Product
+)
 
 logger = logging.getLogger(__name__)
 from app.schemas.schemas import (
@@ -19,7 +26,12 @@ from app.schemas.schemas import (
     CommandCenterResponse,
     CommandCenterAttentionItem,
     CommandCenterMyWorkItem,
-    CommandCenterCampaignHealth
+    CommandCenterCampaignHealth,
+    SmartCSVAnalyzeRequest,
+    SmartCSVAnalyzeResponse,
+    SmartCSVCommitRow,
+    SmartCSVCommitRequest,
+    SmartCSVCommitResponse,
 )
 from app.services.ai.ai_doctor import AIDoctorEngine
 from app.api.v1.campaigns import _accessible_workspace_ids
@@ -122,6 +134,7 @@ def record_campaign_metric(
     metric = CampaignMetric(
         campaign_id=campaign_id,
         channel_id=req.channel_id,
+        content_id=getattr(req, "content_id", None),
         metric_date=req.metric_date,
         views=req.views,
         clicks=req.clicks,
@@ -259,11 +272,6 @@ def get_global_dashboard(
             Campaign.id.in_(allowed_ids),
             Campaign.status == "ACTIVE"
         ).count()
-        # Tổng ngân sách của các chiến dịch ĐANG CHẠY. Thẻ "Ngân sách đang chạy"
-        # ở màn hình Quản lý Chiến dịch cần đúng con số này. Trước khi có nó, UI
-        # phải tự cộng từ danh sách chiến dịch đã tải — mà sau khi danh sách đó
-        # được phân trang, phép cộng đó chỉ tính trang hiện tại và thẻ số liệu
-        # nói dối. Đây là lý do số phải do server tính trên tập ĐÃ LỌC.
         active_budget = float(db.query(func.coalesce(func.sum(Campaign.budget), 0)).filter(
             Campaign.id.in_(allowed_ids),
             Campaign.status == "ACTIVE",
@@ -274,12 +282,6 @@ def get_global_dashboard(
         active_campaigns = 0
         active_budget = 0.0
 
-    # Chi phí theo từng chiến dịch. Bảng chiến dịch ở Dashboard và ở trang
-    # Quản lý đều cần nhịp chi tiêu (đã chi / ngân sách); không có field này
-    # thì giao diện buộc phải hiện "chưa ghi nhận chi phí" dù tổng chi phí ngay
-    # phía trên đã tính ra — hai phần của cùng một màn hình nói hai sự thật khác nhau.
-    # Tính ngay từ các dòng CampaignMetric đã nạp ở trên, không phát sinh truy vấn
-    # thêm.
     campaign_spend: Dict[str, float] = {}
     for m in metrics:
         key = str(m.campaign_id)
@@ -298,24 +300,10 @@ def get_global_dashboard(
     roi = ((total_revenue - total_cost) / total_cost * 100.0) if total_cost > 0 else 0.0
     roas = (total_revenue / total_cost) if total_cost > 0 else 0.0
 
-    # Nguồn gốc số liệu. Tồn tại vì dashboard tổng hợp thẳng từ CampaignMetric
-    # mà bảng này có thể chứa dữ liệu MẪU do `seed` nạp. Không phân biệt thì
-    # "15.700 lượt xem" từ dữ liệu mẫu sẽ hiện y hệt kết quả thật, và người
-    # mua sản phẩm sẽ hiểu sai. `has_demo_data=true` bắt buộc UI hiện cảnh báo.
-    #
-    # PHÒNG THỦ: đọc `source` bằng getattr và bắt lỗi. Nếu cột `source` chưa
-    # được tạo (migration lỗi trên CSDL cũ), truy vấn `m.source` sẽ ném
-    # ProgrammingError và làm TOÀN BỘ dashboard trả 500 — tệ hơn nhiều so với
-    # mất cảnh báo. Đã xảy ra thật trên production một lần.
     seed_rows = 0
     unverified_rows = 0
     try:
         seed_rows = sum(1 for m in metrics if getattr(m, "source", None) == "seed")
-        # Dòng có `source IS NULL` là dữ liệu KHÔNG xác minh được nguồn gốc, KHÔNG
-        # phải dữ liệu thật. Đây là trạng thái phổ biến của mọi CSDL đã có số liệu
-        # từ trước khi cột `source` được thêm: các dòng seed cũ rơi vào đây. Gọi
-        # chúng là "thật" là khẳng định sai — nên báo riêng thay vì gộp vào
-        # `real_rows`.
         unverified_rows = sum(1 for m in metrics if getattr(m, "source", None) is None)
     except Exception:
         seed_rows = 0
@@ -346,22 +334,10 @@ def get_global_dashboard(
             "active": active_campaigns,
             "active_budget": round(active_budget, 2),
         },
-        # Chi phí thực đo theo từng chiến dịch (khoá là campaign_id dạng chuỗi vì
-        # JSON object bắt buộc khoá chuỗi).
         "campaign_spend": campaign_spend,
-        # Frontend đọc trực tiếp field này để vẽ biểu đồ attribution. Trước đây
-        # response không có nó nên client rơi về `|| MOCK_CHANNEL_ATTRIBUTIONS`, tức là
-        # production hiển thị số liệu bịa đặt.
         "channel_attributions": _aggregate_channel_attribution(db, allowed_ids),
-        # Nguồn gốc số liệu. Tồn tại vì dashboard tổng hợp thẳng từ CampaignMetric
-        # mà bảng này có thể chứa dữ liệu MẪU do `seed` nạp. Không phân biệt thì
-        # "15.700 lượt xem" từ dữ liệu mẫu sẽ hiện y hệt kết quả thật, và người
-        # mua sản phẩm sẽ hiểu sai. `has_demo_data=true` bắt buộc UI hiện cảnh báo.
         "data_provenance": {
             "has_demo_data": seed_rows > 0,
-            # Cần cảnh báo khi có dòng KHÔNG xác minh được nguồn, không chỉ khi
-            # biết chắc là dữ liệu mẫu. Thiếu nhánh này thì mọi số liệu seed có
-            # sẵn từ trước migration đều bị trình bày như dữ liệu thật.
             "has_unverified_data": unverified_rows > 0,
             "seed_rows": seed_rows,
             "unverified_rows": unverified_rows,
@@ -420,13 +396,6 @@ def _aggregate_channel_metrics(db: Session, campaign_ids: List[int]) -> List[Dic
 
 
 def _aggregate_channel_attribution(db: Session, campaign_ids: List[int]) -> List[Dict[str, Any]]:
-    """Dùng đúng công thức attribution của AIDoctorEngine nhưng gộp nhiều chiến dịch.
-
-    `AIDoctorEngine.compute_channel_attribution` chỉ nhận một campaign_id, nên gọi
-    nó trong vòng lặp rồi cộng tay sẽ trả kết quả sai (thiếu phần doanh thu của
-    các chiến dịch còn lại trên cùng kênh). Ở đây gộp trực tiếp từ CampaignMetric
-    theo cùng định nghĩa chỉ số.
-    """
     return _aggregate_channel_metrics(db, campaign_ids)
 
 
@@ -441,14 +410,9 @@ def get_command_center(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Command Center điều phối vận hành chiến dịch Marketing theo thời gian thực:
-    - What needs attention: Tác vụ quá hạn, nội dung chờ duyệt, cảnh báo ngân sách, hạn chót chiến dịch.
-    - What's my work today: Tác vụ được giao cho người dùng hiện tại cần xử lý.
-    - Active campaigns health: Đánh giá sức khỏe chiến dịch theo luật tất định (deterministic rules).
-    """
+    """Command Center điều phối vận hành chiến dịch Marketing theo thời gian thực."""
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    # 1. Xác định phạm vi chiến dịch được truy cập
     if current_user.role == "ADMIN":
         accessible_campaigns = db.query(Campaign).all()
     elif current_user.role in ("MANAGER", "AGENCY_MANAGER"):
@@ -493,7 +457,6 @@ def get_command_center(
             }
         )
 
-    # 2. Attention Items - Overdue Tasks
     overdue_tasks = db.query(Task).filter(
         Task.campaign_id.in_(camp_ids),
         Task.due_date < today_str,
@@ -515,12 +478,6 @@ def get_command_center(
             due_date=t.due_date
         ))
 
-    # 3. Attention Items - Pending Approvals (Contents in IN_REVIEW, AI_DRAFT)
-    #
-    # Danh sách hiển thị bị giới hạn 15 bản ghi (để payload Command Center không
-    # phình), nhưng `total_pending_approvals` phải là TỔNG số thực, không phải
-    # `len(pending_contents)` — trước đây con số này âm thầm bị chặn ở 15 và bị
-    # hiển thị cho người dùng như tổng số.
     pending_filter = (
         MarketingContent.campaign_id.in_(camp_ids),
         MarketingContent.status.in_(["IN_REVIEW", "AI_DRAFT"]),
@@ -548,7 +505,6 @@ def get_command_center(
             due_date=None
         ))
 
-    # 4. Attention Items - Budget Overruns, Budget Risk & Proximity to Deadline
     spent_by_campaign = {}
     actual_metrics_by_campaign = {}
     metrics_sums = db.query(
@@ -584,7 +540,6 @@ def get_command_center(
 
         budget_pct = (c_spent / c_budget * 100.0) if c_budget > 0 else 0.0
 
-        # KPI Tracking
         c_kpi_target = float(c.target_kpi_value or 0.0)
         kpi_name_lower = (c.target_kpi_name or "conversions").lower()
         camp_metrics = actual_metrics_by_campaign.get(c.id, {})
@@ -602,7 +557,6 @@ def get_command_center(
         else:
             c_kpi_achievement_pct = 100.0 if c_kpi_actual > 0 else 0.0
 
-        # Budget Risk rule: budget_utilization > 80% AND kpi_achievement < 60%
         is_budget_risk = (budget_pct > 80.0 and c_kpi_achievement_pct < 60.0)
 
         if c_budget > 0 and c_spent > c_budget:
@@ -642,7 +596,6 @@ def get_command_center(
                 due_date=c.end_date
             ))
 
-        # Tính điểm sức khỏe chiến dịch tất định (Deterministic Health Score)
         health_score = 100
         if c_overdue > 0:
             health_score -= min(45, c_overdue * 15)
@@ -687,7 +640,6 @@ def get_command_center(
                 budget_risk=is_budget_risk
             ))
 
-    # 5. My Work Today - Ngăn ngừa rò rỉ cross-tenant (chỉ lấy task trong campaign/workspace được cấp quyền)
     user_tasks_query = db.query(Task).filter(
         Task.assignee_id == current_user.id,
         Task.status.notin_(["DONE", "COMPLETED"])
@@ -738,13 +690,8 @@ def get_command_center(
 
 
 # ==============================================================================
-# REAL ADS CSV IMPORTER, DATA VERIFICATION & AI MORNING BRIEFING (PRODUCTION)
+# REAL ADS CSV IMPORTER, SMART CSV WIZARD, DATA VERIFICATION & AI MORNING BRIEFING
 # ==============================================================================
-
-import csv
-import io
-from pydantic import BaseModel, Field
-
 
 class CSVMetricsImportRequest(BaseModel):
     csv_content: str = Field(..., min_length=5, description="Nội dung file CSV/TSV xuất từ Facebook Ads, TikTok Ads, Google Ads hoặc mẫu chuẩn")
@@ -783,6 +730,7 @@ def _resolve_channel_from_label(db: Session, raw_label: str) -> MarketingChannel
         "email": ["email", "mail", "edm", "newsletter", "crm"],
         "linkedin": ["linkedin", "b2b"],
         "zalo": ["zalo", "oa"],
+        "blog": ["blog", "seo", "website", "web"],
     }
     for code_key, keywords in alias_map.items():
         if any(k in clean for k in keywords):
@@ -796,14 +744,486 @@ def _resolve_channel_from_label(db: Session, raw_label: str) -> MarketingChannel
 def _parse_number(val: Any, is_float: bool = False) -> float:
     if val is None:
         return 0.0
-    s = str(val).strip().replace(",", "").replace("₫", "").replace("đ", "").replace("$", "").replace(" ", "")
+    s = str(val).strip()
+    s = re.sub(r"[₫đ$€£%\s]|vnd|usd", "", s, flags=re.IGNORECASE)
     if not s or s == "-":
         return 0.0
+    # Xử lý định dạng tiền tệ Việt Nam "1.850.000" (nhiều dấu chấm hoặc chấm ngăn cách hàng nghìn)
+    if s.count(".") > 1 and "," not in s:
+        s = s.replace(".", "")
+    elif "." in s and "," not in s:
+        parts = s.split(".")
+        if len(parts) == 2 and len(parts[1]) == 3 and len(parts[0]) >= 1:
+            # Ví dụ "500.000" hoặc "12.500" trong báo cáo VND
+            try:
+                if int(parts[0]) >= 10:
+                    s = s.replace(".", "")
+            except ValueError:
+                pass
+    elif "," in s and "." in s:
+        if s.rfind(",") > s.rfind("."):
+            # Định dạng 1.850.000,50
+            s = s.replace(".", "").replace(",", ".")
+        else:
+            # Định dạng 1,850,000.50
+            s = s.replace(",", "")
+    else:
+        s = s.replace(",", "")
     try:
         num = float(s)
-        return max(0.0, num if is_float else float(int(round(num))))
+        return num if is_float else float(int(round(num)))
     except ValueError:
         return 0.0
+
+
+def _normalize_date_str(raw_val: Any, fallback_date: str) -> str:
+    if not raw_val:
+        return fallback_date
+    s = str(raw_val).strip()[:10]
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%Y/%m/%d", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(s, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return fallback_date
+
+
+def _detect_ads_platform_and_mapping(fieldnames: List[str]) -> Tuple[str, Dict[str, str]]:
+    """Tự động nhận diện nền tảng quảng cáo và ánh xạ cột sang chuẩn hệ thống."""
+    lower_map = {f.strip().lower(): f for f in fieldnames if f}
+    lower_keys = set(lower_map.keys())
+
+    platform = "Generic CSV"
+    if any(k in lower_keys for k in ("reporting starts", "amount spent (vnd)", "amount spent", "purchases conversion value", "link clicks")):
+        platform = "Facebook Ads"
+    elif any(k in lower_keys for k in ("by day", "total cost", "total complete payment", "video views")):
+        platform = "TikTok Ads"
+    elif any(k in lower_keys for k in ("impr.", "conv. value", "avg. cpc", "search impr. share")):
+        platform = "Google Ads"
+
+    candidates = {
+        "metric_date": ["metric_date", "date", "ngày", "ngay", "reporting starts", "by day", "day"],
+        "campaign_code": ["campaign_code", "mã chiến dịch", "ma chien dich", "campaign id"],
+        "campaign_name": ["campaign_name", "campaign", "tên chiến dịch", "ten chien dich", "chiến dịch"],
+        "channel": ["channel", "channel_code", "platform", "kênh", "kenh", "source", "placement"],
+        "views": ["views", "impressions", "impr.", "lượt hiển thị", "luot hien thi", "lượt xem", "luot xem", "reach", "video views"],
+        "clicks": ["clicks", "link clicks", "clicks (all)", "lượt nhấp (tất cả)", "lượt nhấp", "luot nhap"],
+        "conversions": ["conversions", "results", "purchases", "leads", "kết quả", "ket qua", "chuyển đổi", "chuyen doi", "total complete payment", "conv."],
+        "cost": ["cost", "spend", "amount spent (vnd)", "amount spent", "total cost", "chi phí", "chi phi", "ngân sách đã chi"],
+        "revenue": ["revenue", "purchases conversion value", "purchase conversion value", "conversion value", "conv. value", "giá trị chuyển đổi", "gia tri chuyen doi", "doanh thu"],
+    }
+
+    column_mapping: Dict[str, str] = {}
+    for canonical, aliases in candidates.items():
+        for alias in aliases:
+            if alias in lower_map:
+                column_mapping[canonical] = lower_map[alias]
+                break
+
+    return platform, column_mapping
+
+
+def _accessible_campaigns_for_user(db: Session, user: User) -> List[Campaign]:
+    if user.role == "ADMIN":
+        return db.query(Campaign).all()
+    ws_ids = _accessible_workspace_ids(user, db)
+    q = db.query(Campaign)
+    if ws_ids:
+        q = q.filter(or_(Campaign.workspace_id.in_(ws_ids), Campaign.owner_id == user.id))
+    else:
+        q = q.filter(Campaign.owner_id == user.id)
+    if user.role not in ("MANAGER", "AGENCY_MANAGER"):
+        member_ids = [r[0] for r in db.query(CampaignMember.campaign_id).filter(CampaignMember.user_id == user.id).all()]
+        q = q.filter(or_(Campaign.owner_id == user.id, Campaign.id.in_(member_ids)))
+    return q.all()
+
+
+def _parse_smart_csv_rows(
+    csv_text: str,
+    default_campaign_id: Optional[int],
+    default_channel_code: str,
+    accessible_campaigns: List[Campaign],
+) -> Tuple[str, Dict[str, str], List[Dict[str, Any]], List[Dict[str, Any]], set, List[str]]:
+    raw_text = (csv_text or "").strip().lstrip("\ufeff")
+    if not raw_text:
+        raise HTTPException(status_code=400, detail="Nội dung CSV trống.")
+    first_line = raw_text.splitlines()[0]
+    delimiter = "\t" if ("\t" in first_line and "," not in first_line) else (";" if (";" in first_line and "," not in first_line) else ",")
+    reader = csv.DictReader(io.StringIO(raw_text), delimiter=delimiter)
+    if not reader.fieldnames:
+        raise HTTPException(status_code=400, detail="File CSV không có dòng tiêu đề cột hợp lệ.")
+
+    platform, col_map = _detect_ads_platform_and_mapping(list(reader.fieldnames))
+    default_platform_channel = (
+        "facebook" if platform == "Facebook Ads"
+        else ("tiktok" if platform == "TikTok Ads" else ("google_ads" if platform == "Google Ads" else default_channel_code))
+    )
+
+    by_id = {c.id: c for c in accessible_campaigns}
+    by_code = {(c.campaign_code or "").strip().lower(): c for c in accessible_campaigns if c.campaign_code}
+    by_name = {(c.name or "").strip().lower(): c for c in accessible_campaigns if c.name}
+
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    parsed_rows: List[Dict[str, Any]] = []
+    anomalies: List[Dict[str, Any]] = []
+    matched_camp_ids = set()
+    unmatched_names: List[str] = []
+
+    for idx, row in enumerate(reader, start=1):
+        norm = {str(k or "").strip().lower(): v for k, v in row.items() if k is not None}
+        if not any(str(v or "").strip() for v in norm.values()):
+            continue
+
+        raw_date = row.get(col_map.get("metric_date", "")) if "metric_date" in col_map else (
+            norm.get("metric_date") or norm.get("date") or norm.get("ngày") or norm.get("reporting starts")
+        )
+        m_date = _normalize_date_str(raw_date, today_str)
+
+        raw_code = (row.get(col_map.get("campaign_code", "")) if "campaign_code" in col_map else norm.get("campaign_code")) or ""
+        raw_name = (row.get(col_map.get("campaign_name", "")) if "campaign_name" in col_map else norm.get("campaign_name")) or ""
+        raw_code_clean = str(raw_code).strip()
+        raw_name_clean = str(raw_name).strip()
+
+        matched_camp: Optional[Campaign] = None
+        if raw_code_clean and raw_code_clean.lower() in by_code:
+            matched_camp = by_code[raw_code_clean.lower()]
+        elif raw_name_clean and raw_name_clean.lower() in by_name:
+            matched_camp = by_name[raw_name_clean.lower()]
+        elif raw_name_clean:
+            # Tìm kiếm gần đúng theo substring
+            for cname_lower, c_obj in by_name.items():
+                if raw_name_clean.lower() in cname_lower or cname_lower in raw_name_clean.lower():
+                    matched_camp = c_obj
+                    break
+        if matched_camp is None and default_campaign_id and default_campaign_id in by_id:
+            matched_camp = by_id[default_campaign_id]
+
+        raw_ch = (row.get(col_map.get("channel", "")) if "channel" in col_map else norm.get("channel")) or default_platform_channel
+
+        raw_views = row.get(col_map.get("views", "")) if "views" in col_map else norm.get("views", 0)
+        raw_clicks = row.get(col_map.get("clicks", "")) if "clicks" in col_map else norm.get("clicks", 0)
+        raw_conv = row.get(col_map.get("conversions", "")) if "conversions" in col_map else norm.get("conversions", 0)
+        raw_cost = row.get(col_map.get("cost", "")) if "cost" in col_map else norm.get("cost", 0)
+        raw_rev = row.get(col_map.get("revenue", "")) if "revenue" in col_map else norm.get("revenue", 0)
+
+        views = int(_parse_number(raw_views, is_float=False))
+        clicks = int(_parse_number(raw_clicks, is_float=False))
+        conversions = int(_parse_number(raw_conv, is_float=False))
+        cost = _parse_number(raw_cost, is_float=True)
+        revenue = _parse_number(raw_rev, is_float=True)
+
+        row_anomalies: List[str] = []
+        if matched_camp is None:
+            label = raw_code_clean or raw_name_clean or f"Dòng #{idx}"
+            row_anomalies.append(f"Không khớp được chiến dịch '{label}'")
+            if label not in unmatched_names:
+                unmatched_names.append(label)
+        else:
+            matched_camp_ids.add(matched_camp.id)
+
+        if clicks > views and views > 0:
+            row_anomalies.append(f"Lượt nhấp ({clicks}) lớn hơn lượt hiển thị ({views}) — sẽ tự động chuẩn hóa views = clicks.")
+        if cost < 0:
+            row_anomalies.append(f"Chi phí âm ({cost}) không hợp lệ.")
+        if conversions > clicks and clicks > 0:
+            row_anomalies.append(f"Lượt chuyển đổi ({conversions}) vượt số lượt nhấp ({clicks}).")
+
+        if row_anomalies:
+            anomalies.append({
+                "row_index": idx,
+                "issues": row_anomalies,
+                "campaign_name": raw_name_clean or (matched_camp.name if matched_camp else None),
+            })
+
+        parsed_rows.append({
+            "row_index": idx,
+            "campaign_id": matched_camp.id if matched_camp else None,
+            "campaign_code": matched_camp.campaign_code if matched_camp else (raw_code_clean or None),
+            "campaign_name": matched_camp.name if matched_camp else (raw_name_clean or None),
+            "channel_code": str(raw_ch).strip().lower() or default_platform_channel,
+            "metric_date": m_date,
+            "views": max(0, views),
+            "clicks": max(0, clicks),
+            "conversions": max(0, conversions),
+            "cost": round(max(0.0, cost), 2),
+            "revenue": round(max(0.0, revenue), 2),
+            "has_anomaly": len(row_anomalies) > 0,
+            "anomaly_notes": row_anomalies,
+        })
+
+    return platform, col_map, parsed_rows, anomalies, matched_camp_ids, unmatched_names
+
+
+@router.post("/metrics/smart-import/analyze", response_model=SmartCSVAnalyzeResponse)
+@router.post("/analytics/smart-import/analyze", response_model=SmartCSVAnalyzeResponse)
+def analyze_smart_csv_import(
+    req: SmartCSVAnalyzeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Smart CSV Importer — Bước 1 (Analyze & Column Mapping Preview):
+    Tự động nhận diện định dạng báo cáo (Facebook Ads / TikTok Ads / Google Ads / Generic),
+    chuẩn hóa tiền tệ & ngày tháng, đối sánh chiến dịch theo `campaign_code` hoặc `campaign_name`,
+    và phát hiện dòng bất thường trước khi commit.
+    """
+    raw_csv = (req.csv_text or req.csv_content or "").strip()
+    if len(raw_csv) < 5:
+        raise HTTPException(status_code=400, detail="Nội dung CSV quá ngắn hoặc trống.")
+
+    if req.default_campaign_id is not None:
+        check_campaign_access_for_metrics(req.default_campaign_id, current_user, db)
+
+    accessible_campaigns = _accessible_campaigns_for_user(db, current_user)
+    platform, col_map, parsed_rows, anomalies, matched_ids, unmatched_names = _parse_smart_csv_rows(
+        csv_text=raw_csv,
+        default_campaign_id=req.default_campaign_id,
+        default_channel_code=req.default_channel_code or "facebook",
+        accessible_campaigns=accessible_campaigns,
+    )
+
+    by_id = {c.id: c for c in accessible_campaigns}
+    grouped: Dict[str, Dict[str, Any]] = {}
+    t_views = 0
+    t_clicks = 0
+    t_conv = 0
+    t_cost = 0.0
+    t_rev = 0.0
+
+    for r in parsed_rows:
+        t_views += int(r.get("views") or 0)
+        t_clicks += int(r.get("clicks") or 0)
+        t_conv += int(r.get("conversions") or 0)
+        t_cost += float(r.get("cost") or 0.0)
+        t_rev += float(r.get("revenue") or 0.0)
+
+        key_name = str(r.get("campaign_name") or r.get("campaign_code") or f"Chiến dịch #{r.get('campaign_id') or 1}")
+        if key_name not in grouped:
+            cid = r.get("campaign_id")
+            matched_obj = by_id.get(cid) if cid else None
+            grouped[key_name] = {
+                "csv_campaign_name": key_name,
+                "matched_campaign_id": cid,
+                "matched_campaign_name": matched_obj.name if matched_obj else None,
+                "match_confidence": "EXACT" if cid else "NEW",
+                "row_count": 0,
+                "channels": [],
+                "total_cost": 0.0,
+                "total_revenue": 0.0,
+                "total_conversions": 0,
+                "total_clicks": 0,
+                "total_views": 0,
+            }
+        g = grouped[key_name]
+        g["row_count"] += 1
+        ch_c = str(r.get("channel_code") or "facebook")
+        if ch_c not in g["channels"]:
+            g["channels"].append(ch_c)
+        g["total_cost"] = round(g["total_cost"] + float(r.get("cost") or 0.0), 2)
+        g["total_revenue"] = round(g["total_revenue"] + float(r.get("revenue") or 0.0), 2)
+        g["total_conversions"] += int(r.get("conversions") or 0)
+        g["total_clicks"] += int(r.get("clicks") or 0)
+        g["total_views"] += int(r.get("views") or 0)
+
+    campaign_matches = list(grouped.values())
+    valid_rows = sum(1 for r in parsed_rows if r.get("campaign_id") is not None)
+    ui_col_map = {
+        **col_map,
+        "report_date": col_map.get("metric_date") or "Date",
+    }
+
+    return SmartCSVAnalyzeResponse(
+        status="ok",
+        detected_platform=platform,
+        total_rows=len(parsed_rows),
+        valid_rows=valid_rows,
+        valid_rows_count=valid_rows,
+        anomaly_rows=len(anomalies),
+        column_mapping=ui_col_map,
+        detected_headers=[v for v in col_map.values() if v],
+        preview_rows=parsed_rows[:100],
+        sample_rows=parsed_rows[:20],
+        anomalies=anomalies,
+        matched_campaigns_count=len(matched_ids),
+        matched_count=len(matched_ids),
+        unmatched_count=len(unmatched_names),
+        unmatched_campaigns=unmatched_names,
+        campaign_matches=campaign_matches,
+        summary={
+            "total_views": t_views,
+            "total_clicks": t_clicks,
+            "total_conversions": t_conv,
+            "total_cost": round(t_cost, 2),
+            "total_revenue": round(t_rev, 2),
+            "estimated_roas": round(t_rev / t_cost, 2) if t_cost > 0 else 0.0,
+        },
+    )
+
+
+@router.post("/metrics/smart-import/commit", response_model=SmartCSVCommitResponse)
+@router.post("/analytics/smart-import/commit", response_model=SmartCSVCommitResponse)
+def commit_smart_csv_import(
+    req: SmartCSVCommitRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Smart CSV Importer — Bước 2 (Idempotent Bulk Upsert Commit):
+    Lưu dữ liệu đã phân tích (hoặc parse trực tiếp từ `csv_text`/`csv_content`) vào bảng `campaign_metrics`.
+    """
+    if req.default_campaign_id is not None:
+        check_campaign_access_for_metrics(req.default_campaign_id, current_user, db)
+
+    accessible_campaigns = _accessible_campaigns_for_user(db, current_user)
+    by_id = {c.id: c for c in accessible_campaigns}
+    by_code = {(c.campaign_code or "").strip().lower(): c for c in accessible_campaigns if c.campaign_code}
+    by_name = {(c.name or "").strip().lower(): c for c in accessible_campaigns if c.name}
+
+    raw_csv = (req.csv_text or req.csv_content or "").strip()
+    rows_to_commit: List[Dict[str, Any]] = []
+    if req.rows:
+        for r in req.rows:
+            rows_to_commit.append(r.model_dump())
+    elif raw_csv:
+        _, _, parsed_rows, _, _, _ = _parse_smart_csv_rows(
+            csv_text=raw_csv,
+            default_campaign_id=req.default_campaign_id,
+            default_channel_code=req.default_channel_code or "facebook",
+            accessible_campaigns=accessible_campaigns,
+        )
+        rows_to_commit = parsed_rows
+    else:
+        raise HTTPException(status_code=400, detail="Cần truyền `rows` hoặc `csv_text`/`csv_content` để thực hiện import.")
+
+    imported_count = 0
+    updated_count = 0
+    skipped_count = 0
+    created_campaigns_count = 0
+    replaced_seed_rows = 0
+    affected_campaign_ids = set()
+    errors: List[str] = []
+    purged_campaigns = set()
+    custom_map = req.campaign_mapping or {}
+
+    default_ws_id = req.workspace_id
+    if default_ws_id is None:
+        ws_ids = _accessible_workspace_ids(current_user, db)
+        default_ws_id = ws_ids[0] if ws_ids else (accessible_campaigns[0].workspace_id if accessible_campaigns else 1)
+    first_prod = db.query(Product).first()
+    default_prod_id = first_prod.id if first_prod else 1
+
+    for idx, r in enumerate(rows_to_commit, start=1):
+        camp: Optional[Campaign] = None
+        cid = r.get("campaign_id")
+        raw_cname = str(r.get("campaign_name") or "").strip()
+        ccode = str(r.get("campaign_code") or "").strip().lower()
+        cname = raw_cname.lower()
+
+        if raw_cname and raw_cname in custom_map and custom_map[raw_cname] in by_id:
+            camp = by_id[custom_map[raw_cname]]
+        elif cid and cid in by_id:
+            camp = by_id[cid]
+        elif ccode and ccode in by_code:
+            camp = by_code[ccode]
+        elif cname and cname in by_name:
+            camp = by_name[cname]
+        elif req.default_campaign_id and req.default_campaign_id in by_id:
+            camp = by_id[req.default_campaign_id]
+        elif req.auto_create_campaigns and raw_cname:
+            new_code = f"CMP-CSV-{len(by_id) + created_campaigns_count + 1:03d}"
+            camp = Campaign(
+                workspace_id=default_ws_id,
+                product_id=default_prod_id,
+                owner_id=current_user.id,
+                name=raw_cname[:255],
+                objective="Tối ưu chuyển đổi đa kênh (Imported from CSV)",
+                funnel_stage="BoFU",
+                campaign_code=new_code,
+                budget=50000000.0,
+                status="ACTIVE",
+                tags_json='["csv-auto-created"]',
+            )
+            db.add(camp)
+            db.flush()
+            by_id[camp.id] = camp
+            by_name[cname] = camp
+            created_campaigns_count += 1
+
+        if camp is None:
+            skipped_count += 1
+            errors.append(f"Dòng #{idx}: Không xác định được chiến dịch hợp lệ.")
+            continue
+
+        if req.replace_seed_data and camp.id not in purged_campaigns:
+            deleted_n = db.query(CampaignMetric).filter(
+                CampaignMetric.campaign_id == camp.id,
+                or_(CampaignMetric.source == "seed", CampaignMetric.source.is_(None)),
+            ).delete(synchronize_session=False)
+            replaced_seed_rows += int(deleted_n or 0)
+            purged_campaigns.add(camp.id)
+            db.flush()
+
+        channel_obj = _resolve_channel_from_label(db, str(r.get("channel_code") or r.get("channel_name") or "facebook"))
+        m_date = _normalize_date_str(r.get("metric_date"), datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+        views = max(0, int(r.get("views") or 0))
+        clicks = max(0, int(r.get("clicks") or 0))
+        conversions = max(0, int(r.get("conversions") or 0))
+        cost = round(max(0.0, float(r.get("cost") or 0.0)), 2)
+        revenue = round(max(0.0, float(r.get("revenue") or 0.0)), 2)
+
+        if clicks > views:
+            views = clicks
+
+        existing = db.query(CampaignMetric).filter(
+            CampaignMetric.campaign_id == camp.id,
+            CampaignMetric.channel_id == channel_obj.id,
+            CampaignMetric.metric_date == m_date,
+        ).first()
+
+        if existing:
+            existing.views = views
+            existing.clicks = clicks
+            existing.conversions = conversions
+            existing.cost = cost
+            existing.revenue = revenue
+            existing.source = "csv_import"
+            if r.get("content_id"):
+                existing.content_id = r.get("content_id")
+            updated_count += 1
+        else:
+            db.add(
+                CampaignMetric(
+                    campaign_id=camp.id,
+                    channel_id=channel_obj.id,
+                    content_id=r.get("content_id"),
+                    metric_date=m_date,
+                    views=views,
+                    clicks=clicks,
+                    conversions=conversions,
+                    cost=cost,
+                    revenue=revenue,
+                    source="csv_import",
+                )
+            )
+            imported_count += 1
+
+        affected_campaign_ids.add(camp.id)
+
+    db.commit()
+    sorted_affected = sorted(affected_campaign_ids)
+    return SmartCSVCommitResponse(
+        status="success",
+        imported_rows=imported_count,
+        updated_rows=updated_count,
+        skipped_rows=skipped_count,
+        inserted_or_updated=imported_count + updated_count,
+        skipped_count=skipped_count,
+        updated_campaigns_count=len(sorted_affected),
+        created_campaigns_count=created_campaigns_count,
+        replaced_seed_rows=replaced_seed_rows,
+        affected_campaign_ids=sorted_affected,
+        campaigns_touched=sorted_affected,
+        errors=errors,
+        message=f"Đã đồng bộ {imported_count + updated_count} dòng dữ liệu cho {len(sorted_affected)} chiến dịch.",
+    )
 
 
 @router.get("/campaigns/{campaign_id}/metrics/sample-csv")
@@ -882,7 +1302,7 @@ def import_campaign_metrics_csv(
             or norm.get("day")
             or today_fallback
         )
-        m_date = str(m_date).strip()[:10]
+        m_date = _normalize_date_str(m_date, today_fallback)
 
         ch_label = (
             norm.get("channel")
@@ -1001,11 +1421,12 @@ def get_ai_morning_briefing(
 ):
     """AI Morning Briefing & Anomaly Detector:
     Phân tích toàn bộ dữ liệu thực tế mỗi sáng, phát hiện kênh hiệu quả nhất, cảnh báo điểm nghẽn CPA/ROAS,
-    và chuẩn bị sẵn lệnh tái phân bổ ngân sách 1-Click qua MCP.
+    và chuẩn bị sẵn lệnh tái phân bổ ngân sách 1-Click qua MCP cho chiến dịch có mức độ ưu tiên tối ưu cao nhất.
     """
     dash = get_global_dashboard(current_user=current_user, db=db)
     kpi = dash.get("kpi") or {}
     channels = kpi.get("channel_metrics") or []
+    spend_map = dash.get("campaign_spend") or {}
 
     if current_user.role == "ADMIN":
         camps = db.query(Campaign).filter(Campaign.status != "ARCHIVED").order_by(Campaign.id.asc()).all()
@@ -1018,7 +1439,35 @@ def get_ai_morning_briefing(
             q = q.filter(Campaign.owner_id == current_user.id)
         camps = q.order_by(Campaign.id.asc()).all()
 
-    primary_camp = camps[0] if camps else None
+    # Chọn chiến dịch ưu tiên tối ưu hóa cao nhất (thay vì luôn chọn camps[0]):
+    # Ưu tiên chiến dịch ACTIVE có chi tiêu cao nhưng ROAS thấp hoặc tổng chi tiêu lớn nhất.
+    primary_camp = None
+    if camps:
+        camp_ids = [c.id for c in camps]
+        rev_rows = (
+            db.query(
+                CampaignMetric.campaign_id,
+                func.sum(CampaignMetric.cost).label("cost"),
+                func.sum(CampaignMetric.revenue).label("rev"),
+            )
+            .filter(CampaignMetric.campaign_id.in_(camp_ids))
+            .group_by(CampaignMetric.campaign_id)
+            .all()
+        )
+        perf_by_camp = {
+            r.campaign_id: (float(r.cost or 0.0), float(r.rev or 0.0))
+            for r in rev_rows
+        }
+
+        def _urgency_key(c: Campaign):
+            is_active = 1 if c.status == "ACTIVE" else 0
+            cost_val, rev_val = perf_by_camp.get(c.id, (float(spend_map.get(str(c.id), 0.0)), 0.0))
+            roas_val = (rev_val / cost_val) if cost_val > 0 else 99.0
+            needs_rescue = 1 if (cost_val > 0 and roas_val < 2.0) else 0
+            return (is_active, needs_rescue, cost_val, float(c.budget or 0.0))
+
+        primary_camp = max(camps, key=_urgency_key)
+
     top_channel = max(channels, key=lambda c: float(c.get("roas") or 0.0)) if channels else None
     weak_channel = min(channels, key=lambda c: float(c.get("roas") or 999.0)) if len(channels) > 1 else None
 
@@ -1076,4 +1525,3 @@ def get_ai_morning_briefing(
             ),
         },
     }
-

@@ -13,6 +13,8 @@ from app.schemas.schemas import (
     AISummaryRequest, AISummaryResponse,
     AIPlanRequest, AIPlanResponse,
     OmnichannelRequest, OmnichannelResponse,
+    AIAngleMatrixRequest, AIAngleMatrixResponse,
+    AIPrelaunchCriticRequest, AIPrelaunchCriticResponse,
     AILogResponse
 )
 from app.services.ai.ai_service import ai_service
@@ -465,24 +467,7 @@ def generate_plan(
     return plan
 
 def _score_omnichannel_compliance(payload: dict, brand_kit: Optional[BrandKit], db: Session) -> Optional[int]:
-    """Chấm điểm tuân thủ TRÊN CHÍNH NỘI DUNG VỪA SINH, bằng bộ quy tắc tất định.
-
-    Vì sao cần đo thay vì đặt hằng số: trước đây `OmnichannelResponse.compliance_score`
-    mặc định là 100 và KHÔNG mã nào từng gán lại nó. Kết quả là mọi phản hồi — kể
-    cả template dự phòng — đều báo "100/100 đạt chuẩn", dù không có bộ quét nào
-    chạy. Đó là một tuyên bố không có cơ sở mà người dùng dựa vào để quyết định có
-    duyệt bài hay không.
-
-    Nay điểm đến từ `ComplianceScanner.scan` — cùng bộ quét mà
-    `POST /contents/compliance-check` dùng, đối chiếu từ khóa cấm của Brand Kit
-    và chính sách quảng cáo. Nhờ vậy con số là kết quả đo, kể cả với nội dung
-    dự phòng, và hệ thống vẫn chạy được khi AI tắt vì bộ quét này không gọi LLM.
-
-    Quét cả 3 kênh và lấy điểm thấp nhất: một email sạch không bù được cho một
-    bài Facebook vi phạm. Trả `None` khi không có Brand Kit để đối chiếu, hoặc
-    khi không có nội dung nào để quét — để UI hiển thị "chưa chấm" thay vì bịa
-    điểm.
-    """
+    """Chấm điểm tuân thủ TRÊN CHÍNH NỘI DUNG VỪA SINH, bằng bộ quy tắc tất định."""
     from app.services.compliance.compliance_service import ComplianceScanner
 
     if brand_kit is None or brand_kit.workspace_id is None:
@@ -554,7 +539,6 @@ def generate_omnichannel(
     Sinh trọn bộ tài sản tiếp thị Facebook, TikTok và Email từ 1 brief duy nhất,
     kế thừa Brand Kit (USP, Tone, Banned Keywords) của Workspace.
     """
-    # Endpoint này tốn nhiều lượt gọi nhất (sinh 3 kênh cùng lúc) nên cần hạn mức riêng.
     enforce_quota(f"ai:omnichannel:user={current_user.id}")
     user_id = current_user.id
     cid = req.campaign_id
@@ -573,7 +557,6 @@ def generate_omnichannel(
     if not brand_kit and req.brand_kit_id:
         bk = db.query(BrandKit).filter(BrandKit.id == req.brand_kit_id).first()
         if bk:
-            # Xác minh quyền truy cập Brand Kit theo Tenant Isolation
             if current_user.role != "ADMIN" and bk.workspace_id is not None:
                 ws = db.query(Workspace).filter(Workspace.id == bk.workspace_id).first()
                 is_ws_owner = ws is not None and ws.owner_id == current_user.id
@@ -589,12 +572,10 @@ def generate_omnichannel(
             brand_kit = bk
 
     if not brand_kit:
-        # Fallback an toàn vào workspace của người dùng hiện tại (nếu có), tuyệt đối không lấy BrandKit của tenant khác
         membership = db.query(WorkspaceMember).filter(WorkspaceMember.user_id == user_id).first()
         if membership:
             brand_kit = db.query(BrandKit).filter(BrandKit.workspace_id == membership.workspace_id).first()
 
-    # Kế thừa thông số Brand Kit
     brand_name = brand_kit.brand_name if brand_kit else (product.name if product else "MarketFlow AI")
     usp = req.product_usp or (brand_kit.usp if brand_kit and brand_kit.usp else (product.usp if product else "Nền tảng Tiếp thị Đột phá"))
     tone_of_voice = req.tone or (brand_kit.tone_of_voice if brand_kit and brand_kit.tone_of_voice else "Chuyên nghiệp, hiện đại, tin cậy")
@@ -638,12 +619,6 @@ def generate_omnichannel(
         if "email" not in requested_channels:
             res["email"] = None
         res["campaign_id"] = cid
-        # KHÔNG ghi đè model_used/model_provider/is_fallback. Trước đây dòng này
-        # hardcode "gemini-2.5-flash", nên kể cả khi `ai_service` đã trả về
-        # `is_fallback=True` + `model_provider="template-fallback-engine"` thì API
-        # vẫn báo `model_used: "gemini-2.5-flash"` — client hiển thị nội dung
-        # template dự phòng với nhãn của Gemini. Chỉ đặt mặc định khi service
-        # không cung cấp (đường lỗi/validate).
         res.setdefault("model_used", ai_service.model)
         res.setdefault("is_fallback", False)
         res["prompt_version"] = req.prompt_version
@@ -666,8 +641,6 @@ def generate_omnichannel(
     except ValidationError:
         if ai_service.fallback_enabled:
             fallback = ai_service._generate_fallback("omnichannel_generation", context)
-            # Nội dung do template sinh ra, không phải mô hình ngôn ngữ: ghi
-            # `model_used` là tên engine dự phòng để client không gán nhãn AI.
             fallback["model_used"] = "template-fallback-engine"
             fallback["prompt_version"] = req.prompt_version
             fallback["task_type"] = "OMNICHANNEL"
@@ -689,6 +662,110 @@ def generate_omnichannel(
             return OmnichannelResponse.model_validate(filtered_fallback)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Lỗi dịch vụ AI: {str(e)}")
 
+
+@router.post(
+    "/angle-matrix",
+    response_model=AIAngleMatrixResponse,
+    description="Ma trận Creative Angle × Hook 3x3 (Pain-Point, Social-Proof, Urgency/FOMO).",
+)
+def generate_angle_matrix(
+    req: AIAngleMatrixRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Sinh 9 biến thể quảng cáo theo ma trận 3 Góc tiếp cận × 3 Hook cho chiến dịch hoặc brief."""
+    enforce_quota(f"ai:angle_matrix:user={current_user.id}")
+    cid = req.campaign_id
+    campaign = None
+    product = None
+    brand_kit = None
+
+    if cid is not None:
+        campaign = check_campaign_access_for_ai(cid, current_user, db)
+        if campaign.product_id:
+            product = db.query(Product).filter(Product.id == campaign.product_id).first()
+        if campaign.workspace_id:
+            brand_kit = db.query(BrandKit).filter(BrandKit.workspace_id == campaign.workspace_id).first()
+
+    campaign_name = campaign.name if campaign else "Chiến dịch Tiếp thị Đa góc độ"
+    funnel_stage = req.funnel_stage or (getattr(campaign, "funnel_stage", None) if campaign else "BoFU") or "BoFU"
+    product_name = req.product_name or (product.name if product else (brand_kit.brand_name if brand_kit else campaign_name))
+    product_usp = req.product_usp or (product.usp if product else (brand_kit.usp if brand_kit else "Tối ưu hiệu suất vượt trội"))
+    target_audience = req.target_audience or req.audience or (campaign.audience if campaign else "Khách hàng tiềm năng")
+    tone = req.tone or (brand_kit.tone_of_voice if brand_kit else "Chuyên nghiệp, thuyết phục")
+    ch_code = (req.channel_code if req.channel_code and req.channel_code != "facebook" else (req.channel or req.channel_code or "facebook"))
+
+    res = ai_service.generate_angle_hook_matrix(
+        db=db,
+        user_id=current_user.id,
+        campaign_id=cid,
+        workspace_id=campaign.workspace_id if campaign else req.workspace_id,
+        campaign_name=campaign_name,
+        objective=req.objective or (campaign.objective if campaign else None),
+        funnel_stage=funnel_stage,
+        channel=ch_code,
+        channel_code=ch_code,
+        product_name=product_name,
+        product_usp=product_usp,
+        target_audience=target_audience,
+        audience=target_audience,
+        tone=tone,
+        brief=req.brief or req.key_message or "",
+        angles=req.angles,
+        hooks_per_angle=req.hooks_per_angle,
+        prompt_version=req.prompt_version,
+        chain_id=req.chain_id,
+    )
+    return AIAngleMatrixResponse.model_validate(res)
+
+
+@router.post(
+    "/prelaunch-critic",
+    response_model=AIPrelaunchCriticResponse,
+    description="AI Pre-Launch Focus Group Critic: Chấm điểm giả lập bởi 4 Persona khách hàng & chính sách trước khi chạy Ads.",
+)
+def evaluate_prelaunch_critic(
+    req: AIPrelaunchCriticRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Mô phỏng hội đồng 4 Persona khách hàng & chính sách đánh giá bài quảng cáo trước khi tiêu ngân sách."""
+    enforce_quota(f"ai:prelaunch_critic:user={current_user.id}")
+    cid = req.campaign_id
+    campaign = None
+    product = None
+
+    if cid is not None:
+        campaign = check_campaign_access_for_ai(cid, current_user, db)
+        if campaign.product_id:
+            product = db.query(Product).filter(Product.id == campaign.product_id).first()
+
+    funnel_stage = req.funnel_stage or (getattr(campaign, "funnel_stage", None) if campaign else "BoFU") or "BoFU"
+    target_audience = req.target_audience or req.audience or (campaign.audience if campaign else "Khách hàng mục tiêu")
+    product_name = req.product_name or (product.name if product else (campaign.name if campaign else "Sản phẩm"))
+    product_usp = req.product_usp or (product.usp if product else "Giải pháp hiệu quả vượt trội")
+    ch_code = (req.channel_code if req.channel_code and req.channel_code != "facebook" else (req.channel or req.channel_code or "facebook"))
+
+    res = ai_service.simulate_prelaunch_critic(
+        db=db,
+        user_id=current_user.id,
+        campaign_id=cid,
+        workspace_id=campaign.workspace_id if campaign else req.workspace_id,
+        title=req.title or "Giải pháp tiếp thị chuyển đổi cao",
+        body=req.body,
+        cta=req.cta or "Tìm hiểu ngay",
+        channel=ch_code,
+        channel_code=ch_code,
+        funnel_stage=funnel_stage,
+        target_audience=target_audience,
+        product_name=product_name,
+        product_usp=product_usp,
+        prompt_version=req.prompt_version,
+        chain_id=req.chain_id,
+    )
+    return AIPrelaunchCriticResponse.model_validate(res)
+
+
 @router.get("/logs", response_model=Page[AILogResponse])
 def get_ai_logs(
     campaign_id: Optional[int] = None,
@@ -708,12 +785,6 @@ def get_ai_logs(
             check_campaign_access_for_ai(campaign_id, current_user, db)
         query = query.filter(AILog.campaign_id == campaign_id)
     elif current_user.role != "ADMIN":
-        # Không truyền `campaign_id`: chỉ thấy log của CHÍNH MÌNH.
-        #
-        # Bảng `ai_logs` không có cột `workspace_id` — tenant duy nhất gắn được
-        # là `user_id` (người đã gọi). Trước đây nhánh này không lọc gì cả, nên
-        # một MANAGER bỏ trống tham số tuỳ chọn là đọc được nhật ký AI của mọi
-        # tenant. `user_id` là cột NOT NULL nên không có đường lọt nào qua đây.
         query = query.filter(AILog.user_id == current_user.id)
     if result_status:
         query = query.filter(AILog.result_status == result_status)

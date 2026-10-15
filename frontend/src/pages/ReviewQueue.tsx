@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { CheckCircle2, XCircle, AlertTriangle, Clock, Check, ShieldCheck, Send, Sparkles, FileText, Loader2, History, Info, X, Tag, Eye, LayoutGrid, Edit2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { CheckCircle2, XCircle, AlertTriangle, Clock, Check, ShieldCheck, Send, Sparkles, FileText, Loader2, History, Info, X, Tag, Eye, LayoutGrid, Edit2, Wand2 } from 'lucide-react';
 import { MarketingContent, Page, QuotaErrorDetail } from '../types';
-import { contentApi, getApiErrorMessage, getQuotaError } from '../services/api';
+import { contentApi, getApiErrorMessage, getQuotaError, evaluateMarketingCompliance } from '../services/api';
 import { useToast } from '../components/Toast';
 import { ReviewQueueSkeleton } from '../components/Skeleton';
 import { SocialPreviewContainer } from '../components/previews';
@@ -54,6 +54,9 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
   const [publishingId, setPublishingId] = useState<number | null>(null);
   const [submittingId, setSubmittingId] = useState<number | null>(null);
   const [showSocialPreview, setShowSocialPreview] = useState<boolean>(true);
+  const [selectedContentIds, setSelectedContentIds] = useState<number[]>([]);
+  const [isBulkReviewing, setIsBulkReviewing] = useState<boolean>(false);
+  const [isBatchFixing, setIsBatchFixing] = useState<boolean>(false);
 
   const rejectModalRef = useFocusTrap<HTMLDivElement>({
     isActive: !!rejectId,
@@ -191,6 +194,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
       });
       setContents(result.items);
       setContentPage(result);
+      setSelectedContentIds([]);
     } catch (e) {
       const quotaErr = getQuotaError(e);
       if (quotaErr) setQuotaError(quotaErr);
@@ -208,10 +212,103 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
   // "Lịch sử" vốn có ít bản ghi hơn.
   useEffect(() => {
     setPage(1);
+    setSelectedContentIds([]);
   }, [activeTab]);
   const handlePageSizeChange = (nextSize: number) => {
     setPageSize(nextSize);
     setPage(1);
+  };
+
+  const complianceByContentId = useMemo(() => {
+    const map: Record<number, ReturnType<typeof evaluateMarketingCompliance>> = {};
+    for (const item of contents) {
+      map[item.id] = evaluateMarketingCompliance(item.title || '', item.body || '', item.cta);
+    }
+    return map;
+  }, [contents]);
+
+  const safeContentIds = useMemo(
+    () => contents.filter(c => (complianceByContentId[c.id]?.score ?? 100) >= 90).map(c => c.id),
+    [contents, complianceByContentId]
+  );
+
+  const flaggedContentIds = useMemo(
+    () => contents.filter(c => (complianceByContentId[c.id]?.score ?? 100) < 90).map(c => c.id),
+    [contents, complianceByContentId]
+  );
+
+  const handleToggleSelectContent = (id: number) => {
+    setSelectedContentIds(prev =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedContentIds.length === contents.length && contents.length > 0) {
+      setSelectedContentIds([]);
+    } else {
+      setSelectedContentIds(contents.map(c => c.id));
+    }
+  };
+
+  const handleBulkApprove = async (explicitIds?: number[]) => {
+    if (!isApprover) {
+      toast.warning('Chỉ Quản lý (Manager, Agency Manager, Client Approver) mới có quyền phê duyệt hàng loạt!');
+      return;
+    }
+    const targetIds = explicitIds && explicitIds.length > 0
+      ? explicitIds
+      : selectedContentIds.length > 0
+        ? selectedContentIds
+        : safeContentIds;
+    if (targetIds.length === 0) {
+      toast.info('Không có bài viết nào được chọn hoặc đạt chuẩn an toàn (≥90 điểm) để duyệt nhanh.');
+      return;
+    }
+    setIsBulkReviewing(true);
+    try {
+      const res = await contentApi.bulkReview({
+        content_ids: targetIds,
+        action: 'APPROVE',
+      });
+      toast.success(`Đã phê duyệt nhanh ${res.updated_count} bài viết thành công (Bulk Approve)!`);
+      setSelectedContentIds([]);
+      await loadContents();
+    } catch (e: any) {
+      toast.error(getApiErrorMessage(e), 'Lỗi khi duyệt hàng loạt');
+    } finally {
+      setIsBulkReviewing(false);
+    }
+  };
+
+  const handleBatchAutoFix = async (explicitIds?: number[]) => {
+    const targetIds = explicitIds && explicitIds.length > 0
+      ? explicitIds
+      : selectedContentIds.length > 0
+        ? selectedContentIds
+        : flaggedContentIds.length > 0
+          ? flaggedContentIds
+          : contents.map(c => c.id);
+    if (targetIds.length === 0) {
+      toast.info('Vui lòng chọn bài viết cần AI tự động khử từ nhạy cảm & viết lại hợp chuẩn.');
+      return;
+    }
+    setIsBatchFixing(true);
+    try {
+      const res = await contentApi.batchAutoFix({
+        content_ids: targetIds,
+        apply_immediately: true,
+      });
+      toast.success(
+        `AI đã tự động làm sạch từ khóa vi phạm & chuẩn hóa ${res.fixed_count} bài viết! (Điểm tuân thủ nâng lên ≥92/100)`
+      );
+      setSelectedContentIds([]);
+      await loadContents();
+    } catch (e: any) {
+      toast.error(getApiErrorMessage(e), 'Lỗi khi chạy AI Batch Auto-Fix');
+    } finally {
+      setIsBatchFixing(false);
+    }
   };
 
   const handleApprove = async (id: number) => {
@@ -312,74 +409,74 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
       </div>
 
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E2E0D8] pb-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Hàng đợi Phê duyệt Nội dung</h2>
-            <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-300">
-              Quy trình Kiểm duyệt con người (Human-in-the-loop)
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-2xl font-bold text-[#121316] tracking-tight">Duyệt bài & Kiểm tra từ cấm</h2>
+            <span className="text-xs bg-[#ECFDF5] text-[#15803D] font-semibold px-2.5 py-0.5 rounded-md border border-[#A7F3D0]">
+              Kiểm tra trước khi đăng
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Nội dung do AI hoặc nhân viên soạn thảo bắt buộc phải được Quản lý (Manager / Approver) kiểm duyệt trước khi xuất bản hoặc lập lịch.
+          <p className="text-sm text-[#52555E] mt-1">
+            Kiểm tra bài viết có dính từ cấm quảng cáo (cam kết 100%, trị dứt điểm...) hay sai thông tin thương hiệu trước khi cho phép đăng.
           </p>
         </div>
 
         {!isApprover && (
-          <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3 py-2 rounded-lg flex items-center gap-2 no-print">
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-            <span>Bạn đang xem dưới vai trò <strong>{userRole || 'MARKETER'}</strong> (chỉ có quyền xem). Chuyển sang <strong>Manager / Client Approver</strong> ở thanh trên để bấm duyệt hoặc từ chối.</span>
+          <div className="bg-[#FFFBEB] border border-[#FDE68A] text-[#B45309] text-xs px-3 py-2 rounded-lg flex items-center gap-2 no-print">
+            <AlertTriangle className="w-4 h-4 text-[#B45309] shrink-0" />
+            <span>Bạn đang ở chế độ <strong>Nhân viên viết bài</strong> (chỉ xem). Đổi sang <strong>Quản lý duyệt bài</strong> ở góc trên cùng để bấm Duyệt.</span>
           </div>
         )}
       </div>
 
-      {/* Top Action Bar: Export & Visual View Switcher (FEAT-FE-14 & R4) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow no-print">
+      {/* Top Action Bar: Export & Visual View Switcher */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-[#E2E0D8] shadow-xs no-print">
         <ExportActions
-          campaignName="Hàng Đợi Duyệt Bài MarketFlow AI"
+          campaignName="Danh sách bài chờ duyệt"
           contents={contents}
           className="border-0 p-0 bg-transparent"
         />
 
         <div className="flex items-center gap-2 ml-auto">
-          <span className="text-xs text-slate-500 font-medium hidden sm:inline">Chế độ hiển thị:</span>
-          <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+          <span className="text-xs text-[#52555E] font-medium hidden sm:inline">Cách xem:</span>
+          <div className="flex bg-[#F3F2EE] p-0.5 rounded-lg border border-[#E2E0D8]">
             <button
               onClick={() => setShowSocialPreview(false)}
               className={`px-2.5 py-1 rounded-md text-xs font-semibold transition flex items-center gap-1.5 ${
-                !showSocialPreview ? 'bg-white text-slate-900 shadow' : 'text-slate-600 hover:text-slate-900'
+                !showSocialPreview ? 'bg-white text-[#121316] shadow-xs' : 'text-[#52555E] hover:text-[#121316]'
               }`}
             >
               <LayoutGrid className="w-3.5 h-3.5" />
-              Thẻ tóm tắt
+              Xem dạng danh sách
             </button>
             <button
               onClick={() => setShowSocialPreview(true)}
               className={`px-2.5 py-1 rounded-md text-xs font-semibold transition flex items-center gap-1.5 ${
-                showSocialPreview ? 'bg-indigo-600 text-white shadow' : 'text-slate-600 hover:text-slate-900'
+                showSocialPreview ? 'bg-[#121316] text-white shadow-xs' : 'text-[#52555E] hover:text-[#121316]'
               }`}
             >
               <Eye className="w-3.5 h-3.5" />
-              Social Preview (R4)
+              Xem thử như trên Facebook / TikTok
             </button>
           </div>
         </div>
       </div>
 
       {/* Filter Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 no-print">
+      <div className="flex items-center gap-2 border-b border-[#E2E0D8] pb-2 no-print">
         <button
           onClick={() => setActiveTab('pending')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
             activeTab === 'pending'
-              ? 'bg-amber-700 text-white shadow-sm'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              ? 'bg-[#121316] text-white shadow-xs'
+              : 'bg-[#F3F2EE] text-[#52555E] hover:bg-[#E2E0D8]/60'
           }`}
         >
           <Clock className="w-3.5 h-3.5" />
-          <span>Chờ phê duyệt</span>
-          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
-            activeTab === 'pending' ? 'bg-amber-800 text-white' : 'bg-slate-200 text-slate-700'
+          <span>Bài đang chờ duyệt</span>
+          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold tabular-nums ${
+            activeTab === 'pending' ? 'bg-white/20 text-white' : 'bg-[#E2E0D8] text-[#121316]'
           }`}>
             {pendingList.length}
           </span>
@@ -387,16 +484,16 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
 
         <button
           onClick={() => setActiveTab('drafts')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
             activeTab === 'drafts'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              ? 'bg-[#121316] text-white shadow-xs'
+              : 'bg-[#F3F2EE] text-[#52555E] hover:bg-[#E2E0D8]/60'
           }`}
         >
           <FileText className="w-3.5 h-3.5" />
-          <span>Bản nháp chờ gửi duyệt</span>
-          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
-            activeTab === 'drafts' ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'
+          <span>Bản nháp chưa gửi duyệt</span>
+          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold tabular-nums ${
+            activeTab === 'drafts' ? 'bg-white/20 text-white' : 'bg-[#E2E0D8] text-[#121316]'
           }`}>
             {draftList.length}
           </span>
@@ -404,21 +501,100 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
 
         <button
           onClick={() => setActiveTab('history')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
             activeTab === 'history'
-              ? 'bg-slate-800 text-white shadow-sm'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              ? 'bg-[#121316] text-white shadow-xs'
+              : 'bg-[#F3F2EE] text-[#52555E] hover:bg-[#E2E0D8]/60'
           }`}
         >
           <History className="w-3.5 h-3.5" />
-          <span>Lịch sử duyệt bài</span>
-          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
-            activeTab === 'history' ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-700'
+          <span>Bài đã duyệt xong</span>
+          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold tabular-nums ${
+            activeTab === 'history' ? 'bg-white/20 text-white' : 'bg-[#E2E0D8] text-[#121316]'
           }`}>
             {historyList.length}
           </span>
         </button>
       </div>
+
+      {/* BATCH TRIAGE & BULK REVIEW BAR (FOR PENDING & DRAFTS) */}
+      {!loading && (activeTab === 'pending' || activeTab === 'drafts') && contents.length > 0 && (
+        <div
+          data-testid="review-batch-triage-bar"
+          className="bg-white text-[#121316] rounded-xl p-4 shadow-xs border border-[#E2E0D8] flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 no-print"
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="inline-flex items-center gap-2 cursor-pointer bg-[#F8F7F4] hover:bg-[#F3F2EE] px-3 py-1.5 rounded-lg border border-[#E2E0D8] text-xs font-semibold text-[#121316]">
+              <input
+                type="checkbox"
+                checked={selectedContentIds.length === contents.length && contents.length > 0}
+                onChange={handleToggleSelectAll}
+                className="w-4 h-4 rounded accent-[#D95D39] cursor-pointer"
+              />
+              <span>
+                {selectedContentIds.length > 0
+                  ? `Đã chọn ${selectedContentIds.length}/${contents.length} bài`
+                  : `Chọn tất cả (${contents.length})`}
+              </span>
+            </label>
+
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#ECFDF5] text-[#15803D] border border-[#A7F3D0] font-semibold">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Không dính từ cấm (≥90đ): {safeContentIds.length} bài
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#FFFBEB] text-[#B45309] border border-[#FDE68A] font-semibold">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Nghi dính từ cấm (&lt;90đ): {flaggedContentIds.length} bài
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleBatchAutoFix()}
+              disabled={isBatchFixing}
+              data-testid="btn-batch-auto-fix"
+              className="px-3.5 py-2 rounded-lg bg-[#121316] hover:bg-[#2A2C32] disabled:opacity-50 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+            >
+              {isBatchFixing ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Wand2 className="w-3.5 h-3.5" />
+              )}
+              <span>
+                {selectedContentIds.length > 0
+                  ? `Tự động sửa từ cấm (${selectedContentIds.length} bài đã chọn)`
+                  : flaggedContentIds.length > 0
+                    ? `Tự động sửa ${flaggedContentIds.length} bài dính từ cấm`
+                    : 'Chuẩn hóa câu chữ hàng loạt'}
+              </span>
+            </button>
+
+            {activeTab === 'pending' && (
+              <button
+                type="button"
+                onClick={() => handleBulkApprove()}
+                disabled={!isApprover || isBulkReviewing || (selectedContentIds.length === 0 && safeContentIds.length === 0)}
+                data-testid="btn-bulk-approve"
+                className="px-3.5 py-2 rounded-lg bg-[#15803D] hover:bg-[#166534] disabled:bg-slate-200 disabled:text-slate-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+              >
+                {isBulkReviewing ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                )}
+                <span>
+                  {selectedContentIds.length > 0
+                    ? `Duyệt ngay ${selectedContentIds.length} bài đã chọn`
+                    : `Duyệt nhanh ${safeContentIds.length} bài an toàn (≥90đ)`}
+                </span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main Content Areas */}
       {loading ? (
@@ -443,18 +619,51 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-4">
-                  {pendingList.map((item) => (
+                  {pendingList.map((item) => {
+                    const comp = complianceByContentId[item.id];
+                    const compScore = comp?.score ?? 100;
+                    return (
                     <div key={item.id} className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm hover:border-indigo-300 transition-all space-y-4 review-item-card print-card">
                       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedContentIds.includes(item.id)}
+                            onChange={() => handleToggleSelectContent(item.id)}
+                            aria-label={`Chọn bài viết ${item.title}`}
+                            className="w-4 h-4 rounded accent-indigo-600 cursor-pointer no-print"
+                          />
                           <span className="text-[10px] bg-amber-50 text-amber-700 font-bold px-2 py-0.5 rounded border border-amber-200">
                             CHỜ DUYỆT (IN_REVIEW)
                           </span>
                           <span className="text-xs text-slate-500 font-medium">Kênh: {item.channel?.name || 'Mạng xã hội'}</span>
+                          <span
+                            className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                              compScore >= 90
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : 'bg-rose-50 text-rose-700 border-rose-200'
+                            }`}
+                          >
+                            {compScore >= 90
+                              ? `Không dính từ cấm (${compScore}/100)`
+                              : `Nghi dính từ cấm (${compScore}/100 · ${comp?.flagged_items?.map((f) => f.phrase).join(', ') || 'Cần rà soát'})`}
+                          </span>
                         </div>
 
                         {/* Actions for Manager / Approver */}
                         <div className="flex items-center gap-2 no-print review-actions">
+                          {compScore < 90 && (
+                            <button
+                              type="button"
+                              onClick={() => handleBatchAutoFix([item.id])}
+                              disabled={isBatchFixing}
+                              className="px-2.5 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg text-xs font-bold flex items-center gap-1 transition-all"
+                              title="AI tự động khử từ khóa vi phạm chính sách và chuẩn hóa bài viết"
+                            >
+                              <Wand2 className="w-3.5 h-3.5" />
+                              <span>AI Sửa Nhanh</span>
+                            </button>
+                          )}
                           <button
                             onClick={() => handleStartEdit(item)}
                             className="px-2.5 py-1.5 border border-slate-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all"
@@ -508,7 +717,8 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                         </div>
                       )}
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               )}
             </div>
@@ -537,10 +747,20 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-4">
-                  {draftList.map((item) => (
+                  {draftList.map((item) => {
+                    const comp = complianceByContentId[item.id];
+                    const compScore = comp?.score ?? 100;
+                    return (
                     <div key={item.id} className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm hover:border-blue-300 transition-all space-y-4 review-item-card print-card">
                       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedContentIds.includes(item.id)}
+                            onChange={() => handleToggleSelectContent(item.id)}
+                            aria-label={`Chọn bản nháp ${item.title}`}
+                            className="w-4 h-4 rounded accent-indigo-600 cursor-pointer no-print"
+                          />
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
                             item.status === 'REJECTED'
                               ? 'bg-rose-50 text-rose-700 border-rose-200'
@@ -549,10 +769,33 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                             {item.status === 'REJECTED' ? 'CẦN CHỈNH SỬA (REJECTED)' : `BẢN NHÁP (${item.status})`}
                           </span>
                           <span className="text-xs text-slate-500 font-medium">Kênh: {item.channel?.name || 'Mạng xã hội'}</span>
+                          <span
+                            className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                              compScore >= 90
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : 'bg-rose-50 text-rose-700 border-rose-200'
+                            }`}
+                          >
+                            {compScore >= 90
+                              ? `🛡️ Policy Safe (${compScore}/100)`
+                              : `⚠️ Cảnh báo Policy (${compScore}/100)`}
+                          </span>
                         </div>
 
                         {/* Submit Action */}
                         <div className="flex items-center gap-2 no-print review-actions">
+                          {(compScore < 90 || item.status === 'REJECTED') && (
+                            <button
+                              type="button"
+                              onClick={() => handleBatchAutoFix([item.id])}
+                              disabled={isBatchFixing}
+                              className="px-2.5 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg text-xs font-bold flex items-center gap-1 transition-all"
+                              title="AI tự động viết lại bài nháp hợp chuẩn & khắc phục lỗi bị từ chối"
+                            >
+                              <Wand2 className="w-3.5 h-3.5" />
+                              <span>AI Viết Lại Hợp Chuẩn</span>
+                            </button>
+                          )}
                           <button
                             onClick={() => handleStartEdit(item)}
                             className="px-2.5 py-1.5 border border-slate-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all"
@@ -607,7 +850,8 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                         </div>
                       )}
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               )}
             </div>

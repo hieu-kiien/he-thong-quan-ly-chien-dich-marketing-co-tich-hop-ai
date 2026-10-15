@@ -8,12 +8,18 @@ from app.core.database import get_db
 from app.core.pagination import Page, PageParams, page_params, paginate_query
 from app.core.security import RoleChecker, get_current_user
 from app.services import quota
-from app.models.entities import MarketingContent, Campaign, MarketingChannel, ContentReview, User, CampaignMember, Workspace, WorkspaceMember
+from app.models.entities import (
+    MarketingContent, Campaign, MarketingChannel, ContentReview,
+    User, CampaignMember, Workspace, WorkspaceMember, BrandKit
+)
 from app.schemas.schemas import (
     ContentCreate, ContentUpdate, ContentResponse, ReviewCreate,
-    ComplianceCheckRequest, ComplianceCheckResponse
+    ComplianceCheckRequest, ComplianceCheckResponse,
+    ContentBulkReviewRequest, ContentBulkReviewResponse,
+    ContentBatchAutoFixRequest, ContentBatchAutoFixItem, ContentBatchAutoFixResponse,
 )
 from app.services.compliance.compliance_service import ComplianceScanner
+from app.services.ai.ai_service import ai_service
 from app.api.v1.notifications import create_notification
 from app.api.v1.campaigns import _apply_tenant_scope, get_workspace_filter
 
@@ -181,12 +187,15 @@ def get_contents(
     campaign_id: Optional[int] = Query(None),
     status_filter: Optional[str] = Query(None, alias="status"),
     channel_id: Optional[int] = Query(None),
+    creative_angle: Optional[str] = Query(None, description="Lọc theo góc tiếp cận (Creative Angle)"),
     search: Optional[str] = Query(None, description="Tìm trong tiêu đề hoặc nội dung"),
     sort: str = Query("newest", description=_SORT_DESCRIPTION),
-    pagination: PageParams = Depends(page_params),
+    page: int = Query(1, ge=1, description="Trang hiện tại (bắt đầu từ 1)."),
+    page_size: int = Query(20, ge=1, le=200, description="Số dòng mỗi trang (1..200)."),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    pagination = PageParams(page=page, page_size=page_size)
     query = db.query(MarketingContent)
 
     # Tenant scope (fail-closed): mọi role trừ ADMIN chỉ thấy nội dung thuộc workspace
@@ -251,6 +260,8 @@ def get_contents(
             query = query.filter(MarketingContent.status.in_(wanted))
     if channel_id:
         query = query.filter(MarketingContent.channel_id == channel_id)
+    if creative_angle:
+        query = query.filter(MarketingContent.creative_angle == creative_angle.strip().upper())
     if search:
         search_fmt = f"%{search}%"
         query = query.filter(
@@ -323,6 +334,14 @@ def create_content(
     if ws_id is not None:
         quota.enforce(db, quota.LIMIT_CONTENTS, user=current_user, workspace_id=ws_id)
 
+    utm_params = req.utm_params
+    if not utm_params:
+        ch_code = (channel.code or "social").lower()
+        angle_slug = (req.creative_angle or "general").lower().replace(" ", "_")
+        hook_slug = (req.hook_variant or "v1").lower().replace(" ", "_")
+        camp_code = getattr(campaign, "campaign_code", None) or f"camp_{req.campaign_id}"
+        utm_params = f"?utm_source={ch_code}&utm_medium=paid_social&utm_campaign={camp_code.lower()}&utm_content={angle_slug}_{hook_slug}"
+
     content = MarketingContent(
         workspace_id=ws_id,
         campaign_id=req.campaign_id,
@@ -332,7 +351,11 @@ def create_content(
         body=req.body,
         cta=req.cta,
         image_url=req.image_url,
-        status=req.status or "DRAFT"
+        status=req.status or "DRAFT",
+        creative_angle=req.creative_angle.strip().upper() if req.creative_angle else None,
+        hook_variant=req.hook_variant,
+        utm_params=utm_params,
+        ai_metadata_json=req.ai_metadata_json,
     )
     db.add(content)
     try:
@@ -372,6 +395,270 @@ def compliance_check(
         cta=req.cta,
         workspace_id=req.workspace_id,
         db=db
+    )
+
+
+@router.post("/bulk-review", response_model=ContentBulkReviewResponse)
+def bulk_review_contents(
+    req: ContentBulkReviewRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Phê duyệt / Từ chối / Gửi duyệt / Xóa hàng loạt nội dung (Enterprise Bulk Review Queue)."""
+    action = req.action.strip().upper()
+    reason_text = (req.feedback or req.rejection_reason or req.reason or "").strip()
+    if action in ("APPROVE", "REJECT"):
+        if current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER", "CLIENT_APPROVER"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Chỉ Quản lý hoặc Người phê duyệt mới có quyền duyệt/từ chối hàng loạt.",
+            )
+    if action == "REJECT" and len(reason_text) < 3:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Vui lòng cung cấp lý do từ chối cụ thể (tối thiểu 3 ký tự).",
+        )
+
+    contents = db.query(MarketingContent).filter(MarketingContent.id.in_(req.content_ids)).all()
+    content_map = {c.id: c for c in contents}
+
+    processed_ids: List[int] = []
+    skipped_ids: List[int] = []
+    errors: List[str] = []
+    deleted_count = 0
+
+    for cid in req.content_ids:
+        content = content_map.get(cid)
+        if not content:
+            skipped_ids.append(cid)
+            errors.append(f"Nội dung #{cid} không tồn tại.")
+            continue
+
+        try:
+            if action in ("APPROVE", "REJECT"):
+                check_workspace_boundary(content, current_user, db)
+            else:
+                check_content_access(content, current_user, db)
+        except HTTPException as exc:
+            skipped_ids.append(cid)
+            errors.append(f"Nội dung #{cid}: {exc.detail}")
+            continue
+
+        if action == "SUBMIT":
+            if content.status not in ("DRAFT", "AI_DRAFT", "REJECTED"):
+                skipped_ids.append(cid)
+                errors.append(f"Nội dung #{cid} đang ở trạng thái '{content.status}', không thể gửi duyệt.")
+                continue
+            scan_res = ComplianceScanner.scan(
+                title=content.title,
+                body=content.body,
+                cta=content.cta,
+                workspace_id=content.workspace_id,
+                db=db,
+            )
+            content.warnings_json = json.dumps([v.model_dump() for v in scan_res.violations], ensure_ascii=False)
+            if not scan_res.can_submit:
+                skipped_ids.append(cid)
+                errors.append(f"Nội dung #{cid} chứa vi phạm an toàn thương hiệu mức độ HIGH.")
+                continue
+            content.status = "IN_REVIEW"
+            processed_ids.append(cid)
+
+        elif action == "APPROVE":
+            if content.created_by == current_user.id:
+                skipped_ids.append(cid)
+                errors.append(f"Nội dung #{cid}: Không thể tự phê duyệt nội dung do chính mình tạo (Separation of duties).")
+                continue
+            if content.status != "IN_REVIEW":
+                skipped_ids.append(cid)
+                errors.append(f"Nội dung #{cid} đang ở trạng thái '{content.status}', cần ở IN_REVIEW để phê duyệt.")
+                continue
+            scan_res = ComplianceScanner.scan(
+                title=content.title,
+                body=content.body,
+                cta=content.cta,
+                workspace_id=content.workspace_id,
+                db=db,
+            )
+            if not scan_res.can_submit:
+                skipped_ids.append(cid)
+                errors.append(f"Nội dung #{cid} chứa vi phạm an toàn thương hiệu mức độ HIGH.")
+                continue
+            content.status = "APPROVED"
+            db.add(
+                ContentReview(
+                    content_id=content.id,
+                    reviewer_id=current_user.id,
+                    decision="APPROVED",
+                    reason=reason_text or "Phê duyệt hàng loạt (Bulk Approval).",
+                )
+            )
+            processed_ids.append(cid)
+
+        elif action == "REJECT":
+            if content.created_by == current_user.id:
+                skipped_ids.append(cid)
+                errors.append(f"Nội dung #{cid}: Không thể tự từ chối nội dung do chính mình tạo.")
+                continue
+            if content.status != "IN_REVIEW":
+                skipped_ids.append(cid)
+                errors.append(f"Nội dung #{cid} đang ở trạng thái '{content.status}', cần ở IN_REVIEW để từ chối.")
+                continue
+            content.status = "REJECTED"
+            db.add(
+                ContentReview(
+                    content_id=content.id,
+                    reviewer_id=current_user.id,
+                    decision="REJECTED",
+                    reason=reason_text,
+                )
+            )
+            processed_ids.append(cid)
+
+        elif action == "DELETE":
+            if content.status == "PUBLISHED":
+                skipped_ids.append(cid)
+                errors.append(f"Nội dung #{cid} đã xuất bản (PUBLISHED), không thể xóa.")
+                continue
+            db.delete(content)
+            deleted_count += 1
+            processed_ids.append(cid)
+
+    db.commit()
+    return ContentBulkReviewResponse(
+        status="ok",
+        action=action,
+        requested_count=len(req.content_ids),
+        processed_count=len(processed_ids),
+        updated_count=len(processed_ids),
+        deleted_count=deleted_count,
+        skipped_count=len(skipped_ids),
+        processed_ids=processed_ids,
+        skipped_ids=skipped_ids,
+        errors=errors,
+        message=f"Đã xử lý {len(processed_ids)}/{len(req.content_ids)} nội dung.",
+    )
+
+
+@router.post("/batch-auto-fix", response_model=ContentBatchAutoFixResponse)
+def batch_auto_fix_compliance(
+    req: ContentBatchAutoFixRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Tự động viết lại hàng loạt bài viết vi phạm Brand Safety / Compliance bằng Semantic Rewrite Engine."""
+    if req.content_ids:
+        contents = db.query(MarketingContent).filter(MarketingContent.id.in_(req.content_ids)).all()
+        target_ids = req.content_ids
+    else:
+        contents = (
+            db.query(MarketingContent)
+            .filter(MarketingContent.status.in_(["IN_REVIEW", "AI_DRAFT", "DRAFT", "REJECTED"]))
+            .limit(100)
+            .all()
+        )
+        target_ids = [c.id for c in contents]
+
+    content_map = {c.id: c for c in contents}
+    items: List[ContentBatchAutoFixItem] = []
+    fixed_items_summary: List[Dict[str, Any]] = []
+
+    for cid in target_ids:
+        content = content_map.get(cid)
+        if not content:
+            continue
+        try:
+            check_content_access(content, current_user, db)
+        except HTTPException:
+            continue
+
+        ws_id = resolve_workspace_id_for_content(content, db)
+        before_scan = ComplianceScanner.scan(
+            title=content.title,
+            body=content.body,
+            cta=content.cta,
+            workspace_id=ws_id,
+            db=db,
+        )
+
+        banned_words: List[str] = []
+        if ws_id is not None:
+            bk = db.query(BrandKit).filter(BrandKit.workspace_id == ws_id).first()
+            if bk and bk.banned_keywords_json:
+                try:
+                    banned_words = json.loads(bk.banned_keywords_json)
+                except Exception:
+                    banned_words = []
+
+        violations_payload = [v.model_dump() for v in before_scan.violations]
+        rewrite_res = ai_service.semantic_compliance_rewrite(
+            db=db,
+            user_id=current_user.id,
+            workspace_id=ws_id,
+            campaign_id=content.campaign_id,
+            title=content.title,
+            body=content.body,
+            cta=content.cta or "",
+            violations=violations_payload,
+            banned_keywords=banned_words,
+        )
+
+        new_title = rewrite_res.get("rewritten_title") or rewrite_res.get("title") or content.title
+        new_body = rewrite_res.get("rewritten_body") or rewrite_res.get("body") or content.body
+        new_cta = rewrite_res.get("rewritten_cta") or rewrite_res.get("cta") or content.cta
+
+        after_scan = ComplianceScanner.scan(
+            title=new_title,
+            body=new_body,
+            cta=new_cta,
+            workspace_id=ws_id,
+            db=db,
+        )
+
+        if req.apply_immediately:
+            content.title = new_title
+            content.body = new_body
+            if new_cta is not None:
+                content.cta = new_cta
+            content.warnings_json = json.dumps([v.model_dump() for v in after_scan.violations], ensure_ascii=False)
+            if content.status in ("APPROVED", "PUBLISHED", "REJECTED"):
+                content.status = "AI_DRAFT"
+            content.version_no = int(content.version_no or 1) + 1
+
+        fixed_list = [str(x) for x in (rewrite_res.get("fixed_violations") or [])]
+        items.append(
+            ContentBatchAutoFixItem(
+                content_id=content.id,
+                original_score=before_scan.score,
+                old_score=before_scan.score,
+                new_score=after_scan.score,
+                can_submit=after_scan.can_submit,
+                status_before=before_scan.status,
+                status_after=after_scan.status,
+                fixed_violations_count=len(fixed_list),
+                fixed_violations=fixed_list,
+                rewritten_title=new_title,
+                rewritten_body=new_body,
+                rewritten_cta=new_cta,
+                title=new_title,
+                body=new_body,
+                cta=new_cta,
+            )
+        )
+        fixed_items_summary.append({
+            "id": content.id,
+            "title": new_title,
+            "replacements": fixed_list,
+        })
+
+    db.commit()
+    return ContentBatchAutoFixResponse(
+        status="ok",
+        requested_count=len(target_ids),
+        processed_count=len(items),
+        fixed_count=len(items),
+        items=items,
+        fixed_items=fixed_items_summary,
     )
 
 
@@ -427,6 +714,14 @@ def update_content(
         if target_img != content.image_url:
             content.image_url = target_img
             is_content_edited = True
+    if req.creative_angle is not None:
+        content.creative_angle = req.creative_angle.strip().upper() if req.creative_angle else None
+    if req.hook_variant is not None:
+        content.hook_variant = req.hook_variant
+    if req.utm_params is not None:
+        content.utm_params = req.utm_params
+    if req.ai_metadata_json is not None:
+        content.ai_metadata_json = req.ai_metadata_json
 
     was_approved = content.status in ["APPROVED", "PUBLISHED"]
     if was_approved and is_content_edited:

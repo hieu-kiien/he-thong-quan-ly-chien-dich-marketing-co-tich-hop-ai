@@ -256,6 +256,7 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
 
   useEffect(() => {
     void loadManifest();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleRunAgent = async () => {
@@ -704,14 +705,14 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
                       {isExpanded && (
                         <div className="px-4 pb-3 pt-1 border-t border-slate-200/70 bg-slate-900 text-slate-100 font-mono text-[11px] space-y-2 overflow-x-auto">
                           <div>
-                            <span className="text-amber-300 font-bold">// INPUT PARAMS:</span>
+                            <span className="text-amber-300 font-bold">{'// INPUT PARAMS:'}</span>
                             <pre className="mt-0.5 text-slate-300 whitespace-pre-wrap">
                               {JSON.stringify(st.input, null, 2)}
                             </pre>
                           </div>
                           {st.output !== undefined && (
                             <div>
-                              <span className="text-emerald-300 font-bold">// MCP OUTPUT PAYLOAD:</span>
+                              <span className="text-emerald-300 font-bold">{'// MCP OUTPUT PAYLOAD:'}</span>
                               <pre className="mt-0.5 text-emerald-100 whitespace-pre-wrap max-h-60 overflow-y-auto">
                                 {JSON.stringify(st.output, null, 2)}
                               </pre>

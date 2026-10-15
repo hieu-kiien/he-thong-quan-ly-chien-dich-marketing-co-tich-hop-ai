@@ -59,8 +59,22 @@ KIND_DRAFT = "draft"
 KIND_SUMMARY = "summary"
 KIND_OMNICHANNEL = "omnichannel"
 KIND_PLAN = "plan"
+KIND_ANGLE_MATRIX = "angle_matrix"
+KIND_PRELAUNCH_CRITIC = "prelaunch_critic"
+KIND_DEEP_DOCTOR = "deep_doctor"
+KIND_BATCH_COMPLIANCE_FIX = "batch_compliance_fix"
 
-JOB_KINDS = (KIND_IDEAS, KIND_DRAFT, KIND_SUMMARY, KIND_OMNICHANNEL, KIND_PLAN)
+JOB_KINDS = (
+    KIND_IDEAS,
+    KIND_DRAFT,
+    KIND_SUMMARY,
+    KIND_OMNICHANNEL,
+    KIND_PLAN,
+    KIND_ANGLE_MATRIX,
+    KIND_PRELAUNCH_CRITIC,
+    KIND_DEEP_DOCTOR,
+    KIND_BATCH_COMPLIANCE_FIX,
+)
 
 # Lý do thất bại dùng chung cho cả API lẫn test, để client đổi chuỗi hiển thị
 # không bị lệch với những gì worker thực sự ghi.

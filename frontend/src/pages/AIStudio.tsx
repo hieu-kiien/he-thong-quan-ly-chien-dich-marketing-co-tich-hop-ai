@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Lightbulb, FileText, SendHorizontal, Copy, Check, Loader2, ArrowRight, CheckCircle2, Zap, Stethoscope, RefreshCw, AlertTriangle, ThumbsUp, Video, Mail, ExternalLink, ShieldCheck, Eye, Lock, Bot } from 'lucide-react';
-import { Campaign, AIIdeaResponse, AIDraftResponse, MarketingContent, AISummaryResponse, KPISummary, OmnichannelResponse, ComplianceCheckResponse } from '../types';
-import { contentApi, campaignApi, mcpApi, getApiErrorMessage } from '../services/api';
+import { Sparkles, Lightbulb, FileText, SendHorizontal, Copy, Check, Loader2, ArrowRight, CheckCircle2, Zap, Stethoscope, RefreshCw, AlertTriangle, ThumbsUp, Video, Mail, ExternalLink, ShieldCheck, Eye, Lock, Bot, Target, Scale, Layers, Rocket } from 'lucide-react';
+import { Campaign, AIIdeaResponse, AIDraftResponse, MarketingContent, AISummaryResponse, KPISummary, OmnichannelResponse, ComplianceCheckResponse, AngleMatrixResponse, PrelaunchCriticResponse } from '../types';
+import { contentApi, campaignApi, aiApi, mcpApi, getApiErrorMessage } from '../services/api';
 import { AIJobError, describeAIJobFailure, describeAIResultOrigin } from '../services/aiJobPoller';
 import { useAIJob } from '../hooks/useAIJob';
 import { AIJobProgress } from '../components/AIJobProgress';
@@ -42,8 +42,26 @@ export const AIStudio: React.FC<AIStudioProps> = ({
   const [channelCode, setChannelCode] = useState<string>('facebook');
   const [framework, setFramework] = useState<'AIDA' | 'PAS' | 'FAB'>('AIDA');
 
-  // Studio Modes: 'omnichannel' | 'create' | 'doctor' | 'mcp'
-  const [studioSection, setStudioSection] = useState<'omnichannel' | 'create' | 'doctor' | 'mcp'>('omnichannel');
+  // Studio Modes: 'omnichannel' | 'create' | 'doctor' | 'angle_matrix' | 'persona_critic' | 'mcp'
+  const [studioSection, setStudioSection] = useState<'omnichannel' | 'create' | 'doctor' | 'angle_matrix' | 'persona_critic' | 'mcp'>('omnichannel');
+
+  // Flagship 1: AI Angle × Hook Matrix States
+  const [matrixProduct, setMatrixProduct] = useState<string>('Nền tảng Quản trị Chiến dịch Marketing AI');
+  const [matrixUsp, setMatrixUsp] = useState<string>('Tự động hóa tạo 12 biến thể A/B, cảnh báo Over-pacing và tăng 38% ROAS chỉ sau 14 ngày');
+  const [matrixAudience] = useState<string>('Chủ doanh nghiệp SME, Performance Marketer & Trưởng phòng Tăng trưởng');
+  const [matrixChannel, setMatrixChannel] = useState<string>('Facebook');
+  const [matrixData, setMatrixData] = useState<AngleMatrixResponse | null>(null);
+  const [matrixLoading, setMatrixLoading] = useState<boolean>(false);
+  const [matrixSeeding, setMatrixSeeding] = useState<boolean>(false);
+  const [activeAngleFilter, setActiveAngleFilter] = useState<string>('ALL');
+
+  // Flagship 2: Pre-Launch Persona Critic States
+  const [criticTitle, setCriticTitle] = useState<string>('Giải pháp số 1 thị trường cam kết 100% tăng gấp đôi doanh số sau 3 ngày');
+  const [criticBody, setCriticBody] = useState<string>('Chúng tôi là nền tảng số 1 thị trường giúp bạn cam kết 100% ra đơn ngay lập tức mà không cần tốn công sức. Hãy đăng ký ngay hôm nay để không bỏ lỡ cơ hội tuyệt đối này!');
+  const [criticCta, setCriticCta] = useState<string>('Đăng ký ngay');
+  const [criticData, setCriticData] = useState<PrelaunchCriticResponse | null>(null);
+  const [criticLoading, setCriticLoading] = useState<boolean>(false);
+  const [criticSaving, setCriticSaving] = useState<boolean>(false);
 
   // Omnichannel States (R2)
   const [omniBrief, setOmniBrief] = useState<string>('Chiến dịch Tuyển sinh Kỹ sư Trí tuệ Nhân tạo 2026. Khán giả: Sinh viên CNTT, người chuyển ngành công nghệ. USP: Học thực hành GPU xịn, cam kết kết nối việc làm ngay khi tốt nghiệp.');
@@ -115,22 +133,22 @@ export const AIStudio: React.FC<AIStudioProps> = ({
   // Realistic Marketing Presets
   const presets = [
     {
-      label: '🎓 Khóa học Kỹ sư AI',
+      label: 'Khóa học Kỹ sư AI',
       topic: 'Chiến dịch Tuyển sinh Kỹ sư AI 2026',
       product: 'Khóa Đào tạo Trí tuệ Nhân tạo Thực Chiến',
-      usp: 'Đào tạo chuẩn quốc tế, cấp chứng chỉ chuyên môn, cam kết kết nối thực tập tại các tập đoàn công nghệ'
+      usp: 'Thực hành trên máy chủ GPU riêng, hỗ trợ giới thiệu thực tập tại các công ty phần mềm'
     },
     {
-      label: '💼 MarketFlow SaaS',
-      topic: 'Chiến dịch Giới thiệu Nền tảng Tiếp thị Tự động MarketFlow',
-      product: 'Hệ thống Quản lý Chiến dịch Tích hợp Trợ lý AI MarketFlow',
-      usp: 'Tự động hóa luồng tiếp thị đa kênh, chốt chặn duyệt con người HITL an toàn, đo lường ROI theo thời gian thực'
+      label: 'Phần mềm Quản lý Bán hàng',
+      topic: 'Chiến dịch Giới thiệu Phần mềm Quản lý Quảng cáo MarketFlow',
+      product: 'Hệ thống Quản lý Chiến dịch & Nội dung MarketFlow',
+      usp: 'Theo dõi tiền chi và doanh thu tập trung, kiểm tra từ cấm trước khi đăng bài'
     },
     {
-      label: '🌟 Học bổng Tài năng',
-      topic: 'Chương trình Học bổng Đột phá Đổi mới Sáng tạo 2026',
+      label: 'Học bổng Công nghệ',
+      topic: 'Chương trình Học bổng Công nghệ 2026',
       product: 'Quỹ Học bổng Tài năng Công nghệ',
-      usp: 'Hỗ trợ 100% học phí, đài thọ kinh phí nghiên cứu Lab và cơ hội du học trao đổi'
+      usp: 'Tài trợ 100% học phí và chi phí phòng thí nghiệm cho sinh viên đạt chuẩn đầu vào'
     }
   ];
 
@@ -577,6 +595,110 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
   const activeC = selectedCampaign || (campaigns.length > 0 ? campaigns[0] : null);
 
+  // Flagship 1: Generate 4 Angles × 3 Hooks = 12 Variants Matrix
+  const handleGenerateAngleMatrix = async () => {
+    if (matrixLoading) return;
+    setMatrixLoading(true);
+    try {
+      const res = await aiApi.generateAngleMatrix({
+        campaign_id: activeC?.id,
+        product_name: activeC?.product?.name || matrixProduct,
+        product_usp: activeC?.product?.usp || matrixUsp,
+        objective: activeC?.objective || 'Tối ưu chuyển đổi & ROAS',
+        audience: activeC?.audience || matrixAudience,
+        channel: matrixChannel,
+        tone,
+      });
+      setMatrixData(res);
+      setActiveAngleFilter('ALL');
+      toast.success(`Đã sinh Ma trận ${res.variants.length} biến thể quảng cáo (4 Góc Tâm lý × 3 Hook 3s)!`);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err), 'Lỗi khi sinh Ma trận Góc tiếp cận');
+    } finally {
+      setMatrixLoading(false);
+    }
+  };
+
+  // 1-Click Seed all 12 Matrix Variants into the selected Campaign
+  const handleSeedMatrixToCampaign = async () => {
+    if (!matrixData || matrixSeeding) return;
+    const targetC = activeC;
+    if (!targetC) {
+      toast.warning('Vui lòng chọn hoặc tạo ít nhất 1 chiến dịch trước khi đẩy biến thể.');
+      return;
+    }
+    setMatrixSeeding(true);
+    try {
+      const res = await campaignApi.seedAngleMatrix(targetC.id, {
+        variants: matrixData.variants,
+        channel_code: matrixChannel.toLowerCase(),
+      });
+      toast.success(`Đã đẩy toàn bộ ${res.created_count || matrixData.variants.length} biến thể A/B vào chiến dịch "${targetC.name}"!`);
+      if (onContentCreated) onContentCreated();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err), 'Không thể đẩy biến thể vào chiến dịch');
+    } finally {
+      setMatrixSeeding(false);
+    }
+  };
+
+  // Flagship 2: Run Pre-Launch Persona Critic
+  const handleRunPrelaunchCritic = async () => {
+    if (criticLoading || !criticBody.trim()) return;
+    setCriticLoading(true);
+    try {
+      const res = await aiApi.simulatePrelaunchCritic({
+        campaign_id: activeC?.id,
+        title: criticTitle,
+        body: criticBody,
+        cta: criticCta,
+        channel: matrixChannel,
+        objective: activeC?.objective,
+      });
+      setCriticData(res);
+      toast.success(`Hội đồng 4 Khán giả AI đã chấm điểm xong (Readiness: ${res.overall_readiness_score}/100)!`);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err), 'Lỗi khi chạy Hội đồng Phản biện');
+    } finally {
+      setCriticLoading(false);
+    }
+  };
+
+  // 1-Click Upgrade Copy from Persona Critic
+  const handleApplyCriticRewrite = () => {
+    if (!criticData?.rewritten_version) return;
+    setCriticTitle(criticData.rewritten_version.title);
+    setCriticBody(criticData.rewritten_version.body);
+    setCriticCta(criticData.rewritten_version.cta);
+    toast.success('Đã áp dụng bản viết lại sắc bén & hợp chuẩn từ Hội đồng Phản biện!');
+  };
+
+  const handleSaveCriticCopyToCampaign = async () => {
+    if (!activeC || criticSaving) return;
+    setCriticSaving(true);
+    try {
+      await contentApi.create({
+        campaign_id: activeC.id,
+        channel_id: 1,
+        created_by: 1,
+        title: criticTitle,
+        body: criticBody,
+        cta: criticCta,
+        status: 'IN_REVIEW',
+        version_no: 1,
+        source_ids_json: '["PERSONA_CRITIC_VERIFIED"]',
+        warnings_json: '[]',
+      });
+      toast.success(`Đã lưu bài viết đã kiểm định vào Hàng đợi Duyệt của "${activeC.name}"!`);
+      if (onContentCreated) onContentCreated();
+      if (onNavigateToReviews) onNavigateToReviews();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err), 'Không thể lưu bài viết');
+    } finally {
+      setCriticSaving(false);
+    }
+  };
+
   // Contents formatted for ExportActions toolbar (R4)
   const omniContentsForExport: MarketingContent[] = [];
   if (omniData) {
@@ -640,72 +762,81 @@ export const AIStudio: React.FC<AIStudioProps> = ({
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header Banner */}
-      {/* Dùng `lg:` chứ không phải `md:`. Sidebar cố định 256px nên tổng bề rộng
-        khả dụng thấp hơn nhiều so với viewport — ở viewport 929px nội dung chỉ
-        còn ~667px, `md:flex-row` vẫn kích hoạt và ép bộ chuyển mục xuống
-        259px, cắt mất nút "Đơn giản hoá". `lg:` (1024px) mới đủ chỗ. */}
-      <div className="bg-[#121316] border border-slate-800 rounded-2xl p-6 text-white shadow-xl flex flex-col lg:flex-row lg:flex-wrap items-start lg:items-center justify-between gap-4 no-print">
+      <div className="bg-white border border-[#E4E2DD] rounded-xl p-5 flex flex-col lg:flex-row lg:flex-wrap items-start lg:items-center justify-between gap-4 no-print">
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              {/* Provider/model đọc từ CẤU HÌNH backend, không hardcode. Nhãn cứng
-                  "Gemini 2.5 Flash" sai ngay khi chạy provider khác (openrouter /
-                  opencode / gemini) — người dùng tưởng đang gọi Gemini trong khi
-                  backend đang gọi nơi khác. Tên model thật hiển thị ở bảng cảnh
-                  báo ngay dưới kết quả sinh nội dung. */}
-              AI Provider • mô hình đã cấu hình (xem ở Cài đặt &gt; Khóa AI)
-            </span>
-            <span className="text-xs text-indigo-300">● Tích hợp Chiến dịch</span>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight">Xưởng Sáng Tạo Đa Kênh &amp; Chẩn Đoán Chiến Dịch</h1>
-          <p className="text-xs sm:text-sm text-indigo-200 mt-1 max-w-2xl">
-            Sáng tạo nội dung đa kênh theo khung chuẩn tiếp thị (AIDA, PAS, FAB) và Chẩn đoán hiệu quả chiến dịch bằng mô hình ngôn ngữ đã cấu hình.
+          <h1 className="text-xl sm:text-2xl font-black text-[#121316] tracking-tight">
+            Viết bài &amp; Tạo mẫu quảng cáo
+          </h1>
+          <p className="text-xs text-[#5A5E66] mt-1 max-w-2xl">
+            Chọn công cụ bên phải: Viết bài cho 3 kênh cùng lúc, tạo 12 mẫu câu mở đầu để thử nghiệm, hoặc chấm điểm bài viết trước khi đăng.
           </p>
         </div>
 
         {/* Section Switcher */}
-        <div className="flex w-full lg:w-auto items-center gap-2 bg-slate-800/80 p-1.5 rounded-xl border border-slate-700 overflow-x-auto shrink-0">
+        <div className="flex w-full lg:w-auto flex-wrap items-center gap-1.5 bg-[#F6F5F0] p-1.5 rounded-xl border border-[#E4E2DD] shrink-0">
           <button
             onClick={() => setStudioSection('omnichannel')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
               studioSection === 'omnichannel'
-                ? 'bg-[#D95D39] text-white shadow-sm'
-                : 'text-slate-300 hover:text-white'
+                ? 'bg-[#D95D39] text-white shadow-xs'
+                : 'text-[#5A5E66] hover:text-[#121316]'
             }`}
           >
-            <Zap className="w-3.5 h-3.5 text-amber-300" /> Đa kênh 3-trong-1
+            <Zap className="w-3.5 h-3.5" /> Viết 3 kênh cùng lúc
+          </button>
+          <button
+            data-testid="studio-tab-angle-matrix"
+            onClick={() => setStudioSection('angle_matrix')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+              studioSection === 'angle_matrix'
+                ? 'bg-[#121316] text-white shadow-xs'
+                : 'text-[#5A5E66] hover:text-[#121316]'
+            }`}
+          >
+            <Target className="w-3.5 h-3.5" /> Tạo 12 mẫu thử nghiệm
+          </button>
+          <button
+            data-testid="studio-tab-persona-critic"
+            onClick={() => setStudioSection('persona_critic')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+              studioSection === 'persona_critic'
+                ? 'bg-[#121316] text-white shadow-xs'
+                : 'text-[#5A5E66] hover:text-[#121316]'
+            }`}
+          >
+            <Scale className="w-3.5 h-3.5" /> Chấm điểm trước khi đăng
           </button>
           <button
             onClick={() => setStudioSection('create')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
               studioSection === 'create'
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'text-slate-300 hover:text-white'
+                ? 'bg-[#121316] text-white shadow-xs'
+                : 'text-[#5A5E66] hover:text-[#121316]'
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5" /> Đơn kênh (AIDA / PAS)
+            <Sparkles className="w-3.5 h-3.5" /> Viết lẻ từng bài
           </button>
           <button
             onClick={() => setStudioSection('doctor')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
               studioSection === 'doctor'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-slate-300 hover:text-white'
+                ? 'bg-[#121316] text-white shadow-xs'
+                : 'text-[#5A5E66] hover:text-[#121316]'
             }`}
           >
-            <Stethoscope className="w-3.5 h-3.5" /> Bác sĩ Chẩn đoán Chiến dịch
+            <Stethoscope className="w-3.5 h-3.5" /> Khám bệnh chiến dịch
           </button>
           <button
             data-testid="studio-tab-mcp"
             onClick={() => setStudioSection('mcp')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer ${
               studioSection === 'mcp'
-                ? 'bg-[#0F766E] text-white shadow-sm'
-                : 'text-slate-300 hover:text-white'
+                ? 'bg-[#121316] text-white shadow-xs'
+                : 'text-[#5A5E66] hover:text-[#121316]'
             }`}
+            title="Công cụ kiểm tra kỹ thuật (MCP)"
           >
-            <Bot className="w-3.5 h-3.5 text-amber-300" /> Điều phối Tự động (MCP)
+            <Bot className="w-3.5 h-3.5" /> Kỹ thuật
           </button>
         </div>
       </div>
@@ -714,29 +845,23 @@ export const AIStudio: React.FC<AIStudioProps> = ({
       {studioSection === 'omnichannel' && (
         <div className="space-y-6">
           {/* Top Context & Brand Kit Inheritance Card */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4 no-print">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div className="bg-white rounded-xl p-5 border border-[#E4E2DD] space-y-4 no-print">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[#F0EFEA] pb-4">
               <div>
-                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-amber-500" />
-                  <span>1-Brief ➔ 3-Channels Creative Engine (R2)</span>
-                  {/* Model thật hiển thị ở bảng cảnh báo sau khi sinh; ở đây chỉ
-                      ghi nhãn chung để không gán sai tên Gemini khi provider
-                      đang chạy là opencode/openrouter. */}
-                  <span className="text-[11px] font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
-                    AI
-                  </span>
+                <h2 className="text-base font-bold text-[#121316] flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-[#D95D39]" />
+                  <span>Soạn 1 lần — Ra bài viết cho cả Facebook, TikTok &amp; Email</span>
                 </h2>
-                <p className="text-xs text-slate-500 mt-1">
-                  Nhập một bản tóm tắt duy nhất (Brief) để tự động sinh và định dạng trọn gói cho Facebook Post/Ads, TikTok Video Script (4 cảnh) và Email Sequence (A/B Test) với cơ chế bảo toàn Brand Kit.
+                <p className="text-xs text-[#5A5E66] mt-1">
+                  Nhập tóm tắt sản phẩm, điểm mạnh và khách hàng mục tiêu. Hệ thống sẽ viết sẵn bài đăng Facebook, kịch bản quay TikTok và thư gửi khách hàng.
                 </p>
               </div>
 
               {/* Campaign Selector & Brand Kit Pill */}
               <div className="flex flex-wrap items-center gap-2">
                 {campaigns.length > 0 && (
-                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs">
-                    <span className="text-slate-600 font-medium">Chiến dịch:</span>
+                  <div className="flex items-center gap-1.5 bg-[#F6F5F0] border border-[#D0CEC7] rounded-lg px-2.5 py-1.5 text-xs">
+                    <span className="text-[#5A5E66] font-medium">Gắn vào chiến dịch:</span>
                     <select
                       value={selectedCampaign?.id || campaigns[0]?.id || ''}
                       onChange={(e) => {
@@ -744,7 +869,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                         onSelectCampaign(found);
                       }}
                       aria-label="Chọn chiến dịch sáng tạo"
-                      className="bg-transparent font-bold text-indigo-700 outline-none cursor-pointer"
+                      className="bg-transparent font-bold text-[#121316] outline-none cursor-pointer"
                     >
                       {campaigns.map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
@@ -752,26 +877,26 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                     </select>
                   </div>
                 )}
-                <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold px-2.5 py-1 rounded-lg">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Brand Kit Kế thừa: MarketFlow AI</span>
+                <div className="flex items-center gap-1.5 bg-[#F0FDF4] border border-[#BBF7D0] text-[#15803D] text-[11px] font-semibold px-2.5 py-1.5 rounded-lg">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#15803D]" />
+                  <span>Đã bật bộ lọc từ cấm quảng cáo</span>
                 </div>
               </div>
             </div>
 
             {/* Presets */}
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="font-semibold text-slate-600">Gợi ý mẫu Brief:</span>
+              <span className="font-semibold text-[#5A5E66]">Điền nhanh đề bài mẫu:</span>
               {presets.map((p, idx) => (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => {
-                    const briefText = `Chiến dịch: ${p.topic}\nSản phẩm: ${p.product}\nUSP độc đáo: ${p.usp}\nĐối tượng mục tiêu: Khách hàng tiềm năng, học viên, doanh nghiệp chuyển đổi số.`;
+                    const briefText = `Chiến dịch: ${p.topic}\nSản phẩm: ${p.product}\nĐiểm mạnh: ${p.usp}\nKhách hàng mục tiêu: Người có nhu cầu thực tế.`;
                     setOmniBrief(briefText);
-                    toast.info(`Đã áp dụng mẫu: ${p.label}`);
+                    toast.info(`Đã điền mẫu: ${p.label}`);
                   }}
-                  className="bg-slate-100 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-300 text-slate-700 px-2.5 py-1 rounded-lg transition-colors font-medium border border-slate-200 cursor-pointer"
+                  className="bg-[#F6F5F0] hover:bg-[#EAE8E1] text-[#121316] px-2.5 py-1 rounded-lg transition-colors font-medium border border-[#E4E2DD] cursor-pointer"
                 >
                   {p.label}
                 </button>
@@ -781,74 +906,57 @@ export const AIStudio: React.FC<AIStudioProps> = ({
             {/* Brief Input */}
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <label className="font-bold text-slate-800">
-                  Nội dung Brief Chiến dịch (Sản phẩm, USP, Khán giả, Thông điệp cốt lõi):
+                <label className="font-bold text-[#121316]">
+                  Thông tin sản phẩm, điểm khác biệt và khách hàng bạn muốn nhắm tới:
                 </label>
-                <span className="text-slate-600 font-mono text-[11px] font-semibold">{omniBrief.length} ký tự</span>
+                <span className="text-[#5A5E66] font-mono text-[11px] font-semibold">{omniBrief.length} ký tự</span>
               </div>
               <textarea
                 rows={3}
                 value={omniBrief}
                 onChange={(e) => setOmniBrief(e.target.value)}
-                placeholder="Nhập chi tiết yêu cầu chiến dịch..."
-                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 leading-relaxed"
+                placeholder="Nhập chi tiết sản phẩm, giá bán, ưu đãi và đối tượng khách hàng..."
+                className="w-full text-xs bg-[#F6F5F0]/60 border border-[#D0CEC7] rounded-xl p-3 text-[#121316] focus:bg-white focus:outline-none focus:border-[#D95D39] leading-relaxed"
               />
             </div>
 
             {/* Action Bar */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
-              <div className="text-xs text-slate-500 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <span>Tự động áp dụng giọng văn thương hiệu & từ điển từ ngữ bị cấm (Banned Keywords)</span>
+              <div className="text-xs text-[#5A5E66] flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#15803D]"></span>
+                <span>Tự động kiểm tra và loại bỏ các từ ngữ sáo rỗng hoặc vi phạm chính sách</span>
               </div>
 
               <button
                 type="button"
                 onClick={handleGenerateOmnichannel}
                 disabled={omniLoading}
-                className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-amber-500 via-indigo-600 to-violet-600 hover:from-amber-600 hover:to-violet-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25 transition-all cursor-pointer active:scale-95 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-6 py-2.5 bg-[#D95D39] hover:bg-[#C04E2C] disabled:bg-slate-300 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 disabled:cursor-not-allowed"
               >
-{omniLoading ? (
-                      <>
+                {omniLoading ? (
+                  <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    {/* Nhãn phụ "đang xếp hàng" cho biết việc còn nằm trong hàng
-                        đợi hay đã được worker nhặt lên. Nhánh nền giữ nguyên cụm
-                        "AI đang sáng tạo 3 kênh" để các probe đo hành vi
-                        double-click vẫn bám đúng nhãn này. */}
                     <span>
                       {(omniJob.phase === 'queued' || omniJob.phase === 'enqueuing')
                         ? 'Đang xếp hàng — '
                         : ''}
                       AI đang sáng tạo 3 kênh{omniJob.busy ? '...' : ''}
                     </span>
-                      </>
+                  </>
                 ) : (
                   <>
                     <Zap className="w-4 h-4" />
-                    <span>⚡ Sáng tạo 3 Kênh Đồng Thời (1-Click)</span>
+                    <span>Tạo bài viết cho cả 3 kênh</span>
                   </>
                 )}
               </button>
             </div>
-            {/* Trạng thái chờ: hàng đợi, đồng hồ, huỷ. Hiện cả khi đang chờ lẫn
-                khi đã thất bại, nên người dùng luôn thấy kết quả cuối cùng của
-                lần bấm vừa rồi. */}
             <AIJobProgress job={omniJob} label="3 kênh (Facebook, TikTok, Email)" onRetry={handleGenerateOmnichannel} />
           </div>
 
           {/* Results Area */}
           {omniData && (
             <div className="space-y-4">
-              {/*
-                  BẢNG BÁO NGUỒN GỐC NỘI DUNG.
-                  Trước đây UI hiện thẳng "Gemini 2.5 Flash" và toast báo
-                  "Đã tạo thành công ... (Gemini 2.5 Flash)" bất kể backend có thực
-                  sự gọi được nhà cung cấp hay không. Khi AI hỏng, backend trả
-                  `is_fallback=true`, `model_provider="template-fallback-engine"`
-                  cùng `warnings` nêu lý do — nhưng frontend bỏ qua toàn bộ, người
-                  dùng tưởng đang xem nội dung do AI viết trong khi thực ra là
-                  template dự phòng. Nội dung dù là fallback vẫn hữu ích, nhưng
-                  phải nói rõ nguồn gốc. */}
               <div
                 role={omniData.is_fallback ? 'alert' : 'status'}
                 className={`rounded-xl border p-3.5 ${
@@ -891,77 +999,77 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                 )}
               </div>
               {/* Filter / View Switcher */}
-              <div className="flex items-center justify-between flex-wrap gap-2 bg-white p-2 rounded-xl border border-slate-200">
+              <div className="flex items-center justify-between flex-wrap gap-2 bg-white p-2 rounded-xl border border-[#E4E2DD]">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-xs font-bold text-slate-700 px-2">Bộ lọc hiển thị:</span>
-                  <div className="flex bg-slate-100 p-1 rounded-lg text-xs font-semibold">
+                  <span className="text-xs font-bold text-[#121316] px-2">Hiển thị kênh:</span>
+                  <div className="flex bg-[#F6F5F0] p-1 rounded-lg text-xs font-semibold">
                     <button
                       type="button"
                       onClick={() => setOmniFilter('all')}
                       className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                        omniFilter === 'all' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'text-slate-500 hover:text-slate-800'
+                        omniFilter === 'all' ? 'bg-white text-[#121316] shadow-xs font-bold' : 'text-[#5A5E66] hover:text-[#121316]'
                       }`}
                     >
-                      Tất cả 3 Kênh
+                      Tất cả 3 kênh
                     </button>
                     <button
                       type="button"
                       onClick={() => setOmniFilter('facebook')}
                       className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                        omniFilter === 'facebook' ? 'bg-white text-blue-700 shadow-sm font-bold' : 'text-slate-500 hover:text-slate-800'
+                        omniFilter === 'facebook' ? 'bg-white text-blue-700 shadow-xs font-bold' : 'text-[#5A5E66] hover:text-[#121316]'
                       }`}
                     >
-                      📘 Facebook
+                      Facebook
                     </button>
                     <button
                       type="button"
                       onClick={() => setOmniFilter('tiktok')}
                       className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                        omniFilter === 'tiktok' ? 'bg-white text-rose-600 shadow-sm font-bold' : 'text-slate-500 hover:text-slate-800'
+                        omniFilter === 'tiktok' ? 'bg-white text-rose-600 shadow-xs font-bold' : 'text-[#5A5E66] hover:text-[#121316]'
                       }`}
                     >
-                      🎵 TikTok
+                      TikTok
                     </button>
                     <button
                       type="button"
                       onClick={() => setOmniFilter('email')}
                       className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                        omniFilter === 'email' ? 'bg-white text-purple-700 shadow-sm font-bold' : 'text-slate-500 hover:text-slate-800'
+                        omniFilter === 'email' ? 'bg-white text-[#121316] shadow-xs font-bold' : 'text-[#5A5E66] hover:text-[#121316]'
                       }`}
                     >
-                      ✉️ Email
+                      Email
                     </button>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <div className="flex bg-slate-100 p-1 rounded-lg text-xs font-semibold">
+                  <div className="flex bg-[#F6F5F0] p-1 rounded-lg text-xs font-semibold">
                     <button
                       type="button"
                       onClick={() => setOmniPreviewMode(true)}
                       className={`px-3 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
-                        omniPreviewMode ? 'bg-white text-indigo-700 shadow-sm font-bold' : 'text-slate-500 hover:text-slate-800'
+                        omniPreviewMode ? 'bg-white text-[#121316] shadow-xs font-bold' : 'text-[#5A5E66] hover:text-[#121316]'
                       }`}
-                      title="Xem dạng mockup mạng xã hội trực quan"
+                      title="Xem bản dựng giống trên điện thoại/mạng xã hội"
                     >
                       <Eye className="w-3.5 h-3.5" />
-                      <span>Social Mockup</span>
+                      <span>Xem như trên mạng xã hội</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setOmniPreviewMode(false)}
                       className={`px-3 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
-                        !omniPreviewMode ? 'bg-white text-slate-800 shadow-sm font-bold' : 'text-slate-500 hover:text-slate-800'
+                        !omniPreviewMode ? 'bg-white text-[#121316] shadow-xs font-bold' : 'text-[#5A5E66] hover:text-[#121316]'
                       }`}
-                      title="Xem dạng văn bản chi tiết"
+                      title="Xem dạng chữ thuần để dễ đọc và chỉnh sửa"
                     >
                       <FileText className="w-3.5 h-3.5" />
-                      <span>Chi tiết Raw</span>
+                      <span>Xem dạng văn bản</span>
                     </button>
                   </div>
 
-                  <div className="text-xs text-slate-400 font-mono hidden sm:flex items-center gap-1.5 px-2">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <div className="text-xs text-[#5A5E66] font-mono hidden sm:flex items-center gap-1.5 px-2">
+                    <Sparkles className="w-3.5 h-3.5 text-[#D95D39]" />
                     <span>Model: {omniData.model_used || 'không rõ'}</span>
                   </div>
                 </div>
@@ -2100,7 +2208,422 @@ export const AIStudio: React.FC<AIStudioProps> = ({
           )}
         </div>
       )}
-      {/* SECTION 3: MCP & AGENTIC COPILOT */}
+
+      {/* SECTION 4: AI ANGLE × HOOK MATRIX (4 PSYCHOLOGICAL ANGLES × 3 HOOKS = 12 A/B VARIANTS) */}
+      {studioSection === 'angle_matrix' && (
+        <div className="space-y-6" data-testid="angle-matrix-section">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center shrink-0">
+                  <Target className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-slate-900">
+                    Ma Trận Góc Tiếp Cận &amp; 3s Hook (AI Angle × Hook A/B Matrix)
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Thay vì viết 1 bài đơn lẻ, tạo ngay 4 Góc Tâm lý (Pain Point, Social Proof, Myth Buster, Offer/FOMO) × 3 biến thể Hook 3 giây = 12 mẫu quảng cáo kèm giả thuyết A/B và mã UTM.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleGenerateAngleMatrix}
+                disabled={matrixLoading}
+                data-testid="generate-angle-matrix-btn"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white text-xs font-bold shadow-md transition-all shrink-0 disabled:opacity-50"
+              >
+                {matrixLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Đang sinh 12 biến thể A/B...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    <span>Sinh Ma trận 12 Biến thể A/B</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Chiến dịch liên kết</label>
+                <select
+                  value={activeC?.id || ''}
+                  onChange={(e) => {
+                    const found = campaigns.find((c) => c.id === Number(e.target.value)) || null;
+                    onSelectCampaign(found);
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-800"
+                >
+                  {campaigns.length === 0 && <option value="">Chưa có chiến dịch</option>}
+                  {campaigns.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      #{c.id} — {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Sản phẩm / Giải pháp</label>
+                <input
+                  type="text"
+                  value={matrixProduct}
+                  onChange={(e) => setMatrixProduct(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-medium text-slate-800"
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Điểm khác biệt độc tôn (USP)</label>
+                <input
+                  type="text"
+                  value={matrixUsp}
+                  onChange={(e) => setMatrixUsp(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-medium text-slate-800"
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Kênh phân phối chủ lực</label>
+                <select
+                  value={matrixChannel}
+                  onChange={(e) => setMatrixChannel(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-800"
+                >
+                  <option value="Facebook">Facebook Feed &amp; Reels Ads</option>
+                  <option value="TikTok">TikTok Video 9:16 Spark Ads</option>
+                  <option value="Email">Email Conversion Sequence</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {matrixData ? (
+            <div className="space-y-4">
+              {/* Action & Filter Bar */}
+              <div className="bg-slate-900 text-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-xs font-bold">
+                    <Layers className="w-4 h-4 text-violet-400" />
+                    <span>
+                      Đã sẵn sàng {matrixData.variants.length} Biến thể Quảng cáo cho &ldquo;{matrixData.product_name}&rdquo;
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300">
+                    {matrixData.strategy_summary}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSeedMatrixToCampaign}
+                  disabled={matrixSeeding}
+                  data-testid="seed-angle-matrix-btn"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition-all shrink-0 disabled:opacity-50"
+                >
+                  {matrixSeeding ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Rocket className="w-4 h-4" />
+                  )}
+                  <span>🚀 Đẩy toàn bộ {matrixData.variants.length} biến thể vào Chiến dịch (1-Click Seed)</span>
+                </button>
+              </div>
+
+              {/* Angle Filter Pills */}
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { code: 'ALL', label: `Tất cả (${matrixData.variants.length})` },
+                  { code: 'PAIN_POINT', label: '🔥 Pain Point (Nỗi đau)' },
+                  { code: 'SOCIAL_PROOF', label: '🏆 Social Proof (Bằng chứng)' },
+                  { code: 'MYTH_BUSTER', label: '💡 Myth Buster (Phá ngộ nhận)' },
+                  { code: 'OFFER_FOMO', label: '⚡ Offer / FOMO (Thúc đẩy chốt đơn)' },
+                ].map((pill) => (
+                  <button
+                    key={pill.code}
+                    type="button"
+                    onClick={() => setActiveAngleFilter(pill.code)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                      activeAngleFilter === pill.code
+                        ? 'bg-violet-600 text-white border-violet-600 shadow-xs'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {pill.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Variants Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {matrixData.variants
+                  .filter((v) => activeAngleFilter === 'ALL' || v.angle_code === activeAngleFilter)
+                  .map((v, idx) => (
+                    <div
+                      key={v.id || idx}
+                      className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-3"
+                    >
+                      <div className="space-y-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 border border-violet-200 text-[10px] font-bold">
+                            {v.angle_code} • {v.funnel_stage || 'ToFU'}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-mono font-bold">
+                            An toàn: {v.compliance_score}%
+                          </span>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/80">
+                          <div className="text-[10px] font-bold uppercase text-amber-800">
+                            🎯 3s Hook ({v.hook_type}):
+                          </div>
+                          <div className="text-xs font-extrabold text-slate-900 mt-0.5">
+                            &ldquo;{v.hook_3s}&rdquo;
+                          </div>
+                        </div>
+
+                        <div className="text-xs text-slate-700 whitespace-pre-line line-clamp-4 leading-relaxed">
+                          {v.body}
+                        </div>
+                      </div>
+
+                      <div className="pt-2.5 border-t border-slate-100 space-y-2">
+                        <div className="text-[10px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-200">
+                          <strong className="text-indigo-700">🔬 Giả thuyết A/B:</strong> {v.ab_hypothesis}
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-mono text-slate-400 truncate max-w-[180px]" title={v.utm_params}>
+                            {v.utm_params}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(`${v.hook_3s}\n\n${v.body}\n\nCTA: ${v.cta}\n${v.utm_params}`)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-[10px] font-bold inline-flex items-center gap-1"
+                          >
+                            <Copy className="w-3 h-3" /> Sao chép
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-10 text-center space-y-3">
+              <Target className="w-10 h-10 text-violet-400 mx-auto" />
+              <div className="max-w-lg mx-auto space-y-1">
+                <h3 className="text-sm font-bold text-slate-800">
+                  Chưa khởi tạo Ma trận Góc tiếp cận &amp; 3s Hook
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Bấm nút &ldquo;Sinh Ma trận 12 Biến thể A/B&rdquo; phía trên để AI tự động thiết kế 4 góc tiếp cận tâm lý × 3 Hook 3 giây chuẩn Performance Marketing và đẩy vào chiến dịch chỉ với 1 cú nhấp.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SECTION 5: PRE-LAUNCH PERSONA CRITIC (4 SIMULATED BUYER & POLICY PERSONAS) */}
+      {studioSection === 'persona_critic' && (
+        <div className="space-y-6" data-testid="persona-critic-section">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                  <Scale className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-slate-900">
+                    Hội Đồng Khán Giả Phản Biện Trước Khi Chạy Ads (Pre-Launch Persona Critic)
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Đưa mẫu quảng cáo qua 4 màng lọc giả lập: Khách hàng hoài nghi, Người lướt 3 giây, Người gác cổng Brand Kit và Thuật toán Chính sách Meta/TikTok trước khi tốn tiền thật.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleRunPrelaunchCritic}
+                disabled={criticLoading || !criticBody.trim()}
+                data-testid="run-persona-critic-btn"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 text-white text-xs font-bold shadow-md transition-all shrink-0 disabled:opacity-50"
+              >
+                {criticLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Hội đồng đang thẩm định...</span>
+                  </>
+                ) : (
+                  <>
+                    <Scale className="w-4 h-4" />
+                    <span>Chấm điểm &amp; Phản biện Bản nháp</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div className="md:col-span-2 space-y-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Tiêu đề Quảng cáo (Headline)</label>
+                  <input
+                    type="text"
+                    value={criticTitle}
+                    onChange={(e) => setCriticTitle(e.target.value)}
+                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Nội dung Chính (Ad Copy / Script)</label>
+                  <textarea
+                    rows={4}
+                    value={criticBody}
+                    onChange={(e) => setCriticBody(e.target.value)}
+                    className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 font-medium text-slate-800 leading-relaxed"
+                  />
+                </div>
+              </div>
+              <div className="space-y-3 flex flex-col justify-between">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Nút Kêu gọi Hành động (CTA)</label>
+                  <input
+                    type="text"
+                    value={criticCta}
+                    onChange={(e) => setCriticCta(e.target.value)}
+                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-900"
+                  />
+                </div>
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                  <div className="text-[11px] font-bold text-slate-800">Lưu vào Hàng đợi Duyệt</div>
+                  <p className="text-[11px] text-slate-500">
+                    Sau khi áp dụng bản viết lại từ Hội đồng Phản biện, bạn có thể đẩy thẳng sang Hàng đợi Duyệt của chiến dịch đang chọn.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleSaveCriticCopyToCampaign}
+                    disabled={criticSaving || !activeC}
+                    className="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors disabled:opacity-50"
+                  >
+                    {criticSaving ? 'Đang lưu...' : `Đẩy sang Duyệt (${activeC?.name || 'Chọn chiến dịch'})`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {criticData && (
+            <div className="space-y-4">
+              {/* Scorecards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+                  <div className="text-xs font-semibold text-slate-500">Điểm Dừng Ngón Tay 3 Giây (Thumb-Stop Score)</div>
+                  <div className="text-2xl font-black text-indigo-600 font-mono mt-1">
+                    {criticData.thumb_stop_score}/100
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1">Khả năng giữ chân người xem ở dòng đầu</div>
+                </div>
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+                  <div className="text-xs font-semibold text-slate-500">Chỉ số Ma Sát Chuyển Đổi (Conversion Friction)</div>
+                  <div className="text-2xl font-black text-amber-600 font-mono mt-1">
+                    {criticData.conversion_friction_score}/100
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1">Càng thấp càng dễ thuyết phục khách mua</div>
+                </div>
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+                  <div className="text-xs font-semibold text-slate-500">Điểm Sẵn Sàng Chạy Thực Tế (Readiness)</div>
+                  <div className="text-2xl font-black text-emerald-600 font-mono mt-1">
+                    {criticData.overall_readiness_score}/100
+                  </div>
+                  <div className="text-[11px] font-semibold text-slate-700 mt-1">{criticData.verdict_label}</div>
+                </div>
+              </div>
+
+              {/* Weakest Sentence & 1-Click Rewrite Upgrade */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="bg-rose-50/70 border border-rose-200 rounded-2xl p-4 space-y-2">
+                  <div className="text-xs font-bold uppercase text-rose-800 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-rose-600" />
+                    <span>Câu yếu nhất làm tụt tỷ lệ chuyển đổi</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white border border-rose-200 text-xs font-bold text-rose-900 italic">
+                    &ldquo;{criticData.weakest_sentence}&rdquo;
+                  </div>
+                  <p className="text-xs text-rose-800 leading-relaxed">
+                    <strong>Lý do bị bắt lỗi:</strong> {criticData.weakest_reason}
+                  </p>
+                </div>
+
+                <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 space-y-3 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase text-emerald-900 flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-emerald-600" />
+                        <span>Bản Viết Lại Sắc Bén &amp; Hợp Chuẩn Chính Sách</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleApplyCriticRewrite}
+                        data-testid="apply-critic-rewrite-btn"
+                        className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all"
+                      >
+                        ✨ Áp dụng Bản viết lại (1-Click Upgrade)
+                      </button>
+                    </div>
+                    <div className="p-3 rounded-xl bg-white border border-emerald-200 text-xs space-y-1">
+                      <div className="font-bold text-slate-900">{criticData.rewritten_version.title}</div>
+                      <div className="text-slate-700 whitespace-pre-line">{criticData.rewritten_version.body}</div>
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-emerald-800">
+                    💡 {criticData.rewritten_version.improvement_notes}
+                  </div>
+                </div>
+              </div>
+
+              {/* 4 Personas Feedback Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {criticData.personas.map((p) => (
+                  <div
+                    key={p.persona_id}
+                    className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">{p.avatar_emoji}</span>
+                        <div>
+                          <div className="text-xs font-extrabold text-slate-900">{p.persona_name}</div>
+                          <div className="text-[11px] text-slate-500">{p.persona_role}</div>
+                        </div>
+                      </div>
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-xs font-mono font-bold border ${
+                          p.verdict === 'PASS'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : p.verdict === 'FAIL'
+                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}
+                      >
+                        {p.score}/100 ({p.verdict})
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      &ldquo;{p.critique}&rdquo;
+                    </p>
+                    <div className="text-[11px] text-indigo-700 font-medium">
+                      <strong>🔧 Đề xuất chỉnh sửa:</strong> {p.actionable_fix}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SECTION 3: MCP & AGENTIC COPILOT (Developer Inspector) */}
       {studioSection === 'mcp' && (
         <MCPAgentStudio
           campaigns={campaigns}

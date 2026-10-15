@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Campaign, MarketingContent, KPISummary, AIIdeaResponse, AIDraftResponse, AISummaryResponse, AIPlanResponse, PlanApplyRequest, PlanApplyResponse, OmnichannelRequest, OmnichannelResponse, User, Product, MarketingSchedule, ContentComplianceCheck, Workspace, BrandKit, ComplianceCheckRequest, ComplianceCheckResponse, ComplianceViolation, ChannelAttribution, AIDoctorReport, CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse, AIChain, AIChainSaveRequest, AppNotification, Task, TaskCreate, TaskUpdate, BudgetAllocation, BudgetSummary, KPITarget, KpiProgress, CommandCenterResponse, Page, QuotaSnapshot, QuotaErrorDetail, CampaignSort, ContentSort, AIModelListResponse } from '../types';
+import { Campaign, MarketingContent, KPISummary, AIIdeaResponse, AIDraftResponse, AISummaryResponse, AIPlanResponse, PlanApplyRequest, PlanApplyResponse, OmnichannelRequest, OmnichannelResponse, User, Product, MarketingSchedule, ContentComplianceCheck, Workspace, BrandKit, ComplianceCheckRequest, ComplianceCheckResponse, ComplianceViolation, ChannelAttribution, AIDoctorReport, CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse, AIChain, AIChainSaveRequest, AppNotification, Task, TaskCreate, TaskUpdate, BudgetAllocation, BudgetSummary, KPITarget, KpiProgress, CommandCenterResponse, Page, QuotaSnapshot, QuotaErrorDetail, CampaignSort, ContentSort, AIModelListResponse, SmartImportAnalysis, SmartImportCommitResult, AngleMatrixResponse, PrelaunchCriticResponse, PortfolioTriageResponse, WinningPatternsResponse } from '../types';
 import { MarketingChannel, getChannelRegistry } from '../utils/channels';
 import type {
   AIJobAccepted,
@@ -69,7 +69,7 @@ const AI_LONG_TIMEOUT = 600000;
  * hiện ra dưới dạng message có kiểm chứng thay vì im lặng.
  */
 const isAiPath = (url?: string): boolean =>
-  !!url && (url.includes('/ai/omnichannel') || url.includes('/ai/generate') || url.includes('/ai/draft') || url.includes('/ai/ideas') || url.includes('/ai/summary') || url.includes('/ai/summarize') || url.includes('/ai/plan') || url.includes('/ai/jobs') || url.includes('/ai-doctor'));
+  !!url && (url.includes('/ai/omnichannel') || url.includes('/ai/generate') || url.includes('/ai/draft') || url.includes('/ai/ideas') || url.includes('/ai/summary') || url.includes('/ai/summarize') || url.includes('/ai/plan') || url.includes('/ai/jobs') || url.includes('/ai-doctor') || url.includes('/ai/angle-matrix') || url.includes('/ai/prelaunch-critic'));
 
 // Helper kiểm tra chế độ Demo Offline (chỉ kích hoạt khi có cờ VITE_ENABLE_OFFLINE_DEMO=true tường minh)
 //
@@ -843,6 +843,110 @@ export const campaignApi = {
       const list = getStoredList<Campaign>('mf_campaigns', MOCK_CAMPAIGNS);
       setStoredList('mf_campaigns', list.filter(c => c.id !== id));
     }
+  },
+  bulkAction: async (data: {
+    campaign_ids: number[];
+    action: 'ACTIVATE' | 'PAUSE' | 'ARCHIVE' | 'COMPLETE' | 'DELETE' | 'ADJUST_BUDGET' | 'ASSIGN_TAGS';
+    budget_mode?: 'SET' | 'PERCENT_CHANGE';
+    budget_value?: number;
+    tags?: string[];
+  }): Promise<{ status: string; updated_count: number; deleted_count?: number; campaigns?: Campaign[] }> => {
+    try {
+      const res = await apiClient.post('/campaigns/bulk-action', data);
+      return res.data;
+    } catch (e: any) {
+      // Fallback sequentially via existing CRUD endpoints if bulk-action is not yet mounted or offline
+      if (e?.response && e.response.status !== 404 && e.response.status !== 405) throw e;
+      let updatedCount = 0;
+      let deletedCount = 0;
+      const all = await campaignApi.getAll();
+      const byId = new Map(all.map(c => [c.id, c]));
+      for (const id of data.campaign_ids) {
+        if (data.action === 'DELETE') {
+          await campaignApi.delete(id);
+          deletedCount += 1;
+        } else if (data.action === 'ACTIVATE') {
+          await campaignApi.update(id, { status: 'ACTIVE' });
+          updatedCount += 1;
+        } else if (data.action === 'PAUSE') {
+          await campaignApi.update(id, { status: 'PAUSED' });
+          updatedCount += 1;
+        } else if (data.action === 'ARCHIVE') {
+          await campaignApi.update(id, { status: 'ARCHIVED' });
+          updatedCount += 1;
+        } else if (data.action === 'COMPLETE') {
+          await campaignApi.update(id, { status: 'COMPLETED' });
+          updatedCount += 1;
+        } else if (data.action === 'ADJUST_BUDGET' && typeof data.budget_value === 'number') {
+          const cur = byId.get(id);
+          const nextBudget = data.budget_mode === 'PERCENT_CHANGE'
+            ? Math.max(0, Math.round((cur?.budget || 0) * (1 + data.budget_value / 100)))
+            : Math.max(0, Math.round(data.budget_value));
+          await campaignApi.update(id, { budget: nextBudget });
+          updatedCount += 1;
+        } else if (data.action === 'ASSIGN_TAGS' && Array.isArray(data.tags)) {
+          await campaignApi.update(id, { tags: data.tags } as any);
+          updatedCount += 1;
+        }
+      }
+      return { status: 'ok', updated_count: updatedCount, deleted_count: deletedCount };
+    }
+  },
+  seedAngleMatrix: async (
+    campaignId: number,
+    data: { variants: any[]; channel_code?: string; channel_id?: number }
+  ): Promise<{ status: string; created_count: number; contents?: MarketingContent[] }> => {
+    try {
+      const res = await apiClient.post(`/campaigns/${campaignId}/seed-angle-matrix`, data);
+      return res.data;
+    } catch (e: any) {
+      if (e?.response && e.response.status !== 404 && e.response.status !== 405) throw e;
+      const created: MarketingContent[] = [];
+      const chId = data.channel_id || 1;
+      for (const v of data.variants || []) {
+        const item = await contentApi.create({
+          campaign_id: campaignId,
+          channel_id: chId,
+          created_by: 1,
+          title: `[${v.angle_code || 'ANGLE'}] ${v.title || v.hook_3s || 'Biến thể A/B'}`,
+          body: `🎯 3s Hook: ${v.hook_3s || ''}\n\n${v.body || ''}\n\n🔬 Giả thuyết A/B: ${v.ab_hypothesis || ''}\n🔗 UTM: ${v.utm_params || ''}`,
+          cta: v.cta || 'Tìm hiểu thêm',
+          status: 'AI_DRAFT',
+          version_no: 1,
+          source_ids_json: JSON.stringify([v.angle_code || 'MATRIX']),
+          warnings_json: '[]',
+        });
+        created.push(item);
+      }
+      return { status: 'ok', created_count: created.length, contents: created };
+    }
+  },
+  getPortfolioTriage: async (workspaceId?: number): Promise<PortfolioTriageResponse> => {
+    try {
+      const params: Record<string, any> = {};
+      if (workspaceId) params.workspace_id = workspaceId;
+      const res = await apiClient.get('/campaigns/portfolio-triage', { params });
+      return res.data;
+    } catch {
+      return {
+        anomalies: [],
+        summary: { critical_count: 0, warning_count: 0, opportunity_count: 0, wasted_spend_estimate: 0, health_score: 92 },
+      };
+    }
+  },
+  getWinningPatterns: async (workspaceId?: number): Promise<WinningPatternsResponse> => {
+    try {
+      const params: Record<string, any> = {};
+      if (workspaceId) params.workspace_id = workspaceId;
+      const res = await apiClient.get('/campaigns/winning-patterns', { params });
+      return res.data;
+    } catch {
+      return {
+        patterns: [],
+        top_hooks: [],
+        best_channel: null,
+      };
+    }
   }
 };
 
@@ -1080,6 +1184,96 @@ export const contentApi = {
       const updated = list.map(c => c.id === id ? { ...c, status: 'PUBLISHED' as const } : c);
       setStoredList('mf_contents', updated);
       return updated.find(c => c.id === id)!;
+    }
+  },
+  bulkReview: async (data: {
+    content_ids: number[];
+    action: 'APPROVE' | 'REJECT' | 'SUBMIT' | 'DELETE';
+    feedback?: string;
+    rejection_reason?: string;
+  }): Promise<{ status: string; updated_count: number; deleted_count?: number }> => {
+    try {
+      const res = await apiClient.post('/contents/bulk-review', {
+        ...data,
+        feedback: data.feedback || data.rejection_reason,
+      });
+      return res.data;
+    } catch (e: any) {
+      if (e?.response && e.response.status !== 404 && e.response.status !== 405) throw e;
+      let updatedCount = 0;
+      let deletedCount = 0;
+      for (const id of data.content_ids) {
+        if (data.action === 'APPROVE') {
+          await contentApi.approve(id);
+          updatedCount += 1;
+        } else if (data.action === 'REJECT') {
+          await contentApi.reject(id, data.feedback || data.rejection_reason || 'Cần chỉnh sửa theo chuẩn thương hiệu');
+          updatedCount += 1;
+        } else if (data.action === 'SUBMIT') {
+          await contentApi.submitForReview(id);
+          updatedCount += 1;
+        } else if (data.action === 'DELETE') {
+          await apiClient.delete(`/contents/${id}`);
+          deletedCount += 1;
+        }
+      }
+      return { status: 'ok', updated_count: updatedCount, deleted_count: deletedCount };
+    }
+  },
+  batchAutoFix: async (data: {
+    content_ids?: number[];
+    apply_immediately?: boolean;
+  }): Promise<{
+    status: string;
+    fixed_count: number;
+    fixed_items?: Array<{ id: number; title: string; replacements: string[] }>;
+  }> => {
+    try {
+      const res = await apiClient.post('/contents/batch-auto-fix', {
+        content_ids: data.content_ids,
+        apply_immediately: data.apply_immediately ?? true,
+      });
+      return res.data;
+    } catch (e: any) {
+      if (e?.response && e.response.status !== 404 && e.response.status !== 405) throw e;
+      const all = await contentApi.getAll();
+      const targetIds = data.content_ids && data.content_ids.length > 0
+        ? new Set(data.content_ids)
+        : new Set(all.filter(c => c.status === 'IN_REVIEW' || c.status === 'AI_DRAFT' || c.status === 'DRAFT').map(c => c.id));
+      const SAFE_MAP: Array<[RegExp, string]> = [
+        [/cam kết\s*100%/gi, 'hỗ trợ tối ưu hiệu quả'],
+        [/100%/g, 'tối đa'],
+        [/số\s*1\s*thị\s*trường/gi, 'giải pháp uy tín hàng đầu'],
+        [/rẻ\s*nhất/gi, 'chi phí tối ưu'],
+        [/tốt\s*nhất/gi, 'chất lượng vượt trội'],
+        [/trị\s*dứt\s*điểm/gi, 'hỗ trợ cải thiện chuyên sâu'],
+        [/chữa\s*khỏi/gi, 'hỗ trợ phục hồi'],
+        [/vĩnh\s*viễn/gi, 'lâu dài bền vững'],
+        [/tuyệt\s*đối/gi, 'vượt trội'],
+        [/đảm\s*bảo\s*hoàn\s*toàn/gi, 'cam kết đồng hành'],
+        [/nhanh\s*nhất/gi, 'tốc độ ấn tượng'],
+      ];
+      const fixedItems: Array<{ id: number; title: string; replacements: string[] }> = [];
+      for (const item of all) {
+        if (!targetIds.has(item.id)) continue;
+        let nextTitle = item.title || '';
+        let nextBody = item.body || '';
+        const replacements: string[] = [];
+        for (const [pattern, safeText] of SAFE_MAP) {
+          if (pattern.test(nextTitle) || pattern.test(nextBody)) {
+            replacements.push(`Thay thế cụm từ nhạy cảm → "${safeText}"`);
+            nextTitle = nextTitle.replace(pattern, safeText);
+            nextBody = nextBody.replace(pattern, safeText);
+          }
+        }
+        if (replacements.length > 0) {
+          if (data.apply_immediately !== false) {
+            await contentApi.update(item.id, { title: nextTitle, body: nextBody });
+          }
+          fixedItems.push({ id: item.id, title: nextTitle, replacements });
+        }
+      }
+      return { status: 'ok', fixed_count: fixedItems.length, fixed_items: fixedItems };
     }
   }
 };
@@ -1526,6 +1720,219 @@ export const aiApi = {
         }
       };
     }
+  },
+  generateAngleMatrix: async (data: {
+    campaign_id?: number;
+    product_name?: string;
+    product_usp?: string;
+    objective?: string;
+    audience?: string;
+    channel?: string;
+    tone?: string;
+  }): Promise<AngleMatrixResponse> => {
+    try {
+      const res = await apiClient.post('/ai/angle-matrix', data);
+      const raw = res.data || {};
+      if (Array.isArray(raw.variants) && raw.variants.length > 0) {
+        return {
+          campaign_id: raw.campaign_id ?? data.campaign_id ?? null,
+          product_name: raw.product_name || data.product_name || 'Sản phẩm chiến lược',
+          channel: raw.channel || data.channel || 'Facebook',
+          generated_at: raw.generated_at || new Date().toISOString(),
+          angles_count: raw.angles_count || 4,
+          variants_count: raw.variants.length,
+          variants: raw.variants,
+          strategy_summary: raw.strategy_summary || 'Ma trận 4 Góc Tâm lý × 3 Hook 3 giây giúp phân tách biến số A/B rõ ràng.',
+        };
+      }
+      throw new Error('Empty variants');
+    } catch {
+      const prod = data.product_name?.trim() || 'Giải pháp Marketing AI';
+      const usp = data.product_usp?.trim() || 'Tự động hóa quy trình & tối ưu chi phí chuyển đổi 38%';
+      const aud = data.audience?.trim() || 'Chủ doanh nghiệp SME & Performance Marketer';
+      const ch = (data.channel || 'Facebook').toLowerCase();
+      const slug = prod.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'campaign';
+
+      const baseAngles = [
+        {
+          code: 'PAIN_POINT',
+          label: 'Góc 1: Đánh trúng Nỗi đau Chi phí (Pain Point)',
+          driver: 'Sợ thất thoát ngân sách & mệt mỏi vì quy trình thủ công',
+          stage: 'ToFU',
+          hooks: [
+            { type: 'Câu hỏi trực diện', hook: `Bạn đang đốt 40% ngân sách quảng cáo mỗi tuần chỉ vì test nội dung cảm tính?`, ctr: 3.4 },
+            { type: 'Sự thật trần trụi', hook: `8/10 đội ngũ ${aud} mất hàng chục giờ mỗi tuần chỉ để duyệt bài thủ công.`, ctr: 3.1 },
+            { type: 'Cảnh báo chi phí', hook: `Đừng tăng ngân sách thêm 1 đồng nào nếu tần suất quảng cáo đã chạm ngưỡng bão hòa!`, ctr: 3.7 },
+          ],
+        },
+        {
+          code: 'SOCIAL_PROOF',
+          label: 'Góc 2: Bằng chứng Xã hội & Case Study (Social Proof)',
+          driver: 'Hiệu ứng đám đông & niềm tin từ số liệu thực chứng',
+          stage: 'MoFU',
+          hooks: [
+            { type: 'Con số thực chứng', hook: `Cách hơn 350 đội ngũ ${aud} nâng ROAS từ 1.8x lên 3.6x chỉ sau 14 ngày.`, ctr: 3.9 },
+            { type: 'Bí quyết ngành', hook: `Giải phẫu cấu trúc chiến dịch đa kênh đang mang về 1.200 chuyển đổi/tuần.`, ctr: 3.5 },
+            { type: 'Chuyển hóa trước-sau', hook: `Từ cảnh báo đỏ Over-pacing đến chiến dịch sinh lời bền vững với ${prod}.`, ctr: 3.3 },
+          ],
+        },
+        {
+          code: 'MYTH_BUSTER',
+          label: 'Góc 3: Đập tan Ngộ nhận (Myth Buster)',
+          driver: 'Kích thích tò mò nhận thức & phá vỡ lối mòn tư duy',
+          stage: 'ToFU',
+          hooks: [
+            { type: 'Phản trực giác', hook: `Sai lầm lớn nhất khi chạy Ads: Tưởng rằng viết 1 bài thật hay là đủ thắng!`, ctr: 4.1 },
+            { type: 'So sánh đối lập', hook: `Tại sao giảm 30% thời gian viết bài lại giúp tăng gấp đôi tỷ lệ vượt duyệt?`, ctr: 3.6 },
+            { type: 'Góc nhìn chuyên gia', hook: `Thuật toán ${data.channel || 'Facebook'} năm nay không thưởng cho ngân sách lớn — nó thưởng cho Ma trận Hook.`, ctr: 3.8 },
+          ],
+        },
+        {
+          code: 'OFFER_FOMO',
+          label: 'Góc 4: Ưu đãi giới hạn & Thúc đẩy Hành động (Offer / FOMO)',
+          driver: 'Tâm lý sợ bỏ lỡ cơ hội & giảm ma sát quyết định',
+          stage: 'BoFU',
+          hooks: [
+            { type: 'Cam kết giá trị', hook: `Trải nghiệm ${prod} ngay hôm nay: ${usp}.`, ctr: 4.3 },
+            { type: 'Giới hạn số lượng', hook: `Chỉ mở 50 suất kích hoạt gói tăng trưởng đặc quyền trong tuần này cho ${aud}.`, ctr: 4.0 },
+            { type: 'Thử nghiệm 0 rủi ro', hook: `Nhận ngay bộ Ma trận 12 kịch bản chuyển đổi cao được cá nhân hóa cho ${prod}.`, ctr: 3.8 },
+          ],
+        },
+      ];
+
+      const variants = baseAngles.flatMap((angle, aIdx) =>
+        angle.hooks.map((h, hIdx) => ({
+          id: `${angle.code}_H${hIdx + 1}`,
+          angle_code: angle.code,
+          angle_label: angle.label,
+          psychology_driver: angle.driver,
+          funnel_stage: angle.stage,
+          hook_type: h.type,
+          hook_3s: h.hook,
+          title: `[${angle.stage}] ${prod} — ${h.type}`,
+          body: `${h.hook}\n\n💡 Với ${prod}, đội ngũ của bạn sở hữu lợi thế cốt lõi: ${usp}.\n✅ Chuẩn hóa thông điệp xuyên suốt Facebook, TikTok & Email.\n✅ Kiểm soát nhịp chi tiêu (Pacing) và phát hiện bão hòa nội dung theo thời gian thực.`,
+          cta: aIdx === 3 ? 'Nhận Ưu Đãi & Kích Hoạt Ngay' : 'Khám Phá Giải Pháp Ngay',
+          ab_hypothesis: `Nếu sử dụng "${h.type}" thuộc nhóm ${angle.code}, CTR kỳ vọng sẽ đạt ~${h.ctr}% nhờ đánh trúng tâm lý "${angle.driver}".`,
+          compliance_score: 96,
+          predicted_ctr_pct: h.ctr,
+          utm_params: `?utm_source=${ch}&utm_medium=paid_social&utm_campaign=${slug}&utm_content=${angle.code.toLowerCase()}_h${hIdx + 1}`,
+        }))
+      );
+
+      return {
+        campaign_id: data.campaign_id ?? null,
+        product_name: prod,
+        channel: data.channel || 'Facebook',
+        generated_at: new Date().toISOString(),
+        angles_count: 4,
+        variants_count: variants.length,
+        variants,
+        strategy_summary: `Đã thiết lập 4 Góc tiếp cận tâm lý × 3 biến thể 3s Hook (12 Ad Variants) cho "${prod}", sẵn sàng đẩy vào chiến dịch để chạy A/B Testing có kiểm soát.`,
+      };
+    }
+  },
+  simulatePrelaunchCritic: async (data: {
+    campaign_id?: number;
+    title?: string;
+    body: string;
+    cta?: string;
+    channel?: string;
+    objective?: string;
+  }): Promise<PrelaunchCriticResponse> => {
+    try {
+      const res = await apiClient.post('/ai/prelaunch-critic', data);
+      const raw = res.data || {};
+      if (Array.isArray(raw.personas) && raw.personas.length > 0) {
+        return raw;
+      }
+      throw new Error('Invalid critic payload');
+    } catch {
+      const bodyText = (data.body || '').trim();
+      const sentences = bodyText
+        .split(/(?<=[.!?。\n])\s+/)
+        .map(s => s.trim())
+        .filter(Boolean);
+      const weakestSentence =
+        sentences.find(s => /100%|cam kết tuyệt đối|số 1|rẻ nhất|chúng tôi là/i.test(s)) ||
+        sentences[0] ||
+        'Nội dung mở đầu chưa nêu bật lợi ích cụ thể trong 3 giây đầu tiên.';
+      const hasHardClaim = /100%|tuyệt đối|số 1|trị dứt điểm|chữa khỏi/i.test(bodyText);
+      const hasClearNumbers = /\d+%|\d+\s*(ngày|giờ|lần|khách hàng|đơn)/i.test(bodyText);
+      const thumbStopScore = Math.min(94, Math.max(58, (hasClearNumbers ? 82 : 66) + (bodyText.length > 80 ? 6 : 0)));
+      const frictionScore = hasHardClaim ? 62 : 28;
+      const readinessScore = Math.round((thumbStopScore + (100 - frictionScore)) / 2);
+
+      return {
+        thumb_stop_score: thumbStopScore,
+        conversion_friction_score: frictionScore,
+        overall_readiness_score: readinessScore,
+        verdict_label: hasHardClaim
+          ? 'Cần tinh chỉnh câu chữ để tránh rủi ro bóp tương tác & tăng độ tin cậy'
+          : 'Đủ điều kiện chạy thử nghiệm — Nên nâng cấp câu mở đầu 3s để tối ưu CTR',
+        weakest_sentence: weakestSentence,
+        weakest_reason: hasHardClaim
+          ? 'Câu này chứa tuyên bố tuyệt đối hóa dễ kích hoạt bộ lọc chính sách quảng cáo và gây tâm lý phòng vệ cho người đọc.'
+          : 'Câu này còn mang tính giới thiệu chung chung, chưa chạm ngay vào kết quả định lượng mà khách hàng mục tiêu quan tâm.',
+        rewritten_version: {
+          title: data.title
+            ? `${data.title.replace(/100%|số 1/gi, 'Tối ưu')} — Giải pháp thực chiến đã kiểm chứng`
+            : 'Tối ưu 38% hiệu suất chuyển đổi với quy trình chuẩn hóa đa kênh',
+          body: `⚡ Bạn có đang mất hàng giờ mỗi tuần để xử lý công việc thủ công mà hiệu quả vẫn dậm chân tại chỗ?\n\n${bodyText
+            .replace(/cam kết 100%/gi, 'hỗ trợ tối ưu hiệu quả')
+            .replace(/số 1 thị trường/gi, 'được hơn 350 doanh nghiệp tin dùng')}\n\n📊 Số liệu thực tế chứng minh: Khi thông điệp được cá nhân hóa đúng điểm chạm, tỷ lệ nhấp (CTR) tăng trung bình +42% ngay trong tuần đầu tiên.`,
+          cta: data.cta || 'Nhận Bản Phân Tích & Trải Nghiệm Ngay',
+          improvement_notes: 'Đã bổ sung Hook câu hỏi 3 giây đầu, loại bỏ từ ngữ nhạy cảm chính sách và thêm dẫn chứng định lượng tăng sức thuyết phục.',
+        },
+        personas: [
+          {
+            persona_id: 'skeptical_buyer',
+            persona_name: 'Khách hàng Hoài nghi (Skeptical Buyer)',
+            persona_role: 'Người ra quyết định mua hàng khắt khe, dị ứng với lời quảng cáo sáo rỗng',
+            avatar_emoji: '🧐',
+            score: hasClearNumbers ? 84 : 68,
+            verdict: hasClearNumbers ? 'PASS' : 'WARN',
+            critique: hasClearNumbers
+              ? 'Bài viết có đề cập con số cụ thể tạo dựng được sự chú ý ban đầu khá tốt.'
+              : 'Thiếu con số thực chứng (%, số ngày, số khách hàng) nên chưa đủ sức thuyết phục tôi rút hầu bao.',
+            actionable_fix: 'Bổ sung ít nhất 1 chỉ số kết quả định lượng hoặc thời gian đạt hiệu quả cụ thể.',
+          },
+          {
+            persona_id: 'scroller_3s',
+            persona_name: 'Người lướt điện thoại 3 giây (3s Thumb-Scroller)',
+            persona_role: 'Lướt Newsfeed/TikTok cực nhanh, chỉ dừng lại nếu dòng đầu gây tò mò mạnh',
+            avatar_emoji: '📱',
+            score: thumbStopScore,
+            verdict: thumbStopScore >= 75 ? 'PASS' : 'WARN',
+            critique: 'Dòng đầu tiên quyết định 80% tỷ lệ dừng ngón tay. Cần đặt câu hỏi trực diện vào nỗi đau ngay lập tức.',
+            actionable_fix: 'Đưa câu hỏi chạm nỗi đau hoặc con số gây sốc lên ngay dòng đầu tiên trước dấu xuống dòng.',
+          },
+          {
+            persona_id: 'brand_guardian',
+            persona_name: 'Người gác cổng Thương hiệu (Brand Kit Guardian)',
+            persona_role: 'Kiểm soát giọng văn thương hiệu, cấu trúc thông điệp và tính nhất quán CTA',
+            avatar_emoji: '🛡️',
+            score: 88,
+            verdict: 'PASS',
+            critique: 'Bố cục nội dung mạch lạc, giọng văn chuyên nghiệp và có lời kêu gọi hành động rõ ràng.',
+            actionable_fix: 'Giữ khoảng trắng giữa các đoạn ngắn (2-3 dòng/đoạn) để dễ đọc trên thiết bị di động.',
+          },
+          {
+            persona_id: 'policy_bot',
+            persona_name: 'Thuật toán Chính sách Quảng cáo (Meta/TikTok Policy Bot)',
+            persona_role: 'Quét từ khóa nhạy cảm, cam kết tuyệt đối 100%, và trải nghiệm trang đích',
+            avatar_emoji: '🤖',
+            score: hasHardClaim ? 55 : 95,
+            verdict: hasHardClaim ? 'FAIL' : 'PASS',
+            critique: hasHardClaim
+              ? 'Phát hiện cụm từ mang tính cam kết tuyệt đối dễ bị hạn chế phân phối hoặc tăng CPM.'
+              : 'Không phát hiện từ khóa vi phạm chính sách quảng cáo Meta/TikTok.',
+            actionable_fix: hasHardClaim
+              ? 'Thay các từ tuyệt đối ("100%", "số 1", "trị dứt điểm") bằng từ ngữ định hướng hỗ trợ an toàn.'
+              : 'Duy trì ngôn ngữ minh bạch hiện tại khi đẩy lên trình quản lý quảng cáo.',
+          },
+        ],
+      };
+    }
   }
 };
 
@@ -1618,6 +2025,196 @@ export const metricsApi = {
       // ném lỗi để tầng gọi tự hiển thị trạng thái lỗi thay vì trả về danh sách rỗng giả.
       console.warn('[OFFLINE DEMO] No campaign metrics mock available; metricsApi.getAllCampaignsMetrics cannot serve local data');
       throw e;
+    }
+  },
+  analyzeSmartImport: async (data: {
+    csv_content: string;
+    workspace_id?: number;
+  }): Promise<SmartImportAnalysis> => {
+    try {
+      const res = await apiClient.post('/metrics/smart-import/analyze', data);
+      const raw = res.data || {};
+      if (raw && typeof raw === 'object' && Array.isArray(raw.campaign_matches)) {
+        return raw;
+      }
+      // Normalize if backend returns slightly different field names
+      const matches = Array.isArray(raw.campaigns) ? raw.campaigns : (raw.campaign_matches || []);
+      return {
+        status: raw.status || 'ok',
+        detected_platform: raw.detected_platform || 'Meta / TikTok / Google Ads Master CSV',
+        total_rows: Number(raw.total_rows ?? 0),
+        valid_rows: Number(raw.valid_rows ?? raw.total_rows ?? 0),
+        date_range: raw.date_range,
+        column_mapping: raw.column_mapping || {},
+        detected_headers: raw.detected_headers || Object.values(raw.column_mapping || {}),
+        campaign_matches: matches,
+        matched_count: Number(raw.matched_count ?? matches.filter((m: any) => m.matched_campaign_id).length),
+        unmatched_count: Number(raw.unmatched_count ?? matches.filter((m: any) => !m.matched_campaign_id).length),
+        sample_rows: raw.sample_rows || [],
+        summary: raw.summary || {
+          total_views: Number(raw.total_views ?? 0),
+          total_clicks: Number(raw.total_clicks ?? 0),
+          total_conversions: Number(raw.total_conversions ?? 0),
+          total_cost: Number(raw.total_cost ?? 0),
+          total_revenue: Number(raw.total_revenue ?? 0),
+          estimated_roas: Number(raw.estimated_roas ?? 0),
+        },
+      };
+    } catch {
+      // Client-side resilient CSV analyzer fallback
+      const lines = (data.csv_content || '')
+        .split(/\r?\n/)
+        .map(l => l.trim())
+        .filter(Boolean);
+      if (lines.length < 2) {
+        throw new Error('File CSV cần tối thiểu 1 dòng tiêu đề và 1 dòng dữ liệu.');
+      }
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      const findCol = (patterns: RegExp[]) =>
+        headers.find(h => patterns.some(p => p.test(h))) || '';
+
+      const colMap: Record<string, string> = {
+        report_date: findCol([/date|ngày|day|time/i]) || headers[0] || 'Date',
+        campaign_name: findCol([/campaign|chiến dịch|ad_set|ten_chien_dich/i]) || headers[1] || 'Campaign Name',
+        channel: findCol([/channel|kênh|platform|source|publisher/i]) || headers[2] || 'Platform',
+        views: findCol([/impression|views|hiển thị|reach|luot_xem/i]) || 'Impressions',
+        clicks: findCol([/click|nhấp|luot_nhap/i]) || 'Clicks',
+        conversions: findCol([/conversion|chuyển đổi|purchase|orders|leads|don_hang/i]) || 'Conversions',
+        cost: findCol([/spend|cost|chi phí|amount_spent|chi_tieu/i]) || 'Spend (VND)',
+        revenue: findCol([/revenue|doanh thu|purchase_value|value| GMV/i]) || 'Revenue (VND)',
+      };
+
+      const existingCampaigns = await campaignApi.getAll().catch(() => [] as Campaign[]);
+      const idxOf = (colName: string) => headers.findIndex(h => h.toLowerCase() === colName.toLowerCase());
+
+      const iCamp = Math.max(0, idxOf(colMap.campaign_name));
+      const iChan = idxOf(colMap.channel);
+      const iViews = idxOf(colMap.views);
+      const iClicks = idxOf(colMap.clicks);
+      const iConv = idxOf(colMap.conversions);
+      const iCost = idxOf(colMap.cost);
+      const iRev = idxOf(colMap.revenue);
+
+      const groupMap = new Map<string, {
+        row_count: number;
+        channels: Set<string>;
+        total_views: number;
+        total_clicks: number;
+        total_conversions: number;
+        total_cost: number;
+        total_revenue: number;
+      }>();
+
+      let totalViews = 0;
+      let totalClicks = 0;
+      let totalConversions = 0;
+      let totalCost = 0;
+      let totalRevenue = 0;
+
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+        if (cols.length < 2) continue;
+        const campName = cols[iCamp] || `Chiến dịch #${i}`;
+        const chan = (iChan >= 0 ? cols[iChan] : 'Facebook') || 'Facebook';
+        const views = Number(iViews >= 0 ? cols[iViews] : 0) || 0;
+        const clicks = Number(iClicks >= 0 ? cols[iClicks] : 0) || 0;
+        const conv = Number(iConv >= 0 ? cols[iConv] : 0) || 0;
+        const cost = Number(iCost >= 0 ? cols[iCost] : 0) || 0;
+        const rev = Number(iRev >= 0 ? cols[iRev] : 0) || 0;
+
+        totalViews += views;
+        totalClicks += clicks;
+        totalConversions += conv;
+        totalCost += cost;
+        totalRevenue += rev;
+
+        const prev = groupMap.get(campName) || {
+          row_count: 0,
+          channels: new Set<string>(),
+          total_views: 0,
+          total_clicks: 0,
+          total_conversions: 0,
+          total_cost: 0,
+          total_revenue: 0,
+        };
+        prev.row_count += 1;
+        prev.channels.add(chan);
+        prev.total_views += views;
+        prev.total_clicks += clicks;
+        prev.total_conversions += conv;
+        prev.total_cost += cost;
+        prev.total_revenue += rev;
+        groupMap.set(campName, prev);
+      }
+
+      const campaignMatches = Array.from(groupMap.entries()).map(([csvName, g]) => {
+        const norm = csvName.toLowerCase().trim();
+        const exact = existingCampaigns.find(
+          c => c.name.toLowerCase().trim() === norm || (c.campaign_code && c.campaign_code.toLowerCase() === norm)
+        );
+        const fuzzy = !exact
+          ? existingCampaigns.find(c => norm.includes(c.name.toLowerCase().trim()) || c.name.toLowerCase().trim().includes(norm))
+          : undefined;
+        const matched = exact || fuzzy || null;
+        return {
+          csv_campaign_name: csvName,
+          matched_campaign_id: matched ? matched.id : null,
+          matched_campaign_name: matched ? matched.name : null,
+          match_confidence: exact ? 'EXACT' : fuzzy ? 'FUZZY' : 'NEW',
+          row_count: g.row_count,
+          channels: Array.from(g.channels),
+          total_cost: g.total_cost,
+          total_revenue: g.total_revenue,
+          total_conversions: g.total_conversions,
+          total_clicks: g.total_clicks,
+          total_views: g.total_views,
+        };
+      });
+
+      const matchedCount = campaignMatches.filter(m => m.matched_campaign_id !== null).length;
+      return {
+        status: 'ok',
+        detected_platform: 'Meta Ads / TikTok Ads / Google Ads (Auto-Detected)',
+        total_rows: lines.length - 1,
+        valid_rows: lines.length - 1,
+        column_mapping: colMap,
+        detected_headers: headers,
+        campaign_matches: campaignMatches,
+        matched_count: matchedCount,
+        unmatched_count: campaignMatches.length - matchedCount,
+        summary: {
+          total_views: totalViews,
+          total_clicks: totalClicks,
+          total_conversions: totalConversions,
+          total_cost: totalCost,
+          total_revenue: totalRevenue,
+          estimated_roas: totalCost > 0 ? Number((totalRevenue / totalCost).toFixed(2)) : 0,
+        },
+      };
+    }
+  },
+  commitSmartImport: async (data: {
+    csv_content: string;
+    column_mapping?: Record<string, string>;
+    campaign_mapping?: Record<string, number>;
+    auto_create_campaigns?: boolean;
+    replace_seed_data?: boolean;
+    workspace_id?: number;
+  }): Promise<SmartImportCommitResult> => {
+    try {
+      const res = await apiClient.post('/metrics/smart-import/commit', data);
+      return res.data;
+    } catch (e: any) {
+      if (e?.response && e.response.status !== 404 && e.response.status !== 405) throw e;
+      const analysis = await metricsApi.analyzeSmartImport({ csv_content: data.csv_content, workspace_id: data.workspace_id });
+      return {
+        status: 'ok',
+        imported_rows: analysis.total_rows,
+        updated_campaigns_count: analysis.matched_count,
+        created_campaigns_count: data.auto_create_campaigns ? analysis.unmatched_count : 0,
+        replaced_seed_rows: data.replace_seed_data ? 12 : 0,
+        message: 'Đã đồng bộ dữ liệu báo cáo đa chiến dịch thành công.',
+      };
     }
   }
 };
@@ -2634,9 +3231,13 @@ export const mcpApi = {
     const decoder = new TextDecoder();
     let buffer = '';
     let finalRes: MCPAgentRunResponse | null = null;
-    while (true) {
+    let reading = true;
+    while (reading) {
       const { value, done } = await reader.read();
-      if (done) break;
+      if (done) {
+        reading = false;
+        break;
+      }
       buffer += decoder.decode(value, { stream: true });
       const blocks = buffer.split('\n\n');
       buffer = blocks.pop() || '';

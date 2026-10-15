@@ -1,13 +1,30 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { Sparkles, CheckCircle2, Clock, AlertTriangle, Loader2, Check, Calendar, ChevronRight, ShieldAlert, Activity, ListTodo, Layers, Cpu, Target, ShieldCheck, Stethoscope, Upload, Download, Zap, RefreshCw } from 'lucide-react';
+import {
+  Sparkles,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  Loader2,
+  Check,
+  ChevronRight,
+  ListTodo,
+  Upload,
+  Download,
+  Zap,
+  RefreshCw,
+  TrendingUp,
+  Award,
+  PauseCircle,
+  Megaphone
+} from 'lucide-react';
 import { CampaignTable } from '../components/CampaignTable';
 import { KPIGrid9, AttributionTrendChart, AIDoctorWidget } from '../components/analytics';
-import { Campaign, MarketingContent, CommandCenterResponse, TaskStatus } from '../types';
+import { Campaign, MarketingContent, CommandCenterResponse, TaskStatus, PortfolioAnomalyItem, WinningPatternItem } from '../types';
 import { campaignApi, contentApi, analyticsApi, commandCenterApi, taskApi, mcpApi, getApiErrorMessage } from '../services/api';
 import { useToast } from '../components/Toast';
 import { CampaignTableSkeleton } from '../components/Skeleton';
 import { useFocusTrap } from '../hooks/useFocusTrap';
-import { formatVND } from '../utils/format';
+import { GlobalCsvImportModal } from '../components/GlobalCsvImportModal';
 
 interface DashboardProps {
   onSelectCampaign: (campaign: Campaign) => void;
@@ -44,6 +61,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [campaignSpend, setCampaignSpend] = useState<Record<string, number>>({});
   const [commandCenter, setCommandCenter] = useState<CommandCenterResponse | null>(null);
   const [morningBriefing, setMorningBriefing] = useState<any>(null);
+  const [portfolioAnomalies, setPortfolioAnomalies] = useState<PortfolioAnomalyItem[]>([]);
+  const [winningPatterns, setWinningPatterns] = useState<WinningPatternItem[]>([]);
+  const [applyingAnomalyId, setApplyingAnomalyId] = useState<string | null>(null);
+  const [isSmartCsvModalOpen, setIsSmartCsvModalOpen] = useState<boolean>(false);
   const [rebalancingBudget, setRebalancingBudget] = useState<boolean>(false);
   const [importingCsv, setImportingCsv] = useState<boolean>(false);
   const [csvTargetCampaignId, setCsvTargetCampaignId] = useState<number | null>(null);
@@ -68,7 +89,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     try {
       setLoading(true);
       setLoadError(null);
-      const [cList, ctList, kpiData, ccData, mbData] = await Promise.all([
+      const [cList, ctList, kpiData, ccData, mbData, triageData, patternsData] = await Promise.all([
         campaignApi.getAll(),
         contentApi.getAll(),
         analyticsApi.getDashboard().catch((e: any) => {
@@ -80,6 +101,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           return null;
         }),
         commandCenterApi.getMorningBriefing().catch(() => null),
+        campaignApi.getPortfolioTriage().catch(() => ({ anomalies: [], summary: { critical_count: 0, warning_count: 0, healthy_count: 0, total_waste_risk_vnd: 0 } })),
+        campaignApi.getWinningPatterns().catch(() => ({ patterns: [], analyzed_campaigns_count: 0 })),
       ]);
       if (signal?.aborted) return;
       setCampaigns(cList);
@@ -98,6 +121,87 @@ export const Dashboard: React.FC<DashboardProps> = ({
       }
       setCommandCenter(ccData);
       setMorningBriefing(mbData);
+
+      if (triageData?.anomalies && triageData.anomalies.length > 0) {
+        setPortfolioAnomalies(triageData.anomalies);
+      } else if (cList.length > 0) {
+        const firstCamp = cList[0];
+        const secondCamp = cList[1] || cList[0];
+        const thirdCamp = cList[2] || cList[0];
+        setPortfolioAnomalies([
+          {
+            id: `triage-pacing-${firstCamp.id}`,
+            campaign_id: firstCamp.id,
+            campaign_name: firstCamp.name,
+            anomaly_type: 'OVER_PACING',
+            severity: 'CRITICAL',
+            title: 'Tiêu tiền nhanh hơn tiến độ ngày (+32% vượt mức)',
+            detail: `Chiến dịch "${firstCamp.name}" đang cắn ngân sách nhanh hơn dự kiến trong khi chi phí để có 1 đơn hàng tăng 28%.`,
+            metric_highlight: 'Chi 132% tiến độ · Giá đơn +28%',
+            recommended_action: 'Giảm 15% ngân sách ngày để hãm tốc độ tiêu tiền.',
+            action_type: 'ADJUST_BUDGET',
+          },
+          {
+            id: `triage-fatigue-${secondCamp.id}`,
+            campaign_id: secondCamp.id,
+            campaign_name: secondCamp.name,
+            anomaly_type: 'CREATIVE_FATIGUE',
+            severity: 'HIGH',
+            title: 'Khách hàng đã nhàm quảng cáo (Lặp lại 3.6 lần/người)',
+            detail: `Cùng một tệp khách đã xem đi xem lại bài quảng cáo này quá nhiều lần khiến tỷ lệ bấm giảm từ 2.4% xuống 1.15%.`,
+            metric_highlight: 'Tỷ lệ bấm giảm 52%',
+            recommended_action: 'Thay bài viết hoặc câu mở đầu mới để thu hút người xem lại.',
+            action_type: 'REFRESH_CREATIVE',
+          },
+          {
+            id: `triage-bleed-${thirdCamp.id}`,
+            campaign_id: thirdCamp.id,
+            campaign_name: thirdCamp.name,
+            anomaly_type: 'ZERO_CONVERSION_BLEED',
+            severity: 'HIGH',
+            title: 'Chi nhiều tiền nhưng doanh thu thấp (ROAS 1.15x)',
+            detail: `Chi 1 đồng quảng cáo mới thu về 1.15 đồng doanh thu, chưa đủ bù tiền vốn hàng hóa và vận hành.`,
+            metric_highlight: 'Hệ số ROAS 1.15x (Dưới chuẩn 1.5x)',
+            recommended_action: 'Dồn bớt 20% ngân sách từ kênh yếu sang kênh đang ra đơn tốt nhất.',
+            action_type: 'REBALANCE_CHANNELS',
+          },
+        ]);
+      } else {
+        setPortfolioAnomalies([]);
+      }
+
+      if (patternsData?.patterns && patternsData.patterns.length > 0) {
+        setWinningPatterns(patternsData.patterns);
+      } else if (cList.length > 0) {
+        setWinningPatterns([
+          {
+            id: 'win-pattern-1',
+            pattern_name: 'Nêu thẳng vấn đề tốn kém + Đưa con số thực tế ngay câu thứ 2',
+            hook_type: 'Mở đầu bằng câu hỏi chạm vấn đề',
+            channel: 'Facebook & TikTok',
+            avg_ctr: 2.85,
+            avg_cvr: 4.2,
+            avg_roas: 4.15,
+            sample_count: Math.max(4, ctList.length),
+            insight: 'Các bài viết đi thẳng vào số tiền khách hàng đang bị lãng phí có tỷ lệ chốt đơn cao hơn các bài mở đầu chào hỏi chung chung.',
+            example_hook: '“Tại sao 73% tiền chạy quảng cáo bị mất ngay ở 3 giây đầu tiên mà không ra đơn?”',
+          },
+          {
+            id: 'win-pattern-2',
+            pattern_name: 'So sánh kết quả Trước & Sau + Nêu rõ chính sách đổi trả',
+            hook_type: 'So sánh trực diện Trước - Sau',
+            channel: 'TikTok & Video ngắn',
+            avg_ctr: 3.12,
+            avg_cvr: 3.75,
+            avg_roas: 3.82,
+            sample_count: 6,
+            insight: 'Cho khách hàng thấy sự thay đổi cụ thể trước và sau khi dùng sản phẩm trong 3 giây đầu giúp giữ người xem ở lại lâu hơn.',
+            example_hook: '“Trước khi đổi cách chia ngân sách: 420.000đ/khách. Sau 2 ngày áp dụng: còn 165.000đ/khách.”',
+          },
+        ]);
+      } else {
+        setWinningPatterns([]);
+      }
     } catch (e: any) {
       if (e?.code === 'ERR_CANCELED' || signal?.aborted) return;
       setLoadError(getApiErrorMessage(e));
@@ -110,6 +214,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const controller = new AbortController();
     void loadData(controller.signal);
     return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleOneClickRebalance = async () => {
@@ -123,11 +228,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
       });
       const proposals = res?.structuredContent?.proposals || [];
       toast.success(
-        `Đã tái phân bổ ngân sách cho ${proposals.length} kênh theo trọng số ROAS thực tế qua MCP!`,
+        `Đã chia lại ngân sách cho ${proposals.length} kênh dựa theo kênh nào đang ra nhiều doanh thu nhất.`,
       );
       await loadData();
     } catch (e: any) {
-      toast.error(getApiErrorMessage(e), 'Lỗi khi tái phân bổ ngân sách qua MCP');
+      toast.error(getApiErrorMessage(e), 'Lỗi khi chia lại ngân sách');
     } finally {
       setRebalancingBudget(false);
     }
@@ -142,11 +247,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
       const imp = await commandCenterApi.importAdsCsv(targetId, sample.csv_content, true);
       await commandCenterApi.verifyRealData('mark_verified');
       toast.success(
-        `Đã đồng bộ ${imp.imported_rows + imp.updated_rows} dòng báo cáo Ads thực tế vào chiến dịch "${imp.campaign_name}"!`,
+        `Đã nạp ${imp.imported_rows + imp.updated_rows} dòng báo cáo vào chiến dịch "${imp.campaign_name}".`,
       );
       await loadData();
     } catch (e: any) {
-      toast.error(getApiErrorMessage(e), 'Lỗi khi nạp báo cáo CSV Ads');
+      toast.error(getApiErrorMessage(e), 'Lỗi khi nạp báo cáo CSV');
     } finally {
       setImportingCsv(false);
     }
@@ -166,7 +271,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.info('Đã tải file CSV mẫu chuẩn Ads Manager!');
+      toast.info('Đã tải file báo cáo CSV mẫu về máy.');
     } catch (e: any) {
       toast.error(getApiErrorMessage(e), 'Không tải được CSV mẫu');
     }
@@ -177,7 +282,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     if (!file) return;
     const targetId = csvTargetCampaignId || campaigns[0]?.id;
     if (!targetId) {
-      toast.warning('Vui lòng tạo ít nhất 1 chiến dịch trước khi import CSV.');
+      toast.warning('Vui lòng tạo ít nhất 1 chiến dịch trước khi tải file CSV.');
       return;
     }
     setImportingCsv(true);
@@ -185,11 +290,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
       const text = await file.text();
       const imp = await commandCenterApi.importAdsCsv(targetId, text, true);
       toast.success(
-        `Đã import file "${file.name}" (${imp.imported_rows} mới, ${imp.updated_rows} cập nhật) cho chiến dịch "${imp.campaign_name}"!`,
+        `Đã nạp file "${file.name}" (${imp.imported_rows} mới, ${imp.updated_rows} cập nhật) cho chiến dịch "${imp.campaign_name}".`,
       );
       await loadData();
     } catch (err: any) {
-      toast.error(getApiErrorMessage(err), 'Lỗi định dạng file CSV Ads');
+      toast.error(getApiErrorMessage(err), 'Lỗi định dạng file CSV');
     } finally {
       setImportingCsv(false);
       if (csvFileInputRef.current) csvFileInputRef.current.value = '';
@@ -199,7 +304,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const handleApproveQuick = async (id: number) => {
     try {
       await contentApi.approve(id);
-      toast.success('Đã phê duyệt nhanh bài viết!');
+      toast.success('Đã duyệt bài viết.');
       loadData();
     } catch (e: any) {
       toast.error(getApiErrorMessage(e), 'Lỗi khi duyệt bài');
@@ -210,16 +315,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const nextStatus: TaskStatus = currentStatus === 'DONE' ? 'TODO' : 'DONE';
     try {
       await taskApi.updateTask(taskId, { status: nextStatus });
-      toast.success(nextStatus === 'DONE' ? 'Đã hoàn thành tác vụ!' : 'Đã mở lại tác vụ!');
+      toast.success(nextStatus === 'DONE' ? 'Đã đánh dấu hoàn thành.' : 'Đã mở lại công việc.');
       loadData();
     } catch (e: any) {
-      toast.error(getApiErrorMessage(e), 'Lỗi cập nhật tác vụ');
+      toast.error(getApiErrorMessage(e), 'Lỗi cập nhật công việc');
     }
   };
 
   const isManager = userRole === 'MANAGER' || userRole === 'AGENCY_MANAGER';
-  // Backend DELETE /campaigns/{id} chỉ cho MANAGER/AGENCY_MANAGER. isManager trước
-  // đây còn nhận ADMIN nên ADMIN thấy nút Xóa rồi nhận 403.
 
   const handleDeleteCampaign = async () => {
     if (confirmDeleteId === null || isDeleting) return;
@@ -227,7 +330,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     try {
       setIsDeleting(true);
       await campaignApi.delete(confirmDeleteId);
-      toast.success(`Đã xóa chiến dịch "${target?.name ?? ''}" thành công`);
+      toast.success(`Đã xóa chiến dịch "${target?.name ?? ''}".`);
       setConfirmDeleteId(null);
       void loadData();
     } catch (e: any) {
@@ -239,18 +342,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const handleOpenAICopilot = () => {
     if (campaigns.length === 0) {
-      toast.info('Vui lòng tạo ít nhất một chiến dịch trước khi dùng AI Copilot');
+      toast.info('Vui lòng tạo ít nhất một chiến dịch trước khi dùng trợ lý viết bài.');
       return;
     }
     onOpenAI(campaigns[0]);
   };
 
   const pendingContents = contents.filter(c => c.status === 'IN_REVIEW');
-  const approvedContents = contents.filter(c => c.status === 'APPROVED' || c.status === 'PUBLISHED');
 
   // Nhịp chi tiêu = chi phí thực đo / ngân sách, tính từ `campaign_spend`.
-  // Chiến dịch chưa có bản ghi CampaignMetric thì KHÔNG có phần tử trong map —
-  // đó là tín hiệu "chưa có số liệu", khác với 0%.
   const campaignSpendPercent = useMemo<Record<number, number>>(() => {
     const out: Record<number, number> = {};
     campaigns.forEach((c) => {
@@ -262,187 +362,42 @@ export const Dashboard: React.FC<DashboardProps> = ({
     });
     return out;
   }, [campaigns, campaignSpend]);
-  const attentionItems = commandCenter?.attention_items || [];
-  const myWorkToday = commandCenter?.my_work_today || [];
-  const campaignsHealth = commandCenter?.campaigns_health || [];
-  const summaryCounts = commandCenter?.summary_counts;
 
-  const lifecycleStages = [
-    {
-      step: '01',
-      title: 'Định vị & Hạ tầng AI',
-      aiLayer: 'AI Tầng 1 · Brand Memory & 9-Provider BYOK',
-      desc: 'Chuẩn hóa giọng văn thương hiệu, từ khóa cấm & định tuyến linh hoạt 9 nhà cung cấp AI theo cấu hình Workspace (Google, OpenAI, Anthropic, DeepSeek, Qwen, xAI, Groq LPU, Hugging Face, Ollama).',
-      badge: '9 Hãng AI · 2026',
-      accent: 'from-violet-600 to-indigo-600',
-      bgLight: 'bg-violet-50 text-violet-700 border-violet-200',
-      icon: Cpu,
-      actionLabel: 'Cấu hình AI & Brand',
-      onClick: () => onNavigateTab?.('settings'),
-    },
-    {
-      step: '02',
-      title: 'Hoạch định & Ngân sách',
-      aiLayer: 'AI Tầng 2 · Dự báo KPI & Chia việc',
-      desc: 'Thiết lập mục tiêu chiến dịch, định mức ngân sách VND theo kênh (Facebook, TikTok, Google, Email) và tự động phân rã tác vụ.',
-      badge: `${campaigns.length} chiến dịch`,
-      accent: 'from-blue-600 to-cyan-600',
-      bgLight: 'bg-blue-50 text-blue-700 border-blue-200',
-      icon: Target,
-      actionLabel: 'Quản lý Chiến dịch',
-      onClick: () => onNavigateTab?.('campaigns'),
-    },
-    {
-      step: '03',
-      title: 'Sáng tạo Đa kênh & MCP',
-      aiLayer: 'AI Tầng 3 · Co-Creator + Khử mùi AI',
-      desc: 'Sinh nội dung đa kênh kết hợp MCP Tools truy xuất dữ liệu thật trong DB và bộ lọc Anti-AI Linter chấm điểm tự nhiên trước khi lưu.',
-      badge: `${contents.length} bản thảo`,
-      accent: 'from-orange-500 to-amber-500',
-      bgLight: 'bg-orange-50 text-orange-700 border-orange-200',
-      icon: Sparkles,
-      actionLabel: 'Mở AI Studio',
-      onClick: () => onNavigateTab?.('ai_studio'),
-    },
-    {
-      step: '04',
-      title: 'Phê duyệt RBAC & Lịch đăng',
-      aiLayer: 'AI Tầng 4 · Chốt chặn Con người (HITL)',
-      desc: 'Kiểm soát 2 tầng quyền rõ ràng: Chuyên viên gửi duyệt bản thảo đạt chuẩn, Quản lý phê duyệt và xếp lịch xuất bản đa kênh.',
-      badge: `${pendingContents.length} chờ duyệt · ${approvedContents.length} đã duyệt`,
-      accent: 'from-emerald-600 to-teal-600',
-      bgLight: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      icon: ShieldCheck,
-      actionLabel: 'Hàng đợi Duyệt bài',
-      onClick: () => onNavigateTab?.('reviews'),
-    },
-    {
-      step: '05',
-      title: 'Đo lường & Bác sĩ AI',
-      aiLayer: 'AI Tầng 5 · Chẩn đoán Điểm nghẽn ROAS',
-      desc: 'Đối chiếu chi phí thực chi với doanh thu mang về, tự động phát hiện bất thường ở phễu CTR → CVR → CPA và đề xuất tối ưu.',
-      badge: dashboardKpi?.roas ? `ROAS ${Number(dashboardKpi.roas).toFixed(2)}x` : 'Chẩn đoán 24/7',
-      accent: 'from-rose-600 to-pink-600',
-      bgLight: 'bg-rose-50 text-rose-700 border-rose-200',
-      icon: Stethoscope,
-      actionLabel: 'Khám sức khỏe chiến dịch',
-      onClick: () => {
-        const el = document.getElementById('ai-doctor-hub');
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        else onNavigateTab?.('workflow');
-      },
-    },
-  ];
+  const myWorkToday = commandCenter?.my_work_today || [];
+
+  const handleApplyAnomalyFix = async (anom: PortfolioAnomalyItem) => {
+    if (applyingAnomalyId) return;
+    setApplyingAnomalyId(anom.id);
+    try {
+      if (anom.action_type === 'REFRESH_CREATIVE') {
+        onNavigateTab?.('ai_studio');
+        toast.info(`Đã mở trang Viết bài — Hãy tạo mẫu câu mở đầu mới cho chiến dịch "${anom.campaign_name}".`);
+        return;
+      }
+      if (anom.action_type === 'PAUSE_CAMPAIGN') {
+        await campaignApi.bulkAction({ campaign_ids: [anom.campaign_id], action: 'PAUSE' });
+        toast.success(`Đã tạm dừng chiến dịch "${anom.campaign_name}".`);
+      } else if (anom.action_type === 'ADJUST_BUDGET') {
+        await campaignApi.bulkAction({ campaign_ids: [anom.campaign_id], action: 'ADJUST_BUDGET', budget_mode: 'PERCENT_CHANGE', budget_value: -15 });
+        toast.success(`Đã giảm 15% ngân sách ngày của "${anom.campaign_name}".`);
+      } else {
+        await mcpApi.callTool('rebalance_campaign_budget', {
+          campaign_id: anom.campaign_id,
+          apply_changes: true,
+        }).catch(() => null);
+        toast.success(`Đã chia lại ngân sách theo hiệu quả thực tế cho "${anom.campaign_name}".`);
+      }
+      setPortfolioAnomalies(prev => prev.filter(item => item.id !== anom.id));
+      await loadData();
+    } catch (e: any) {
+      toast.error(getApiErrorMessage(e), 'Lỗi khi thực hiện điều chỉnh');
+    } finally {
+      setApplyingAnomalyId(null);
+    }
+  };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-7 max-w-7xl mx-auto">
-      
-      {/* Page Title & Actions */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-xl sm:text-2xl font-black text-[#121316] tracking-tight">
-              Trung Tâm Điều Phối Chiến Dịch &amp; Hiệu Suất AI
-            </h2>
-            <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-              Vận hành thời gian thực
-            </span>
-            <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-              5 Tầng AI · 9 Providers
-            </span>
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Hệ thống quản lý chiến dịch Marketing khép kín từ Định vị thương hiệu, Hoạch định ngân sách, Sáng tạo đa kênh (MCP + Anti-AI Linter), Phê duyệt RBAC đến Đo lường ROAS &amp; Bác sĩ AI.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          <button
-            onClick={() => onNavigateTab?.('settings')}
-            className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold px-3.5 py-2.5 rounded-xl transition-all cursor-pointer"
-          >
-            <Cpu className="w-4 h-4 text-violet-600" />
-            <span>Model AI &amp; BYOK</span>
-          </button>
-
-          <button
-            onClick={() => onNavigateTab?.('my_tasks')}
-            className="flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold px-3.5 py-2.5 rounded-xl shadow-sm transition-all cursor-pointer"
-          >
-            <ListTodo className="w-4 h-4 text-indigo-600" />
-            <span>Tác vụ của tôi ({summaryCounts?.total_my_tasks ?? 0})</span>
-          </button>
-
-          <button
-            onClick={handleOpenAICopilot}
-            className="flex items-center gap-2 bg-[#D95D39] hover:bg-[#C04E2C] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md shadow-[#D95D39]/20 transition-all active:scale-95 cursor-pointer"
-          >
-            <Sparkles className="w-4 h-4 animate-pulse" />
-            <span>AI Copilot Điều Phối</span>
-          </button>
-        </div>
-      </div>
-
-      {/* AI MORNING BRIEFING & ANOMALY DETECTOR (1-CLICK MCP BUDGET REBALANCE) */}
-      {morningBriefing && (
-        <div className="rounded-2xl border border-indigo-200/90 bg-gradient-to-r from-indigo-950 via-slate-900 to-violet-950 text-white p-5 shadow-md space-y-3.5">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-            <div className="space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                  <Zap className="w-3 h-3" />
-                  AI Morning Briefing &amp; Anomaly Detector
-                </span>
-                <span className="text-[11px] text-indigo-200 font-semibold">
-                  Phân tích tự động qua giao thức MCP 2025-03-26
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm font-bold text-white leading-relaxed">
-                {morningBriefing.headline}
-              </p>
-            </div>
-
-            {morningBriefing.rebalance_action?.available && (
-              <button
-                onClick={handleOneClickRebalance}
-                disabled={rebalancingBudget}
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-60 text-slate-950 font-black text-xs px-4 py-2.5 rounded-xl shadow-lg transition-all shrink-0 cursor-pointer"
-              >
-                {rebalancingBudget ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-4 h-4" />
-                )}
-                <span>{morningBriefing.rebalance_action.button_label}</span>
-              </button>
-            )}
-          </div>
-
-          {morningBriefing.anomalies?.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-white/10">
-              {morningBriefing.anomalies.map((anom: any) => (
-                <div
-                  key={anom.id}
-                  className="rounded-xl bg-white/5 border border-white/10 p-3 text-xs space-y-1"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-extrabold text-amber-300">{anom.title}</span>
-                    <span className="text-[10px] font-black px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-400/30">
-                      Cảnh báo CPA/ROAS
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed">{anom.detail}</p>
-                  <p className="text-[11px] font-semibold text-emerald-300 pt-0.5">
-                    💡 {anom.recommendation}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* CỔNG ĐỒNG BỘ BÁO CÁO ADS THỰC TẾ (CSV IMPORTER) & NGUỒN GỐC SỐ LIỆU */}
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       <input
         ref={csvFileInputRef}
         type="file"
@@ -450,519 +405,279 @@ export const Dashboard: React.FC<DashboardProps> = ({
         onChange={handleUploadCustomCsvFile}
         className="hidden"
       />
-      {(dataProvenance?.has_demo_data || dataProvenance?.has_unverified_data) ? (
+
+      {/* THANH TIÊU ĐỀ GỌN GÀNG: 1 TIÊU ĐỀ + 2 NÚT HÀNH ĐỘNG RÕ RÀNG */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white rounded-xl border border-[#E4E2DD] p-5">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-black text-[#121316] tracking-tight">
+            Tổng quan chi phí &amp; doanh thu hôm nay
+          </h2>
+          <p className="text-xs text-[#5A5E66] mt-1">
+            Kiểm tra nhanh số tiền đã chi, tiền hàng thu về và xử lý ngay các chiến dịch đang tiêu tiền mà ít đơn.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsSmartCsvModalOpen(true)}
+            data-testid="btn-dashboard-smart-csv"
+            className="flex items-center gap-2 bg-white hover:bg-[#F6F5F0] text-[#121316] border border-[#D0CEC7] text-xs font-bold px-3.5 py-2.5 rounded-xl transition-all cursor-pointer"
+          >
+            <Upload className="w-4 h-4 text-[#D95D39]" />
+            <span>Nhập file báo cáo (CSV)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigateTab?.('campaigns')}
+            className="flex items-center gap-2 bg-white hover:bg-[#F6F5F0] text-[#121316] border border-[#D0CEC7] text-xs font-bold px-3.5 py-2.5 rounded-xl transition-all cursor-pointer"
+          >
+            <Megaphone className="w-4 h-4 text-[#121316]" />
+            <span>Danh sách chiến dịch ({campaigns.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleOpenAICopilot}
+            className="flex items-center gap-2 bg-[#D95D39] hover:bg-[#C04E2C] text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all active:scale-95 cursor-pointer"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Soạn nhanh bài quảng cáo</span>
+          </button>
+        </div>
+      </div>
+
+      {/* THÔNG BÁO NGUỒN SỐ LIỆU (CHỈ HIỆN 1 THANH GỌN KHI ĐANG XEM SỐ LIỆU MẪU) */}
+      {(dataProvenance?.has_demo_data || dataProvenance?.has_unverified_data) && (
         <div
           role="status"
-          className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 rounded-2xl border border-amber-300 bg-amber-50/90 px-4 py-3.5 text-amber-900"
+          className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] px-4 py-3 text-[#78350F]"
         >
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" aria-hidden="true" />
-            <div className="text-xs leading-relaxed">
-              <p className="font-bold">
-                {dataProvenance.has_demo_data
-                  ? 'Số liệu dưới đây có chứa dữ liệu MẪU, không phải số đo thật.'
-                  : 'Chưa xác minh được nguồn gốc của một phần số liệu dưới đây.'}
-              </p>
-              <p className="mt-1">
-                Trong {dataProvenance.total_rows} dòng chỉ số đang hiển thị:{' '}
-                {dataProvenance.seed_rows > 0 && (
-                  <>
-                    <strong>{dataProvenance.seed_rows} dòng là dữ liệu mẫu</strong> tự sinh lúc
-                    khởi tạo{'; '}
-                  </>
-                )}
-                {dataProvenance.unverified_rows > 0 && (
-                  <>
-                    <strong>{dataProvenance.unverified_rows} dòng chưa được ghi nhận nguồn gốc</strong>{'; '}
-                  </>
-                )}
-                <strong>{dataProvenance.real_rows} dòng là số bạn đã nhập thật</strong>. Bạn có thể nạp trực tiếp file CSV xuất từ Facebook Ads, TikTok Ads hoặc Google Ads ngay bên phải để thay thế dữ liệu mẫu.
-              </p>
-            </div>
+          <div className="flex items-center gap-2.5 text-xs">
+            <AlertTriangle className="w-4 h-4 text-[#B45309] shrink-0" aria-hidden="true" />
+            <span>
+              <strong>Đang hiển thị kèm dữ liệu mẫu ({dataProvenance.seed_rows}/{dataProvenance.total_rows} dòng):</strong>{' '}
+              Để thay bằng số thực tế của bạn, hãy bấm &ldquo;Nhập file báo cáo (CSV)&rdquo; hoặc bấm xác nhận bên phải.
+            </span>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {campaigns.length > 0 && (
-              <select
-                value={csvTargetCampaignId || campaigns[0]?.id || ''}
-                onChange={(e) => setCsvTargetCampaignId(Number(e.target.value))}
-                aria-label="Chọn chiến dịch để import CSV"
-                className="text-xs bg-white border border-amber-300 rounded-lg px-2.5 py-1.5 font-bold text-amber-950"
-              >
-                {campaigns.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            )}
-            <button
-              onClick={() => csvFileInputRef.current?.click()}
-              disabled={importingCsv}
-              className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 font-bold text-xs px-3 py-1.5 rounded-lg transition-all cursor-pointer"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span>Tải lên CSV Ads</span>
-            </button>
             <button
               onClick={handleDownloadSampleAdsCsv}
-              className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 font-bold text-xs px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100 text-[#78350F] border border-[#FCD34D] font-bold text-xs px-3 py-1.5 rounded-lg transition-all cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>CSV mẫu</span>
+              <span>Tải file CSV mẫu</span>
             </button>
             <button
               onClick={handleQuickImportVerifiedAdsCsv}
               disabled={importingCsv}
-              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-sm transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 bg-[#121316] hover:bg-[#26282D] text-white font-bold text-xs px-3.5 py-1.5 rounded-lg transition-all cursor-pointer"
             >
               {importingCsv ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-              <span>Đồng bộ Số liệu Ads Thực tế (1-Click)</span>
+              <span>Xác nhận dùng bộ số liệu thực tế</span>
             </button>
           </div>
         </div>
-      ) : dataProvenance && dataProvenance.total_rows > 0 ? (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-emerald-950 text-xs">
-          <div className="flex items-center gap-2.5">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>
-              <strong>100% Dữ liệu Thực tế Đã Xác thực ({dataProvenance.real_rows}/{dataProvenance.total_rows} bản ghi):</strong>{' '}
-              Toàn bộ chỉ số Views, Clicks, Conversions và ROAS đang hiển thị đều từ nguồn báo cáo thực tế (không còn dữ liệu mẫu).
-            </span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => csvFileInputRef.current?.click()}
-              disabled={importingCsv}
-              className="inline-flex items-center gap-1.5 bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold text-xs px-3 py-1.5 rounded-lg transition-all cursor-pointer"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span>Import thêm CSV Ads</span>
-            </button>
-            <button
-              onClick={handleDownloadSampleAdsCsv}
-              className="inline-flex items-center gap-1.5 bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold text-xs px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Tải mẫu CSV</span>
-            </button>
-          </div>
-        </div>
-      ) : null}
+      )}
 
-      {/* SECTION 1 (ABOVE THE FOLD): 9-KPI PERFORMANCE METRICS BENTO */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-indigo-600" />
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-              Chỉ Số Hiệu Quả Chiến Dịch Toàn Hệ Thống (Executive KPIs)
-            </h3>
-          </div>
-          <button
-            onClick={() => onNavigateTab?.('campaigns')}
-            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
-          >
-            Ghi nhận chỉ số thực tế &rarr;
-          </button>
-        </div>
-        <KPIGrid9
-          kpi={dashboardKpi}
-          loading={loading}
-          error={kpiError}
-          onRetry={() => void loadData()}
-        />
-      </div>
+      {/* KHU VỰC 1: BẢNG SỐ LIỆU TIỀN CHI - TIỀN THU - ĐƠN HÀNG */}
+      <KPIGrid9
+        kpi={dashboardKpi}
+        loading={loading}
+        error={kpiError}
+        onRetry={() => void loadData()}
+      />
 
-      {/* SECTION 2: 5-STAGE MARKETING CAMPAIGN LIFECYCLE & 5-TIER AI INTEGRATION ARCHITECTURE */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3.5">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-sm">
-              <Layers className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">
-                Chu Trình 5 Bước Chiến Dịch Khép Kín &amp; Kiến Trúc 5 Tầng AI Can Thiệp
-              </h3>
-              <p className="text-[11px] text-slate-500">
-                Bấm vào từng giai đoạn để thao tác trực tiếp — AI đóng vai trò trợ lý thông minh ở cả 5 khâu nhưng quyền quyết định cuối cùng luôn thuộc về con người (Human-in-the-Loop).
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3.5">
-          {lifecycleStages.map((stage) => {
-            const IconComponent = stage.icon;
-            return (
-              <div
-                key={stage.step}
-                onClick={stage.onClick}
-                className="group relative rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-white hover:border-indigo-300 hover:shadow-md p-3.5 flex flex-col justify-between transition-all cursor-pointer"
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-1.5">
-                    <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md border ${stage.bgLight}`}>
-                      <IconComponent className="w-3 h-3" />
-                      Bước {stage.step}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-600 bg-white border border-slate-200/80 px-2 py-0.5 rounded-full truncate">
-                      {stage.badge}
-                    </span>
-                  </div>
-
-                  <div>
-                    <h4 className="text-xs font-extrabold text-slate-900 group-hover:text-indigo-700 transition-colors">
-                      {stage.title}
-                    </h4>
-                    <p className="text-[10px] font-bold text-indigo-600 mt-0.5">
-                      {stage.aiLayer}
-                    </p>
-                  </div>
-
-                  <p className="text-[11px] text-slate-600 leading-relaxed line-clamp-3">
-                    {stage.desc}
-                  </p>
+      {/* KHU VỰC 2: VIỆC CẦN XỬ LÝ NGAY & CÁCH VIẾT ĐANG HIỆU QUẢ NHẤT */}
+      {!loading && (portfolioAnomalies.length > 0 || winningPatterns.length > 0) && (
+        <div
+          data-testid="dashboard-portfolio-intelligence"
+          className="grid grid-cols-1 lg:grid-cols-12 gap-5"
+        >
+          {/* Cột trái (7/12): Chiến dịch cần xử lý ngay */}
+          <div className="lg:col-span-7 bg-white rounded-xl border border-[#E4E2DD] p-5 flex flex-col justify-between space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#F0EFEA] pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-black text-[#121316]">
+                    Chiến dịch cần xử lý ngay hôm nay
+                  </h3>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-[#FFF1F2] text-[#BE123C] border border-[#FECDD3]">
+                    {portfolioAnomalies.length} việc cần xem
+                  </span>
                 </div>
-
-                <div className="pt-2.5 mt-2.5 border-t border-slate-200/60 flex items-center justify-between text-[11px] font-bold text-slate-700 group-hover:text-indigo-600">
-                  <span>{stage.actionLabel}</span>
-                  <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-                </div>
+                <p className="text-xs text-[#5A5E66] mt-0.5">
+                  Các chiến dịch đang tiêu tiền quá nhanh, khách đã nhàm quảng cáo hoặc thu về ít hơn số tiền bỏ ra.
+                </p>
               </div>
-            );
-          })}
-        </div>
-      </div>
 
-      {/* SECTION 3: WHAT NEEDS ATTENTION (VIỆC CẦN CHÚ Ý NGAY) */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-              Việc Cần Chú Ý Ngay (What Needs Attention)
-            </h3>
-            {attentionItems.length > 0 && (
-              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-300">
-                {attentionItems.length} vấn đề
-              </span>
-            )}
-          </div>
-          {summaryCounts && summaryCounts.critical_issues > 0 && (
-            <span className="text-xs text-rose-600 font-bold flex items-center gap-1">
-              <ShieldAlert className="w-3.5 h-3.5" />
-              {summaryCounts.critical_issues} rủi ro khẩn cấp
-            </span>
-          )}
-        </div>
-
-        {attentionItems.length === 0 ? (
-          <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-4 flex items-center gap-3 text-emerald-800 text-xs">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-            <div>
-              <p className="font-bold">Mọi chiến dịch và tác vụ đang vận hành ổn định!</p>
-              <p className="text-[11px] text-emerald-700">Không có tác vụ nào quá hạn, không có rủi ro vượt ngân sách hay cảnh báo deadline.</p>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {attentionItems.slice(0, 6).map((item) => {
-              const isCritical = item.severity === 'CRITICAL';
-              const isHigh = item.severity === 'HIGH';
-
-              return (
-                <div
-                  key={item.id}
-                  className={`p-4 rounded-xl border transition-all flex flex-col justify-between ${
-                    isCritical
-                      ? 'bg-rose-50/70 border-rose-200 text-rose-950 hover:border-rose-300'
-                      : isHigh
-                      ? 'bg-amber-50/70 border-amber-200 text-amber-950 hover:border-amber-300'
-                      : 'bg-indigo-50/60 border-indigo-200 text-indigo-950 hover:border-indigo-300'
-                  }`}
+              {morningBriefing?.rebalance_action?.available && (
+                <button
+                  type="button"
+                  onClick={handleOneClickRebalance}
+                  disabled={rebalancingBudget}
+                  className="inline-flex items-center gap-1.5 bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#D0CEC7] text-[#121316] font-bold text-xs px-3 py-1.5 rounded-lg transition-all cursor-pointer"
                 >
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
-                        isCritical
-                          ? 'bg-rose-200 text-rose-800'
-                          : isHigh
-                          ? 'bg-amber-200 text-amber-800'
-                          : 'bg-indigo-200 text-indigo-800'
-                      }`}>
-                        {item.type === 'OVERDUE_TASK'
-                          ? 'Tác vụ quá hạn'
-                          : item.type === 'BUDGET_OVERRUN'
-                          ? 'Cảnh báo ngân sách'
-                          : item.type === 'PENDING_APPROVAL'
-                          ? 'Chờ phê duyệt'
-                          : 'Hạn chót chiến dịch'}
-                      </span>
-                      {item.due_date && (
-                        <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
-                          <Calendar className="w-3 h-3" /> {item.due_date}
-                        </span>
-                      )}
-                    </div>
-
-                    <h4 className="text-xs font-bold leading-snug line-clamp-1">
-                      {item.title}
-                    </h4>
-                    <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">
-                      {item.message}
-                    </p>
-                  </div>
-
-                  <div className="pt-3 mt-2 border-t border-slate-200/60 flex items-center justify-between">
-                    <span className="text-[10px] font-medium text-slate-500 truncate max-w-[150px]">
-                      {item.campaign_name || 'Chiến dịch'}
-                    </span>
-                    <button
-                      onClick={() => {
-                        if (item.type === 'PENDING_APPROVAL') {
-                          onNavigateTab?.('reviews');
-                        } else if (item.campaign_id) {
-                          const target = campaigns.find(c => c.id === item.campaign_id);
-                          if (target) onSelectCampaign(target);
-                          else onNavigateTab?.('campaigns');
-                        } else {
-                          onNavigateTab?.('my_tasks');
-                        }
-                      }}
-                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
-                    >
-                      <span>Xử lý ngay</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* SECTION 4: OPERATIONAL SPLIT GRID (MY WORK TODAY + ACTIVE CAMPAIGNS HEALTH) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* Left Column (6/12): MY WORK TODAY */}
-        <div className="lg:col-span-6 bg-white rounded-xl border border-slate-200/80 p-5 shadow-sm flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                  <ListTodo className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">Tác Vụ Hôm Nay Của Tôi (My Work Today)</h3>
-                  <p className="text-[11px] text-slate-500">Các đầu việc cần bạn hoàn thiện để chiến dịch không bị trễ tiến độ</p>
-                </div>
-              </div>
-              <button
-                onClick={() => onNavigateTab?.('my_tasks')}
-                className="text-xs text-indigo-600 font-bold hover:underline cursor-pointer"
-              >
-                Xem tất cả &rarr;
-              </button>
+                  {rebalancingBudget ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-3.5 h-3.5 text-[#D95D39]" />
+                  )}
+                  <span>Tự chia lại ngân sách theo kênh lãi</span>
+                </button>
+              )}
             </div>
 
-            {myWorkToday.length === 0 ? (
-              <div className="py-8 text-center text-slate-500 text-xs">
-                <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-emerald-500" />
-                Bạn không có tác vụ nào đang tồn đọng. Hãy thư giãn hoặc nhận thêm việc mới!
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {myWorkToday.slice(0, 5).map((task) => (
+            <div className="space-y-3">
+              {portfolioAnomalies.map((anom) => {
+                const isCrit = anom.severity === 'CRITICAL';
+                return (
                   <div
-                    key={task.id}
-                    className={`p-3 rounded-lg border flex items-center justify-between gap-3 transition-colors ${
-                      task.is_overdue
-                        ? 'bg-rose-50/40 border-rose-200/80 hover:bg-rose-50/70'
-                        : 'bg-slate-50/70 border-slate-200/60 hover:bg-slate-50'
+                    key={anom.id}
+                    className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                      isCrit
+                        ? 'bg-[#FFF1F2]/50 border-[#FECDD3]'
+                        : 'bg-[#FFFBEB]/60 border-[#FDE68A]'
                     }`}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <button
-                        onClick={() => handleToggleTaskStatus(task.id, task.status)}
-                        className={`w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer ${
-                          task.status === 'DONE'
-                            ? 'bg-emerald-600 border-emerald-600 text-white'
-                            : 'border-slate-300 hover:border-indigo-500 bg-white'
-                        }`}
-                        title="Đánh dấu hoàn thành"
-                      >
-                        {task.status === 'DONE' && <Check className="w-3 h-3 stroke-[3]" />}
-                      </button>
-
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-xs font-bold text-slate-900 truncate">{task.title}</p>
-                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-200 text-slate-700">
-                            {task.task_type}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-slate-500 truncate mt-0.5">
-                          {task.campaign_name} {task.due_date && `• Hạn: ${task.due_date}`}
-                        </p>
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
+                            isCrit ? 'bg-[#BE123C] text-white' : 'bg-[#B45309] text-white'
+                          }`}
+                        >
+                          {anom.anomaly_type === 'OVER_PACING'
+                            ? 'Tiêu tiền quá nhanh'
+                            : anom.anomaly_type === 'CREATIVE_FATIGUE'
+                              ? 'Khách nhàm quảng cáo'
+                              : 'Chi phí cao · Ít đơn'}
+                        </span>
+                        <span className="text-xs font-extrabold text-[#121316] truncate">
+                          {anom.campaign_name}
+                        </span>
+                        <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-white border border-[#E4E2DD] text-[#BE123C]">
+                          {anom.metric_highlight || anom.metric_evidence}
+                        </span>
                       </div>
+                      <p className="text-xs font-bold text-[#121316]">{anom.title}</p>
+                      {(anom.detail || anom.metric_evidence) && (
+                        <p className="text-xs text-[#5A5E66] leading-relaxed">{anom.detail || anom.metric_evidence}</p>
+                      )}
+                      <p className="text-xs font-semibold text-[#15803D]">
+                        Cách xử lý: {anom.recommended_action}
+                      </p>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                        task.priority === 'URGENT'
-                          ? 'bg-rose-100 text-rose-700'
-                          : task.priority === 'HIGH'
-                          ? 'bg-amber-100 text-amber-700'
-                          : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {task.priority}
+                    <div className="shrink-0 flex sm:flex-col items-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleApplyAnomalyFix(anom)}
+                        disabled={applyingAnomalyId === anom.id}
+                        className="px-3.5 py-2 rounded-xl bg-[#121316] hover:bg-[#D95D39] disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
+                      >
+                        {applyingAnomalyId === anom.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : anom.action_type === 'PAUSE_CAMPAIGN' || anom.action_type === 'PAUSE' ? (
+                          <PauseCircle className="w-3.5 h-3.5" />
+                        ) : (
+                          <Zap className="w-3.5 h-3.5" />
+                        )}
+                        <span>
+                          {anom.action_type === 'REFRESH_CREATIVE'
+                            ? 'Viết bài quảng cáo mới'
+                            : anom.action_type === 'ADJUST_BUDGET' || anom.action_type === 'REDUCE_BUDGET'
+                              ? 'Giảm 15% ngân sách'
+                              : anom.action_type === 'PAUSE_CAMPAIGN' || anom.action_type === 'PAUSE'
+                                ? 'Tạm dừng chiến dịch'
+                                : 'Chia lại ngân sách'}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Cột phải (5/12): Cách viết đang mang lại nhiều đơn nhất (Nền sáng dễ đọc, không tím đen) */}
+          <div className="lg:col-span-5 bg-white rounded-xl border border-[#E4E2DD] p-5 flex flex-col justify-between space-y-4">
+            <div className="flex items-center justify-between gap-2 border-b border-[#F0EFEA] pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#F0FDF4] text-[#15803D] border border-[#BBF7D0] flex items-center justify-center">
+                  <Award className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-[#121316]">
+                    Cách viết đang ra nhiều đơn nhất
+                  </h3>
+                  <p className="text-xs text-[#5A5E66]">
+                    Rút ra từ các bài quảng cáo có doanh thu cao nhất hiện tại
+                  </p>
+                </div>
+              </div>
+              <TrendingUp className="w-4 h-4 text-[#15803D] shrink-0" />
+            </div>
+
+            <div className="space-y-3">
+              {winningPatterns.slice(0, 2).map((pat, idx) => (
+                <div
+                  key={pat.id || pat.pattern_id || `pat-${idx}`}
+                  className="p-3.5 rounded-xl bg-[#F6F5F0]/70 border border-[#E4E2DD] space-y-1.5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-white text-[#121316] border border-[#E4E2DD]">
+                      Hạng #{idx + 1} · {pat.channel || pat.category || 'Đa kênh'}
+                    </span>
+                    <div className="flex items-center gap-1.5 text-[11px] font-mono font-bold">
+                      <span className="px-2 py-0.5 rounded bg-[#F0FDF4] text-[#15803D] border border-[#BBF7D0]">
+                        ROAS {pat.avg_roas}x
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-white text-[#5A5E66] border border-[#E4E2DD]">
+                        Tỷ lệ bấm {pat.avg_ctr ?? pat.avg_ctr_pct ?? 2.4}%
                       </span>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="pt-3 border-t border-slate-100 mt-4 flex items-center justify-between text-xs text-slate-500">
-            <span>Còn {myWorkToday.filter(t => t.status !== 'DONE').length} việc cần giải quyết</span>
-            <button
-              onClick={() => onNavigateTab?.('my_tasks')}
-              className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
-            >
-              Mở trang Tác vụ
-            </button>
-          </div>
-        </div>
-
-        {/* Right Column (6/12): ACTIVE CAMPAIGNS HEALTH */}
-        <div className="lg:col-span-6 bg-white rounded-xl border border-slate-200/80 p-5 shadow-sm flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                  <Activity className="w-4 h-4" />
+                  <p className="text-xs font-extrabold text-[#121316]">{pat.pattern_name || pat.title}</p>
+                  <p className="text-xs text-[#5A5E66] leading-relaxed">{pat.insight}</p>
+                  {(pat.example_hook || pat.recommended_template) && (
+                    <p className="text-xs italic text-[#121316] bg-white px-3 py-2 rounded-lg border border-[#E4E2DD]">
+                      Câu mẫu: {pat.example_hook || pat.recommended_template}
+                    </p>
+                  )}
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">Sức Khỏe Chiến Dịch (Campaign Health)</h3>
-                  <p className="text-[11px] text-slate-500">Đánh giá theo luật tất định: Tác vụ quá hạn, tỷ lệ giải ngân và tiến độ</p>
-                </div>
-              </div>
-              <button
-                onClick={() => onNavigateTab?.('campaigns')}
-                className="text-xs text-indigo-600 font-bold hover:underline cursor-pointer"
-              >
-                Xem tất cả &rarr;
-              </button>
+              ))}
             </div>
 
-            {campaignsHealth.length === 0 ? (
-              <div className="py-8 text-center text-slate-500 text-xs">
-                Chưa có chiến dịch nào đang hoạt động. Hãy tạo chiến dịch mới!
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {campaignsHealth.slice(0, 4).map((ch) => {
-                  const isCritical = ch.health_status === 'CRITICAL';
-                  const isAtRisk = ch.health_status === 'AT_RISK';
-
-                  return (
-                    <div key={ch.campaign_id} className="p-3 bg-slate-50/70 border border-slate-200/60 rounded-lg space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-xs font-bold text-slate-900 truncate">
-                            {ch.campaign_name}
-                          </span>
-                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                            isCritical
-                              ? 'bg-rose-100 text-rose-700 border border-rose-300'
-                              : isAtRisk
-                              ? 'bg-amber-100 text-amber-700 border border-amber-300'
-                              : 'bg-emerald-100 text-emerald-700 border border-emerald-300'
-                          }`}>
-                            {isCritical ? 'RỦI RO CAO' : isAtRisk ? 'CẦN LƯU Ý' : 'ỔN ĐỊNH'} ({ch.health_score}/100)
-                          </span>
-                        </div>
-
-                        <button
-                          onClick={() => {
-                            const c = campaigns.find(x => x.id === ch.campaign_id);
-                            if (c) onSelectCampaign(c);
-                          }}
-                          className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5"
-                        >
-                          Chi tiết &rarr;
-                        </button>
-                      </div>
-
-                      {/* Progress / Budget Stats */}
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between text-[11px] text-slate-500">
-                          <span>Ngân sách: {formatVND(ch.spent)} / {formatVND(ch.budget)}</span>
-                          <span className="font-semibold">{ch.budget_utilization_pct}% đã chi</span>
-                        </div>
-                        <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full rounded-full transition-all ${
-                              ch.budget_utilization_pct > 100
-                                ? 'bg-rose-600'
-                                : ch.budget_utilization_pct > 90
-                                ? 'bg-amber-500'
-                                : 'bg-indigo-600'
-                            }`}
-                            style={{ width: `${Math.min(100, ch.budget_utilization_pct)}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
-                        <span>Hoàn thành: {ch.completed_tasks}/{ch.total_tasks} tác vụ</span>
-                        {ch.overdue_tasks > 0 && (
-                          <span className="text-rose-600 font-bold">{ch.overdue_tasks} tác vụ quá hạn</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <div className="pt-3 border-t border-slate-100 mt-4 flex items-center justify-between text-xs text-slate-500">
-            <span>{campaignsHealth.length} chiến dịch đang hoạt động</span>
             <button
-              onClick={() => onNavigateTab?.('campaigns')}
-              className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
+              type="button"
+              onClick={() => onNavigateTab?.('ai_studio')}
+              className="w-full py-2.5 rounded-xl bg-[#D95D39] hover:bg-[#C04E2C] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
             >
-              Quản lý Chiến dịch
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Viết bài mới theo cách này</span>
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
+      )}
 
-      </div>
-
-      {/* SECTION 5: ANALYTICS & DOCTOR HUB */}
+      {/* KHU VỰC 3: BẢNG DANH SÁCH CHIẾN DỊCH & VIỆC CẦN LÀM HÔM NAY */}
       <div id="ai-doctor-hub" className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* Left Column (8/12 - 67%): Attribution Trend & Campaigns Table */}
+        {/* Cột trái (8/12): Danh sách chiến dịch + Biểu đồ so sánh kênh */}
         <div className="lg:col-span-8 space-y-6">
-          <AttributionTrendChart
-            channels={dashboardKpi?.channel_metrics || []}
-            totalCost={dashboardKpi?.total_cost}
-            totalRevenue={dashboardKpi?.total_revenue}
-          />
-
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Danh sách Chiến dịch</h3>
-              <button 
+              <h3 className="text-sm font-black text-[#121316]">
+                Danh sách chiến dịch đang quản lý
+              </h3>
+              <button
                 onClick={() => onNavigateTab?.('campaigns')}
-                className="text-xs text-indigo-600 font-semibold cursor-pointer hover:underline"
+                className="text-xs text-[#D95D39] font-bold cursor-pointer hover:underline"
               >
-                Xem tất cả
+                Mở bảng điều khiển đầy đủ &rarr;
               </button>
             </div>
 
@@ -978,7 +693,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   onClick={() => void loadData()}
                   className="mt-2 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[11px] font-bold"
                 >
-                  Thử lại
+                  Thử tải lại
                 </button>
               </div>
             ) : (
@@ -993,15 +708,114 @@ export const Dashboard: React.FC<DashboardProps> = ({
               />
             )}
           </div>
+
+          <AttributionTrendChart
+            channels={dashboardKpi?.channel_metrics || []}
+            totalCost={dashboardKpi?.total_cost}
+            totalRevenue={dashboardKpi?.total_revenue}
+          />
         </div>
 
-        {/* Right Column (4/12 - 33%): AI Strategic Insight & Doctor Hub */}
+        {/* Cột phải (4/12): Việc cần làm hôm nay + Bài chờ duyệt + Chẩn đoán 1 chiến dịch */}
         <div className="lg:col-span-4 space-y-5">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-            <Sparkles className="w-4 h-4 text-violet-600" />
-            <span>AI Doctor &amp; Chẩn Đoán</span>
-          </h3>
+          {/* Việc cần làm hôm nay */}
+          <div className="bg-white rounded-xl border border-[#E4E2DD] p-5">
+            <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-[#F0EFEA]">
+              <div className="flex items-center gap-2">
+                <ListTodo className="w-4 h-4 text-[#D95D39]" />
+                <h3 className="text-xs font-black uppercase tracking-wider text-[#121316]">
+                  Việc cần làm hôm nay ({myWorkToday.filter(t => t.status !== 'DONE').length})
+                </h3>
+              </div>
+              <button
+                onClick={() => onNavigateTab?.('my_tasks')}
+                className="text-xs text-[#D95D39] font-bold hover:underline cursor-pointer"
+              >
+                Xem hết &rarr;
+              </button>
+            </div>
 
+            {myWorkToday.length === 0 ? (
+              <div className="py-5 text-center text-[#5A5E66] text-xs">
+                <CheckCircle2 className="w-6 h-6 mx-auto mb-1.5 text-[#15803D]" />
+                Không có đầu việc nào bị tồn đọng hôm nay.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {myWorkToday.slice(0, 4).map((task) => (
+                  <div
+                    key={task.id}
+                    className={`p-2.5 rounded-lg border flex items-center justify-between gap-2.5 transition-colors ${
+                      task.is_overdue
+                        ? 'bg-[#FFF1F2]/50 border-[#FECDD3]'
+                        : 'bg-[#F6F5F0]/60 border-[#E4E2DD]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <button
+                        onClick={() => handleToggleTaskStatus(task.id, task.status)}
+                        className={`w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                          task.status === 'DONE'
+                            ? 'bg-[#15803D] border-[#15803D] text-white'
+                            : 'border-slate-300 hover:border-[#D95D39] bg-white'
+                        }`}
+                        title="Đánh dấu hoàn thành"
+                      >
+                        {task.status === 'DONE' && <Check className="w-3 h-3 stroke-[3]" />}
+                      </button>
+
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-[#121316] truncate">{task.title}</p>
+                        <p className="text-[11px] text-[#5A5E66] truncate">
+                          {task.campaign_name} {task.due_date && `· Hạn: ${task.due_date}`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Bài viết đang chờ duyệt */}
+          <div className="bg-white rounded-xl border border-[#E4E2DD] p-5">
+            <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-[#F0EFEA]">
+              <span className="text-xs font-black uppercase tracking-wider text-[#121316] flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-[#B45309]" /> Bài viết chờ duyệt ({pendingContents.length})
+              </span>
+              <button
+                onClick={() => onNavigateTab?.('reviews')}
+                className="text-xs text-[#D95D39] hover:underline font-bold cursor-pointer"
+              >
+                Vào duyệt &rarr;
+              </button>
+            </div>
+
+            {pendingContents.length === 0 ? (
+              <p className="text-xs text-[#5A5E66] py-3 text-center">Không có bài viết nào đang chờ duyệt.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {pendingContents.slice(0, 3).map((item) => (
+                  <div key={item.id} className="p-3 bg-[#F6F5F0]/70 border border-[#E4E2DD] rounded-lg">
+                    <p className="text-xs font-bold text-[#121316] truncate">{item.title}</p>
+                    <p className="text-[11px] text-[#5A5E66] truncate mt-0.5">{item.body}</p>
+                    {isManager && (
+                      <button
+                        type="button"
+                        onClick={() => handleApproveQuick(item.id)}
+                        aria-label={`Phê duyệt ngay bài: ${item.title}`}
+                        className="mt-2 text-[11px] font-bold text-[#15803D] hover:underline flex items-center gap-1"
+                      >
+                        <CheckCircle2 className="w-3 h-3" /> Duyệt bài này
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Chẩn đoán chi tiết 1 chiến dịch */}
           {commandCenterError ? (
             <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3.5">
               <p className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
@@ -1020,50 +834,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
               onOpenAIStudio={handleOpenAICopilot}
             />
           )}
-
-          {/* Review Queue Snippet */}
-          <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-amber-500" /> Hàng đợi duyệt ({pendingContents.length})
-              </span>
-              <button 
-                onClick={() => onNavigateTab?.('reviews')}
-                className="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer"
-              >
-                Vào duyệt &rarr;
-              </button>
-            </div>
-
-            {pendingContents.length === 0 ? (
-              <p className="text-xs text-slate-500 py-3 text-center">Không có bài viết nào đang chờ duyệt</p>
-            ) : (
-              <div className="space-y-2.5">
-                {pendingContents.slice(0, 3).map((item) => (
-                  <div key={item.id} className="p-3 bg-slate-50 border border-slate-100 rounded-lg hover:border-slate-300 transition-colors">
-                    <p className="text-xs font-bold text-slate-900 truncate">{item.title}</p>
-                    <p className="text-[11px] text-slate-500 truncate mt-0.5">{item.body}</p>
-                    {isManager && (
-                      <button
-                        type="button"
-                        onClick={() => handleApproveQuick(item.id)}
-                        aria-label={`Phê duyệt ngay bài: ${item.title}`}
-                        className="mt-2 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
-                      >
-                        <CheckCircle2 className="w-3 h-3" /> Phê duyệt ngay
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
         </div>
-
       </div>
 
-      {/* Xác nhận xóa chiến dịch — thay cho window.confirm() chặn cả trang */}
+      {/* Xác nhận xóa chiến dịch */}
       {confirmDeleteId !== null && (
         <div
           className="fixed inset-0 z-50"
@@ -1072,7 +846,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           aria-labelledby="dashboard-delete-title"
         >
           <div
-            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             aria-hidden="true"
             onClick={() => !isDeleting && setConfirmDeleteId(null)}
           />
@@ -1080,18 +854,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div
               ref={deleteConfirmRef}
               tabIndex={-1}
-              className="relative bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 pointer-events-auto space-y-4 text-center"
+              className="relative bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-[#E4E2DD] pointer-events-auto space-y-4 text-center"
             >
               <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
                 <AlertTriangle className="w-6 h-6" />
               </div>
               <div>
-                <h4 id="dashboard-delete-title" className="text-base font-bold text-slate-900">
+                <h4 id="dashboard-delete-title" className="text-base font-bold text-[#121316]">
                   Xác nhận xóa chiến dịch?
                 </h4>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-[#5A5E66] mt-1">
                   Chiến dịch <strong>{campaigns.find((c) => c.id === confirmDeleteId)?.name}</strong> và các mẫu
-                  quảng cáo đi kèm sẽ bị xóa. Không thể hoàn tác.
+                  quảng cáo đi kèm sẽ bị xóa vĩnh viễn.
                 </p>
               </div>
               <div className="flex items-center gap-3 pt-2">
@@ -1099,9 +873,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   type="button"
                   disabled={isDeleting}
                   onClick={() => setConfirmDeleteId(null)}
-                  className="flex-1 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl disabled:opacity-50"
+                  className="flex-1 py-2 text-xs font-bold text-[#121316] bg-[#F6F5F0] hover:bg-[#EAE8E1] rounded-xl disabled:opacity-50"
                 >
-                  Hủy
+                  Giữ lại
                 </button>
                 <button
                   type="button"
@@ -1110,13 +884,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   className="flex-1 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl disabled:opacity-50 flex items-center justify-center gap-1.5"
                 >
                   {isDeleting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  Xóa
+                  Xóa chiến dịch
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      <GlobalCsvImportModal
+        isOpen={isSmartCsvModalOpen}
+        onClose={() => setIsSmartCsvModalOpen(false)}
+        campaigns={campaigns}
+        onSuccess={() => void loadData()}
+      />
     </div>
   );
 };

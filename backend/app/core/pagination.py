@@ -69,8 +69,8 @@ class PageParams(BaseModel):
     page_size: int = Field(
         PAGE_SIZE_DEFAULT,
         ge=1,
-        le=PAGE_SIZE_MAX,
-        description=f"Số bản ghi mỗi trang (1..{PAGE_SIZE_MAX})",
+        le=200,
+        description="Số bản ghi mỗi trang (1..200)",
     )
 
     @property

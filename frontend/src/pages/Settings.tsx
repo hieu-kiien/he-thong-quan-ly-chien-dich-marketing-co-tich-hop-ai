@@ -3,6 +3,7 @@ import { KeyRound, ShieldCheck, Zap, CheckCircle2, AlertCircle, Eye, EyeOff, Tra
 import { settingsApi, authApi, workspaceApi, getApiErrorMessage } from '../services/api';
 import { useToast } from '../components/Toast';
 import { CustomApiKey, AIKeyTestResponse, User as UserType, Workspace, AIModelListResponse, AIChain, AIChainHop, WorkspaceMemberItem } from '../types';
+import { MCPAgentStudio } from '../components/MCPAgentStudio';
 
 /**
  * Cấu hình hiển thị cho từng nhà cung cấp AI.
@@ -2034,6 +2035,26 @@ const handleTestConnection = async () => {
           </div>
         </div>
       )}
+
+      {/* Developer Tools: MCP Agent & Protocol Inspector */}
+      <details className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs group">
+        <summary className="cursor-pointer list-none flex items-center justify-between text-xs font-bold text-slate-700">
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-indigo-600" />
+            <span>Công cụ Kỹ thuật &amp; Nhà phát triển: Trình kiểm tra Giao thức MCP (Model Context Protocol Inspector)</span>
+          </div>
+          <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-semibold group-open:bg-indigo-50 group-open:text-indigo-700">
+            Nhấp để Mở / Đóng
+          </span>
+        </summary>
+        <div className="mt-4 pt-4 border-t border-slate-100">
+          <MCPAgentStudio
+            campaigns={[]}
+            selectedCampaign={null}
+            onSelectCampaign={() => {}}
+          />
+        </div>
+      </details>
     </div>
   );
 };

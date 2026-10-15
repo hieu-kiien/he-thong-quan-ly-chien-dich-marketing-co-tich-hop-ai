@@ -1797,16 +1797,28 @@ h1, .signup-row, .status, .text-action, .field input::placeholder,
   background: rgb(246 155 73 / 24%);
 }
 
+.register-role-badge,
+.recent-registered-chip,
+.quick-login,
+.auth-mode-switch button,
+.status,
+.signup-row {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
 .quick-login  {
   margin-top: auto;
-  padding-top: 8px;
-  border-top: 1px dashed currentColor;
-  opacity: .9;
-  font-size: 12.5px;
+  padding-top: 9px;
+  border-top: 1px dashed rgb(20 129 144 / 40%);
+  color: #173e4b;
+  font-size: 12px;
 }
 
 .quick-login p  {
   margin: 0 0 6px;
+  color: #2b5463;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .quick-login-grid  {
@@ -1816,24 +1828,52 @@ h1, .signup-row, .status, .text-action, .field input::placeholder,
 }
 
 .quick-login-grid button  {
-  padding: 6px 4px;
-  border: 1px solid currentColor;
-  border-radius: 8px;
-  background: rgb(255 255 255 / 14%);
-  color: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
+  padding: 6px 8px;
+  border: 1px solid rgb(20 129 144 / 42%);
+  border-radius: 9px;
+  background: rgb(255 255 255 / 48%);
+  color: #114b59;
+  font-size: 12px;
+  font-weight: 700;
   cursor: pointer;
-  transition: background .15s ease, transform .12s ease;
+  box-shadow: 0 2px 6px rgb(15 50 69 / 6%), inset 0 1px 0 rgb(255 255 255 / 70%);
+  transition: background-color .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease, transform .12s ease;
 }
 
 .quick-login-grid button:hover  {
-  background: rgba(0, 0, 0, .1);
+  background: rgb(20 141 157 / 18%);
+  border-color: #148d9d;
+  color: #0b3944;
+  box-shadow: 0 4px 10px rgb(16 110 127 / 14%), inset 0 1px 0 rgb(255 255 255 / 85%);
   transform: translateY(-1px);
 }
 
+.quick-login-grid button:active  {
+  transform: translateY(0);
+}
+
+.night .quick-login  {
+  border-top-color: rgb(234 162 103 / 38%);
+  color: #f1f5f9;
+}
+
+.night .quick-login p  {
+  color: #e6d3c1;
+}
+
 .night .quick-login-grid button {
-  background: rgb(255 255 255 / 5%);
+  border-color: rgb(246 155 73 / 50%);
+  background: linear-gradient(180deg, rgb(49 34 68 / 88%), rgb(33 22 48 / 92%));
+  color: #ffdfb9;
+  box-shadow: 0 3px 10px rgb(0 0 0 / 35%), inset 0 1px 0 rgb(255 223 185 / 14%);
+}
+
+.night .quick-login-grid button:hover {
+  border-color: #f69b49;
+  background: linear-gradient(135deg, rgb(246 155 73 / 30%), rgb(206 98 43 / 24%));
+  color: #ffffff;
+  box-shadow: 0 5px 14px rgb(246 155 73 / 25%), inset 0 1px 0 rgb(255 235 205 / 28%);
+  transform: translateY(-1px);
 }
 
 .submit:disabled  {

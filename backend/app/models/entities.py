@@ -192,6 +192,10 @@ class Campaign(Base):
     primary_cta = Column(String(255), nullable=True)
     target_kpi_name = Column(String(50), nullable=True)
     target_kpi_value = Column(Numeric(12, 2), nullable=True)
+    campaign_code = Column(String(100), nullable=True, index=True)
+    funnel_stage = Column(String(20), nullable=False, default="BoFU", server_default="BoFU")
+    daily_budget_cap = Column(Numeric(12, 2), nullable=True)
+    tags_json = Column(Text, nullable=True, default="[]", server_default="[]")
     created_at = Column(DateTime, default=utc_now, nullable=False)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
@@ -257,6 +261,10 @@ class MarketingContent(Base):
     status = Column(String(50), nullable=False, default="DRAFT")
     source_ids_json = Column(Text, nullable=False, default="[]")
     warnings_json = Column(Text, nullable=True, default="[]", server_default="[]")
+    creative_angle = Column(String(50), nullable=True)
+    hook_variant = Column(String(50), nullable=True)
+    utm_params = Column(String(500), nullable=True)
+    ai_metadata_json = Column(Text, nullable=True)
     version_no = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime, default=utc_now, nullable=False)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
@@ -326,6 +334,7 @@ class CampaignMetric(Base):
     id = Column(Integer, primary_key=True, index=True)
     campaign_id = Column(Integer, ForeignKey("campaigns.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     channel_id = Column(Integer, ForeignKey("marketing_channels.id", onupdate="CASCADE", ondelete="RESTRICT"), nullable=False)
+    content_id = Column(Integer, ForeignKey("marketing_contents.id", onupdate="CASCADE", ondelete="SET NULL"), nullable=True, index=True)
     metric_date = Column(String(50), nullable=False) # YYYY-MM-DD
     views = Column(Integer, nullable=False, default=0)
     clicks = Column(Integer, nullable=False, default=0)
@@ -492,7 +501,7 @@ class AIJob(Base):
     workspace_id = Column(Integer, ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     campaign_id = Column(Integer, ForeignKey("campaigns.id", onupdate="CASCADE", ondelete="SET NULL"), nullable=True)
-    # 'ideas' | 'draft' | 'summary' | 'omnichannel' | 'plan' (khớp endpoint đồng bộ tương ứng)
+    # 'ideas' | 'draft' | 'summary' | 'omnichannel' | 'plan' | 'angle_matrix' | 'prelaunch_critic' | 'deep_doctor' | 'batch_compliance_fix'
     kind = Column(String(30), nullable=False)
     # 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
     status = Column(String(20), nullable=False, default="queued")
@@ -524,7 +533,7 @@ class AIJob(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('ideas', 'draft', 'summary', 'omnichannel', 'plan')",
+            "kind IN ('ideas', 'draft', 'summary', 'omnichannel', 'plan', 'angle_matrix', 'prelaunch_critic', 'deep_doctor', 'batch_compliance_fix')",
             name="chk_ai_job_kind",
         ),
         CheckConstraint(

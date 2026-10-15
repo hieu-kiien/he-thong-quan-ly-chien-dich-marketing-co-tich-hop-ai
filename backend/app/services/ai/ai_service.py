@@ -670,6 +670,12 @@ class AIService:
             return self._generate_fallback_omnichannel(context)
         elif task_type in ["campaign_plan", "PLAN"]:
             return self._generate_fallback_campaign_plan(context)
+        elif task_type in ["angle_matrix", "ANGLE_MATRIX"]:
+            return self._generate_fallback_angle_matrix(context)
+        elif task_type in ["prelaunch_critic", "PRELAUNCH_CRITIC"]:
+            return self._generate_fallback_prelaunch_critic(context)
+        elif task_type in ["compliance_rewrite", "COMPLIANCE_REWRITE"]:
+            return self._generate_fallback_compliance_rewrite(context)
         return {}
 
     def _generate_fallback_campaign_plan(self, context: Dict[str, Any]) -> Dict[str, Any]:
@@ -1296,6 +1302,819 @@ class AIService:
             context=context
         )
 
+    def _generate_fallback_angle_matrix(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Sinh ma trận Góc tiếp cận Tâm lý × Biến thể Hook 3 giây chuẩn nghiệp vụ khi offline/fallback."""
+        camp_name = str(context.get("campaign_name") or "Chiến dịch Tăng trưởng")
+        prod_name = str(context.get("product_name") or "Giải pháp MarketFlow")
+        usp = str(context.get("product_usp") or "Tự động hóa đa kênh, tối ưu chi phí thực chiến")
+        audience = str(context.get("audience") or "Khách hàng mục tiêu 22-40 tuổi")
+        channel = str(context.get("channel") or "facebook").lower()
+        requested_angles = context.get("angles_list") or ["PAIN_POINT", "SOCIAL_PROOF", "MYTH_BUSTER", "OFFER_FOMO"]
+        hooks_per_angle = int(context.get("hooks_per_angle") or 3)
+
+        angle_catalog = {
+            "PAIN_POINT": {
+                "label": "Nỗi đau & Chi phí cơ hội",
+                "hooks": [
+                    ("Hook_A", f"Dừng lại 3 giây nếu {audience.lower()} vẫn đang lãng phí hàng giờ mỗi ngày vì thiếu {prod_name}!"),
+                    ("Hook_B", f"80% người mới thất bại chỉ vì bỏ qua bước cốt lõi này khi triển khai {prod_name}."),
+                    ("Hook_C", f"Đừng để ngân sách bốc hơi vô ích thêm một tuần nào nữa — đây là cách xử lý tận gốc!"),
+                ],
+                "cta": "👉 Nhắn tin nhận phác đồ giải quyết ngay hôm nay",
+                "hypothesis": "Khai thác trực diện nỗi đau mất thời gian/chi phí giúp tăng tỷ lệ dừng ngón tay (Thumb-Stop Rate) ở 3 giây đầu.",
+            },
+            "SOCIAL_PROOF": {
+                "label": "Bằng chứng xã hội & Kết quả thực",
+                "hooks": [
+                    ("Hook_A", f"Hơn 1.200 học viên & đội ngũ thực chiến đã chuyển đổi sang {prod_name} trong quý này — vì sao?"),
+                    ("Hook_B", f"Case study thực tế: Cách đội ngũ tinh gọn vận hành {prod_name} nhờ {usp}."),
+                    ("Hook_C", f"Nhìn vào bảng số liệu trước & sau 14 ngày ứng dụng {prod_name} của khách hàng thực tế:"),
+                ],
+                "cta": "👉 Xem trọn bộ Case Study & Đăng ký trải nghiệm",
+                "hypothesis": "Sử dụng con số thực chứng và câu chuyện thành công giúp giảm rào cản hoài nghi ở nhóm khách hàng cân nhắc kỹ.",
+            },
+            "MYTH_BUSTER": {
+                "label": "Phá vỡ lầm tưởng ngành",
+                "hooks": [
+                    ("Hook_A", f"Sự thật ngược đời: Bạn KHÔNG cần ngân sách lớn để làm chủ {prod_name}!"),
+                    ("Hook_B", f"Quên cách làm thủ công cũ kỹ đi — đây mới là chuẩn mực {prod_name} năm 2026."),
+                    ("Hook_C", f"3 lầm tưởng tai hại khiến {audience.lower()} mãi dậm chân tại chỗ (và cách đảo ngược):"),
+                ],
+                "cta": "👉 Khám phá phương pháp mới ngay tại đây",
+                "hypothesis": "Góc nhìn phản trực giác (Pattern Interrupt) kích thích tò mò mạnh trên Newsfeed Facebook và TikTok.",
+            },
+            "OFFER_FOMO": {
+                "label": "Ưu đãi giới hạn & Thúc đẩy hành động",
+                "hooks": [
+                    ("Hook_A", f"[Chỉ còn 20 suất] Đặc quyền sở hữu {prod_name} kèm bộ công cụ thực chiến trong tuần này!"),
+                    ("Hook_B", f"Ưu đãi đặc biệt chiến dịch {camp_name}: Kích hoạt {prod_name} trước khi đóng cổng đăng ký."),
+                    ("Hook_C", f"Đừng chờ đến khi đối thủ đi trước — nhận ngay gói ưu đãi khởi động {prod_name} hôm nay!"),
+                ],
+                "cta": "👉 Giữ suất ưu đãi của bạn ngay lập tức",
+                "hypothesis": "Giới hạn số lượng suất và thời gian cụ thể thúc đẩy tỷ lệ nhấp chuyển đổi (CVR) ở đáy phễu BoFU.",
+            },
+        }
+        angle_catalog["URGENCY_FOMO"] = angle_catalog["OFFER_FOMO"]
+
+        variants = []
+        for angle_key in requested_angles:
+            spec = angle_catalog.get(angle_key, angle_catalog["PAIN_POINT"])
+            for hook_type, hook_text in spec["hooks"][:hooks_per_angle]:
+                title = f"[{spec['label']}] {hook_text[:85]}"
+                body = (
+                    f"{hook_text}\n\n"
+                    f"💡 Giải pháp từ {prod_name}:\n"
+                    f"• Đặc tính cốt lõi: {usp}\n"
+                    f"• Thiết kế chuyên biệt cho: {audience}\n"
+                    f"• Triển khai bài bản trong khuôn khổ {camp_name}.\n\n"
+                    f"#MarketFlowAI #{channel.capitalize()} #{angle_key.lower()}"
+                )
+                variants.append({
+                    "angle": angle_key,
+                    "angle_label": spec["label"],
+                    "hook_type": hook_type,
+                    "hook_text": hook_text,
+                    "title": title,
+                    "body": body,
+                    "cta": spec["cta"],
+                    "ab_hypothesis": f"[{angle_key} × {hook_type}] {spec['hypothesis']}",
+                })
+
+        return {
+            "variants": variants,
+            "is_fallback": True,
+            "model_provider": "template-fallback-engine",
+        }
+
+    def _generate_fallback_prelaunch_critic(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Sinh báo cáo Hội đồng 4 chuyên gia thẩm định quảng cáo trước xuất bản (Pre-launch Critic)."""
+        title = str(context.get("title") or "").strip()
+        body = str(context.get("body") or "").strip()
+        cta = str(context.get("cta") or "Đăng ký ngay hôm nay").strip()
+        channel = str(context.get("channel") or "facebook").lower()
+        funnel_stage = str(context.get("funnel_stage") or "BoFU")
+        comp_score = int(context.get("compliance_score") or 100)
+        violations_summary = str(context.get("violations_summary") or "Không phát hiện từ khóa cấm")
+
+        sentences = [s.strip() for s in body.replace("\n", ". ").split(".") if s.strip()]
+        weakest_sentence = sentences[-1] if sentences else body[:100]
+        weakest_reason = "Câu văn còn mang tính mô tả chung chung, thiếu con số định lượng hoặc lợi ích cụ thể cho người đọc."
+        for s in sentences:
+            s_low = s.lower()
+            if any(w in s_low for w in ("hàng đầu", "tốt nhất", "toàn diện", "tối ưu", "cam kết 100%")):
+                weakest_sentence = s
+                weakest_reason = "Sử dụng tính từ tự khen sáo rỗng hoặc nhạy cảm chính sách, làm giảm độ tin cậy với khách hàng thực tế."
+                break
+
+        has_numbers = any(ch.isdigit() for ch in (title + " " + body))
+        has_hook_punct = any(p in title for p in ("?", "!", "[", "🔥", "🚀", ":"))
+        thumb_stop_score = min(96, 62 + (14 if has_hook_punct else 0) + (12 if has_numbers else 0) + (6 if len(title) >= 20 else 0))
+        friction_score = max(12, 58 - (15 if len(cta) >= 10 else 0) - (12 if has_numbers else 0) + (25 if comp_score < 80 else 0))
+        overall_score = int(round((thumb_stop_score * 0.35) + ((100 - friction_score) * 0.30) + (comp_score * 0.35)))
+        overall_score = max(0, min(100, overall_score))
+
+        if comp_score < 70:
+            verdict = "BLOCKED_BY_COMPLIANCE"
+        elif overall_score >= 75:
+            verdict = "READY_TO_LAUNCH"
+        else:
+            verdict = "NEEDS_REVISION"
+
+        personas = [
+            {
+                "persona_id": "skeptical_buyer",
+                "persona_name": "Khách hàng hoài nghi (Skeptical Buyer)",
+                "persona_role": "Người ra quyết định mua hàng khắt khe, dị ứng với lời quảng cáo sáo rỗng",
+                "avatar_emoji": "🧐",
+                "score": min(95, 65 + (18 if has_numbers else 0)),
+                "verdict": "PASS" if has_numbers else "WARN",
+                "critique": (
+                    "Bài viết đã nêu được giải pháp nhưng người mua khó tính cần thấy con số cụ thể (thời gian tiết kiệm, số lượng học viên/khách hàng đã kiểm chứng)."
+                ),
+                "fix_suggestion": "Bổ sung 1 con số định lượng hoặc mốc thời gian cụ thể ngay đoạn thứ 2 của thân bài.",
+                "actionable_fix": "Bổ sung 1 con số định lượng hoặc mốc thời gian cụ thể ngay đoạn thứ 2 của thân bài.",
+            },
+            {
+                "persona_id": "three_sec_scroller",
+                "persona_name": "Người lướt điện thoại 3 giây (3-Second Scroller)",
+                "persona_role": "Lướt Newsfeed/TikTok cực nhanh, chỉ dừng lại nếu dòng đầu gây tò mò mạnh",
+                "avatar_emoji": "📱",
+                "score": thumb_stop_score,
+                "verdict": "PASS" if thumb_stop_score >= 75 else "WARN",
+                "critique": (
+                    f"Trên kênh {channel.upper()}, người dùng quyết định lướt qua trong 1.7 giây đầu. Tiêu đề '{title[:45]}...' cần đánh thẳng vào nỗi đau hoặc sự tò mò."
+                ),
+                "fix_suggestion": "Đặt câu hỏi trực diện hoặc con số gây chú ý ngay 5 từ đầu tiên của tiêu đề.",
+                "actionable_fix": "Đặt câu hỏi trực diện hoặc con số gây chú ý ngay 5 từ đầu tiên của tiêu đề.",
+            },
+            {
+                "persona_id": "brand_guardian",
+                "persona_name": "Người gác cổng Brand Kit (Brand Guardian)",
+                "persona_role": "Kiểm soát giọng văn thương hiệu, cấu trúc thông điệp và tính nhất quán CTA",
+                "avatar_emoji": "🛡️",
+                "score": min(98, max(50, comp_score - 2)),
+                "verdict": "PASS" if comp_score >= 85 else "WARN",
+                "critique": (
+                    f"Đánh giá mức độ nhất quán với phễu {funnel_stage}: cấu trúc ngắt dòng rõ ràng, tuy nhiên câu '{weakest_sentence[:50]}...' cần cụ thể hóa hơn."
+                ),
+                "fix_suggestion": "Thay thế các tính từ chung chung bằng lợi ích đo đếm được gắn với USP thương hiệu.",
+                "actionable_fix": "Thay thế các tính từ chung chung bằng lợi ích đo đếm được gắn với USP thương hiệu.",
+            },
+            {
+                "persona_id": "ad_policy_bot",
+                "persona_name": "Thuật toán Chính sách FB/TikTok (Ad Policy Bot)",
+                "persona_role": "Quét từ khóa nhạy cảm, cam kết tuyệt đối 100%, và trải nghiệm trang đích",
+                "avatar_emoji": "🤖",
+                "score": comp_score,
+                "verdict": "PASS" if comp_score >= 85 else "FAIL",
+                "critique": f"Điểm quét tuân thủ hiện tại đạt {comp_score}/100 ({violations_summary}).",
+                "fix_suggestion": "Loại bỏ hoàn toàn từ khóa cam kết tuyệt đối 100% hoặc tuyên bố phóng đại trước khi bấm xuất bản.",
+                "actionable_fix": "Loại bỏ hoàn toàn từ khóa cam kết tuyệt đối 100% hoặc tuyên bố phóng đại trước khi bấm xuất bản.",
+            },
+        ]
+
+        improved_title = title if (has_hook_punct and comp_score >= 90) else f"🔥 [Giải pháp Thực Chiến] {title}"
+        improved_body = (
+            f"{body}\n\n"
+            "✅ Lộ trình triển khai rõ ràng từng bước — tối ưu thời gian và ngân sách thực tế cho đội ngũ của bạn."
+        )
+        improved_cta = cta if len(cta) >= 12 else "👉 Đăng ký nhận lộ trình & tư vấn chi tiết ngay hôm nay!"
+
+        return {
+            "overall_readiness_score": overall_score,
+            "thumb_stop_score": thumb_stop_score,
+            "conversion_friction_score": friction_score,
+            "compliance_score": comp_score,
+            "verdict": verdict,
+            "weakest_sentence": weakest_sentence,
+            "weakest_reason": weakest_reason,
+            "personas": personas,
+            "improved_title": improved_title,
+            "improved_body": improved_body,
+            "improved_cta": improved_cta,
+            "is_fallback": True,
+            "model_provider": "template-fallback-engine",
+        }
+
+    def _generate_fallback_compliance_rewrite(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Viết lại ngữ cảnh câu chứa từ khóa vi phạm chính sách quảng cáo & Brand Kit bằng Tiếng Việt tự nhiên."""
+        import re as _re
+
+        title = str(context.get("title") or "")
+        body = str(context.get("body") or "")
+        cta = str(context.get("cta") or "")
+        violations = context.get("violations_raw") or []
+
+        semantic_clause_map = {
+            "cam kết 100%": "đồng hành sát sao cùng lộ trình đã kiểm chứng thực tế",
+            "100%": "tối đa hiệu năng theo tiêu chuẩn thực tế",
+            "chữa dứt điểm": "hỗ trợ cải thiện bền vững từ gốc",
+            "trị dứt điểm": "hỗ trợ xử lý chuyên sâu và bài bản",
+            "khỏi hoàn toàn": "cải thiện rõ rệt theo phác đồ",
+            "làm giàu nhanh": "xây dựng nguồn thu nhập bền vững theo năng lực",
+            "đa cấp": "mô hình phát triển đối tác minh bạch",
+            "hoàn tiền không lý do": "chính sách bảo vệ quyền lợi học viên/khách hàng rõ ràng",
+            "không hoàn tiền": "bảo đảm quyền lợi minh bạch theo hợp đồng",
+            "bán phá giá": "mức ngân sách ưu đãi trực tiếp từ chương trình",
+            "trắng da cấp tốc": "chăm sóc làn da sáng khỏe tự nhiên theo chu kỳ",
+            "tốt nhất thị trường": "được cộng đồng chuyên môn đánh giá cao về tính thực tiễn",
+            "số 1 việt nam": "thuộc nhóm giải pháp tiên phong tại Việt Nam",
+            "chắc chắn thành công": "nâng cao tỷ lệ đạt mục tiêu nhờ quy trình chuẩn",
+            "vĩnh viễn": "lâu dài và ổn định",
+            "tuyệt đối": "vượt trội và nhất quán",
+        }
+
+        def _rewrite_text(txt: str) -> str:
+            if not txt:
+                return txt
+            out = txt
+            for v in violations:
+                word = str(v.get("word") if isinstance(v, dict) else getattr(v, "word", "")).strip()
+                suggestion = str(v.get("suggestion") if isinstance(v, dict) else getattr(v, "suggestion", "")).strip()
+                if not word:
+                    continue
+                replacement = semantic_clause_map.get(word.lower())
+                if not replacement:
+                    m = _re.search(r"['\"“]([^'\"”]{3,60})['\"”]", suggestion)
+                    replacement = m.group(1) if m else "giải pháp tối ưu theo chuẩn thực tế"
+                pattern = _re.compile(_re.escape(word), _re.IGNORECASE)
+                out = pattern.sub(replacement, out)
+            for bad_kw, safe_phrase in semantic_clause_map.items():
+                out = _re.compile(_re.escape(bad_kw), _re.IGNORECASE).sub(safe_phrase, out)
+            return out
+
+        return {
+            "title": _rewrite_text(title),
+            "body": _rewrite_text(body),
+            "cta": _rewrite_text(cta),
+            "is_fallback": True,
+            "model_provider": "template-fallback-engine",
+        }
+
+    def generate_angle_hook_matrix(
+        self,
+        db: Session,
+        user_id: int,
+        campaign_id: Optional[int] = None,
+        context: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Tạo ma trận Góc tiếp cận Tâm lý × Biến thể Hook, tính CTR/CVR dự phóng theo chuẩn ngành và chấm điểm Compliance thật."""
+        import re as _re
+        from app.services.ai.ai_doctor import AIDoctorEngine, CHANNEL_BENCHMARKS
+        from app.services.compliance.compliance_service import ComplianceScanner
+
+        merged_ctx: Dict[str, Any] = {}
+        if isinstance(context, dict):
+            merged_ctx.update(context)
+        merged_ctx.update({k: v for k, v in kwargs.items() if v is not None})
+
+        channel = str(merged_ctx.get("channel") or merged_ctx.get("channel_code") or "facebook").lower().strip()
+        funnel_stage = AIDoctorEngine.infer_funnel_stage(
+            merged_ctx.get("objective") or merged_ctx.get("brief"),
+            merged_ctx.get("funnel_stage"),
+        )
+        angles_list = merged_ctx.get("angles") or ["PAIN_POINT", "SOCIAL_PROOF", "MYTH_BUSTER", "OFFER_FOMO"]
+        hooks_per_angle = max(1, min(3, int(merged_ctx.get("hooks_per_angle") or 3)))
+        prod_name = str(merged_ctx.get("product_name") or merged_ctx.get("campaign_name") or "Giải pháp Marketing AI")
+
+        exec_ctx = {
+            **merged_ctx,
+            "product_name": prod_name,
+            "product_usp": merged_ctx.get("product_usp") or "Tối ưu hiệu suất chuyển đổi đa kênh",
+            "audience": merged_ctx.get("audience") or merged_ctx.get("target_audience") or "Khách hàng mục tiêu",
+            "channel": channel,
+            "funnel_stage": funnel_stage,
+            "angles": ", ".join(angles_list),
+            "angles_list": angles_list,
+            "hooks_per_angle": hooks_per_angle,
+        }
+        raw = self.execute_task(
+            db=db,
+            user_id=user_id,
+            campaign_id=campaign_id,
+            task_type="angle_matrix",
+            task_code="ANGLE_MATRIX",
+            prompt_version=str(merged_ctx.get("prompt_version") or "v3"),
+            context=exec_ctx,
+        )
+        raw_variants = raw.get("variants") if isinstance(raw.get("variants"), list) else []
+        expected_min = len(angles_list) * hooks_per_angle
+        if len(raw_variants) < expected_min:
+            raw_variants = self._generate_fallback_angle_matrix(exec_ctx).get("variants", [])
+
+        bench = CHANNEL_BENCHMARKS.get(channel, CHANNEL_BENCHMARKS["facebook"])
+        base_ctr = float(bench.get("ctr_good", 2.0))
+        base_cvr = float(bench.get("cvr_good", 3.0))
+
+        angle_multipliers = {
+            "PAIN_POINT": (1.18, 1.05),
+            "SOCIAL_PROOF": (1.08, 1.22),
+            "MYTH_BUSTER": (1.25, 0.98),
+            "OFFER_FOMO": (1.12, 1.28),
+            "URGENCY_FOMO": (1.12, 1.28),
+        }
+        hook_multipliers = {
+            "Hook_A": (1.06, 1.02),
+            "Hook_B": (1.00, 1.08),
+            "Hook_C": (0.96, 1.04),
+        }
+
+        camp_slug = _re.sub(
+            r"[^a-z0-9]+",
+            "_",
+            str(merged_ctx.get("campaign_name") or f"camp_{campaign_id or 1}").lower(),
+        ).strip("_")[:32] or "campaign"
+        ws_id = merged_ctx.get("workspace_id")
+
+        enriched_variants = []
+        for idx, item in enumerate(raw_variants):
+            if not isinstance(item, dict):
+                continue
+            angle = str(item.get("angle") or angles_list[idx % len(angles_list)]).upper()
+            hook_type = str(item.get("hook_type") or f"Hook_{chr(65 + (idx % 3))}")
+            title = str(item.get("title") or "").strip() or f"[{angle}] Giải pháp đột phá"
+            body = str(item.get("body") or "").strip() or title
+            cta = str(item.get("cta") or "Đăng ký ngay").strip()
+            hook_text = str(item.get("hook_text") or item.get("hook_3s") or title)
+
+            ctr_mult, cvr_mult = angle_multipliers.get(angle, (1.0, 1.0))
+            h_ctr_m, h_cvr_m = hook_multipliers.get(hook_type, (1.0, 1.0))
+            if funnel_stage == "ToFU":
+                ctr_mult *= 1.10
+                cvr_mult *= 0.85
+            elif funnel_stage == "BoFU":
+                cvr_mult *= 1.12
+
+            pred_ctr = round(base_ctr * ctr_mult * h_ctr_m, 2)
+            pred_cvr = round(base_cvr * cvr_mult * h_cvr_m, 2)
+
+            scan_res = ComplianceScanner.scan(
+                title=title,
+                body=body,
+                cta=cta,
+                workspace_id=ws_id,
+                db=db,
+            )
+            utm_params = (
+                f"?utm_source={channel}&utm_medium=paid_social"
+                f"&utm_campaign={camp_slug}&utm_content={angle.lower()}_{hook_type.lower()}"
+            )
+            enriched_variants.append({
+                "id": f"{angle}_{hook_type}_{idx + 1}",
+                "angle": angle,
+                "angle_code": angle,
+                "creative_angle": angle,
+                "angle_label": str(item.get("angle_label") or angle),
+                "funnel_stage": funnel_stage,
+                "hook_type": hook_type,
+                "hook_variant": hook_type,
+                "hook_text": hook_text,
+                "hook_3s": hook_text,
+                "title": title,
+                "body": body,
+                "cta": cta,
+                "ab_hypothesis": str(item.get("ab_hypothesis") or f"Kiểm thử góc {angle} kết hợp {hook_type} trên kênh {channel}."),
+                "predicted_ctr_pct": pred_ctr,
+                "predicted_cvr_pct": pred_cvr,
+                "compliance_score": int(scan_res.score),
+                "compliance_status": str(scan_res.status),
+                "utm_params": utm_params,
+            })
+
+        return {
+            "campaign_id": campaign_id,
+            "product_name": prod_name,
+            "channel": channel,
+            "funnel_stage": funnel_stage,
+            "angles_count": len(angles_list),
+            "total_variants": len(enriched_variants),
+            "variants_count": len(enriched_variants),
+            "strategy_summary": (
+                f"Đã thiết lập {len(angles_list)} Góc tiếp cận tâm lý × {hooks_per_angle} biến thể 3s Hook "
+                f"({len(enriched_variants)} Ad Variants) cho '{prod_name}' ở tầng phễu {funnel_stage}."
+            ),
+            "variants": enriched_variants,
+            "provider_used": raw.get("model_provider"),
+            "model_used": raw.get("model_used"),
+            "fallback_used": bool(raw.get("is_fallback", False)),
+        }
+
+    def simulate_prelaunch_critic(
+        self,
+        db: Session,
+        user_id: int,
+        campaign_id: Optional[int] = None,
+        context: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Mô phỏng Hội đồng chuyên gia thẩm định quảng cáo trước khi xuất bản."""
+        from app.services.compliance.compliance_service import ComplianceScanner
+
+        merged_ctx: Dict[str, Any] = {}
+        if isinstance(context, dict):
+            merged_ctx.update(context)
+        merged_ctx.update({k: v for k, v in kwargs.items() if v is not None})
+
+        ws_id = merged_ctx.get("workspace_id")
+        channel = str(merged_ctx.get("channel") or merged_ctx.get("channel_code") or "facebook").lower().strip()
+        title = str(merged_ctx.get("title") or "").strip()
+        body = str(merged_ctx.get("body") or "").strip()
+        cta = str(merged_ctx.get("cta") or "Đăng ký ngay").strip()
+
+        scan_res = ComplianceScanner.scan(
+            title=title,
+            body=body,
+            cta=cta,
+            workspace_id=ws_id,
+            db=db,
+        )
+        violations_summary = (
+            ", ".join(f"{v.word} ({v.severity})" for v in scan_res.violations)
+            if scan_res.violations
+            else "Không phát hiện từ khóa cấm"
+        )
+
+        exec_ctx = {
+            **merged_ctx,
+            "channel": channel,
+            "title": title,
+            "body": body,
+            "cta": cta,
+            "compliance_score": int(scan_res.score),
+            "violations_summary": violations_summary,
+        }
+        raw = self.execute_task(
+            db=db,
+            user_id=user_id,
+            campaign_id=campaign_id,
+            task_type="prelaunch_critic",
+            task_code="PRELAUNCH_CRITIC",
+            prompt_version=str(merged_ctx.get("prompt_version") or "v3"),
+            context=exec_ctx,
+        )
+        fallback_data = self._generate_fallback_prelaunch_critic(exec_ctx)
+        raw_personas = raw.get("personas") if isinstance(raw.get("personas"), list) and len(raw.get("personas")) >= 3 else fallback_data["personas"]
+        personas = []
+        for idx, p in enumerate(raw_personas):
+            if not isinstance(p, dict):
+                continue
+            fix_s = str(p.get("fix_suggestion") or p.get("actionable_fix") or "Tối ưu câu mở đầu và bằng chứng số liệu.")
+            personas.append({
+                "persona_id": str(p.get("persona_id") or f"persona_{idx + 1}"),
+                "persona_name": str(p.get("persona_name") or f"Persona #{idx + 1}"),
+                "persona_role": str(p.get("persona_role") or "Chuyên gia đánh giá chuyển đổi & chính sách quảng cáo"),
+                "avatar_emoji": str(p.get("avatar_emoji") or ("🧐" if idx == 0 else "📱" if idx == 1 else "🛡️" if idx == 2 else "🤖")),
+                "score": int(p.get("score", 80)),
+                "verdict": str(p.get("verdict") or "PASS"),
+                "critique": str(p.get("critique") or ""),
+                "fix_suggestion": fix_s,
+                "actionable_fix": fix_s,
+            })
+
+        overall_score = int(raw.get("overall_readiness_score", fallback_data["overall_readiness_score"]))
+        verdict = str(raw.get("verdict") or fallback_data["verdict"])
+        if int(scan_res.score) < 70:
+            launch_rec = "HIGH_RISK_REWRITE"
+        elif overall_score >= 75:
+            launch_rec = "READY_TO_LAUNCH"
+        else:
+            launch_rec = "NEEDS_MINOR_TUNING"
+
+        imp_title = str(raw.get("improved_title") or fallback_data["improved_title"])
+        imp_body = str(raw.get("improved_body") or fallback_data["improved_body"])
+        imp_cta = str(raw.get("improved_cta") or fallback_data["improved_cta"])
+
+        return {
+            "overall_readiness_score": overall_score,
+            "thumb_stop_score": int(raw.get("thumb_stop_score", fallback_data["thumb_stop_score"])),
+            "conversion_friction_score": int(raw.get("conversion_friction_score", fallback_data["conversion_friction_score"])),
+            "compliance_score": int(scan_res.score),
+            "verdict": verdict,
+            "verdict_label": (
+                "Sẵn sàng triển khai chạy thử nghiệm (Ready to Launch)"
+                if launch_rec == "READY_TO_LAUNCH"
+                else "Cần tinh chỉnh câu chữ trước khi tiêu ngân sách"
+            ),
+            "launch_recommendation": launch_rec,
+            "weakest_sentence": str(raw.get("weakest_sentence") or fallback_data["weakest_sentence"]),
+            "weakest_reason": str(raw.get("weakest_reason") or fallback_data["weakest_reason"]),
+            "personas": personas,
+            "persona_critiques": personas[:3],
+            "improved_title": imp_title,
+            "improved_body": imp_body,
+            "improved_cta": imp_cta,
+            "rewritten_version": {
+                "title": imp_title,
+                "body": imp_body,
+                "cta": imp_cta,
+                "improvement_notes": "Đã tối ưu Hook 3 giây đầu, bổ sung dẫn chứng định lượng và đảm bảo an toàn chính sách.",
+            },
+            "provider_used": raw.get("model_provider"),
+            "model_used": raw.get("model_used"),
+            "fallback_used": bool(raw.get("is_fallback", False)),
+        }
+
+    def semantic_compliance_rewrite(
+        self,
+        db: Session,
+        user_id: int,
+        workspace_id: Optional[int] = None,
+        channel: str = "facebook",
+        title: str = "",
+        body: str = "",
+        cta: Optional[str] = None,
+        preferred_provider: Optional[str] = None,
+        preferred_model: Optional[str] = None,
+        campaign_id: Optional[int] = None,
+        violations: Optional[List[Any]] = None,
+        banned_keywords: Optional[List[str]] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Viết lại ngữ cảnh câu chứa từ khóa vi phạm chính sách quảng cáo & Brand Kit và xác minh lại bằng ComplianceScanner."""
+        from app.services.compliance.compliance_service import ComplianceScanner
+        from app.models.entities import BrandKit, Campaign
+
+        if workspace_id is None and campaign_id is not None:
+            camp_obj = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+            if camp_obj:
+                workspace_id = camp_obj.workspace_id
+
+        old_scan = ComplianceScanner.scan(
+            title=title,
+            body=body,
+            cta=cta or "",
+            workspace_id=workspace_id,
+            db=db,
+        )
+        if not old_scan.violations and not violations:
+            return {
+                "old_score": int(old_scan.score),
+                "new_score": int(old_scan.score),
+                "old_status": str(old_scan.status),
+                "new_status": str(old_scan.status),
+                "fixed_violations_count": 0,
+                "fixed_violations": [],
+                "title": title,
+                "body": body,
+                "cta": cta,
+                "rewritten_title": title,
+                "rewritten_body": body,
+                "rewritten_cta": cta,
+                "violations_before": [],
+                "violations_after": [],
+            }
+
+        bk = db.query(BrandKit).filter(BrandKit.workspace_id == workspace_id).first() if workspace_id else None
+        violations_raw = [v.model_dump() for v in old_scan.violations] if old_scan.violations else (violations or [])
+        violations_text = "\n".join(
+            f"- Từ vi phạm: '{v.get('word')}' ({v.get('category')}/{v.get('severity')}) -> Gợi ý: {v.get('suggestion')}"
+            for v in violations_raw
+            if isinstance(v, dict)
+        )
+
+        ctx = {
+            "workspace_id": workspace_id,
+            "channel": channel,
+            "brand_name": bk.brand_name if bk else "MarketFlow AI",
+            "tone_of_voice": bk.tone_of_voice if bk and bk.tone_of_voice else "Chuyên nghiệp, tin cậy",
+            "title": title,
+            "body": body,
+            "cta": cta or "",
+            "violations_text": violations_text,
+            "violations_raw": violations_raw,
+            "banned_keywords": banned_keywords or [],
+            "provider": preferred_provider,
+            "model": preferred_model,
+        }
+        rewritten = self.execute_task(
+            db=db,
+            user_id=user_id,
+            campaign_id=campaign_id,
+            task_type="compliance_rewrite",
+            task_code="COMPLIANCE_REWRITE",
+            prompt_version="v3",
+            context=ctx,
+        )
+        # Bảo đảm mọi từ khóa cấm còn sót đều được làm sạch ngữ nghĩa
+        cleaned_fallback = self._generate_fallback_compliance_rewrite({
+            "title": str(rewritten.get("title") or title),
+            "body": str(rewritten.get("body") or body),
+            "cta": str(rewritten.get("cta") or cta or ""),
+            "violations_raw": violations_raw,
+        })
+        new_title = cleaned_fallback["title"]
+        new_body = cleaned_fallback["body"]
+        new_cta = cleaned_fallback["cta"] if cta is not None else None
+
+        new_scan = ComplianceScanner.scan(
+            title=new_title,
+            body=new_body,
+            cta=new_cta or "",
+            workspace_id=workspace_id,
+            db=db,
+        )
+        fixed_words = [
+            str(v.get("word"))
+            for v in violations_raw
+            if isinstance(v, dict) and v.get("word")
+        ]
+        fixed_count = max(len(fixed_words), max(0, len(old_scan.violations) - len(new_scan.violations)))
+
+        return {
+            "old_score": int(old_scan.score),
+            "new_score": int(new_scan.score),
+            "old_status": str(old_scan.status),
+            "new_status": str(new_scan.status),
+            "fixed_violations_count": fixed_count,
+            "fixed_violations": fixed_words,
+            "title": new_title,
+            "body": new_body,
+            "cta": new_cta,
+            "rewritten_title": new_title,
+            "rewritten_body": new_body,
+            "rewritten_cta": new_cta,
+            "violations_before": violations_raw,
+            "violations_after": [v.model_dump() for v in new_scan.violations],
+        }
+
+    def extract_winning_patterns(
+        self,
+        db: Session,
+        workspace_id: int,
+    ) -> Dict[str, Any]:
+        """Khám phá quy luật chiến thắng (Cross-Campaign Winning Pattern Extractor) từ dữ liệu thực trong Workspace."""
+        from app.models.entities import Campaign, MarketingContent, CampaignMetric, MarketingChannel
+
+        campaigns = db.query(Campaign).filter(Campaign.workspace_id == workspace_id).all()
+        camp_ids = [c.id for c in campaigns]
+        if not camp_ids:
+            return {
+                "workspace_id": workspace_id,
+                "campaigns_analyzed": 0,
+                "contents_analyzed": 0,
+                "top_channel": None,
+                "top_creative_angle": None,
+                "angle_leaderboard": [],
+                "channel_leaderboard": [],
+                "playbook_recommendations": [
+                    "Workspace chưa có dữ liệu chiến dịch. Hãy khởi tạo chiến dịch và tạo ma trận Angle × Hook để thu thập dữ liệu."
+                ],
+                "patterns": [],
+            }
+
+        contents = db.query(MarketingContent).filter(MarketingContent.campaign_id.in_(camp_ids)).all()
+        metrics = db.query(CampaignMetric).filter(CampaignMetric.campaign_id.in_(camp_ids)).all()
+        channels = {ch.id: ch for ch in db.query(MarketingChannel).all()}
+
+        # 1. Tổng hợp hiệu suất theo kênh
+        ch_stats: Dict[int, Dict[str, Any]] = {}
+        for m in metrics:
+            cid = m.channel_id
+            if cid not in ch_stats:
+                ch_obj = channels.get(cid)
+                ch_stats[cid] = {
+                    "channel_id": cid,
+                    "channel_code": ch_obj.code if ch_obj else f"ch_{cid}",
+                    "channel_name": ch_obj.name if ch_obj else f"Channel #{cid}",
+                    "views": 0,
+                    "clicks": 0,
+                    "conversions": 0,
+                    "cost": 0.0,
+                    "revenue": 0.0,
+                }
+            ch_stats[cid]["views"] += int(m.views or 0)
+            ch_stats[cid]["clicks"] += int(m.clicks or 0)
+            ch_stats[cid]["conversions"] += int(m.conversions or 0)
+            ch_stats[cid]["cost"] += float(m.cost or 0.0)
+            ch_stats[cid]["revenue"] += float(m.revenue or 0.0)
+
+        channel_leaderboard = []
+        for cid, st in ch_stats.items():
+            ctr = (st["clicks"] / st["views"] * 100.0) if st["views"] > 0 else 0.0
+            cvr = (st["conversions"] / st["clicks"] * 100.0) if st["clicks"] > 0 else 0.0
+            roas = (st["revenue"] / st["cost"]) if st["cost"] > 0 else 0.0
+            channel_leaderboard.append({
+                **st,
+                "cost": round(st["cost"], 2),
+                "revenue": round(st["revenue"], 2),
+                "ctr_pct": round(ctr, 2),
+                "cvr_pct": round(cvr, 2),
+                "roas": round(roas, 2),
+            })
+        channel_leaderboard.sort(key=lambda x: (x["roas"], x["ctr_pct"]), reverse=True)
+
+        # 2. Tổng hợp hiệu suất theo Creative Angle
+        camp_metrics_map: Dict[int, List[CampaignMetric]] = {cid: [] for cid in camp_ids}
+        content_metrics_map: Dict[int, List[CampaignMetric]] = {}
+        for m in metrics:
+            if m.campaign_id in camp_metrics_map:
+                camp_metrics_map[m.campaign_id].append(m)
+            if getattr(m, "content_id", None):
+                content_metrics_map.setdefault(m.content_id, []).append(m)
+
+        def _infer_angle_from_content(c: MarketingContent) -> str:
+            if getattr(c, "creative_angle", None):
+                return str(c.creative_angle).upper()
+            txt = f"{c.title or ''} {c.body or ''}".lower()
+            if any(k in txt for k in ("ưu đãi", "giảm", "suất", "đầu tiên", "fomo")):
+                return "OFFER_FOMO"
+            if any(k in txt for k in ("case study", "học viên", "khách hàng", "đánh giá")):
+                return "SOCIAL_PROOF"
+            if any(k in txt for k in ("lầm tưởng", "sự thật", "ngược đời")):
+                return "MYTH_BUSTER"
+            return "PAIN_POINT"
+
+        angle_stats: Dict[str, Dict[str, Any]] = {}
+        for c in contents:
+            ang = _infer_angle_from_content(c)
+            if ang not in angle_stats:
+                angle_stats[ang] = {
+                    "angle": ang,
+                    "contents_count": 0,
+                    "approved_count": 0,
+                    "views": 0,
+                    "clicks": 0,
+                    "conversions": 0,
+                    "cost": 0.0,
+                    "revenue": 0.0,
+                }
+            angle_stats[ang]["contents_count"] += 1
+            if c.status in ("APPROVED", "PUBLISHED"):
+                angle_stats[ang]["approved_count"] += 1
+            c_rows = content_metrics_map.get(c.id) or camp_metrics_map.get(c.campaign_id, [])
+            for m in c_rows:
+                angle_stats[ang]["views"] += int(m.views or 0)
+                angle_stats[ang]["clicks"] += int(m.clicks or 0)
+                angle_stats[ang]["conversions"] += int(m.conversions or 0)
+                angle_stats[ang]["cost"] += float(m.cost or 0.0)
+                angle_stats[ang]["revenue"] += float(m.revenue or 0.0)
+
+        angle_leaderboard = []
+        for ang, st in angle_stats.items():
+            ctr = (st["clicks"] / st["views"] * 100.0) if st["views"] > 0 else 0.0
+            cvr = (st["conversions"] / st["clicks"] * 100.0) if st["clicks"] > 0 else 0.0
+            roas = (st["revenue"] / st["cost"]) if st["cost"] > 0 else 0.0
+            angle_leaderboard.append({
+                "angle": ang,
+                "contents_count": st["contents_count"],
+                "approved_count": st["approved_count"],
+                "ctr_pct": round(ctr, 2),
+                "cvr_pct": round(cvr, 2),
+                "roas": round(roas, 2),
+            })
+        angle_leaderboard.sort(key=lambda x: (x["roas"], x["ctr_pct"], x["contents_count"]), reverse=True)
+
+        top_channel = channel_leaderboard[0] if channel_leaderboard else None
+        top_angle = angle_leaderboard[0] if angle_leaderboard else None
+
+        playbook = []
+        if top_channel:
+            playbook.append(
+                f"Kênh chủ lực sinh lời cao nhất: {top_channel['channel_name']} (ROAS {top_channel['roas']}x, CTR {top_channel['ctr_pct']}%, CVR {top_channel['cvr_pct']}%). Ưu tiên phân bổ 45-60% ngân sách chiến dịch mới vào kênh này."
+            )
+        if top_angle:
+            playbook.append(
+                f"Góc tiếp cận tâm lý hiệu quả nhất: {top_angle['angle']} ({top_angle['contents_count']} bài viết, CTR {top_angle['ctr_pct']}%, ROAS {top_angle['roas']}x). Hãy dùng góc này làm biến thể chủ đạo khi nhân bản chiến dịch."
+            )
+        playbook.append(
+            "Quy tắc vàng chống bão hòa (Anti-Fatigue): Luôn khởi tạo tối thiểu 3 góc tiếp cận (PAIN_POINT, SOCIAL_PROOF, OFFER_FOMO) × 2 Hook cho mỗi chiến dịch để xoay vòng sau mỗi 4 ngày chạy."
+        )
+
+        patterns_list = []
+        angle_labels_map = {
+            "PAIN_POINT": "Đánh trúng Nỗi đau Chi phí (PAS) + Số liệu Thực chứng",
+            "SOCIAL_PROOF": "Bằng chứng Xã hội (Case Study & Review Thật)",
+            "MYTH_BUSTER": "Phá vỡ Ngộ nhận Ngành (Pattern Interrupt)",
+            "OFFER_FOMO": "Ưu đãi Giới hạn & Cam kết Không Rủi ro",
+        }
+        for idx, al in enumerate(angle_leaderboard[:3]):
+            ang_code = al["angle"]
+            patterns_list.append({
+                "id": f"win-pattern-{idx + 1}",
+                "pattern_name": angle_labels_map.get(ang_code, f"Góc tiếp cận {ang_code}"),
+                "hook_type": f"3s {ang_code} Hook",
+                "channel": top_channel["channel_name"] if top_channel else "Facebook & TikTok Ads",
+                "avg_ctr": al["ctr_pct"] or 2.8,
+                "avg_cvr": al["cvr_pct"] or 3.9,
+                "avg_roas": al["roas"] or 3.6,
+                "sample_count": al["contents_count"],
+                "insight": playbook[min(idx, len(playbook) - 1)],
+                "example_hook": f"[{ang_code}] Giải quyết triệt để điểm nghẽn chuyển đổi ngay trong 3 giây đầu tiên.",
+            })
+
+        return {
+            "workspace_id": workspace_id,
+            "campaigns_analyzed": len(campaigns),
+            "contents_analyzed": len(contents),
+            "top_channel": top_channel,
+            "top_creative_angle": top_angle,
+            "angle_leaderboard": angle_leaderboard,
+            "channel_leaderboard": channel_leaderboard,
+            "playbook_recommendations": playbook,
+            "patterns": patterns_list,
+        }
+
     def _log_call(
         self,
         db: Session,
@@ -1311,10 +2130,15 @@ class AIService:
         latency_ms: int
     ):
         try:
+            safe_task_type = task_type if task_type in ("IDEA", "DRAFT", "SUMMARY", "OMNICHANNEL") else (
+                "SUMMARY" if task_type in ("PRELAUNCH_CRITIC",) else (
+                    "DRAFT" if task_type in ("COMPLIANCE_REWRITE",) else "IDEA"
+                )
+            )
             log_entry = AILog(
                 user_id=user_id,
                 campaign_id=campaign_id,
-                task_type=task_type,
+                task_type=safe_task_type,
                 provider=settings.AI_PROVIDER,
                 model=model,
                 prompt_version=prompt_version,

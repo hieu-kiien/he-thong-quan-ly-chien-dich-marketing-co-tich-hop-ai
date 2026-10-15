@@ -71,6 +71,35 @@ export interface Campaign {
   tasks?: Task[];
   budget_allocations?: BudgetAllocation[];
   kpi_targets?: KPITarget[];
+  // Real-world Marketing & Scale UX Enrichment (eliminates N+1 queries)
+  campaign_code?: string;
+  funnel_stage?: 'ToFU' | 'MoFU' | 'BoFU' | string;
+  tags?: string[];
+  contents_count?: number;
+  approved_contents_count?: number;
+  channels?: string[];
+  metrics_summary?: {
+    views: number;
+    clicks: number;
+    conversions: number;
+    cost: number;
+    revenue: number;
+    roas?: number;
+    ctr_percent?: number;
+    cvr_percent?: number;
+    cpa_avg?: number;
+    row_count?: number;
+  };
+  pacing?: {
+    budget_pct: number;
+    time_pct: number;
+    status?: 'ON_TRACK' | 'OVER_PACING' | 'UNDER_PACING' | string;
+  };
+  creative_fatigue?: {
+    is_fatigued: boolean;
+    ctr_drop_pct?: number;
+    reason?: string;
+  };
 }
 
 
@@ -823,6 +852,166 @@ export interface QuotaErrorDetail {
   retry_after?: number;
   retry_after_seconds?: number;
 }
+
+// ==============================================================================
+// ENTERPRISE MARKETING SCALE UX & AI GROWTH ENGINE TYPES
+// ==============================================================================
+
+export interface SmartImportCampaignMatch {
+  csv_campaign_name: string;
+  csv_campaign_code?: string;
+  matched_campaign_id: number | null;
+  matched_campaign_name?: string | null;
+  match_confidence?: 'EXACT' | 'FUZZY' | 'NEW' | string;
+  row_count: number;
+  channels: string[];
+  total_cost: number;
+  total_revenue: number;
+  total_conversions: number;
+  total_clicks?: number;
+  total_views?: number;
+}
+
+export interface SmartImportAnalysis {
+  status?: string;
+  detected_platform?: string;
+  total_rows: number;
+  valid_rows?: number;
+  date_range?: { start: string; end: string };
+  column_mapping: Record<string, string>;
+  detected_headers: string[];
+  campaign_matches: SmartImportCampaignMatch[];
+  matched_count: number;
+  unmatched_count: number;
+  sample_rows?: Record<string, any>[];
+  summary: {
+    total_views: number;
+    total_clicks: number;
+    total_conversions: number;
+    total_cost: number;
+    total_revenue: number;
+    estimated_roas: number;
+  };
+}
+
+export interface SmartImportCommitResult {
+  status: string;
+  imported_rows: number;
+  updated_campaigns_count: number;
+  created_campaigns_count: number;
+  replaced_seed_rows?: number;
+  campaigns?: { id: number; name: string; rows_added: number }[];
+  message?: string;
+}
+
+export interface AngleVariantItem {
+  id?: string;
+  angle_code: 'PAIN_POINT' | 'SOCIAL_PROOF' | 'MYTH_BUSTER' | 'OFFER_FOMO' | string;
+  angle_label: string;
+  psychology_driver?: string;
+  funnel_stage?: 'ToFU' | 'MoFU' | 'BoFU' | string;
+  hook_type: string;
+  hook_3s: string;
+  title: string;
+  body: string;
+  cta: string;
+  ab_hypothesis: string;
+  compliance_score: number;
+  predicted_ctr_pct?: number;
+  utm_params: string;
+}
+
+export interface AngleMatrixResponse {
+  campaign_id?: number | null;
+  product_name: string;
+  channel: string;
+  generated_at?: string;
+  angles_count: number;
+  variants_count: number;
+  variants: AngleVariantItem[];
+  strategy_summary?: string;
+}
+
+export interface PrelaunchPersonaFeedback {
+  persona_id: string;
+  persona_name: string;
+  persona_role: string;
+  avatar_emoji: string;
+  score: number;
+  verdict: 'PASS' | 'WARN' | 'FAIL' | string;
+  critique: string;
+  actionable_fix: string;
+}
+
+export interface PrelaunchCriticResponse {
+  thumb_stop_score: number;
+  conversion_friction_score: number;
+  overall_readiness_score: number;
+  verdict_label: string;
+  weakest_sentence: string;
+  weakest_reason: string;
+  rewritten_version: {
+    title: string;
+    body: string;
+    cta: string;
+    improvement_notes: string;
+  };
+  personas: PrelaunchPersonaFeedback[];
+}
+
+export interface PortfolioAnomalyItem {
+  id: string;
+  campaign_id: number;
+  campaign_name: string;
+  campaign_code?: string;
+  anomaly_type: 'OVER_PACING' | 'CREATIVE_FATIGUE' | 'ZERO_CONVERSION_BLEED' | 'HIGH_ROAS_SCALE' | string;
+  severity: 'CRITICAL' | 'WARNING' | 'OPPORTUNITY' | 'HIGH' | string;
+  title: string;
+  metric_evidence?: string;
+  metric_highlight?: string;
+  detail?: string;
+  recommended_action: string;
+  action_type?: 'PAUSE' | 'PAUSE_CAMPAIGN' | 'REDUCE_BUDGET' | 'ADJUST_BUDGET' | 'SCALE_BUDGET' | 'REFRESH_CREATIVE' | 'REBALANCE_CHANNELS' | string;
+  suggested_budget_delta_pct?: number;
+}
+
+export interface PortfolioTriageResponse {
+  anomalies: PortfolioAnomalyItem[];
+  summary: {
+    critical_count: number;
+    warning_count: number;
+    opportunity_count: number;
+    wasted_spend_estimate?: number;
+    health_score?: number;
+  };
+}
+
+export interface WinningPatternItem {
+  id?: string;
+  pattern_id?: string;
+  category?: 'HOOK' | 'CHANNEL' | 'ANGLE' | 'FUNNEL' | string;
+  title?: string;
+  pattern_name?: string;
+  hook_type?: string;
+  channel?: string;
+  insight: string;
+  avg_roas: number;
+  avg_ctr_pct?: number;
+  avg_ctr?: number;
+  avg_cvr?: number;
+  sample_size?: number;
+  sample_count?: number;
+  recommended_template?: string;
+  example_hook?: string;
+}
+
+export interface WinningPatternsResponse {
+  patterns: WinningPatternItem[];
+  top_hooks: string[];
+  best_channel: string | null;
+  playbook_summary?: string;
+}
+
 
 
 

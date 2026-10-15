@@ -12,7 +12,31 @@ from app.core.security import RoleChecker, get_current_user
 from app.services import quota
 from app.services import campaign_lifecycle
 from app.models.entities import Campaign, Product, User, CampaignMember, WorkspaceMember, Workspace, MarketingContent, CampaignBudgetAllocation, CampaignKPITarget, MarketingChannel, Task, CampaignMetric, CampaignPlanApplication
-from app.schemas.schemas import CampaignCreate, CampaignUpdate, CampaignResponse, ContentResponse, BudgetAllocationCreate, BudgetAllocationResponse, BudgetSummaryResponse, BudgetChannelSummary, KPITargetCreate, KPITargetResponse, KpiProgressResponse, KpiProgressTarget, PlanApplyRequest, PlanApplyResponse
+from app.schemas.schemas import (
+    CampaignCreate,
+    CampaignUpdate,
+    CampaignResponse,
+    ContentResponse,
+    BudgetAllocationCreate,
+    BudgetAllocationResponse,
+    BudgetSummaryResponse,
+    BudgetChannelSummary,
+    KPITargetCreate,
+    KPITargetResponse,
+    KpiProgressResponse,
+    KpiProgressTarget,
+    PlanApplyRequest,
+    PlanApplyResponse,
+    CampaignGridSummaryResponse,
+    CampaignBulkActionRequest,
+    CampaignBulkActionResponse,
+    SeedAngleMatrixRequest,
+    SeedAngleMatrixResponse,
+    PortfolioTriageResponse,
+    WinningPatternsResponse,
+)
+from app.services.ai.ai_doctor import AIDoctorEngine
+from app.services.ai.ai_service import ai_service
 
 
 router = APIRouter(prefix="/campaigns", tags=["Quản lý Chiến dịch"])
@@ -22,6 +46,7 @@ router = APIRouter(prefix="/campaigns", tags=["Quản lý Chiến dịch"])
 _CAMPAIGN_SORT_KEYS = (
     "newest", "oldest", "name_asc", "name_desc",
     "budget_asc", "budget_desc", "start_date",
+    "roas_desc", "roas_asc", "spend_desc",
 )
 
 # Khoá sắp xếp của danh sách NỘI DUNG. Khác `/_CAMPAIGN_SORT_KEYS`: bảng
@@ -36,13 +61,17 @@ _SORT_DESCRIPTION = (
 )
 
 
+def campaign_page_params(
+    page: int = Query(1, ge=1, description="Số trang, bắt đầu từ 1"),
+    page_size: int = Query(20, ge=1, le=200, description="Số bản ghi mỗi trang (1..200)"),
+) -> PageParams:
+    """Dependency phân trang riêng cho Campaign Grid mật độ cao (tối đa 200 dòng/trang)."""
+    return PageParams(page=page, page_size=page_size)
+
+
 def _accessible_workspace_ids(user: User, db: Session) -> List[int]:
     """Danh sách workspace_id mà user thực sự có quyền: workspace họ làm chủ
     (Workspace.owner_id) hoặc họ là thành viên (WorkspaceMember).
-
-    Dùng chung cho các endpoint list (campaigns/contents) để vai trò MANAGER /
-    AGENCY_MANAGER KHÔNG còn bỏ qua mọi lọc bản ghi và nhìn thấy dữ liệu của
-    tenant khác. Chỉ ADMIN mới được phạm vi toàn cục.
     """
     owned_ids = [row[0] for row in db.query(Workspace.id).filter(Workspace.owner_id == user.id).all()]
     member_ids = [
@@ -55,13 +84,7 @@ def _accessible_workspace_ids(user: User, db: Session) -> List[int]:
 
 
 def _apply_tenant_scope(query, model, user: User, db: Session, null_owner_column):
-    """Giới hạn truy vấn theo tenant thực sự của user (fail-closed).
-
-    - Bản ghi có workspace_id: chỉ thấy nếu workspace đó user là owner/member.
-    - Bản ghi legacy workspace_id IS NULL: chỉ thấy nếu chính user là người tạo
-      (null_owner_column), tránh mất dữ liệu của chính mình trong lúc dữ liệu
-      legacy chưa được migration gán workspace.
-    """
+    """Giới hạn truy vấn theo tenant thực sự của user (fail-closed)."""
     ws_ids = _accessible_workspace_ids(user, db)
     in_ws = model.workspace_id.in_(ws_ids) if ws_ids else false()
     return query.filter(
@@ -71,19 +94,12 @@ def _apply_tenant_scope(query, model, user: User, db: Session, null_owner_column
         )
     )
 
+
 def check_campaign_access(campaign: Campaign, user: User, db: Session):
-    """Xác thực phân quyền mức bản ghi và cách ly đa người thuê (Tenant Isolation):
-    - User ADMIN có quyền truy cập tất cả tài nguyên.
-    - User MANAGER / AGENCY_MANAGER:
-      + Phải là owner hoặc member của workspace chứa campaign.
-    - User MARKETER / các role khác:
-      + Phải là owner hoặc member của workspace chứa campaign.
-      + Đồng thời user chỉ được thao tác trên tài nguyên mà họ sở hữu (owner_id) HOẶC là thành viên chiến dịch (CampaignMember).
-    """
+    """Xác thực phân quyền mức bản ghi và cách ly đa người thuê (Tenant Isolation)."""
     if user.role == "ADMIN":
         return
 
-    # Kiểm tra Tenant Isolation đối với các workspace cụ thể
     if campaign.workspace_id is not None:
         ws = db.query(Workspace).filter(Workspace.id == campaign.workspace_id).first()
         is_ws_owner = ws is not None and ws.owner_id == user.id
@@ -99,8 +115,6 @@ def check_campaign_access(campaign: Campaign, user: User, db: Session):
         if user.role in ("MANAGER", "AGENCY_MANAGER"):
             return
 
-    # Fail-closed: campaign không thuộc workspace nào thì không có ranh giới tenant để tin cậy,
-    # mọi role (kể cả MANAGER/AGENCY_MANAGER) đều phải là owner hoặc CampaignMember.
     if campaign.owner_id == user.id:
         return
 
@@ -116,26 +130,14 @@ def check_campaign_access(campaign: Campaign, user: User, db: Session):
         detail="Not authorized to access this resource"
     )
 
+
 def resolve_effective_workspace_id(
     db: Session,
     current_user: User,
     workspace_id: Optional[int] = None,
     header_workspace_id: Optional[str] = None,
 ) -> Optional[int]:
-    """Chốt workspace hiện hành của request, theo thứ tự ưu tiên:
-
-    1. Query param `workspace_id` (gọi API trực tiếp, rõ ý định nhất).
-    2. Header `X-Workspace-Id` — đây là header mà frontend gửi tự động từ
-       workspace người dùng đang chọn trên `WorkspaceSwitcher` (xem
-       interceptor trong frontend/src/services/api.ts).
-    3. `None` = không lọc theo workspace cụ thể (endpoint tự áp tenant scope
-       rộng hơn, ví dụ dashboard tổng hợp).
-
-    Vì sao cần hàm dùng chung: trước đây header chỉ được `POST /campaigns` đọc.
-    Các endpoint LIST (`GET /campaigns`, `GET /contents`, ...) bỏ qua nó, nên khi
-    người dùng đổi workspace trên UI, màn hình vẫn hiện dữ liệu của workspace đầu
-    tiên — bộ chuyển workspace trông như hoạt động nhưng không có tác dụng gì.
-    """
+    """Chốt workspace hiện hành của request, theo thứ tự ưu tiên."""
     if workspace_id is not None:
         return workspace_id
     if header_workspace_id:
@@ -155,13 +157,7 @@ def get_workspace_filter(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Optional[int]:
-    """Dependency trả về workspace hiện hành, hoặc None nếu không yêu cầu lọc.
-
-    Dùng cho endpoint list. Giá trị trả về đã được kiểm tra quyền: người dùng
-    chỉ được chỉ định workspace mà mình là owner hoặc thành viên (ADMIN thì tự do).
-    Endpoint vẫn tự áp `_apply_tenant_scope` phía sau, nên thiếu hoặc sai header
-    cũng không thể vượt qua ranh giới tenant.
-    """
+    """Dependency trả về workspace hiện hành, hoặc None nếu không yêu cầu lọc."""
     target = resolve_effective_workspace_id(db, current_user, workspace_id, x_workspace_id)
     if target is None:
         return None
@@ -180,15 +176,6 @@ def get_workspace_filter(
     return target
 
 
-def _with_progress(db: Session, campaign: Campaign) -> CampaignResponse:
-    """Kèm progress_pct tính từ task; None khi chưa có task."""
-    resp = CampaignResponse.model_validate(campaign)
-    counts = db.query(Task.status).filter(Task.campaign_id == campaign.id).all()
-    done = sum(1 for (s,) in counts if (s or "").upper() in ("DONE", "COMPLETED"))
-    resp.progress_pct = campaign_lifecycle.compute_progress_pct(done, len(counts))
-    return resp
-
-
 def _bulk_task_progress(db: Session, campaign_ids: list[int]) -> dict[int, dict]:
     if not campaign_ids:
         return {}
@@ -205,19 +192,149 @@ def _bulk_task_progress(db: Session, campaign_ids: list[int]) -> dict[int, dict]
     return out
 
 
+def _bulk_content_and_metric_enrichment(
+    db: Session, campaigns: list[Campaign]
+) -> tuple[dict[int, dict], dict[int, dict]]:
+    """Tổng hợp số lượng nội dung, kênh và chỉ số kinh tế (ROAS/Pacing/Fatigue) bằng truy vấn bulk không N+1."""
+    campaign_ids = [c.id for c in campaigns]
+    if not campaign_ids:
+        return {}, {}
+
+    content_info: dict[int, dict] = {
+        cid: {"total": 0, "approved": 0, "channels": set()} for cid in campaign_ids
+    }
+    content_rows = (
+        db.query(MarketingContent.campaign_id, MarketingContent.status, MarketingChannel.code)
+        .outerjoin(MarketingChannel, MarketingContent.channel_id == MarketingChannel.id)
+        .filter(MarketingContent.campaign_id.in_(campaign_ids))
+        .all()
+    )
+    for cid, cstatus, ch_code in content_rows:
+        if cid not in content_info:
+            continue
+        content_info[cid]["total"] += 1
+        if (cstatus or "").upper() in ("APPROVED", "PUBLISHED"):
+            content_info[cid]["approved"] += 1
+        if ch_code:
+            content_info[cid]["channels"].add(str(ch_code).lower())
+
+    metric_rows = (
+        db.query(CampaignMetric)
+        .filter(CampaignMetric.campaign_id.in_(campaign_ids))
+        .all()
+    )
+    metrics_by_cid: dict[int, list[CampaignMetric]] = {cid: [] for cid in campaign_ids}
+    for m in metric_rows:
+        if m.campaign_id in metrics_by_cid:
+            metrics_by_cid[m.campaign_id].append(m)
+
+    metrics_summary_by_cid: dict[int, dict] = {}
+    for camp in campaigns:
+        cid = camp.id
+        m_list = metrics_by_cid.get(cid, [])
+        views = sum(int(m.views or 0) for m in m_list)
+        clicks = sum(int(m.clicks or 0) for m in m_list)
+        conversions = sum(int(m.conversions or 0) for m in m_list)
+        cost = sum(float(m.cost or 0.0) for m in m_list)
+        revenue = sum(float(m.revenue or 0.0) for m in m_list)
+
+        ctr = round((clicks / views * 100.0) if views > 0 else 0.0, 2)
+        cvr = round((conversions / clicks * 100.0) if clicks > 0 else 0.0, 2)
+        cpc = round((cost / clicks) if clicks > 0 else 0.0, 2)
+        cpa = round((cost / conversions) if conversions > 0 else 0.0, 2)
+        roas = round((revenue / cost) if cost > 0 else 0.0, 2)
+        budget_val = float(camp.budget or 0.0)
+        budget_util = round((cost / budget_val * 100.0) if budget_val > 0 else 0.0, 2)
+
+        pacing = AIDoctorEngine.compute_budget_pacing(camp, m_list, cost)
+        fatigue = AIDoctorEngine.detect_creative_fatigue(m_list)
+        funnel_stage = AIDoctorEngine.infer_funnel_stage(camp.objective, getattr(camp, "funnel_stage", None))
+
+        is_tofu_non_rev = (funnel_stage == "ToFU" and revenue == 0)
+        is_mofu_lead_gen = (funnel_stage == "MoFU" and revenue == 0 and conversions > 0)
+        if not m_list or (views == 0 and cost == 0):
+            health_status = "HEALTHY"
+        elif not is_tofu_non_rev and not is_mofu_lead_gen and cost > 0 and roas < 1.0:
+            health_status = "CRITICAL"
+        elif fatigue.get("fatigue_detected") or pacing.get("pacing_status") == "OVER_PACING":
+            health_status = "NEEDS_ATTENTION"
+        else:
+            health_status = "HEALTHY"
+
+        metrics_summary_by_cid[cid] = {
+            "total_views": views,
+            "total_clicks": clicks,
+            "total_conversions": conversions,
+            "total_cost": round(cost, 2),
+            "total_revenue": round(revenue, 2),
+            "ctr": ctr,
+            "cvr": cvr,
+            "cpc": cpc,
+            "cpa": cpa,
+            "roas": roas,
+            "budget_utilization_pct": budget_util,
+            "pacing_ratio": pacing.get("pacing_ratio"),
+            "pacing_status": pacing.get("pacing_status"),
+            "fatigue_detected": bool(fatigue.get("fatigue_detected", False)),
+            "health_status": health_status,
+            "funnel_stage": funnel_stage,
+        }
+
+    return content_info, metrics_summary_by_cid
+
+
 def _serialize_campaign_list(
     db: Session, campaigns: list[Campaign]
 ) -> list[CampaignResponse]:
+    if not campaigns:
+        return []
     progress = _bulk_task_progress(db, [c.id for c in campaigns])
+    content_info, metrics_info = _bulk_content_and_metric_enrichment(db, campaigns)
     result: list[CampaignResponse] = []
     for c in campaigns:
         resp = CampaignResponse.model_validate(c)
+        if not resp.funnel_stage:
+            resp.funnel_stage = AIDoctorEngine.infer_funnel_stage(c.objective, getattr(c, "funnel_stage", None))
         counts = progress.get(c.id, {"done": 0, "total": 0})
         resp.progress_pct = campaign_lifecycle.compute_progress_pct(
             counts["done"], counts["total"]
         )
+        c_meta = content_info.get(c.id, {"total": 0, "approved": 0, "channels": set()})
+        resp.contents_count = c_meta["total"]
+        resp.approved_contents_count = c_meta["approved"]
+        resp.channels = sorted(list(c_meta["channels"]))
+        resp.metrics_summary = metrics_info.get(c.id)
         result.append(resp)
     return result
+
+
+def _with_progress(db: Session, campaign: Campaign) -> CampaignResponse:
+    """Kèm progress_pct và metrics_summary tính từ bulk serializer."""
+    return _serialize_campaign_list(db, [campaign])[0]
+
+
+def _build_scoped_campaign_query(
+    db: Session,
+    current_user: User,
+    workspace_id: Optional[int],
+    include_archived: bool = False,
+):
+    query = db.query(Campaign)
+    if not include_archived:
+        query = query.filter(
+            Campaign.status.notin_(list(campaign_lifecycle.HIDDEN_FROM_DEFAULT_LIST))
+        )
+    if current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER"):
+        member_campaign_ids = db.query(CampaignMember.campaign_id).filter(CampaignMember.user_id == current_user.id)
+        query = query.filter(
+            (Campaign.owner_id == current_user.id) |
+            (Campaign.id.in_(member_campaign_ids))
+        )
+    if current_user.role != "ADMIN":
+        query = _apply_tenant_scope(query, Campaign, current_user, db, Campaign.owner_id)
+    if workspace_id is not None:
+        query = query.filter(Campaign.workspace_id == workspace_id)
+    return query
 
 
 @router.get("", response_model=Page[CampaignResponse])
@@ -225,6 +342,10 @@ def get_campaigns(
     workspace_id: Optional[int] = Depends(get_workspace_filter),
     status_filter: Optional[str] = Query(None, alias="status"),
     channel_id: Optional[int] = Query(None, alias="channel_id"),
+    channel: Optional[str] = Query(None, description="Lọc theo mã kênh (facebook, tiktok, google_ads, email, blog)"),
+    funnel_stage: Optional[str] = Query(None, description="Lọc theo tầng phễu: ToFU | MoFU | BoFU"),
+    health_filter: Optional[str] = Query(None, description="Lọc sức khỏe: over_pacing | under_pacing | fatigue | low_roas | critical | healthy"),
+    tag: Optional[str] = Query(None, description="Lọc theo tag chiến dịch"),
     start_date: Optional[str] = Query(None, alias="start_date"),
     end_date: Optional[str] = Query(None, alias="end_date"),
     search: Optional[str] = Query(None),
@@ -232,66 +353,87 @@ def get_campaigns(
         None, description="Lọc theo mục tiêu chiến dịch (khớp chuỗi con)"
     ),
     sort: str = Query("newest", description=_SORT_DESCRIPTION),
-    pagination: PageParams = Depends(page_params),
+    pagination: PageParams = Depends(campaign_page_params),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    query = db.query(Campaign)
-
-    # Soft-delete: ẩn ARCHIVED khỏi list mặc định. Client lọc status=ARCHIVED
-    # khi cần xem thùng rác thì giữ nguyên (không áp hidden filter).
     want_archived = status_filter is not None and campaign_lifecycle.normalize_status(status_filter) == "ARCHIVED"
-    if not want_archived:
-        query = query.filter(
-            Campaign.status.notin_(list(campaign_lifecycle.HIDDEN_FROM_DEFAULT_LIST))
-        )
+    query = _build_scoped_campaign_query(db, current_user, workspace_id, include_archived=want_archived)
 
-    # Phân quyền record-level: Marketer chỉ xem được chiến dịch của mình hoặc mình là thành viên
-    if current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER"):
-        member_campaign_ids = db.query(CampaignMember.campaign_id).filter(CampaignMember.user_id == current_user.id)
-        query = query.filter(
-            (Campaign.owner_id == current_user.id) |
-            (Campaign.id.in_(member_campaign_ids))
-        )
-
-    # Tenant scope fail-closed: chỉ MANAGER/AGENCY_MANAGER có filter workspace_id
-    # tường minh là chưa đủ — thiếu filter thì MỌI dòng (kể cả workspace_id NULL
-    # hay workspace tenant khác) đều lọt vào trang trả về. `_apply_tenant_scope`
-    # chốt lại tập được phép xem ở tầng query bất kể client có gửi filter hay không.
-    if current_user.role != "ADMIN":
-        query = _apply_tenant_scope(query, Campaign, current_user, db, Campaign.owner_id)
-
-    # `workspace_id` tới đây đã được phân giải + kiểm tra quyền trong dependency
-    # `get_workspace_filter` (đọc cả query param lẫn header X-Workspace-Id).
-    if workspace_id is not None:
-        query = query.filter(Campaign.workspace_id == workspace_id)
     if status_filter:
         query = query.filter(Campaign.status == status_filter)
+    if funnel_stage:
+        query = query.filter(Campaign.funnel_stage == funnel_stage.strip())
+    if tag:
+        query = query.filter(Campaign.tags_json.ilike(f"%{tag.strip()}%"))
     if start_date:
         query = query.filter(Campaign.start_date >= start_date)
     if end_date:
         query = query.filter(Campaign.end_date <= end_date)
     if channel_id:
-        from app.models.entities import MarketingContent
         query = query.join(MarketingContent).filter(MarketingContent.channel_id == channel_id).distinct()
+    if channel:
+        ch_obj = db.query(MarketingChannel).filter(MarketingChannel.code == channel.strip().lower()).first()
+        if ch_obj:
+            query = query.join(MarketingContent).filter(MarketingContent.channel_id == ch_obj.id).distinct()
+        else:
+            query = query.filter(false())
     if search:
         search_fmt = f"%{search}%"
         query = query.filter(
             (Campaign.name.ilike(search_fmt)) |
             (Campaign.objective.ilike(search_fmt)) |
-            (Campaign.audience.ilike(search_fmt))
+            (Campaign.audience.ilike(search_fmt)) |
+            (Campaign.campaign_code.ilike(search_fmt))
         )
     if objective:
-        # Trước đây bộ lọc "mục tiêu" chỉ tồn tại ở client (so khớp chuỗi con với
-        # `objective`). Đưa xuống đây để phân trang ở server cho đúng: nếu vẫn lọc
-        # ở client, mỗi trang chỉ chứa phần đã lọc của riêng trang đó và `total`
-        # của envelope sẽ mâu thuẫn với những gì người dùng thấy.
         query = query.filter(Campaign.objective.ilike(f"%{objective}%"))
 
-    # Sắp xếp sau khi lọc, trước khi cắt trang. Mỗi nhánh đều kèm `Campaign.id`
-    # làm khoá phá thế hoàn toàn: trang 2 không được trả lặp/mất dòng khi hai
-    # chiến dịch trùng giá trị sắp xếp.
     sort_key = (sort or "newest").strip().lower()
+    if sort_key not in _CAMPAIGN_SORT_KEYS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Giá trị sort không hợp lệ. Chỉ nhận: {', '.join(_CAMPAIGN_SORT_KEYS)}.",
+        )
+
+    if health_filter or sort_key in ("roas_desc", "roas_asc", "spend_desc"):
+        all_camps = query.order_by(Campaign.created_at.desc(), Campaign.id.desc()).all()
+        serialized = _serialize_campaign_list(db, all_camps)
+        if health_filter:
+            hf = health_filter.strip().lower()
+            filtered_items = []
+            for item in serialized:
+                ms = item.metrics_summary or {}
+                if hf == "over_pacing" and ms.get("pacing_status") == "OVER_PACING":
+                    filtered_items.append(item)
+                elif hf == "under_pacing" and ms.get("pacing_status") == "UNDER_PACING":
+                    filtered_items.append(item)
+                elif hf == "fatigue" and ms.get("fatigue_detected"):
+                    filtered_items.append(item)
+                elif hf == "low_roas" and (ms.get("total_cost", 0) > 0 and ms.get("roas", 0) < 1.0):
+                    filtered_items.append(item)
+                elif hf == "critical" and ms.get("health_status") == "CRITICAL":
+                    filtered_items.append(item)
+                elif hf == "healthy" and ms.get("health_status") == "HEALTHY":
+                    filtered_items.append(item)
+            serialized = filtered_items
+
+        if sort_key == "roas_desc":
+            serialized.sort(key=lambda x: ((x.metrics_summary or {}).get("roas", 0.0), x.id), reverse=True)
+        elif sort_key == "roas_asc":
+            serialized.sort(key=lambda x: ((x.metrics_summary or {}).get("roas", 0.0), x.id))
+        elif sort_key == "spend_desc":
+            serialized.sort(key=lambda x: ((x.metrics_summary or {}).get("total_cost", 0.0), x.id), reverse=True)
+
+        total = len(serialized)
+        sliced = serialized[pagination.offset : pagination.offset + pagination.page_size]
+        return Page.build(
+            items=sliced,
+            total=total,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        )
+
     order_by = {
         "newest": (Campaign.created_at.desc(), Campaign.id.desc()),
         "oldest": (Campaign.created_at.asc(), Campaign.id.asc()),
@@ -300,23 +442,224 @@ def get_campaigns(
         "budget_asc": (Campaign.budget.asc(), Campaign.id.asc()),
         "budget_desc": (Campaign.budget.desc(), Campaign.id.desc()),
         "start_date": (Campaign.start_date.desc(), Campaign.id.desc()),
-    }.get(sort_key)
-    if order_by is None:
-        # Allowlist: khoá sắp xếp là dữ liệu do client gửi, không nối thẳng vào
-        # ORDER BY. Sai thì trả 422 chứ không phải 500 do SQL.
-        raise HTTPException(
-            status_code=422,
-            detail=f"Giá trị sort không hợp lệ. Chỉ nhận: {', '.join(_CAMPAIGN_SORT_KEYS)}.",
-        )
+    }[sort_key]
 
     page = paginate_query(query.order_by(*order_by), pagination)
-    # Bulk progress (không N+1): một query task cho cả trang.
     return Page.build(
         items=_serialize_campaign_list(db, page.items),
         total=page.total,
         page=page.page,
         page_size=page.page_size,
     )
+
+
+@router.get("/grid-summary", response_model=CampaignGridSummaryResponse)
+def get_campaigns_grid_summary(
+    workspace_id: Optional[int] = Depends(get_workspace_filter),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Tổng hợp KPI toàn danh mục cho thanh điều khiển 1,000 chiến dịch (Grid Summary)."""
+    query = _build_scoped_campaign_query(db, current_user, workspace_id, include_archived=False)
+    campaigns = query.all()
+    if not campaigns:
+        return CampaignGridSummaryResponse(
+            total_campaigns=0,
+            status_counts={},
+            funnel_counts={"ToFU": 0, "MoFU": 0, "BoFU": 0},
+            total_budget=0.0,
+            total_spent=0.0,
+            total_revenue=0.0,
+            overall_roas=0.0,
+            anomaly_counts={"over_pacing": 0, "under_pacing": 0, "fatigue": 0, "low_roas": 0},
+        )
+
+    _, metrics_map = _bulk_content_and_metric_enrichment(db, campaigns)
+    status_counts: dict[str, int] = {}
+    funnel_counts: dict[str, int] = {"ToFU": 0, "MoFU": 0, "BoFU": 0}
+    anomaly_counts: dict[str, int] = {"over_pacing": 0, "under_pacing": 0, "fatigue": 0, "low_roas": 0}
+    total_budget = 0.0
+    total_spent = 0.0
+    total_revenue = 0.0
+
+    for c in campaigns:
+        st = (c.status or "DRAFT").upper()
+        status_counts[st] = status_counts.get(st, 0) + 1
+        fn = AIDoctorEngine.infer_funnel_stage(c.objective, getattr(c, "funnel_stage", None))
+        funnel_counts[fn] = funnel_counts.get(fn, 0) + 1
+        total_budget += float(c.budget or 0.0)
+
+        ms = metrics_map.get(c.id, {})
+        c_spent = float(ms.get("total_cost", 0.0))
+        c_rev = float(ms.get("total_revenue", 0.0))
+        total_spent += c_spent
+        total_revenue += c_rev
+
+        if ms.get("pacing_status") == "OVER_PACING":
+            anomaly_counts["over_pacing"] += 1
+        elif ms.get("pacing_status") == "UNDER_PACING":
+            anomaly_counts["under_pacing"] += 1
+        if ms.get("fatigue_detected"):
+            anomaly_counts["fatigue"] += 1
+        if c_spent > 0 and float(ms.get("roas", 0.0)) < 1.0 and fn == "BoFU":
+            anomaly_counts["low_roas"] += 1
+
+    overall_roas = round((total_revenue / total_spent) if total_spent > 0 else 0.0, 2)
+    return CampaignGridSummaryResponse(
+        total_campaigns=len(campaigns),
+        status_counts=status_counts,
+        funnel_counts=funnel_counts,
+        total_budget=round(total_budget, 2),
+        total_spent=round(total_spent, 2),
+        total_revenue=round(total_revenue, 2),
+        overall_roas=overall_roas,
+        anomaly_counts=anomaly_counts,
+    )
+
+
+@router.post("/bulk-action", response_model=CampaignBulkActionResponse)
+def bulk_campaign_action(
+    req: CampaignBulkActionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Thao tác hàng loạt trên nhiều chiến dịch (PAUSE, ACTIVATE, ARCHIVE, COMPLETE, DELETE, ADJUST_BUDGET, SET_DAILY_CAP, ADD_TAGS/ADD_TAG/ASSIGN_TAGS)."""
+    if current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER", "MARKETER"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Không có quyền thực hiện thao tác hàng loạt trên chiến dịch",
+        )
+
+    campaigns = db.query(Campaign).filter(Campaign.id.in_(req.campaign_ids)).all()
+    camp_map = {c.id: c for c in campaigns}
+    updated_ids: list[int] = []
+    skipped_ids: list[int] = []
+    deleted_count = 0
+    warnings: list[str] = []
+
+    for cid in req.campaign_ids:
+        camp = camp_map.get(cid)
+        if not camp:
+            skipped_ids.append(cid)
+            continue
+        try:
+            check_campaign_access(camp, current_user, db)
+        except HTTPException:
+            skipped_ids.append(cid)
+            continue
+
+        privileged = current_user.role in ("ADMIN", "MANAGER", "AGENCY_MANAGER")
+        is_owner = camp.owner_id == current_user.id
+        if not (privileged or is_owner):
+            skipped_ids.append(cid)
+            continue
+
+        if req.action == "PAUSE":
+            if camp.status in ("ACTIVE", "PLANNED", "DRAFT"):
+                camp.status = "PAUSED"
+                updated_ids.append(cid)
+            else:
+                skipped_ids.append(cid)
+        elif req.action == "ACTIVATE":
+            if camp.status in ("DRAFT", "PLANNED", "PAUSED"):
+                camp.status = "ACTIVE"
+                updated_ids.append(cid)
+            else:
+                skipped_ids.append(cid)
+        elif req.action == "COMPLETE":
+            if camp.status != "COMPLETED":
+                camp.status = "COMPLETED"
+                updated_ids.append(cid)
+            else:
+                skipped_ids.append(cid)
+        elif req.action == "ARCHIVE":
+            if camp.status != "ARCHIVED":
+                camp.status = "ARCHIVED"
+                updated_ids.append(cid)
+            else:
+                skipped_ids.append(cid)
+        elif req.action == "DELETE":
+            if camp.status == "ACTIVE":
+                camp.status = "ARCHIVED"
+                updated_ids.append(cid)
+            else:
+                db.delete(camp)
+                deleted_count += 1
+                updated_ids.append(cid)
+        elif req.action == "ADJUST_BUDGET":
+            old_b = float(camp.budget or 0.0)
+            if req.budget_mode == "SET" and req.budget_value is not None:
+                new_b = max(0.0, float(req.budget_value))
+                if old_b > 0 and ((new_b - old_b) / old_b) * 100.0 > 25.0:
+                    warnings.append(f"Chiến dịch #{cid}: Tăng ngân sách >25% có nguy cơ reset Giai đoạn Máy học (Learning Phase).")
+                camp.budget = round(new_b, 2)
+            else:
+                delta = float(
+                    req.budget_delta_pct
+                    if req.budget_delta_pct is not None
+                    else (req.budget_value or 0.0)
+                )
+                if delta > 25.0:
+                    warnings.append(f"Chiến dịch #{cid}: Tăng ngân sách +{delta:.1f}% vượt ngưỡng 25%/ngày (Learning Phase Warning).")
+                camp.budget = round(max(0.0, old_b * (1.0 + delta / 100.0)), 2)
+            updated_ids.append(cid)
+        elif req.action == "SET_DAILY_CAP":
+            camp.daily_budget_cap = float(req.daily_budget_cap or 0.0)
+            updated_ids.append(cid)
+        elif req.action in ("ADD_TAGS", "ADD_TAG", "ASSIGN_TAGS"):
+            existing_tags = []
+            try:
+                existing_tags = json.loads(camp.tags_json or "[]")
+            except Exception:
+                existing_tags = []
+            incoming = list(req.tags or [])
+            if req.tag:
+                incoming.append(req.tag)
+            merged = list(dict.fromkeys([str(t).strip() for t in (existing_tags + incoming) if str(t).strip()]))
+            camp.tags_json = json.dumps(merged, ensure_ascii=False)
+            updated_ids.append(cid)
+
+    db.commit()
+    return CampaignBulkActionResponse(
+        status="ok",
+        action=req.action,
+        requested_count=len(req.campaign_ids),
+        updated_count=len(updated_ids),
+        deleted_count=deleted_count,
+        updated_ids=updated_ids,
+        skipped_ids=skipped_ids,
+        warnings=warnings,
+        message=f"Đã thực thi '{req.action}' thành công trên {len(updated_ids)}/{len(req.campaign_ids)} chiến dịch.",
+    )
+
+
+@router.get("/portfolio-triage", response_model=PortfolioTriageResponse)
+def get_portfolio_triage(
+    workspace_id: Optional[int] = Depends(get_workspace_filter),
+    limit: int = Query(25, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Quét danh mục chiến dịch phát hiện sớm bất thường (OVER_PACING, ZERO_CONVERSION_BLEED, CREATIVE_FATIGUE, ROAS_CRITICAL)."""
+    query = _build_scoped_campaign_query(db, current_user, workspace_id, include_archived=False)
+    campaigns = query.all()
+    return AIDoctorEngine.scan_portfolio_triage(db, campaigns, limit=limit)
+
+
+@router.get("/winning-patterns", response_model=WinningPatternsResponse)
+def get_winning_patterns(
+    workspace_id: Optional[int] = Depends(get_workspace_filter),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Trích xuất quy luật chiến thắng (Top Channel, Top Creative Angle, Playbook) từ dữ liệu thực của Workspace."""
+    eff_ws_id = workspace_id
+    if eff_ws_id is None:
+        ws_ids = _accessible_workspace_ids(current_user, db)
+        eff_ws_id = ws_ids[0] if ws_ids else 1
+    data = ai_service.extract_winning_patterns(db=db, workspace_id=eff_ws_id)
+    return WinningPatternsResponse.model_validate(data)
+
 
 @router.post("", response_model=CampaignResponse, status_code=status.HTTP_201_CREATED)
 def create_campaign(
@@ -333,12 +676,10 @@ def create_campaign(
         )
     user_id = current_user.id
 
-    # Kiểm tra product_id tồn tại
     product = db.query(Product).filter(Product.id == req.product_id).first()
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sản phẩm không tồn tại")
 
-    # Phân giải workspace_id nghiêm ngặt: X-Workspace-Id hoặc req.workspace_id hoặc membership
     target_ws_id: Optional[int] = req.workspace_id
     if target_ws_id is None and x_workspace_id:
         try:
@@ -366,7 +707,6 @@ def create_campaign(
                 )
         ws_id = target_ws_id
     else:
-        # Nếu không truyền workspace_id hay header, tìm active workspace của user
         membership = db.query(WorkspaceMember).filter(WorkspaceMember.user_id == user_id).first()
         owned_ws = db.query(Workspace).filter(Workspace.owner_id == user_id).first()
         if membership:
@@ -381,11 +721,15 @@ def create_campaign(
                 detail="Người dùng không thuộc bất kỳ workspace nào hoặc không có quyền truy cập."
             )
 
-    # Hạn mức sản phẩm: số chiến dịch của workspace này. Kiểm tra SAU khi đã
-    # chốt được tenant và SAU khi đã xác thực quyền — nếu kiểm tra sớm hơn thì
-    # một workspace khác trả lỗi 429 thay vì 403, tức lộ trạng thái hạn mức của
-    # tenant mà người gọi không thuộc về.
     quota.enforce(db, quota.LIMIT_CAMPAIGNS, user=current_user, workspace_id=ws_id)
+
+    inferred_funnel = AIDoctorEngine.infer_funnel_stage(req.objective, req.funnel_stage)
+    ym_str = (req.start_date or "2026-10")[:7].replace("-", "")
+    existing_count = db.query(Campaign).filter(Campaign.workspace_id == ws_id).count()
+    auto_code = req.campaign_code or f"CMP-{ym_str}-{inferred_funnel.upper()}-{existing_count + 1:03d}"
+    tags_json_str = req.tags_json or "[]"
+    if req.tags:
+        tags_json_str = json.dumps([str(t).strip() for t in req.tags if str(t).strip()], ensure_ascii=False)
 
     campaign = Campaign(
         workspace_id=ws_id,
@@ -397,18 +741,136 @@ def create_campaign(
         start_date=req.start_date,
         end_date=req.end_date,
         budget=req.budget,
+        key_message=req.key_message,
+        primary_cta=req.primary_cta,
+        target_kpi_name=req.target_kpi_name,
+        target_kpi_value=req.target_kpi_value,
+        campaign_code=auto_code,
+        funnel_stage=inferred_funnel,
+        daily_budget_cap=req.daily_budget_cap,
+        tags_json=tags_json_str,
         status=campaign_lifecycle.assert_create_status(req.status),
     )
     db.add(campaign)
     db.commit()
     db.refresh(campaign)
 
-    # Gán người tạo làm OWNER trong campaign_members
     member = CampaignMember(campaign_id=campaign.id, user_id=user_id, member_role="OWNER")
     db.add(member)
     db.commit()
 
     return _with_progress(db, campaign)
+
+
+@router.post("/{campaign_id}/seed-angle-matrix", response_model=SeedAngleMatrixResponse, status_code=status.HTTP_201_CREATED)
+def seed_campaign_angle_matrix(
+    campaign_id: int,
+    req: SeedAngleMatrixRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Tự động khởi tạo ma trận bài viết (Psychological Angle × Hook Variants) kèm UTM chuẩn hóa cho chiến dịch."""
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
+    check_campaign_access(campaign, current_user, db)
+    if current_user.role == "CLIENT_APPROVER":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Client Approver không có quyền tạo nội dung")
+
+    product = db.query(Product).filter(Product.id == campaign.product_id).first()
+    channels = db.query(MarketingChannel).all()
+    ch_map = {c.id: c for c in channels}
+    ch_by_code = {(c.code or "").lower(): c for c in channels}
+
+    if req.channel_ids:
+        target_channel_ids = req.channel_ids
+    elif req.channel_id:
+        target_channel_ids = [req.channel_id]
+    elif req.channel_code and req.channel_code.lower() in ch_by_code:
+        target_channel_ids = [ch_by_code[req.channel_code.lower()].id]
+    else:
+        target_channel_ids = [channels[0].id] if channels else [1]
+
+    created_contents: list[MarketingContent] = []
+    angles_used: set[str] = set()
+
+    for ch_id in target_channel_ids:
+        ch_obj = ch_map.get(ch_id)
+        ch_code = ch_obj.code if ch_obj else (req.channel_code or "facebook")
+        if req.variants:
+            variants_list = req.variants
+        else:
+            matrix = ai_service.generate_angle_hook_matrix(
+                db=db,
+                user_id=current_user.id,
+                campaign_id=campaign.id,
+                context={
+                    "workspace_id": campaign.workspace_id,
+                    "campaign_name": campaign.name,
+                    "objective": campaign.objective,
+                    "funnel_stage": getattr(campaign, "funnel_stage", "BoFU"),
+                    "audience": campaign.audience,
+                    "product_name": product.name if product else campaign.name,
+                    "product_usp": product.usp if product else (campaign.key_message or "Giải pháp đột phá"),
+                    "channel": ch_code,
+                    "angles": req.angles or ["PAIN_POINT", "SOCIAL_PROOF", "OFFER_FOMO"],
+                    "hooks_per_angle": req.hooks_per_angle,
+                    "provider": req.preferred_provider,
+                    "model": req.preferred_model,
+                },
+            )
+            variants_list = matrix.get("variants", [])
+
+        for v in variants_list:
+            ang = str(v.get("angle") or v.get("angle_code") or v.get("creative_angle") or "PAIN_POINT")
+            h_type = str(v.get("hook_type") or v.get("hook_variant") or "Hook_A")
+            h_3s = str(v.get("hook_3s") or v.get("hook_text") or "")
+            raw_title = str(v.get("title") or h_3s or f"[{ang}] Biến thể A/B")[:255]
+            raw_body = str(v.get("body") or h_3s)
+            raw_cta = str(v.get("cta") or "Tìm hiểu thêm")[:255]
+            utm_p = str(v.get("utm_params") or f"?utm_source={ch_code}&utm_medium=paid_social&utm_campaign={campaign.campaign_code or campaign.id}&utm_content={ang.lower()}")
+            angles_used.add(ang)
+            mc = MarketingContent(
+                workspace_id=campaign.workspace_id,
+                campaign_id=campaign.id,
+                channel_id=ch_id,
+                created_by=current_user.id,
+                title=raw_title,
+                body=raw_body,
+                cta=raw_cta,
+                status=req.target_status,
+                version_no=1,
+                creative_angle=ang,
+                hook_variant=h_type,
+                utm_params=utm_p,
+                ai_metadata_json=json.dumps({
+                    "ab_hypothesis": v.get("ab_hypothesis", ""),
+                    "predicted_ctr_pct": v.get("predicted_ctr_pct", 2.5),
+                    "predicted_cvr_pct": v.get("predicted_cvr_pct", 3.0),
+                    "compliance_score": v.get("compliance_score", 96),
+                }, ensure_ascii=False),
+                source_ids_json='["angle_matrix"]',
+                warnings_json="[]",
+            )
+            db.add(mc)
+            created_contents.append(mc)
+
+    db.commit()
+    for mc in created_contents:
+        db.refresh(mc)
+
+    return SeedAngleMatrixResponse(
+        status="ok",
+        campaign_id=campaign.id,
+        created_count=len(created_contents),
+        content_ids=[mc.id for mc in created_contents],
+        contents=[ContentResponse.model_validate(mc) for mc in created_contents],
+        matrix_summary={
+            "channels_seeded": len(target_channel_ids),
+            "angles_used": sorted(list(angles_used)),
+            "hooks_per_angle": req.hooks_per_angle,
+        },
+    )
 
 
 @router.get("/{campaign_id}", response_model=CampaignResponse)
@@ -423,6 +885,7 @@ def get_campaign(
     check_campaign_access(campaign, current_user, db)
     return _with_progress(db, campaign)
 
+
 @router.put("/{campaign_id}", response_model=CampaignResponse)
 def update_campaign(
     campaign_id: int,
@@ -435,11 +898,16 @@ def update_campaign(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
     check_campaign_access(campaign, current_user, db)
 
-    # Allowlist tường minh: chỉ cho sửa các trường nghiệp vụ, không cho set owner_id/workspace_id.
     update_data = req.model_dump(exclude_unset=True)
+    if "tags" in update_data:
+        tags_val = update_data.pop("tags")
+        if tags_val is not None:
+            update_data["tags_json"] = json.dumps([str(t).strip() for t in tags_val if str(t).strip()], ensure_ascii=False)
+
     allowed_fields = {
         "name", "objective", "audience", "start_date", "end_date", "budget", "status",
-        "key_message", "primary_cta", "target_kpi_name", "target_kpi_value"
+        "key_message", "primary_cta", "target_kpi_name", "target_kpi_value",
+        "campaign_code", "funnel_stage", "daily_budget_cap", "tags_json",
     }
     for field, value in update_data.items():
         if field not in allowed_fields:
@@ -448,10 +916,6 @@ def update_campaign(
                 detail=f"Không được cập nhật trường '{field}'.",
             )
 
-    # Sửa `status` hoặc `budget` là hành động quản trị, không phải thao tác
-    # nội dung. Trước đây endpoint này chỉ kiểm tra "có quyền đọc campaign" nên
-    # CLIENT_APPROVER (và cả marketer không sở hữu) cũng đổi được trạng thái và
-    # ngân sách — chính là đường để tăng ngân sách 20% bằng một cú bấm.
     if ("status" in update_data or "budget" in update_data):
         privileged = current_user.role in ("ADMIN", "MANAGER", "AGENCY_MANAGER")
         is_owner = campaign.owner_id == current_user.id
@@ -469,7 +933,6 @@ def update_campaign(
     for field, value in update_data.items():
         setattr(campaign, field, value)
 
-    # Validate lại ngày nếu có cập nhật
     if campaign.end_date < campaign.start_date:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Ngày kết thúc không được trước ngày bắt đầu")
 
@@ -477,29 +940,26 @@ def update_campaign(
     db.refresh(campaign)
     return _with_progress(db, campaign)
 
+
 @router.delete("/{campaign_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_campaign(
     campaign_id: int,
     current_user: User = Depends(get_current_user),
-    user_payload=Depends(RoleChecker(allowed_roles=["MANAGER", "AGENCY_MANAGER"])), # Chỉ quản lý/agency manager mới được xóa!
+    user_payload=Depends(RoleChecker(allowed_roles=["MANAGER", "AGENCY_MANAGER"])),
     db: Session = Depends(get_db)
 ):
-    """Soft-delete: chuyển sang ARCHIVED, giữ nguyên metrics/tasks/history.
-
-    Hard-delete cascade từng làm mất lịch sử KPI. ARCHIVED ẩn khỏi list mặc
-    định; manager/ADMIN vẫn GET được theo id nếu cần đối soát.
-    """
+    """Soft-delete: chuyển sang ARCHIVED, giữ nguyên metrics/tasks/history."""
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
 
-    # Xác thực quyền truy cập đối tượng và cô lập Tenant Isolation
     check_campaign_access(campaign, current_user, db)
 
     if campaign.status != "ARCHIVED":
         campaign.status = "ARCHIVED"
         db.commit()
     return None
+
 
 @router.get("/{campaign_id}/contents", response_model=Page[ContentResponse])
 def get_campaign_contents(
@@ -511,12 +971,7 @@ def get_campaign_contents(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Nội dung của một chiến dịch, có lọc + phân trang.
-
-    Quyền truy cập được chốt ở CẤP CHIẾN DỊCH trước (`check_campaign_access`) rồi
-    mới cắt trang, nên phân trang không thể biến một lần gọi hợp lệ thành đường đọc
-    chéo tenant: `offset` chỉ dịch vị trong tập đã lọc, không mở rộng tập đó.
-    """
+    """Nội dung của một chiến dịch, có lọc + phân trang."""
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
@@ -524,12 +979,9 @@ def get_campaign_contents(
 
     query = db.query(MarketingContent).filter(MarketingContent.campaign_id == campaign_id)
 
-    # Tenant scope (fail-closed): check_campaign_access đã chặn ở cấp chiến dịch, nhưng
-    # các dòng nội dung gắn nhầm workspace khác (legacy/sai dữ liệu) vẫn phải bị lọc.
     if current_user.role != "ADMIN":
         query = _apply_tenant_scope(query, MarketingContent, current_user, db, MarketingContent.created_by)
 
-    # Record-level authorization cho Marketer
     if current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER", "CLIENT_APPROVER"):
         if campaign.owner_id != current_user.id:
             query = query.filter(MarketingContent.created_by == current_user.id)
@@ -598,11 +1050,9 @@ def update_campaign_budget_allocations(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
     check_campaign_access(campaign, current_user, db)
 
-    # Chỉ owner hoặc manager/admin được phân bổ ngân sách
     if current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER") and campaign.owner_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền phân bổ ngân sách")
 
-    # Xác thực các kênh tiếp thị tồn tại
     channel_ids = [a.channel_id for a in allocations_in]
     if channel_ids:
         existing_channels = db.query(MarketingChannel.id).filter(MarketingChannel.id.in_(channel_ids)).all()
@@ -614,8 +1064,6 @@ def update_campaign_budget_allocations(
                 detail=f"Các kênh tiếp thị không tồn tại: {list(missing)}"
             )
 
-    # Mỗi kênh chỉ được phân bổ 1 lần (DB có unique constraint — bắt sớm để
-    # trả 400 thay vì 500 IntegrityError).
     if len(set(channel_ids)) != len(channel_ids):
         dupes = sorted({cid for cid in channel_ids if channel_ids.count(cid) > 1})
         raise HTTPException(
@@ -623,7 +1071,6 @@ def update_campaign_budget_allocations(
             detail=f"Kênh bị phân bổ trùng lặp: {dupes}",
         )
 
-    # Tổng phân bổ không được vượt ngân sách chiến dịch.
     total_planned = sum(float(a.planned_amount) for a in allocations_in)
     total_budget = float(campaign.budget or 0)
     if total_planned > total_budget + 1e-6:
@@ -635,7 +1082,6 @@ def update_campaign_budget_allocations(
             ),
         )
 
-    # Xóa phân bổ cũ và tạo mới
     db.query(CampaignBudgetAllocation).filter(CampaignBudgetAllocation.campaign_id == campaign_id).delete()
 
     created_allocations = []
@@ -661,10 +1107,7 @@ def get_campaign_budget_summary(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Tổng quan ngân sách: phân bổ kế hoạch vs chi phí thực tế (từ CampaignMetric).
-
-    Trước đây không có endpoint này; UI chỉ có planned và tự bịa phần "đã chi".
-    """
+    """Tổng quan ngân sách: phân bổ kế hoạch vs chi phí thực tế (từ CampaignMetric)."""
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
@@ -674,7 +1117,6 @@ def get_campaign_budget_summary(
         CampaignBudgetAllocation.campaign_id == campaign_id
     ).all()
 
-    # Chi phí thực tế theo kênh (SUM cost từ metrics đã ghi nhận).
     spent_rows = (
         db.query(
             CampaignMetric.channel_id,
@@ -696,7 +1138,6 @@ def get_campaign_budget_summary(
         ).all()
     } if (allocations or spent_by_channel) else {}
 
-    # Gộp: kênh có phân bổ hoặc có chi phí (kênh chỉ chi mà chưa phân bổ vẫn hiện).
     all_channel_ids = sorted({a.channel_id for a in allocations} | set(spent_by_channel))
     planned_by_channel = {a.channel_id: float(a.planned_amount or 0.0) for a in allocations}
 
@@ -763,7 +1204,6 @@ def update_campaign_kpi_targets(
     if current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER") and campaign.owner_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền cập nhật KPI mục tiêu")
 
-    # metric_name unique theo DB (uq_campaign_metric_target) — bắt sớm để 400 thay vì 500.
     names = [t.metric_name.strip().lower() for t in targets_in]
     if len(set(names)) != len(names):
         dupes = sorted({n for n in names if names.count(n) > 1})
@@ -793,10 +1233,7 @@ def update_campaign_kpi_targets(
 
 
 def _kpi_actual_value(metric_name: str, agg: dict) -> Optional[float]:
-    """Map tên chỉ tiêu KPI → giá trị thực tế từ tổng hợp CampaignMetric.
-
-    Trả None khi không map được (metric lạ) → caller hiển thị "chưa đo lường".
-    """
+    """Map tên chỉ tiêu KPI → giá trị thực tế từ tổng hợp CampaignMetric."""
     name = metric_name.strip().lower()
     views = agg["views"]
     clicks = agg["clicks"]
@@ -835,11 +1272,7 @@ def get_campaign_kpi_progress(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """So sánh KPI mục tiêu với thực tế đã đo (SUM CampaignMetric).
-
-    Trước đây UI chỉ có target hoặc chỉ có actual, không chỗ nào ghép cặp
-    để biết "đạt bao nhiêu %".
-    """
+    """So sánh KPI mục tiêu với thực tế đã đo (SUM CampaignMetric)."""
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
@@ -927,37 +1360,21 @@ def apply_campaign_plan(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Áp dụng kế hoạch AI (từ POST /ai/plan hoặc POST /ai/jobs kind=plan) vào chiến dịch.
-
-    BẢO MẬT TÍNH TOÁN TOÀN BỘ TRƯỚC, GHI SAU: toàn bộ payload (kênh resolve
-    được, tổng phân bổ ≤ ngân sách, KPI không trùng, task nằm trong khoảng
-    chiến dịch) được kiểm tra xong MỚI chạm vào CSDL — request lỗi không bao
-    giờ để lại "nửa kế hoạch".
-
-    Idempotency BẮT BUỘC: khoá (campaign_id, idempotency_key) là UNIQUE ở tầng
-    CSDL nên double-click/retry không thể áp kế hoạch hai lần. Khoá lặp lại với
-    CÙNG kế hoạch -> 200 deduplicated=True (không ghi gì); khoá lặp lại với kế
-    hoạch KHÁC -> 409 (tái sử dụng khoá im lặng sẽ trả kết quả cũ mà người dùng
-    không biết).
-    """
+    """Áp dụng kế hoạch AI (từ POST /ai/plan hoặc POST /ai/jobs kind=plan) vào chiến dịch."""
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chiến dịch không tồn tại")
     check_campaign_access(campaign, current_user, db)
 
-    # Chỉ owner hoặc manager/admin được áp kế hoạch (cùng ranh giới với phân bổ
-    # ngân sách / KPI ở hai endpoint phía trên).
     if current_user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER") and campaign.owner_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền áp dụng kế hoạch cho chiến dịch")
 
-    # Task bắt buộc có workspace_id NOT NULL — fail-closed trước khi ghi gì.
     if campaign.workspace_id is None and plan_in.tasks:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Chiến dịch chưa thuộc workspace nào; không thể tạo task từ kế hoạch.",
         )
 
-    # --- Validate 1: kênh — chuẩn hoá code (lower/trim), không trùng, phải tồn tại & ACTIVE.
     normalized_codes = [b.channel_code.strip().lower() for b in plan_in.budget_split]
     if len(set(normalized_codes)) != len(normalized_codes):
         dupes = sorted({c for c in normalized_codes if normalized_codes.count(c) > 1})
@@ -976,7 +1393,6 @@ def apply_campaign_plan(
             detail=f"Các kênh tiếp thị không tồn tại hoặc không hoạt động: {missing}",
         )
 
-    # --- Validate 2: tổng phân bổ không vượt ngân sách (cùng ngưỡng với PUT budget).
     total_planned = sum(float(b.planned_amount) for b in plan_in.budget_split)
     total_budget = float(campaign.budget or 0)
     if total_planned > total_budget + 1e-6:
@@ -988,7 +1404,6 @@ def apply_campaign_plan(
             ),
         )
 
-    # --- Validate 3: KPI không trùng metric_name (DB unique campaign_id+metric_name).
     kpi_names = [t.metric_name.strip().lower() for t in plan_in.kpi_targets]
     if len(set(kpi_names)) != len(kpi_names):
         dupes = sorted({n for n in kpi_names if kpi_names.count(n) > 1})
@@ -997,13 +1412,12 @@ def apply_campaign_plan(
             detail=f"Chỉ tiêu KPI trùng lặp: {dupes}",
         )
 
-    # --- Validate 4: task nằm trong khoảng thời gian chiến dịch.
     start_d = end_d = None
     try:
         start_d = datetime.strptime(campaign.start_date, "%Y-%m-%d").date()
         end_d = datetime.strptime(campaign.end_date, "%Y-%m-%d").date()
     except (TypeError, ValueError):
-        start_d = end_d = None  # dữ liệu ngày lạ -> bỏ qua kiểm tra khoảng, due_date=None
+        start_d = end_d = None
     for t in plan_in.tasks:
         if start_d is not None and end_d is not None:
             offset = t.due_offset_days
@@ -1016,8 +1430,6 @@ def apply_campaign_plan(
                     ),
                 )
 
-    # --- Idempotency: hash CỦA KẾ HOẠCH (không gồm khoá) — khoá giống + kế hoạch
-    # giống -> dedup; khoá giống + kế hoạch khác -> 409.
     canonical = json.dumps(
         plan_in.model_dump(exclude={"idempotency_key"}),
         sort_keys=True,
@@ -1041,7 +1453,6 @@ def apply_campaign_plan(
             detail="Khóa idempotency đã được dùng cho một kế hoạch khác của chiến dịch này. Dùng khóa mới cho kế hoạch mới.",
         )
 
-    # --- Ghi (1 transaction): nhật ký + phân bổ + KPI + task.
     try:
         db.add(CampaignPlanApplication(
             campaign_id=campaign_id,
@@ -1051,8 +1462,6 @@ def apply_campaign_plan(
             applied_by=current_user.id,
         ))
 
-        # Thay TOÀN BỘ phân bổ (cùng semantics với PUT budget-allocations), dòng
-        # mới luôn gắn is_ai_estimate=True để UI gắn nhãn "Ước tính AI".
         db.query(CampaignBudgetAllocation).filter(
             CampaignBudgetAllocation.campaign_id == campaign_id
         ).delete(synchronize_session=False)
@@ -1064,8 +1473,6 @@ def apply_campaign_plan(
                 is_ai_estimate=True,
             ))
 
-        # KPI: chỉ thay khi kế hoạch ĐỀ XUẤT KPI (list rỗng = không đổi gì —
-        # tránh xoá mất chỉ tiêu người dùng đã khai tay).
         if plan_in.kpi_targets:
             db.query(CampaignKPITarget).filter(
                 CampaignKPITarget.campaign_id == campaign_id
@@ -1079,7 +1486,6 @@ def apply_campaign_plan(
                     is_ai_estimate=True,
                 ))
 
-        # Task: bỏ qua title đã tồn tại (dedup theo campaign) thay vì tạo trùng.
         existing_titles = {
             (row[0] or "").strip().lower()
             for row in db.query(Task.title).filter(Task.campaign_id == campaign_id).all()
@@ -1110,8 +1516,6 @@ def apply_campaign_plan(
 
         db.commit()
     except IntegrityError:
-        # Request song song thứ hai chèn khoá idempotency trước: rollback rồi
-        # đọc lại trạng thái để trả dedup hoặc 409 đúng bản chất xung đột.
         db.rollback()
         existing_app = (
             db.query(CampaignPlanApplication)
@@ -1134,6 +1538,3 @@ def apply_campaign_plan(
     state.tasks_created = tasks_created
     state.tasks_skipped = tasks_skipped
     return state
-
-
-

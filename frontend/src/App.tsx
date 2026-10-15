@@ -348,9 +348,9 @@ function AppContent() {
         </main>
       </div>
 
-      {/* In-Context AI Slide-over Drawer */}
+      {/* In-Context AI Slide-over Drawer (Tự động ẩn khi đang ở trang AI Studio toàn màn hình để tránh trùng lặp UI) */}
       <AIDrawer
-        isOpen={isAIDrawerOpen}
+        isOpen={isAIDrawerOpen && currentTab !== 'ai_studio'}
         onClose={() => setIsAIDrawerOpen(false)}
         campaign={selectedCampaign}
         campaigns={campaigns}

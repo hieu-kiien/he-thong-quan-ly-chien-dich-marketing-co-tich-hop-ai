@@ -1328,10 +1328,30 @@ class MarketFlowMCPServer:
             db, user, {"workspace_id": campaign.workspace_id, "channel": channel, **raw_b}
         )
 
+        from app.services.ai.ai_doctor import AIDoctorEngine, CHANNEL_BENCHMARKS
+        funnel_stage = AIDoctorEngine.infer_funnel_stage(campaign.objective, getattr(campaign, "funnel_stage", None))
+        bench = CHANNEL_BENCHMARKS.get(channel, CHANNEL_BENCHMARKS["facebook"])
+        camp_metrics = db.query(CampaignMetric).filter(CampaignMetric.campaign_id == campaign.id).all()
+        hist_views = sum(m.views for m in camp_metrics)
+        hist_clicks = sum(m.clicks for m in camp_metrics)
+        hist_conv = sum(m.conversions for m in camp_metrics)
+        base_ctr = (hist_clicks / hist_views * 100.0) if hist_views >= 100 else float(bench.get("ctr_good", 2.0))
+        base_cvr = (hist_conv / hist_clicks * 100.0) if hist_clicks >= 20 else float(bench.get("cvr_good", 3.0))
+        funnel_ctr_boost = 1.12 if funnel_stage == "ToFU" else 1.0
+        funnel_cvr_boost = 1.15 if funnel_stage == "BoFU" else (0.90 if funnel_stage == "ToFU" else 1.0)
+
+        pred_ctr_a = round(max(0.5, base_ctr * 1.18 * funnel_ctr_boost), 2)
+        pred_cvr_a = round(max(0.5, base_cvr * 1.05 * funnel_cvr_boost), 2)
+        pred_ctr_b = round(max(0.5, base_ctr * 1.06 * funnel_ctr_boost), 2)
+        pred_cvr_b = round(max(0.5, base_cvr * 1.24 * funnel_cvr_boost), 2)
+
         saved_ids: List[int] = []
         if save_to_db:
             ch_id = 2 if channel == "email" else 5 if channel == "tiktok" else 1
-            for label, fixed_item in [("A", fix_a["rewritten"]), ("B", fix_b["rewritten"])]:
+            for label, fixed_item, angle_code, hook_code, u_url in [
+                ("A", fix_a["rewritten"], "PAIN_POINT", "Hook_A", url_variant_a),
+                ("B", fix_b["rewritten"], "SOCIAL_PROOF", "Hook_B", url_variant_b),
+            ]:
                 mc = MarketingContent(
                     workspace_id=campaign.workspace_id,
                     campaign_id=campaign.id,
@@ -1340,6 +1360,9 @@ class MarketFlowMCPServer:
                     title=fixed_item["title"][:250],
                     body=fixed_item["body"],
                     cta=fixed_item["cta"][:250],
+                    creative_angle=angle_code,
+                    hook_variant=hook_code,
+                    utm_params=u_url,
                     status="AI_DRAFT",
                     version_no=1,
                 )
@@ -1352,6 +1375,7 @@ class MarketFlowMCPServer:
             "campaign_id": campaign.id,
             "campaign_name": campaign.name,
             "channel": channel,
+            "funnel_stage": funnel_stage,
             "utm_config": {
                 "utm_source": utm_source,
                 "utm_medium": utm_medium,
@@ -1363,8 +1387,8 @@ class MarketFlowMCPServer:
                     "variant_key": "A",
                     "framework": "PAS (Pain - Agitate - Solution)",
                     "hypothesis": "Đánh trực diện vào nỗi đau lãng phí ngân sách giúp tăng CTR ở nhóm khách hàng lạnh.",
-                    "predicted_ctr_pct": 3.85,
-                    "predicted_cvr_pct": 4.20,
+                    "predicted_ctr_pct": pred_ctr_a,
+                    "predicted_cvr_pct": pred_cvr_a,
                     "utm_url": url_variant_a,
                     "title": fix_a["rewritten"]["title"],
                     "body": fix_a["rewritten"]["body"],
@@ -1375,8 +1399,8 @@ class MarketFlowMCPServer:
                     "variant_key": "B",
                     "framework": "FAB (Features - Advantages - Benefits)",
                     "hypothesis": "Nhấn mạnh bằng chứng số liệu và USP giúp tối ưu tỷ lệ chốt đơn (CVR) ở nhóm khách hàng ấm.",
-                    "predicted_ctr_pct": 3.40,
-                    "predicted_cvr_pct": 5.65,
+                    "predicted_ctr_pct": pred_ctr_b,
+                    "predicted_cvr_pct": pred_cvr_b,
                     "utm_url": url_variant_b,
                     "title": fix_b["rewritten"]["title"],
                     "body": fix_b["rewritten"]["body"],
