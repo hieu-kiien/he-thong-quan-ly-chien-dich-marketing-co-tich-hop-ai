@@ -524,51 +524,6 @@ class ContentUpdate(BaseModel):
             raise ValueError("URL hình ảnh không an toàn hoặc chứa giao thức nguy hiểm")
         return v
 
-class ContentResponse(BaseModel):
-    id: int
-    workspace_id: Optional[int] = None
-    campaign_id: int
-    channel_id: int
-    created_by: int
-    title: str
-    body: str
-    cta: Optional[str] = None
-    image_url: Optional[str] = None
-    status: str
-    version_no: int
-    source_ids_json: str
-    warnings_json: Optional[str] = "[]"
-    creative_angle: Optional[str] = None
-    hook_variant: Optional[str] = None
-    utm_params: Optional[str] = None
-    ai_metadata_json: Optional[str] = "{}"
-
-    created_at: datetime
-    updated_at: datetime
-    creator: Optional[UserResponse] = None
-    channel: Optional[ChannelResponse] = None
-    model_config = ConfigDict(from_attributes=True)
-
-# --- COMPLIANCE GUARDRAIL & BRAND SAFETY (M3) ---
-class ViolationItem(BaseModel):
-    category: str = Field(..., description="'AD_POLICY' | 'BRAND_BANNED'")
-    severity: str = Field(..., description="'HIGH' | 'MEDIUM' | 'LOW'")
-    word: str = Field(..., description="Từ khóa vi phạm được phát hiện")
-    suggestion: str = Field(..., description="Đề xuất diễn đạt thay thế an toàn")
-
-class ComplianceCheckRequest(BaseModel):
-    workspace_id: Optional[int] = Field(None, description="ID Workspace chứa cấu hình Brand Kit")
-    channel: Optional[str] = Field("facebook", description="Kênh truyền thông")
-    title: Optional[str] = Field("", description="Tiêu đề nội dung cần quét")
-    body: Optional[str] = Field("", description="Thân bài viết cần quét")
-    cta: Optional[str] = Field(None, description="Lời kêu gọi hành động (tuỳ chọn)")
-
-class ComplianceCheckResponse(BaseModel):
-    status: str = Field(..., description="'PASSED' | 'WARNING' | 'VIOLATION'")
-    score: int = Field(100, ge=0, le=100, description="Điểm đánh giá tuân thủ (0-100)")
-    can_submit: bool = Field(True, description="True nếu không có vi phạm mức độ HIGH")
-    violations: List[ViolationItem] = Field(default_factory=list, description="Danh sách chi tiết các vi phạm phát hiện")
-
 # --- CONTENT REVIEW ---
 class ReviewCreate(BaseModel):
     decision: str = Field(..., pattern="^(APPROVED|REJECTED|REQUEST_CHANGES)$")
@@ -595,6 +550,65 @@ class ReviewResponse(BaseModel):
     created_at: datetime
     reviewer: Optional[UserResponse] = None
     model_config = ConfigDict(from_attributes=True)
+
+class ContentResponse(BaseModel):
+    id: int
+    workspace_id: Optional[int] = None
+    campaign_id: int
+    channel_id: int
+    created_by: int
+    title: str
+    body: str
+    cta: Optional[str] = None
+    image_url: Optional[str] = None
+    status: str
+    version_no: int
+    source_ids_json: str
+    warnings_json: Optional[str] = "[]"
+    creative_angle: Optional[str] = None
+    hook_variant: Optional[str] = None
+    utm_params: Optional[str] = None
+    ai_metadata_json: Optional[str] = "{}"
+
+    created_at: datetime
+    updated_at: datetime
+    creator: Optional[UserResponse] = None
+    channel: Optional[ChannelResponse] = None
+    reviews: List[ReviewResponse] = Field(default_factory=list)
+    rejection_reason: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="after")
+    def populate_rejection_reason(self):
+        if not self.rejection_reason and self.reviews:
+            rejected = [
+                r for r in self.reviews
+                if r.decision in ("REJECTED", "REQUEST_CHANGES") and r.reason
+            ]
+            if rejected:
+                rejected_sorted = sorted(rejected, key=lambda r: r.created_at, reverse=True)
+                self.rejection_reason = rejected_sorted[0].reason
+        return self
+
+# --- COMPLIANCE GUARDRAIL & BRAND SAFETY (M3) ---
+class ViolationItem(BaseModel):
+    category: str = Field(..., description="'AD_POLICY' | 'BRAND_BANNED'")
+    severity: str = Field(..., description="'HIGH' | 'MEDIUM' | 'LOW'")
+    word: str = Field(..., description="Từ khóa vi phạm được phát hiện")
+    suggestion: str = Field(..., description="Đề xuất diễn đạt thay thế an toàn")
+
+class ComplianceCheckRequest(BaseModel):
+    workspace_id: Optional[int] = Field(None, description="ID Workspace chứa cấu hình Brand Kit")
+    channel: Optional[str] = Field("facebook", description="Kênh truyền thông")
+    title: Optional[str] = Field("", description="Tiêu đề nội dung cần quét")
+    body: Optional[str] = Field("", description="Thân bài viết cần quét")
+    cta: Optional[str] = Field(None, description="Lời kêu gọi hành động (tuỳ chọn)")
+
+class ComplianceCheckResponse(BaseModel):
+    status: str = Field(..., description="'PASSED' | 'WARNING' | 'VIOLATION'")
+    score: int = Field(100, ge=0, le=100, description="Điểm đánh giá tuân thủ (0-100)")
+    can_submit: bool = Field(True, description="True nếu không có vi phạm mức độ HIGH")
+    violations: List[ViolationItem] = Field(default_factory=list, description="Danh sách chi tiết các vi phạm phát hiện")
 
 # --- MARKETING SCHEDULE ---
 class ScheduleCreate(BaseModel):

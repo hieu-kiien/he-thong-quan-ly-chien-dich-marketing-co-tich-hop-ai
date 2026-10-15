@@ -178,6 +178,11 @@ export const Campaigns: React.FC<CampaignsProps> = ({
   const [isRecordingMetric, setIsRecordingMetric] = useState<boolean>(false);
 
   const [isManualComposerOpen, setIsManualComposerOpen] = useState<boolean>(false);
+  const [editingDrawerContentId, setEditingDrawerContentId] = useState<number | null>(null);
+  const [editingDrawerContentForm, setEditingDrawerContentForm] = useState({ title: '', body: '', cta: '' });
+  const [rejectingDrawerContentId, setRejectingDrawerContentId] = useState<number | null>(null);
+  const [rejectingDrawerReason, setRejectingDrawerReason] = useState<string>('');
+  const [isProcessingDrawerContent, setIsProcessingDrawerContent] = useState<boolean>(false);
 
   // 4-Step Creation Wizard Modal
   const [isWizardOpen, setIsWizardOpen] = useState<boolean>(false);
@@ -714,17 +719,128 @@ export const Campaigns: React.FC<CampaignsProps> = ({
     }
   };
 
-  // Quick Approve creative inside Drawer
-  const handleApproveDrawerContent = async (contentId: number) => {
+  // Luồng xử lý mẫu quảng cáo ngay trong Ngăn kéo Chiến dịch:
+  // Hỗ trợ đầy đủ: Sửa bài (khi người tạo chưa ưng hoặc Sếp trả về), Xóa nháp, Gửi duyệt, Sếp Trả bài kèm lý do, Sếp Phê duyệt.
+  const handleSubmitDrawerContent = async (contentId: number) => {
+    if (isProcessingDrawerContent) return;
+    setIsProcessingDrawerContent(true);
     try {
-      await contentApi.approve(contentId);
-      toast.success('Đã phê duyệt mẫu quảng cáo (APPROVED)! Sẵn sàng phân phối.');
+      await contentApi.submitForReview(contentId);
+      toast.success('Đã gửi bài viết sang trạng thái Chờ Sếp duyệt (IN_REVIEW)!');
+      if (selectedDrawerCampaign) await loadDrawerDetails(selectedDrawerCampaign.id);
+      if (onRefreshData) onRefreshData();
+    } catch (e) {
+      toast.error(getApiErrorMessage(e), 'Không thể gửi duyệt mẫu quảng cáo');
+    } finally {
+      setIsProcessingDrawerContent(false);
+    }
+  };
+
+  const handleApproveDrawerContent = async (item: MarketingContent) => {
+    if (isProcessingDrawerContent) return;
+    setIsProcessingDrawerContent(true);
+    try {
+      if (item.status === 'DRAFT' || item.status === 'AI_DRAFT' || item.status === 'REJECTED') {
+        await contentApi.submitForReview(item.id);
+      }
+      await contentApi.approve(item.id);
+      toast.success('Đã phê duyệt mẫu quảng cáo (ĐÃ DUYỆT)! Sẵn sàng chạy.');
       if (selectedDrawerCampaign) {
-        loadDrawerDetails(selectedDrawerCampaign.id);
+        await loadDrawerDetails(selectedDrawerCampaign.id);
+        await loadData();
+      }
+      if (onRefreshData) onRefreshData();
+    } catch (e: any) {
+      const status = e?.response?.status;
+      const msg = getApiErrorMessage(e);
+      if (status === 403 && msg.includes('chính mình tạo')) {
+        toast.info(
+          'Bài viết đã được chuyển sang CHỜ DUYỆT. Theo quy tắc kiểm soát chéo (4-Mắt), người tạo bài không tự duyệt bài của mình — hãy dùng tài khoản Duyệt bài (approver@gmail.com) để bấm Duyệt.',
+          'Đã gửi sang hàng đợi Duyệt chéo'
+        );
+        if (selectedDrawerCampaign) await loadDrawerDetails(selectedDrawerCampaign.id);
+      } else {
+        toast.error(msg, 'Không thể duyệt mẫu quảng cáo');
+      }
+    } finally {
+      setIsProcessingDrawerContent(false);
+    }
+  };
+
+  const handleRejectDrawerContent = async (content: MarketingContent) => {
+    if (isProcessingDrawerContent) return;
+    if (rejectingDrawerReason.trim().length < 3) {
+      toast.warning('Vui lòng ghi rõ lý do không ưng / yêu cầu sửa lại (tối thiểu 3 ký tự) để nhân viên biết chỗ sửa.');
+      return;
+    }
+    setIsProcessingDrawerContent(true);
+    try {
+      if (content.status === 'DRAFT' || content.status === 'AI_DRAFT') {
+        await contentApi.submitForReview(content.id);
+      }
+      await contentApi.reject(content.id, rejectingDrawerReason.trim());
+      toast.success('Đã trả bài kèm yêu cầu chỉnh sửa cho người tạo!');
+      setRejectingDrawerContentId(null);
+      setRejectingDrawerReason('');
+      if (selectedDrawerCampaign) {
+        await loadDrawerDetails(selectedDrawerCampaign.id);
+        await loadData();
       }
       if (onRefreshData) onRefreshData();
     } catch (e) {
-      toast.error(getApiErrorMessage(e), 'Không thể duyệt mẫu quảng cáo');
+      toast.error(getApiErrorMessage(e), 'Không thể trả bài');
+    } finally {
+      setIsProcessingDrawerContent(false);
+    }
+  };
+
+  const handleSaveDrawerContentEdit = async (contentId: number, andSubmit: boolean) => {
+    if (isProcessingDrawerContent) return;
+    if (!editingDrawerContentForm.title.trim() || !editingDrawerContentForm.body.trim()) {
+      toast.warning('Tiêu đề và nội dung bài quảng cáo không được để trống.');
+      return;
+    }
+    setIsProcessingDrawerContent(true);
+    try {
+      await contentApi.update(contentId, {
+        title: editingDrawerContentForm.title.trim(),
+        body: editingDrawerContentForm.body.trim(),
+        cta: editingDrawerContentForm.cta.trim() || undefined,
+      });
+      if (andSubmit) {
+        await contentApi.submitForReview(contentId);
+        toast.success('Đã lưu bản sửa mới và gửi lại cho Sếp duyệt!');
+      } else {
+        toast.success('Đã lưu nội dung chỉnh sửa!');
+      }
+      setEditingDrawerContentId(null);
+      if (selectedDrawerCampaign) {
+        await loadDrawerDetails(selectedDrawerCampaign.id);
+        await loadData();
+      }
+      if (onRefreshData) onRefreshData();
+    } catch (e) {
+      toast.error(getApiErrorMessage(e), 'Lỗi khi lưu nội dung chỉnh sửa');
+    } finally {
+      setIsProcessingDrawerContent(false);
+    }
+  };
+
+  const handleDeleteDrawerContent = async (contentId: number) => {
+    if (isProcessingDrawerContent) return;
+    setIsProcessingDrawerContent(true);
+    try {
+      await contentApi.bulkReview({ content_ids: [contentId], action: 'DELETE' });
+      toast.success('Đã xóa bản nháp không ưng ý.');
+      if (selectedDrawerCampaign) {
+        await loadDrawerDetails(selectedDrawerCampaign.id);
+        await loadData();
+      }
+      if (onRefreshData) onRefreshData();
+    } catch (e) {
+      toast.error(getApiErrorMessage(e), 'Không thể xóa mẫu quảng cáo này');
+    } finally {
+      setIsProcessingDrawerContent(false);
     }
   };
 
@@ -2442,67 +2558,312 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         </div>
                       </div>
                     ) : (
-                      drawerContents.map((item) => (
-                        <div key={item.id} className="bg-white rounded-2xl border border-slate-200 p-4 shadow space-y-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-bold text-[10px] uppercase">
-                                {item.channel?.name || (item.channel_id === 1 ? 'Facebook Ad' : item.channel_id === 2 ? 'TikTok Script' : 'Email')}
-                              </span>
-                              <span className="text-xs font-bold text-slate-900 line-clamp-1">
-                                {item.title}
+                      drawerContents.map((item) => {
+                        const isEditing = editingDrawerContentId === item.id;
+                        const isRejecting = rejectingDrawerContentId === item.id;
+                        const statusLabel =
+                          item.status === 'APPROVED'
+                            ? 'ĐÃ DUYỆT'
+                            : item.status === 'IN_REVIEW'
+                              ? 'CHỜ SẾP DUYỆT'
+                              : item.status === 'REJECTED'
+                                ? 'CẦN SỬA LẠI (SẾP TRẢ VỀ)'
+                                : item.status === 'AI_DRAFT'
+                                  ? 'NHÁP AI'
+                                  : 'BẢN NHÁP';
+                        const statusColor =
+                          item.status === 'APPROVED'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : item.status === 'IN_REVIEW'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : item.status === 'REJECTED'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                : 'bg-slate-100 text-slate-600 border border-slate-200';
+
+                        return (
+                          <div
+                            key={item.id}
+                            className={`bg-white rounded-2xl border p-4 shadow space-y-3 transition-all ${
+                              item.status === 'REJECTED' ? 'border-rose-300 ring-1 ring-rose-100' : 'border-slate-200'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-bold text-[10px] uppercase">
+                                  {item.channel?.name || (item.channel_id === 1 ? 'Facebook Ad' : item.channel_id === 2 ? 'TikTok Script' : 'Email')}
+                                </span>
+                                <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-mono text-[10px] font-bold">
+                                  v{item.version_no || 1}
+                                </span>
+                                {!isEditing && (
+                                  <span className="text-xs font-bold text-slate-900 line-clamp-1">
+                                    {item.title}
+                                  </span>
+                                )}
+                              </div>
+
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${statusColor}`}>
+                                {statusLabel}
                               </span>
                             </div>
 
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              item.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                              item.status === 'IN_REVIEW' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
-                              'bg-slate-100 text-slate-600'
-                            }`}>
-                              {item.status === 'APPROVED' ? 'ĐÃ DUYỆT' : item.status === 'IN_REVIEW' ? 'CHỜ DUYỆT' : 'NHÁP'}
-                            </span>
-                          </div>
-
-                          <div className="text-xs text-slate-700 whitespace-pre-line bg-slate-50 p-3 rounded-xl border border-slate-100 max-h-40 overflow-y-auto font-sans leading-relaxed">
-                            {item.body}
-                          </div>
-
-                          {item.cta && (
-                            <div className="text-xs font-medium text-indigo-700 flex items-center gap-1.5">
-                              <span className="font-semibold text-slate-500">Kêu gọi hành động:</span>
-                              <span className="bg-indigo-50 px-2 py-0.5 rounded-md">{item.cta}</span>
-                            </div>
-                          )}
-
-                          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                const ok = await copyToClipboardWithFormatting(
-                                  `${item.title}\n\n${item.body}\n\nCTA: ${item.cta || ''}`
-                                );
-                                if (ok) toast.success('Đã sao chép nội dung mẫu quảng cáo!');
-                                else toast.error('Trình duyệt từ chối ghi vào clipboard');
-                              }}
-                              aria-label={`Sao chép nội dung mẫu quảng cáo: ${item.title}`}
-                              className="text-slate-500 hover:text-slate-800 flex items-center gap-1 font-semibold"
-                            >
-                              <Copy className="w-3.5 h-3.5" />
-                              <span>Sao chép</span>
-                            </button>
-
-                            {(isManager || userRole === 'CLIENT_APPROVER') && item.status !== 'APPROVED' && (
-                              <button
-                                onClick={() => handleApproveDrawerContent(item.id)}
-                                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] flex items-center gap-1"
-                              >
-                                <CheckCircle2 className="w-3 h-3" />
-                                <span>Phê duyệt đăng</span>
-                              </button>
+                            {/* Hộp phản hồi từ Sếp / Quản lý khi bài bị trả về */}
+                            {item.rejection_reason && (
+                              <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-900 flex items-start gap-2">
+                                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                                <div className="space-y-1 flex-1">
+                                  <p className="font-bold text-rose-800">
+                                    Yêu cầu chỉnh sửa từ Sếp / Quản lý:
+                                  </p>
+                                  <p className="text-rose-700 whitespace-pre-line leading-relaxed">
+                                    &ldquo;{item.rejection_reason}&rdquo;
+                                  </p>
+                                </div>
+                              </div>
                             )}
+
+                            {/* Chế độ chỉnh sửa trực tiếp khi người tạo hoặc sếp chưa ưng */}
+                            {isEditing ? (
+                              <div className="space-y-2.5 bg-indigo-50/40 p-3 rounded-xl border border-indigo-200">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                                    Tiêu đề / Hook mở đầu
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={editingDrawerContentForm.title}
+                                    onChange={(e) =>
+                                      setEditingDrawerContentForm((prev) => ({ ...prev, title: e.target.value }))
+                                    }
+                                    className="w-full px-3 py-1.5 text-xs font-semibold bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                                    Nội dung chi tiết (Sửa câu chữ chưa ưng hoặc viết lại theo góp ý của Sếp)
+                                  </label>
+                                  <textarea
+                                    rows={5}
+                                    value={editingDrawerContentForm.body}
+                                    onChange={(e) =>
+                                      setEditingDrawerContentForm((prev) => ({ ...prev, body: e.target.value }))
+                                    }
+                                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none leading-relaxed"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                                    Nút kêu gọi hành động (CTA)
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={editingDrawerContentForm.cta}
+                                    onChange={(e) =>
+                                      setEditingDrawerContentForm((prev) => ({ ...prev, cta: e.target.value }))
+                                    }
+                                    placeholder="VD: Nhận ưu đãi 30% ngay..."
+                                    className="w-full px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                  />
+                                </div>
+                                <div className="flex items-center justify-end gap-2 pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingDrawerContentId(null)}
+                                    className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-lg"
+                                  >
+                                    Hủy
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={isProcessingDrawerContent}
+                                    onClick={() => handleSaveDrawerContentEdit(item.id, false)}
+                                    className="px-3 py-1.5 text-xs font-bold bg-white text-slate-800 border border-slate-300 hover:bg-slate-50 rounded-lg"
+                                  >
+                                    Lưu nháp (v{(item.version_no || 1) + 1})
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={isProcessingDrawerContent}
+                                    onClick={() => handleSaveDrawerContentEdit(item.id, true)}
+                                    className="px-3 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-1"
+                                  >
+                                    <ArrowUpRight className="w-3.5 h-3.5" />
+                                    <span>Lưu & Gửi Sếp duyệt lại</span>
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="text-xs text-slate-700 whitespace-pre-line bg-slate-50 p-3 rounded-xl border border-slate-100 max-h-44 overflow-y-auto font-sans leading-relaxed">
+                                  {item.body}
+                                </div>
+
+                                {item.cta && (
+                                  <div className="text-xs font-medium text-indigo-700 flex items-center gap-1.5">
+                                    <span className="font-semibold text-slate-500">Kêu gọi hành động:</span>
+                                    <span className="bg-indigo-50 px-2 py-0.5 rounded-md">{item.cta}</span>
+                                  </div>
+                                )}
+                              </>
+                            )}
+
+                            {/* Hộp nhập lý do trả bài dành cho Sếp / Quản lý khi không ưng */}
+                            {isRejecting && (
+                              <div className="bg-rose-50/70 border border-rose-200 rounded-xl p-3 space-y-2">
+                                <label className="block text-[11px] font-bold text-rose-900">
+                                  Sếp / Quản lý chưa ưng điểm nào? Ghi chú để nhân viên sửa lại:
+                                </label>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {[
+                                    'Hook 3 giây đầu chưa đủ thu hút, cần nhấn mạnh nỗi đau khách hàng',
+                                    'Giọng văn hơi cứng, cần tự nhiên và gần gũi hơn',
+                                    'Thiếu con số ưu đãi cụ thể và cam kết bảo hành',
+                                    'CTA chưa thúc đẩy hành động ngay, đổi CTA mạnh hơn'
+                                  ].map((preset) => (
+                                    <button
+                                      key={preset}
+                                      type="button"
+                                      onClick={() =>
+                                        setRejectingDrawerReason((prev) =>
+                                          prev ? `${prev}; ${preset}` : preset
+                                        )
+                                      }
+                                      className="text-[10px] bg-white hover:bg-rose-100 text-rose-800 border border-rose-200 px-2 py-0.5 rounded-md font-medium transition-colors"
+                                    >
+                                      + {preset}
+                                    </button>
+                                  ))}
+                                </div>
+                                <textarea
+                                  rows={2}
+                                  value={rejectingDrawerReason}
+                                  onChange={(e) => setRejectingDrawerReason(e.target.value)}
+                                  placeholder="Nhập yêu cầu chỉnh sửa cụ thể (VD: Đổi tiêu đề nhấn vào ưu đãi 30%, bớt từ ngữ sáo rỗng)..."
+                                  className="w-full px-3 py-2 text-xs bg-white border border-rose-300 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none"
+                                />
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setRejectingDrawerContentId(null);
+                                      setRejectingDrawerReason('');
+                                    }}
+                                    className="px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-lg"
+                                  >
+                                    Đóng
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={isProcessingDrawerContent}
+                                    onClick={() => handleRejectDrawerContent(item)}
+                                    className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs"
+                                  >
+                                    Xác nhận trả bài yêu cầu sửa
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Thanh công cụ xử lý cho cả Người Tạo và Sếp Duyệt */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const ok = await copyToClipboardWithFormatting(
+                                      `${item.title}\n\n${item.body}\n\nCTA: ${item.cta || ''}`
+                                    );
+                                    if (ok) toast.success('Đã sao chép nội dung mẫu quảng cáo!');
+                                    else toast.error('Trình duyệt từ chối ghi vào clipboard');
+                                  }}
+                                  aria-label={`Sao chép nội dung mẫu quảng cáo: ${item.title}`}
+                                  className="text-slate-500 hover:text-slate-800 flex items-center gap-1 font-semibold"
+                                >
+                                  <Copy className="w-3.5 h-3.5" />
+                                  <span>Sao chép</span>
+                                </button>
+
+                                {!isEditing && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingDrawerContentId(item.id);
+                                      setEditingDrawerContentForm({
+                                        title: item.title || '',
+                                        body: item.body || '',
+                                        cta: item.cta || '',
+                                      });
+                                      setRejectingDrawerContentId(null);
+                                    }}
+                                    className="text-indigo-600 hover:text-indigo-800 flex items-center gap-1 font-bold"
+                                  >
+                                    <PencilLine className="w-3.5 h-3.5" />
+                                    <span>{item.status === 'REJECTED' ? 'Sửa theo ý Sếp' : 'Sửa câu chữ'}</span>
+                                  </button>
+                                )}
+
+                                {item.status !== 'APPROVED' && (
+                                  <button
+                                    type="button"
+                                    disabled={isProcessingDrawerContent}
+                                    onClick={() => handleDeleteDrawerContent(item.id)}
+                                    className="text-slate-400 hover:text-rose-600 flex items-center gap-1 font-semibold"
+                                    title="Xóa bản nháp không ưng ý này"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Bỏ nháp</span>
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {/* Nút Gửi Sếp Duyệt dành cho Marketer khi bản nháp đã ưng ý */}
+                                {(item.status === 'DRAFT' || item.status === 'AI_DRAFT' || item.status === 'REJECTED') && (
+                                  <button
+                                    type="button"
+                                    disabled={isProcessingDrawerContent}
+                                    onClick={() => handleSubmitDrawerContent(item.id)}
+                                    className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg font-bold text-[11px] flex items-center gap-1"
+                                  >
+                                    <ArrowUpRight className="w-3 h-3" />
+                                    <span>{item.status === 'REJECTED' ? 'Gửi duyệt lại' : 'Gửi Sếp duyệt'}</span>
+                                  </button>
+                                )}
+
+                                {/* Nút Yêu cầu sửa lại (Trả bài) dành cho Sếp / Quản lý */}
+                                {(isManager || userRole === 'CLIENT_APPROVER') && item.status !== 'REJECTED' && (
+                                  <button
+                                    type="button"
+                                    disabled={isProcessingDrawerContent}
+                                    onClick={() => {
+                                      setRejectingDrawerContentId(isRejecting ? null : item.id);
+                                      setRejectingDrawerReason(item.rejection_reason || '');
+                                      setEditingDrawerContentId(null);
+                                    }}
+                                    className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg font-bold text-[11px] flex items-center gap-1"
+                                  >
+                                    <AlertTriangle className="w-3 h-3" />
+                                    <span>Chưa ưng / Yêu cầu sửa</span>
+                                  </button>
+                                )}
+
+                                {/* Nút Phê duyệt đăng dành cho Sếp / Quản lý */}
+                                {(isManager || userRole === 'CLIENT_APPROVER') && item.status !== 'APPROVED' && (
+                                  <button
+                                    type="button"
+                                    disabled={isProcessingDrawerContent}
+                                    onClick={() => handleApproveDrawerContent(item)}
+                                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] flex items-center gap-1"
+                                  >
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span>Phê duyệt đăng</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 )}
@@ -3441,53 +3802,220 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         </button>
                       </div>
 
-                      {/* Creative Preview Box */}
-                      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs space-y-3 max-h-72 overflow-y-auto">
+                      {/* Creative Preview & Inline Edit Box (Cho phép sửa trực tiếp nếu chưa ưng câu chữ AI viết) */}
+                      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs space-y-3 max-h-80 overflow-y-auto">
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 pb-1 border-b border-slate-200/80">
+                          <span className="font-semibold text-indigo-700 flex items-center gap-1">
+                            <PencilLine className="w-3.5 h-3.5" />
+                            Chưa ưng câu chữ AI viết? Bạn có thể gõ sửa trực tiếp ngay bên dưới hoặc bấm &ldquo;Sinh lại&rdquo;:
+                          </span>
+                        </div>
+
                         {activeCreativeTab === 'facebook' && generatedCreatives.facebook && (
-                          <div className="space-y-2">
-                            <div className="font-bold text-slate-900 text-sm">
-                              {generatedCreatives.facebook.headline || generatedCreatives.facebook.title}
+                          <div className="space-y-2.5">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                                Tiêu đề thu hút (Headline)
+                              </label>
+                              <input
+                                type="text"
+                                value={generatedCreatives.facebook.headline || generatedCreatives.facebook.title || ''}
+                                onChange={(e) =>
+                                  setGeneratedCreatives((prev) =>
+                                    prev && prev.facebook
+                                      ? {
+                                          ...prev,
+                                          facebook: {
+                                            ...prev.facebook,
+                                            headline: e.target.value,
+                                            title: e.target.value,
+                                          },
+                                        }
+                                      : prev
+                                  )
+                                }
+                                className="w-full px-3 py-1.5 font-bold text-slate-900 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                              />
                             </div>
-                            <div className="text-slate-700 whitespace-pre-line leading-relaxed">
-                              {generatedCreatives.facebook.primary_text || generatedCreatives.facebook.body}
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                                Nội dung bài đăng Facebook Ad
+                              </label>
+                              <textarea
+                                rows={4}
+                                value={generatedCreatives.facebook.primary_text || generatedCreatives.facebook.body || ''}
+                                onChange={(e) =>
+                                  setGeneratedCreatives((prev) =>
+                                    prev && prev.facebook
+                                      ? {
+                                          ...prev,
+                                          facebook: {
+                                            ...prev.facebook,
+                                            primary_text: e.target.value,
+                                            body: e.target.value,
+                                          },
+                                        }
+                                      : prev
+                                  )
+                                }
+                                className="w-full px-3 py-2 text-slate-700 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none leading-relaxed"
+                              />
                             </div>
-                            <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[11px] font-semibold">
-                              <span className="text-slate-500">Nút kêu gọi:</span>
-                              <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md font-bold">
-                                {generatedCreatives.facebook.cta}
-                              </span>
+                            <div className="flex items-center gap-2 pt-1">
+                              <span className="text-slate-500 font-semibold shrink-0">Nút kêu gọi (CTA):</span>
+                              <input
+                                type="text"
+                                value={generatedCreatives.facebook.cta || ''}
+                                onChange={(e) =>
+                                  setGeneratedCreatives((prev) =>
+                                    prev && prev.facebook
+                                      ? {
+                                          ...prev,
+                                          facebook: {
+                                            ...prev.facebook,
+                                            cta: e.target.value,
+                                          },
+                                        }
+                                      : prev
+                                  )
+                                }
+                                className="flex-1 px-2.5 py-1 bg-white border border-blue-200 text-blue-800 rounded-lg font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                              />
                             </div>
                           </div>
                         )}
 
                         {activeCreativeTab === 'tiktok' && generatedCreatives.tiktok && (
                           <div className="space-y-3">
-                            <div className="p-2.5 bg-rose-50 border border-rose-100 rounded-xl text-rose-900 font-bold">
-                              🎯 Hook 3s: {generatedCreatives.tiktok.hook_3s}
+                            <div>
+                              <label className="block text-[10px] font-bold text-rose-800 uppercase mb-1">
+                                🎯 Câu Hook 3 giây đầu giữ chân người xem
+                              </label>
+                              <input
+                                type="text"
+                                value={generatedCreatives.tiktok.hook_3s || ''}
+                                onChange={(e) =>
+                                  setGeneratedCreatives((prev) =>
+                                    prev && prev.tiktok
+                                      ? {
+                                          ...prev,
+                                          tiktok: {
+                                            ...prev.tiktok,
+                                            hook_3s: e.target.value,
+                                          },
+                                        }
+                                      : prev
+                                  )
+                                }
+                                className="w-full px-3 py-1.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-900 font-bold outline-none focus:ring-2 focus:ring-rose-500"
+                              />
                             </div>
                             {generatedCreatives.tiktok.scenes?.map((s, idx) => (
-                              <div key={idx} className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
+                              <div key={idx} className="p-3 bg-white border border-slate-200 rounded-xl space-y-1.5">
                                 <div className="font-bold text-slate-900 flex justify-between">
                                   <span>Cảnh {s.scene_number || s.scene}</span>
                                   <span className="font-mono text-slate-600 font-semibold">{s.duration_seconds || '0-4s'}</span>
                                 </div>
                                 <div className="text-slate-600">📹 Hình ảnh: {s.visual_action || s.visual}</div>
-                                <div className="text-slate-900 font-medium">🗣️ Lời thoại: {s.voiceover_script || s.voiceover}</div>
+                                <div>
+                                  <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">🗣️ Lời thoại:</label>
+                                  <input
+                                    type="text"
+                                    value={s.voiceover_script || s.voiceover || ''}
+                                    onChange={(e) =>
+                                      setGeneratedCreatives((prev) => {
+                                        if (!prev?.tiktok?.scenes) return prev;
+                                        const nextScenes = [...prev.tiktok.scenes];
+                                        nextScenes[idx] = {
+                                          ...nextScenes[idx],
+                                          voiceover_script: e.target.value,
+                                          voiceover: e.target.value,
+                                        };
+                                        return {
+                                          ...prev,
+                                          tiktok: {
+                                            ...prev.tiktok,
+                                            scenes: nextScenes,
+                                          },
+                                        };
+                                      })
+                                    }
+                                    className="w-full px-2.5 py-1 text-slate-900 font-medium bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500"
+                                  />
+                                </div>
                               </div>
                             ))}
                           </div>
                         )}
 
                         {activeCreativeTab === 'email' && generatedCreatives.email && (
-                          <div className="space-y-2">
-                            <div className="font-bold text-slate-900">
-                              📧 Tiêu đề thư: {generatedCreatives.email.subject}
+                          <div className="space-y-2.5">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                                📧 Tiêu đề thư (Subject Line)
+                              </label>
+                              <input
+                                type="text"
+                                value={generatedCreatives.email.subject || ''}
+                                onChange={(e) =>
+                                  setGeneratedCreatives((prev) =>
+                                    prev && prev.email
+                                      ? {
+                                          ...prev,
+                                          email: {
+                                            ...prev.email,
+                                            subject: e.target.value,
+                                          },
+                                        }
+                                      : prev
+                                  )
+                                }
+                                className="w-full px-3 py-1.5 font-bold text-slate-900 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                              />
                             </div>
-                            <div className="text-slate-700 whitespace-pre-line leading-relaxed">
-                              {generatedCreatives.email.body}
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                                Nội dung Email
+                              </label>
+                              <textarea
+                                rows={4}
+                                value={generatedCreatives.email.body || ''}
+                                onChange={(e) =>
+                                  setGeneratedCreatives((prev) =>
+                                    prev && prev.email
+                                      ? {
+                                          ...prev,
+                                          email: {
+                                            ...prev.email,
+                                            body: e.target.value,
+                                          },
+                                        }
+                                      : prev
+                                  )
+                                }
+                                className="w-full px-3 py-2 text-slate-700 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none leading-relaxed"
+                              />
                             </div>
-                            <div className="pt-2 border-t border-slate-200 font-bold text-violet-700">
-                              CTA: {generatedCreatives.email.cta}
+                            <div className="flex items-center gap-2 pt-1">
+                              <span className="text-slate-500 font-semibold shrink-0">CTA:</span>
+                              <input
+                                type="text"
+                                value={generatedCreatives.email.cta || ''}
+                                onChange={(e) =>
+                                  setGeneratedCreatives((prev) =>
+                                    prev && prev.email
+                                      ? {
+                                          ...prev,
+                                          email: {
+                                            ...prev.email,
+                                            cta: e.target.value,
+                                          },
+                                        }
+                                      : prev
+                                  )
+                                }
+                                className="flex-1 px-2.5 py-1 bg-white border border-violet-200 text-violet-700 rounded-lg font-bold outline-none focus:ring-2 focus:ring-violet-500"
+                              />
                             </div>
                           </div>
                         )}
