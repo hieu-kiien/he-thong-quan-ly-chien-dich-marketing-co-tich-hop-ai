@@ -1,99 +1,89 @@
+\resizebox{0.98\textwidth}{!}{%
 \begin{tikzpicture}[
   font=\sffamily\footnotesize,
   >=Latex,
   stage/.style={
-    draw=ictunavy,
+    draw=black,
     fill=white,
     rounded corners=3pt,
-    minimum width=2.3cm,
-    minimum height=1.3cm,
+    minimum width=2.35cm,
+    minimum height=1.35cm,
     align=center,
     line width=0.8pt,
-    text width=2.1cm,
+    text width=2.15cm,
     inner sep=2pt
   },
   gate/.style={
-    draw=ictunavy,
-    fill=black!5,
+    draw=black,
+    fill=black!8,
     rounded corners=3pt,
-    minimum width=2.3cm,
-    minimum height=1.3cm,
+    minimum width=2.35cm,
+    minimum height=1.35cm,
     align=center,
     line width=1.0pt,
-    text width=2.1cm,
+    text width=2.15cm,
     inner sep=2pt
   },
   ctrl_box/.style={
-    draw=black!70,
+    draw=black!80,
     fill=white,
     rounded corners=3pt,
-    minimum width=4.5cm,
-    minimum height=1.3cm,
+    minimum width=4.6cm,
+    minimum height=1.35cm,
     align=center,
-    line width=0.75pt,
+    line width=0.8pt,
     dashed,
-    text width=4.3cm,
+    text width=4.4cm,
     inner sep=3pt
   },
-  rel/.style={-{Latex[length=2.2mm]},draw=black!85,line width=0.75pt},
-  lab/.style={font=\sffamily\tiny,fill=white,inner sep=1.5pt,align=center,text=black}
+  rel/.style={-{Latex[length=2.2mm]},draw=black,line width=0.75pt},
+  lab/.style={font=\sffamily\scriptsize,fill=white,inner sep=1.5pt,align=center,text=black}
 ]
 
-% Hàng 1: 5 Pha tuần tự (x = 1.2, 4.1, 7.0, 9.9, 12.8, y = 0)
 \node[stage] (p1) at (1.2, 0) {
-  \textbf{Pha 1: Context}\\
-  {\tiny Lọc brief, sản phẩm, dữ liệu an toàn}
+  \textbf{1. Ngữ cảnh}\\[2pt]
+  {\scriptsize Lọc brief, sản phẩm, Brand Kit}
 };
 
 \node[stage] (p2) at (4.1, 0) {
-  \textbf{Pha 2: Prompt}\\
-  {\tiny Ghép System/User prompt; ép Schema}
+  \textbf{2. Tạo Prompt}\\[2pt]
+  {\scriptsize Nạp prompts.json, gắn biến}
 };
 
 \node[stage] (p3) at (7.0, 0) {
-  \textbf{Pha 3: Execute}\\
-  {\tiny Gọi LLM API; Timeout 10s, Retry}
+  \textbf{3. Gọi Model}\\[2pt]
+  {\scriptsize Gọi LLM API, kiểm soát timeout}
 };
 
 \node[stage] (p4) at (9.9, 0) {
-  \textbf{Pha 4: Validate}\\
-  {\tiny Kiểm tra cú pháp JSON, lọc từ cấm}
+  \textbf{4. Kiểm định}\\[2pt]
+  {\scriptsize Xác thực JSON, quét từ cấm}
 };
 
 \node[gate] (p5) at (12.8, 0) {
-  \textbf{Pha 5: Duyệt}\\
-  {\tiny \textbf{Human Review}: Quản lý duyệt bài}
+  \textbf{5. Phê duyệt}\\[2pt]
+  {\scriptsize Quản lý duyệt trước khi đăng}
 };
 
-% Mũi tên tuần tự giữa các pha
 \draw[rel] (p1) -- (p2);
 \draw[rel] (p2) -- (p3);
 \draw[rel] (p3) -- (p4);
-\draw[rel] (p4) -- node[lab,above]{Hợp lệ} (p5);
+\draw[rel] (p4) -- node[lab,above=1pt]{Đạt} (p5);
 
-% Hàng 2: Hai khối kiểm soát (y = -2.8, khoảng cách giữa 2 khối là 2.6cm thông thoáng)
-% Fallback: x = 3.5 (rộng 4.5cm -> x từ 1.25 đến 5.75)
-\node[ctrl_box] (fallback) at (3.5, -2.8) {
-  \textbf{Cơ chế Dự phòng (Fallback)}\\
-  {\tiny Khi timeout hoặc lỗi: Giữ bản nháp cũ, bật template mẫu, thông báo minh bạch để thử lại.}
+\node[ctrl_box] (fallback) at (3.5, -3.25) {
+  \textbf{Chế độ Dự phòng (Smart Fallback)}\\[2pt]
+  {\scriptsize Khi lỗi mạng hoặc sai Schema: trả mẫu dự phòng kèm cờ is\_fallback = true}
 };
 
-% Audit: x = 10.5 (rộng 4.5cm -> x từ 8.25 đến 12.75)
-\node[ctrl_box] (audit) at (10.5, -2.8) {
-  \textbf{Nhật ký Kiểm toán (AI Audit Logs)}\\
-  {\tiny Ghi nhận: user\_id, latency, tokens, prompt version và mã lỗi để phục vụ hậu kiểm.}
+\node[ctrl_box] (audit) at (10.5, -3.25) {
+  \textbf{Nhật ký Kiểm toán (ai\_logs)}\\[2pt]
+  {\scriptsize Lưu vết người gọi, độ trễ, số token, phiên bản prompt và trạng thái}
 };
 
-% Đường nối từ Pha 3 xuống Fallback (tầng trung gian y = -1.1)
-\draw[rel] (p3.south) -- ++(0,-0.45) -| node[lab,above,pos=0.25]{Timeout / Lỗi API} (fallback.north);
+\draw[rel] (p3.south) -- (7.0,-1.40) -| node[lab,pos=0.25]{Timeout / Lỗi API} ([xshift=-0.6cm]fallback.north);
+\draw[rel] (p4.south) -- (9.9,-2.05) -| node[lab,pos=0.25]{Sai cấu trúc JSON} ([xshift=0.8cm]fallback.north);
+\draw[rel] (p5.south) -- (12.8,-1.40) -| node[lab,pos=0.25]{Lưu vết duyệt} (audit.north);
+\draw[rel] (fallback.east) -- node[lab,above=1pt]{Ghi nhận lỗi} (audit.west);
 
-% Đường nối từ Pha 4 xuống Fallback (tầng trung gian y = -1.6, cách nóc audit 0.55cm)
-\draw[rel] (p4.south) -- ++(0,-0.95) -| node[lab,above,pos=0.2]{Lỗi cú pháp JSON} (fallback.north east);
-
-% Đường nối từ Pha 5 xuống Audit (tầng trung gian y = -1.1, cắm thẳng đứng vào audit)
-\draw[rel] (p5.south) -- ++(0,-0.45) -| node[lab,above,pos=0.3]{Lưu vết phê duyệt} (audit.north);
-
-% Báo cáo lỗi giữa Fallback và Audit (khoảng hở 2.5cm)
-\draw[rel] (fallback.east) -- node[lab,above]{Ghi nhận lỗi} (audit.west);
-
-\end{tikzpicture}
+\end{tikzpicture}%
+}

@@ -11,21 +11,21 @@ Trong hoạt động tiếp thị số hiện đại, một chiến dịch marke
 
 Báo cáo V9 là tài liệu học thuật hoàn chỉnh tổng kết toàn diện quá trình nghiên cứu, thiết kế, hiện thực hóa mã nguồn và đánh giá thực nghiệm của dự án MarketFlow AI. Hệ thống không dừng lại ở mức mô hình phân tích lý thuyết mà đã được lập trình hoàn chỉnh toàn bộ mã nguồn (Full-stack), đóng gói chuẩn container Docker và trải qua các vòng kiểm thử đối kháng khắt khe.
 
-Tài liệu được cấu trúc chặt chẽ gồm 8 chương chuẩn mực:
+Tài liệu được cấu trúc gồm 8 chương và 3 phụ lục:
 \begin{enumerate}
-  \item \textbf{Chương 1: Giới thiệu tổng quan đề tài và bối cảnh} --- Phân tích bối cảnh tiếp thị số, các bên liên quan, mục tiêu đo lường được và ranh giới hệ thống.
-  \item \textbf{Chương 2: Cơ sở kỹ thuật và công nghệ} --- Khảo sát nền tảng công nghệ cốt lõi: FastAPI, React 18, hệ sinh thái Google Gemini LLM, SQLite (WAL mode) và Docker containerization.
-  \item \textbf{Chương 3: Phân tích yêu cầu hệ thống} --- Đặc tả chi tiết 14 yêu cầu chức năng (FR01--FR14), 6 yêu cầu chất lượng (NFR01--NFR06), ma trận phân quyền RBAC kết hợp kiểm soát mức bản ghi (Record-level NFR01) và máy trạng thái duyệt nội dung HITL.
-  \item \textbf{Chương 4: Thiết kế hệ thống} --- Trình bày kiến trúc đa tầng (C4 Container), mô hình dữ liệu quan hệ ERD, luồng dữ liệu nghiệp vụ và thiết kế Prompt Engine kiểm soát ngữ cảnh.
-  \item \textbf{Chương 5: Hiện thực hóa hệ thống} --- Chi tiết cài đặt các module backend FastAPI, giao diện web React 18 / Tailwind CSS và cơ chế AI Smart Fallback khử ảo giác (De-hallucination).
-  \item \textbf{Chương 6: Kiểm thử thực nghiệm} --- Báo cáo kết quả bộ kiểm thử tự động (Unit, Integration, Security, Adversarial) với 205 ca kiểm thử, tỷ lệ đạt 100\%, 0 lỗi và 0 cảnh báo.
-  \item \textbf{Chương 7: Đánh giá AI định lượng} --- Phân tích số liệu đo đạc thực nghiệm: Schema validation rate (100\%), Grounding score (>95\%), độ trễ P50/P95 và chi phí thực tế 0 VNĐ trên Google AI Studio Free Tier.
-  \item \textbf{Chương 8: Kết luận và giới hạn đã biết} --- Đánh giá khách quan thành quả đạt được, phân tích trung thực các điểm giới hạn kỹ thuật và định hướng nâng cấp trong tương lai.
+  \item \textbf{Chương 1 -- Tổng quan đề tài và bối cảnh ứng dụng}: Phân tích bối cảnh tiếp thị số, các bên liên quan, mục tiêu đo lường được và ranh giới hệ thống.
+  \item \textbf{Chương 2 -- Cơ sở kỹ thuật và lựa chọn công nghệ}: Khảo sát nền tảng công nghệ cốt lõi gồm FastAPI, React 18, kiến trúc đa nhà cung cấp LLM (Gemini, OpenAI, Claude, OpenRouter, Ollama), SQLite (WAL mode) và Docker.
+  \item \textbf{Chương 3 -- Phân tích yêu cầu hệ thống và kiểm soát phân quyền}: Đặc tả 14 yêu cầu chức năng (FR01--FR14), 6 yêu cầu phi chức năng (NFR01--NFR06), ma trận phân quyền RBAC kết hợp kiểm soát mức bản ghi (Record-level NFR01) và máy trạng thái duyệt nội dung HITL.
+  \item \textbf{Chương 4 -- Thiết kế kiến trúc, dữ liệu và tích hợp AI}: Trình bày kiến trúc đa tầng (C4 Container), mô hình dữ liệu quan hệ ERD 11 bảng, luồng dữ liệu nghiệp vụ, kiến trúc bảo mật khóa BYOK 3 tầng và quy trình tiến hóa Prompt qua 3 vòng tối ưu (\texttt{v1}, \texttt{v2}, \texttt{v3}).
+  \item \textbf{Chương 5 -- Hiện thực hóa hệ thống}: Chi tiết cài đặt các phân hệ backend FastAPI, giao diện web React 18 / Tailwind CSS và cơ chế AI Smart Fallback khử ảo giác (De-hallucination).
+  \item \textbf{Chương 6 -- Kiểm thử thực nghiệm và đối kháng}: Báo cáo kết quả bộ kiểm thử tự động (Unit, Integration, Security, Adversarial) với 205 ca kiểm thử đạt tỷ lệ vượt qua 100\%.
+  \item \textbf{Chương 7 -- Đánh giá định lượng hệ thống AI và kinh tế vận hành}: Phân tích số liệu thực nghiệm qua 3 vòng tối ưu Prompt, tỷ lệ hợp lệ Schema (100\%), Grounding score (95.8\%), độ trễ P50/P95 và chi phí vận hành.
+  \item \textbf{Chương 8 -- Kết luận và giới hạn đã biết}: Tổng kết kết quả đạt được, phân tích khách quan các giới hạn kỹ thuật và lộ trình nâng cấp trong tương lai.
 \end{enumerate}
 
 \section*{Đóng góp kỹ thuật và phương pháp tiếp cận thực chứng}
 
-Dự án MarketFlow AI tuân thủ phương pháp nghiên cứu khoa học thiết kế (Design Science Research Methodology -- DSRM) kết hợp chuẩn kỹ nghệ phần mềm doanh nghiệp, mang lại bốn đóng góp kỹ thuật cốt lõi:
+Dự án MarketFlow AI áp dụng phương pháp nghiên cứu khoa học thiết kế (Design Science Research Methodology) kết hợp quy trình kỹ nghệ phần mềm, tập trung vào bốn đóng góp kỹ thuật chính:
 \begin{itemize}[noitemsep,topsep=2pt]
   \item \textbf{Kiểm soát truy cập mức bản ghi (Record-level Access Control)}: Giải quyết triệt để nguy cơ lộ lọt dữ liệu chéo giữa các chiến dịch (IDOR), bảo đảm nguyên tắc đặc quyền tối thiểu cho từng nhân viên tiếp thị.
   \item \textbf{Máy trạng thái duyệt nội dung bất biến (HITL State Machine)}: Đóng kín mọi ngả đường bypass trạng thái xuất bản, bảo đảm 100\% nội dung trước khi ra công chúng đều được người có thẩm quyền phê chuẩn.

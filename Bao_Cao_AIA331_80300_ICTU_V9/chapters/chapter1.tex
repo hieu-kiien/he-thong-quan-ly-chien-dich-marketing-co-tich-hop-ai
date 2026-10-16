@@ -19,9 +19,10 @@ Sự bùng nổ của các mô hình ngôn ngữ lớn (Large Language Models - 
 
 Hệ thống được thiết kế và hiện thực hóa nhằm phục vụ bốn nhóm tác nhân chính, với nhu cầu và tiêu chí bảo đảm cụ thể được lượng hóa trong Bảng~\ref{tab:v9-stakeholders}.
 
-\begin{table}[h!]
+\begin{table}[H]
 \centering
-\small
+\footnotesize
+\renewcommand{\arraystretch}{1.02}
 \caption{Người sử dụng và tiêu chí bảo đảm kỹ thuật}
 \label{tab:v9-stakeholders}
 \begin{tabularx}{\textwidth}{|L{3.2cm}|Y|Y|}
@@ -43,17 +44,17 @@ Kỹ sư vận hành (DevOps/SecOps) & Đóng gói triển khai nhanh, cấu hì
 
 Hình~\ref{fig:v8-context} thể hiện ranh giới hệ thống MarketFlow AI trong mối tương quan với các thực thể bên ngoài.
 
-\begin{figure}[h!]
+\begin{figure}[H]
 \centering
-\vspace{4pt}
+\vspace{2pt}
 \input{figures/context.tex}
-\vspace{6pt}
+\vspace{2pt}
 \caption{Sơ đồ ranh giới hệ thống MarketFlow AI}
 \label{fig:v8-context}
 \end{figure}
 
 Trong phạm vi hiện thực hóa của hệ thống:
-\begin{itemize}
+\begin{itemize}[noitemsep,topsep=2pt]
   \item \textbf{Bên trong ranh giới}: Ứng dụng Single Page Application (React 18 + Vite), máy chủ dịch vụ API (FastAPI), cơ sở dữ liệu quan hệ (SQLite kích hoạt WAL mode và ràng buộc khóa ngoại), và lớp tích hợp trí tuệ nhân tạo (AI Engine với Prompt Engine và Smart Fallback khử ảo giác).
   \item \textbf{Ngoài ranh giới}: Nhà cung cấp dịch vụ AI (Google Gemini API qua HTTPS RESTful connector an toàn) và các nền tảng mạng xã hội (được trừu tượng hóa thông qua kênh phát hành và lịch đăng, chuẩn bị sẵn sàng cho kết nối Webhook chính thức).
 \end{itemize}
@@ -62,12 +63,13 @@ Trong phạm vi hiện thực hóa của hệ thống:
 
 Hệ thống đặt ra 5 mục tiêu kỹ thuật cốt lõi (M1--M5), toàn bộ đều được hiện thực hóa và kiểm chứng bằng các bài test tự động cũng như dữ liệu thực tế tại Bảng~\ref{tab:v9-goals}.
 
-\begin{table}[h!]
+\begin{table}[H]
 \centering
-\small
+\footnotesize
+\renewcommand{\arraystretch}{1.02}
 \caption{Mục tiêu kỹ thuật và kết quả kiểm chứng thực tế}
 \label{tab:v9-goals}
-\begin{tabularx}{\textwidth}{|C{1.0cm}|L{3.6cm}|Y|L{3.4cm}|}
+\begin{tabularx}{\textwidth}{|C{1.0cm}|L{3.5cm}|Y|L{3.4cm}|}
 \hline
 \thead{Mã} & \thead{Mục tiêu} & \thead{Giải pháp kỹ thuật đã cài đặt} & \thead{Bằng chứng thực chứng}\\
 \hline

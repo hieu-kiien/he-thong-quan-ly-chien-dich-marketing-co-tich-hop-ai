@@ -1,30 +1,30 @@
+\resizebox{0.98\textwidth}{!}{%
 \begin{tikzpicture}[
   font=\sffamily\footnotesize,
   >=Latex,
   entity/.style={
     matrix of nodes,
     nodes={
-      draw=black!70,
+      draw=black!80,
       fill=white,
       minimum width=4.0cm,
-      minimum height=0.40cm,
+      minimum height=0.44cm,
       text width=3.7cm,
       align=left,
-      inner sep=2pt,
+      inner sep=2.5pt,
       font=\sffamily\scriptsize
     },
     row sep=-0.5pt,
     column sep=0pt
   },
-  header/.style={nodes={fill=black!85,text=white,font=\sffamily\bfseries\scriptsize,align=center,minimum height=0.52cm}},
-  header_core/.style={nodes={fill=ictunavy,text=white,font=\sffamily\bfseries\scriptsize,align=center,minimum height=0.52cm}},
-  rel/.style={draw=black!85,line width=0.75pt,-{Latex[length=2mm]}},
-  card/.style={font=\sffamily\bfseries\tiny,text=black,fill=white,inner sep=1.2pt}
+  header/.style={nodes={fill=black!10,text=black,font=\sffamily\bfseries\scriptsize,align=center,minimum height=0.52cm}},
+  header_core/.style={nodes={fill=black!18,text=black,font=\sffamily\bfseries\scriptsize,align=center,minimum height=0.52cm}},
+  rel/.style={draw=black,line width=0.75pt,-{Latex[length=2mm]}},
+  card/.style={font=\sffamily\bfseries\scriptsize,text=black,fill=white,inner sep=1.5pt}
 ]
 
-% 1. Hàng 1 (y = 2.3): Liên quan tới marketing_contents
 \matrix (reviews) [entity,row 1/.style={header}] at (2.1, 2.3) {
-  content\_reviews [Lịch sử duyệt]\\
+  content\_reviews (Lịch sử duyệt)\\
   \textbf{PK} id : INTEGER\\
   \textbf{FK} content\_id : INT\\
   \textbf{FK} reviewer\_id : INT\\
@@ -33,8 +33,8 @@
   reviewed\_at : TIMESTAMP\\
 };
 
-\matrix (contents) [entity,row 1/.style={header_core}] at (7.0, 2.3) {
-  marketing\_contents [Bảng Lõi]\\
+\matrix (contents) [entity,row 1/.style={header_core}] at (7.6, 2.3) {
+  marketing\_contents (Bảng lõi)\\
   \textbf{PK} id : INTEGER\\
   \textbf{FK} campaign\_id : INT\\
   \textbf{FK} channel\_id : INT\\
@@ -42,7 +42,7 @@
   title, body : TEXT\\
 };
 
-\matrix (schedules) [entity,row 1/.style={header}] at (11.9, 2.3) {
+\matrix (schedules) [entity,row 1/.style={header}] at (13.1, 2.3) {
   marketing\_schedules (Lịch đăng)\\
   \textbf{PK} id : INTEGER\\
   \textbf{FK} content\_id : INT\\
@@ -51,8 +51,7 @@
   status : VARCHAR(20)\\
 };
 
-% 2. Hàng 2 (y = -1.3): Liên quan tới campaigns
-\matrix (members) [entity,row 1/.style={header}] at (2.1, -1.3) {
+\matrix (members) [entity,row 1/.style={header}] at (2.1, -1.4) {
   campaign\_members (Phân công)\\
   \textbf{PK, FK} campaign\_id : INT\\
   \textbf{PK, FK} user\_id : INT\\
@@ -60,15 +59,15 @@
   assigned\_at : TIMESTAMP\\
 };
 
-\matrix (campaigns) [entity,row 1/.style={header_core}] at (7.0, -1.3) {
-  campaigns [Bảng Lõi]\\
+\matrix (campaigns) [entity,row 1/.style={header_core}] at (7.6, -1.4) {
+  campaigns (Bảng lõi)\\
   \textbf{PK} id : INTEGER\\
   \textbf{FK} product\_id : INT\\
   title : VARCHAR(200)\\
   budget : NUMERIC(15,2)\\
 };
 
-\matrix (metrics) [entity,row 1/.style={header}] at (11.9, -1.3) {
+\matrix (metrics) [entity,row 1/.style={header}] at (13.1, -1.4) {
   campaign\_metrics (Chỉ số)\\
   \textbf{PK} id : INTEGER\\
   \textbf{FK} campaign\_id : INT\\
@@ -78,7 +77,6 @@
   cost, rev : NUMERIC(12,2)\\
 };
 
-% 3. Hàng 3: AI Audit Logs (Định vị tương đối cách đáy campaigns đúng 1.2cm bằng anchor=north)
 \matrix (ailogs) [entity, anchor=north, row 1/.style={header}] at ([yshift=-1.2cm]campaigns.south) {
   ai\_logs (Nhật ký kiểm toán AI)\\
   \textbf{PK} id : INTEGER\\
@@ -90,16 +88,11 @@
   created\_at : TIMESTAMP\\
 };
 
-% Liên kết quan hệ
-% Contents -> Reviews & Schedules
-\draw[rel] (contents) -- node[card,above,pos=0.2]{1} node[card,above,pos=0.8]{0..*} (reviews);
-\draw[rel] (contents) -- node[card,above,pos=0.2]{1} node[card,above,pos=0.8]{0..*} (schedules);
+\draw[rel] (contents) -- node[card,above=1pt,pos=0.5]{1..*} (reviews);
+\draw[rel] (contents) -- node[card,above=1pt,pos=0.5]{1..*} (schedules);
+\draw[rel] (campaigns) -- node[card,above=1pt,pos=0.5]{1..*} (members);
+\draw[rel] (campaigns) -- node[card,above=1pt,pos=0.5]{1..*} (metrics);
+\draw[rel] (campaigns.south) -- node[card,right=2pt,pos=0.5]{1..*} (ailogs.north);
 
-% Campaigns -> Members & Metrics
-\draw[rel] (campaigns) -- node[card,above,pos=0.2]{1} node[card,above,pos=0.8]{0..*} (members);
-\draw[rel] (campaigns) -- node[card,above,pos=0.2]{1} node[card,above,pos=0.8]{0..*} (metrics);
-
-% Campaigns -> AI Logs (đoạn nối thẳng tuyệt đối dài 1.2cm)
-\draw[rel] (campaigns.south) -- node[card,right,pos=0.25]{1} node[card,right,pos=0.75]{0..*} (ailogs.north);
-
-\end{tikzpicture}
+\end{tikzpicture}%
+}

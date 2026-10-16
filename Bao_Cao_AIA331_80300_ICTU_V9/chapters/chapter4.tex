@@ -6,7 +6,7 @@ Kiến trúc hệ thống MarketFlow AI được thiết kế theo mô hình ph�
 
 Hệ thống được mô hình hóa theo chuẩn C4 Container tại Hình~\ref{fig:v9-container}.
 
-\begin{figure}[h!]
+\begin{figure}[H]
 \centering
 \input{figures/container.tex}
 \caption{Sơ đồ kiến trúc Container và luồng dữ liệu hệ thống}
@@ -17,7 +17,7 @@ Hệ thống được mô hình hóa theo chuẩn C4 Container tại Hình~\ref{
 
 Máy chủ ứng dụng FastAPI được cấu trúc thành các module chức năng độc lập trong thư mục \texttt{backend/app/api/v1/}, mỗi module chịu trách nhiệm thực thi một ranh giới nghiệp vụ cụ thể được mô tả trong Bảng~\ref{tab:v9-components}.
 
-\begin{table}[h!]
+\begin{table}[H]
 \centering
 \small
 \caption{Phân định trách nhiệm của các module trong hệ thống}
@@ -26,17 +26,17 @@ Máy chủ ứng dụng FastAPI được cấu trúc thành các module chức n
 \hline
 \thead{Module backend} & \thead{Trách nhiệm kỹ thuật và nghiệp vụ} & \thead{Yêu cầu đáp ứng}\\
 \hline
-\texttt{auth.py} \& \texttt{security.py} & Quản lý phiên xác thực JWT, băm mật khẩu bằng thuật toán Bcrypt, kiểm tra trạng thái kích hoạt tài khoản (\texttt{user.status == 'ACTIVE'}) và phân quyền vai trò.\\
+\texttt{auth.py} \& \texttt{security.py} & Quản lý phiên xác thực JWT, băm mật khẩu bằng thuật toán Bcrypt, kiểm tra trạng thái kích hoạt tài khoản (\texttt{user.status == 'ACTIVE'}) và phân quyền vai trò. & FR01, FR02, NFR01\\
 \hline
-\texttt{campaigns.py} & Xử lý vòng đời chiến dịch; xác thực khoảng thời gian (\texttt{start\_date} $\le$ \texttt{end\_date}); kiểm tra ngân sách hợp lệ; kiểm soát phân quyền mức bản ghi theo \texttt{owner\_id} và \texttt{CampaignMember}.\\
+\texttt{campaigns.py} & Xử lý vòng đời chiến dịch; xác thực khoảng thời gian (\texttt{start\_date} $\le$ \texttt{end\_date}); kiểm tra ngân sách hợp lệ; kiểm soát phân quyền mức bản ghi theo \texttt{owner\_id} và \texttt{CampaignMember}. & FR04, FR05, NFR01\\
 \hline
-\texttt{contents.py} & Quản lý máy trạng thái nội dung HITL; cấm tạo/sửa trực tiếp trạng thái duyệt; điều phối quy trình gửi duyệt (\texttt{/submit}), phê duyệt (\texttt{/approve}), từ chối (\texttt{/reject}) và xuất bản (\texttt{/publish}); tự động hạ cấp về \texttt{AI\_DRAFT} khi nội dung đã duyệt bị sửa đổi.\\
+\texttt{contents.py} & Quản lý máy trạng thái nội dung HITL; cấm tạo/sửa trực tiếp trạng thái duyệt; điều phối quy trình gửi duyệt (\texttt{/submit}), phê duyệt (\texttt{/approve}), từ chối (\texttt{/reject}) và xuất bản (\texttt{/publish}); tự động hạ cấp về \texttt{AI\_DRAFT} khi nội dung đã duyệt bị sửa đổi. & FR06, FR07, FR14\\
 \hline
-\texttt{schedules.py} & Quản lý lịch phát hành bài viết; kiểm tra điều kiện tiên quyết (chỉ lập lịch cho nội dung \texttt{APPROVED}); xử lý múi giờ quốc tế; ngăn ngừa xung đột thời gian phát hành.\\
+\texttt{schedules.py} & Quản lý lịch phát hành bài viết; kiểm tra điều kiện tiên quyết (chỉ lập lịch cho nội dung \texttt{APPROVED}); xử lý múi giờ quốc tế; ngăn ngừa xung đột thời gian phát hành. & FR08, NFR02\\
 \hline
-\texttt{metrics.py} & Quản lý chỉ số hiệu quả đa kênh theo bộ ba duy nhất (\texttt{campaign}, \texttt{channel}, \texttt{date}); tính toán tự động các chỉ số tài chính (CTR, CPC, CPA, ROI) với cơ chế bảo vệ chia cho 0; tổng hợp dữ liệu bảng điều khiển (Dashboard) phân quyền theo người dùng.\\
+\texttt{metrics.py} & Quản lý chỉ số hiệu quả đa kênh theo bộ ba duy nhất (\texttt{campaign}, \texttt{channel}, \texttt{date}); tính toán tự động các chỉ số tài chính (CTR, CPC, CPA, ROI) với cơ chế bảo vệ chia cho 0; tổng hợp dữ liệu bảng điều khiển (Dashboard) phân quyền theo người dùng. & FR09, FR10, NFR03\\
 \hline
-\texttt{ai.py} \& \texttt{ai\_service.py} & Cổng giao tiếp AI đa tác vụ; kiểm soát phạm vi truy cập dữ liệu trước khi sinh prompt; điều phối gọi Google Gemini API; tự động kích hoạt Smart Fallback khi gặp sự cố; lưu trữ nhật ký kiểm toán vào \texttt{ai\_logs}.\\
+\texttt{ai.py} \& \texttt{ai\_service.py} & Cổng giao tiếp AI đa tác vụ; kiểm soát phạm vi truy cập dữ liệu trước khi sinh prompt; điều phối gọi Google Gemini API; tự động kích hoạt Smart Fallback khi gặp sự cố; lưu trữ nhật ký kiểm toán vào \texttt{ai\_logs}. & FR11--FR14, NFR05\\
 \hline
 \end{tabularx}
 \end{table}
@@ -48,7 +48,7 @@ Mô hình dữ liệu được thiết kế tuân thủ dạng chuẩn 3 (3NF), 
 \subsection{Mô hình dữ liệu hạt nhân (Core ERD)}
 Hình~\ref{fig:v9-erd-core} thể hiện các thực thể nghiệp vụ trung tâm và các mối quan hệ quan trọng.
 
-\begin{figure}[h!]
+\begin{figure}[H]
 \centering
 \input{figures/erd-core.tex}
 \caption{Mô hình dữ liệu hạt nhân của MarketFlow AI}
@@ -58,7 +58,7 @@ Hình~\ref{fig:v9-erd-core} thể hiện các thực thể nghiệp vụ trung t
 \subsection{Mô hình các bảng vận hành và nhật ký kiểm toán (Operations ERD)}
 Hình~\ref{fig:v9-erd-ops} thể hiện các bảng phụ trợ phục vụ quy trình phân công, phê duyệt, lập lịch, số liệu hiệu quả và kiểm toán AI.
 
-\begin{figure}[h!]
+\begin{figure}[H]
 \centering
 \input{figures/erd-ops.tex}
 \caption{Mô hình các bảng vận hành và liên kết khóa ngoại}
@@ -68,11 +68,11 @@ Hình~\ref{fig:v9-erd-ops} thể hiện các bảng phụ trợ phục vụ quy 
 \subsection{Từ điển dữ liệu và các ràng buộc toàn vẹn}
 Bảng~\ref{tab:v9-data-dictionary} đặc tả chi tiết cấu trúc các bảng dữ liệu, khóa chính, khóa ngoại và ràng buộc toàn vẹn đã được hiện thực hóa trong SQLite và SQLAlchemy.
 
-\begin{table}[!htbp]
+\begin{table}[H]
 \centering
 \small
 \caption{Từ điển dữ liệu và các ràng buộc toàn vẹn}\label{tab:v9-data-dictionary}
-\begin{tabularx}{\textwidth}{|L{3.4cm}|L{2.5cm}|L{2.8cm}|Y|}
+\begin{tabularx}{\textwidth}{|L{3.6cm}|L{2.4cm}|L{2.8cm}|Y|}
 \hline
 \thead{Tên bảng} & \thead{Mục đích} & \thead{Cơ chế khóa} & \thead{Ràng buộc và quy tắc nghiệp vụ}\\
 \hline
@@ -105,7 +105,7 @@ Bảng~\ref{tab:v9-data-dictionary} đặc tả chi tiết cấu trúc các bả
 
 Luồng tương tác với mô hình trí tuệ nhân tạo được quản lý tập trung thông qua Động cơ Xây dựng Chỉ dẫn (Prompt Engine) và Dịch vụ Điều phối Trí tuệ Nhân tạo (AI Service) theo quy trình khép kín tại Hình~\ref{fig:v9-ai-pipeline}.
 
-\begin{figure}[h!]
+\begin{figure}[H]
 \centering
 \input{figures/ai-pipeline.tex}
 \caption{Quy trình xử lý yêu cầu AI với Prompt Engine và Smart Fallback}
@@ -120,46 +120,39 @@ Luồng tương tác với mô hình trí tuệ nhân tạo được quản lý 
 \end{itemize}
 
 \subsection{Đặc tả hợp đồng dữ liệu chuẩn hóa (Data Contract Specification)}
-Prompt Engine thiết lập các hợp đồng dữ liệu đầu ra bắt buộc thông qua Pydantic v2 nhằm bảo đảm tính toàn vẹn cấu trúc trước khi chuyển sang tầng ứng dụng. Bảng~\ref{tab:v9-ai-schemas} đặc tả cấu trúc dữ liệu cho ba tác vụ AI cốt lõi (100\% các trường bắt buộc).
+Toàn bộ mẫu prompt được tách khỏi mã nguồn Python và quản lý tại \texttt{backend/\allowbreak prompts/\allowbreak prompts.json} với 3 phiên bản (\texttt{v1}, \texttt{v2}, \texttt{v3}). Prompt Engine thiết lập hợp đồng dữ liệu đầu ra qua Pydantic v2 nhằm kiểm tra cấu trúc JSON trước khi chuyển sang tầng ứng dụng (Bảng~\ref{tab:v9-ai-schemas}).
 
-\begin{table}[h!]
+\begin{table}[H]
 \centering
 \small
-\caption{Đặc tả hợp đồng dữ liệu Pydantic Schema cho các tác vụ AI (Bắt buộc 100\%)}
+\renewcommand{\arraystretch}{1.06}
+\caption{Đặc tả hợp đồng dữ liệu Pydantic Schema cho các tác vụ AI}
 \label{tab:v9-ai-schemas}
-\begin{tabularx}{\textwidth}{|C{1.8cm}|L{2.8cm}|L{3.3cm}|Y|}
+\begin{tabularx}{\textwidth}{|C{2.1cm}|L{2.8cm}|L{3.2cm}|Y|}
 \hline
 \thead{Tác vụ} & \thead{Trường dữ liệu} & \thead{Kiểu dữ liệu} & \thead{Ý nghĩa nghiệp vụ \& Ràng buộc}\\
 \hline
-\multirow{4}{*}{\textbf{IDEA}} & \texttt{task} & \texttt{Literal["IDEA"]} & Định danh loại tác vụ gợi ý ý tưởng.\\
+\multirow{3}{*}{\textbf{IDEA}} & \texttt{campaign\_name} & \texttt{str} & Tên chiến dịch ngữ cảnh mục tiêu.\\
 \cline{2-4}
-& \texttt{campaign\_name} & \texttt{str} & Tên chiến dịch ngữ cảnh mục tiêu.\\
-\cline{2-4}
-& \texttt{ideas} & \texttt{List[IdeaItem]} & Danh sách các góc tiếp cận ý tưởng.\\
+& \texttt{ideas} & \texttt{List[IdeaItem]} & Danh sách đúng 5 góc tiếp cận ý tưởng.\\
 \cline{2-4}
 & \texttt{ideas[i]} & \texttt{Dict[str, str]} & Gồm 3 khóa: \texttt{angle}, \texttt{concept}, \texttt{target\_hook}.\\
 \hline
-\multirow{4}{*}{\textbf{DRAFT}} & \texttt{task} & \texttt{Literal["DRAFT"]} & Định danh loại tác vụ viết bản nháp.\\
+\multirow{3}{*}{\textbf{DRAFT}} & \texttt{channel} & \texttt{ChannelEnum} & Kênh truyền thông mục tiêu (Facebook, TikTok, Email).\\
 \cline{2-4}
-& \texttt{channel} & \texttt{ChannelEnum} & Kênh truyền thông mục tiêu (Facebook, Email, Ads).\\
-\cline{2-4}
-& \texttt{title, body} & \texttt{str} & Tiêu đề và thân bài viết chuẩn hóa theo kênh.\\
+& \texttt{title, body} & \texttt{str} & Tiêu đề và thân bài viết theo giới hạn ký tự kênh.\\
 \cline{2-4}
 & \texttt{cta} & \texttt{str} & Lời kêu gọi hành động cụ thể (\texttt{CTA}).\\
 \hline
-\multirow{3}{*}{\textbf{SUMMARY}} & \texttt{task} & \texttt{Literal["SUMMARY"]} & Định danh loại tác vụ tóm tắt chỉ số.\\
+\multirow{2}{*}{\textbf{SUMMARY}} & \texttt{kpi\_overview} & \texttt{Dict[str, float]} & Tổng hợp số học: views, clicks, cost, revenue, ROI.\\
 \cline{2-4}
-& \texttt{kpi\_overview} & \texttt{Dict[str, float]} & Tổng hợp số học: views, clicks, cost, revenue, ROI.\\
-\cline{2-4}
-& \texttt{insights, recs} & \texttt{List[str]} & Nhận định bám sát số liệu thực và đề xuất tối ưu.\\
+& \texttt{insights, recs} & \texttt{List[str]} & Nhận định bám sát số liệu đã lưu và đề xuất cải thiện.\\
 \hline
 \end{tabularx}
 \end{table}
 
-\subsection{Cơ chế khử ảo giác (De-hallucination Smart Fallback)}
-Trong trường hợp gặp sự cố kết nối LLM hoặc quá thời gian chờ (10s), hệ thống tự động kích hoạt bộ sinh dự phòng \texttt{\_generate\_fallback}: (1) Ý tưởng và bản nháp: Tổng hợp nội dung theo khung mẫu công nghiệp gắn liền với sản phẩm và kênh thực tế; (2) Tóm tắt chỉ số: Tính toán chính xác các chỉ số tài chính từ mảng metrics, \textbf{loại bỏ hoàn toàn các nhận định ảo giác} (như tự suy diễn khung giờ vàng hay khuyến nghị cuối tuần khi đầu vào chỉ có số liệu tổng); (3) Minh bạch thông tin: Gắn cờ \texttt{is\_fallback = True}, ghi nhận vào \texttt{ai\_logs} và thông báo minh bạch cho người dùng trên giao diện.
+\subsection{Cơ chế dự phòng xác định (Smart Fallback)}
+Khi gặp sự cố kết nối LLM hoặc quá thời gian chờ, hệ thống kích hoạt hàm \texttt{\_generate\_\allowbreak fallback}: (1) Ý tưởng và bản nháp được tạo theo khung mẫu gắn với sản phẩm và kênh đã chọn; (2) Tóm tắt chỉ số tính toán trực tiếp từ mảng metrics hiện có, không suy diễn ngoài dữ liệu; (3) Gắn cờ \texttt{is\_fallback = True}, ghi vào \texttt{ai\_logs} và hiển thị cảnh báo rõ trên giao diện.
 
 \section{Kết luận chương}
-
-Chương 4 đã trình bày thiết kế kiến trúc toàn diện của MarketFlow AI từ sơ đồ khối logic, mô hình dữ liệu quan hệ chặt chẽ đến cơ chế tương tác an toàn với mô hình ngôn ngữ lớn qua Prompt Engine. Thiết kế này bảo đảm hệ thống có tính chịu lỗi cao, bảo mật nhiều lớp và luôn duy trì tính toàn vẹn dữ liệu, làm tiền đề vững chắc cho việc hiện thực hóa mã nguồn trong thực tế.
-
+Chương 4 đã trình bày thiết kế kiến trúc phân tầng, mô hình dữ liệu quan hệ và cơ chế tương tác với mô hình ngôn ngữ lớn qua Prompt Engine, làm cơ sở cho việc hiện thực hóa ở Chương 5.

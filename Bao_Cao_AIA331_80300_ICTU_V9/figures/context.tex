@@ -1,85 +1,79 @@
+\resizebox{0.98\textwidth}{!}{%
 \begin{tikzpicture}[
   font=\sffamily\footnotesize,
   >=Latex,
   user_node/.style={
-    draw=ictunavy,
+    draw=black,
     fill=white,
-    rounded corners=4pt,
-    minimum width=2.8cm,
-    minimum height=1.4cm,
+    rounded corners=3pt,
+    minimum width=3.1cm,
+    minimum height=1.6cm,
     align=center,
     line width=0.85pt,
-    text width=2.6cm,
+    text width=2.9cm,
     inner sep=3pt
   },
   sys_node/.style={
-    draw=ictunavy,
-    fill=black!3,
-    rounded corners=5pt,
-    minimum width=4.0cm,
-    minimum height=2.4cm,
+    draw=black,
+    fill=black!4,
+    rounded corners=4pt,
+    minimum width=4.4cm,
+    minimum height=2.6cm,
     align=center,
     line width=1.1pt,
-    text width=3.8cm,
+    text width=4.1cm,
     inner sep=5pt
   },
   ext_node/.style={
-    draw=black!70,
+    draw=black!80,
     fill=white,
-    rounded corners=4pt,
-    minimum width=2.8cm,
-    minimum height=1.4cm,
+    rounded corners=3pt,
+    minimum width=3.1cm,
+    minimum height=1.6cm,
     align=center,
     line width=0.85pt,
     dashed,
-    text width=2.6cm,
+    text width=2.9cm,
     inner sep=3pt
   },
-  rel/.style={-{Latex[length=2.2mm]},draw=black!85,line width=0.8pt},
-  lab/.style={font=\sffamily\tiny,fill=white,inner sep=2pt,align=center,text=black}
+  rel/.style={-{Latex[length=2.2mm]},draw=black,line width=0.8pt},
+  lab/.style={font=\sffamily\scriptsize,fill=white,inner sep=2pt,align=center,text=black}
 ]
 
-\useasboundingbox (0.0, -2.45) rectangle (14.0, 2.45);
-
-% 1. Người dùng (Trái: x = 1.5cm, span: 0.1 -> 2.9)
-\node[user_node] (mgr) at (1.5, 1.6) {
-  \textbf{Quản lý Marketing}\\
-  {\tiny [Vai trò Quản trị]}\\[2pt]
-  {\tiny Lập chiến dịch, duyệt bài, theo dõi tiến độ \& ngân sách}
+\node[user_node] (mgr) at (0.8, 1.65) {
+  \textbf{Quản lý / Duyệt bài}\\[2pt]
+  {\scriptsize Lập chiến dịch, phân bổ ngân sách, duyệt nội dung}
 };
 
-\node[user_node] (stf) at (1.5, -1.6) {
-  \textbf{Nhân viên Marketing}\\
-  {\tiny [Vai trò Thực thi]}\\[2pt]
-  {\tiny Soạn thảo nội dung, gọi AI nháp, cập nhật số liệu}
+\node[user_node] (stf) at (0.8, -1.65) {
+  \textbf{Nhân viên Marketing}\\[2pt]
+  {\scriptsize Soạn nội dung, gọi AI nháp, nhập chỉ số kênh}
 };
 
-% 2. Hệ thống trung tâm (Giữa: x = 7.0cm, span: 5.0 -> 9.0)
 \node[sys_node] (sys) at (7.0, 0) {
-  \textbf{\normalsize HỆ THỐNG QUẢN LÝ}\\
-  \textbf{\normalsize CHIẾN DỊCH MARKETING}\\
-  {\scriptsize [Đề tài AIA331 -- ICTU]}\\[4pt]
-  {\scriptsize Quản lý tập trung chiến dịch, nội dung, chỉ số; điều phối AI tạo bản nháp dưới sự kiểm soát của người dùng.}
+  \textbf{\small HỆ THỐNG QUẢN LÝ}\\
+  \textbf{\small CHIẾN DỊCH MARKETING}\\
+  {\scriptsize (MarketFlow AI -- Đề tài 80300)}\\[3pt]
+  {\scriptsize Quản lý chiến dịch, kênh, nội dung, lịch đăng, chỉ số; tích hợp AI có kiểm duyệt con người}
 };
 
-% 3. Hệ thống bên ngoài (Phải: x = 12.5cm, span: 11.1 -> 13.9)
-\node[ext_node] (ai) at (12.5, 1.6) {
-  \textbf{Dịch vụ AI (LLM)}\\
-  {\tiny [Hệ thống đối tác]}\\[2pt]
-  {\tiny Tiếp nhận prompt có cấu trúc, suy luận và phản hồi JSON}
+\node[ext_node] (ai) at (13.2, 1.65) {
+  \textbf{Nhà cung cấp AI}\\
+  {\scriptsize (Gemini / OpenAI / Ollama)}\\[2pt]
+  {\scriptsize Xử lý prompt, trả JSON theo cấu trúc}
 };
 
-\node[ext_node] (soc) at (12.5, -1.6) {
+\node[ext_node] (soc) at (13.2, -1.65) {
   \textbf{Kênh Truyền thông}\\
-  {\tiny [Hệ thống đối tác]}\\[2pt]
-  {\tiny Nền tảng mạng xã hội tiếp nhận bài viết đã duyệt}
+  {\scriptsize (Facebook / TikTok / Email)}\\[2pt]
+  {\scriptsize Tiếp nhận kế hoạch và nội dung đã duyệt}
 };
 
-% 4. Đường kết nối với nhãn 2 dòng gọn gàng (Khoảng cách thông thủy 2.1cm)
-\draw[rel] (mgr.east) -- node[lab, above=1pt]{Thiết lập \&\\Phê duyệt} (sys.150);
-\draw[rel] (stf.east) -- node[lab, below=1pt]{Soạn thảo \&\\Báo cáo số} (sys.210);
+\draw[rel] (mgr.east) -- node[lab, pos=0.48]{Thiết lập \&\\Phê duyệt} (sys.155);
+\draw[rel] (stf.east) -- node[lab, pos=0.48]{Soạn thảo \&\\Nhập số liệu} (sys.205);
 
-\draw[rel] (sys.30) -- node[lab, above=1pt]{Prompt $\rightarrow$\\[-1pt]$\leftarrow$ JSON} (ai.west);
-\draw[rel] (sys.330) -- node[lab, below=1pt]{Xuất bản\\đã duyệt} (soc.west);
+\draw[rel] (sys.25) -- node[lab, pos=0.52]{Prompt /\\JSON} (ai.west);
+\draw[rel] (sys.335) -- node[lab, pos=0.52]{Nội dung\\đã duyệt} (soc.west);
 
-\end{tikzpicture}
+\end{tikzpicture}%
+}

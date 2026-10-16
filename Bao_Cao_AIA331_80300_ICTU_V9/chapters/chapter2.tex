@@ -16,7 +16,7 @@ Hệ thống tích hợp đồng bộ các tiêu chuẩn kỹ thuật quốc t�
 
 Hệ thống MarketFlow AI được xây dựng trên một ngăn xếp công nghệ hiện đại, cân bằng tối ưu giữa hiệu năng thực thi cao, độ ổn định của dữ liệu và tính tinh gọn trong triển khai cục bộ cũng như môi trường điện toán đám mây. Bảng~\ref{tab:v9-tech-stack} tổng hợp các công nghệ nền tảng đã được triển khai trong thực tế.
 
-\begin{table}[h!]
+\begin{table}[H]
 \centering
 \small
 \caption{Ngăn xếp công nghệ hiện thực hóa hệ thống MarketFlow AI}
@@ -43,7 +43,7 @@ FastAPI được lựa chọn làm máy chủ API trung tâm nhờ các ưu đi�
 \begin{enumerate}
   \item \textbf{Kiến trúc bất đồng bộ (Asynchronous ASGI)}: FastAPI vận hành trên nền tảng Starlette và Uvicorn, cho phép xử lý hàng nghìn kết nối đồng thời với mô hình Non-blocking I/O. Điều này đặc biệt quan trọng khi hệ thống phải gọi các API bên ngoài như Google Gemini mà không làm nghẽn luồng xử lý của các yêu cầu CRUD nghiệp vụ thông thường.
   \item \textbf{Kiểm định dữ liệu chặt chẽ qua Pydantic v2}: Pydantic v2 được viết lại bằng Rust, mang lại tốc độ tuần tự hóa (serialization) và kiểm định dữ liệu (validation) nhanh gấp 5--10 lần phiên bản cũ. Hệ thống tận dụng các bộ validator chặt chẽ để kiểm tra tính hợp lệ của định dạng ngày tháng (\texttt{YYYY-MM-DD}), ngân sách không âm, và chuỗi trạng thái máy nội dung trước khi dữ liệu chạm tới tầng ORM.
-  \item \textbf{Cơ chế Tiêm phụ thuộc (Dependency Injection)}: Module \texttt{backend/app/api/deps.py} sử dụng hệ thống phụ thuộc của FastAPI để quản lý vòng đời kết nối cơ sở dữ liệu (\texttt{get\_db}), giải mã xác thực người dùng từ JWT (\texttt{get\_current\_user}), và kiểm tra vai trò linh hoạt (\texttt{RoleChecker}).
+  \item \textbf{Cơ chế Tiêm phụ thuộc (Dependency Injection)}: Module \texttt{backend/\allowbreak app/\allowbreak api/\allowbreak deps.py} sử dụng hệ thống phụ thuộc của FastAPI để quản lý vòng đời kết nối cơ sở dữ liệu (\texttt{get\_db}), giải mã xác thực người dùng từ JWT (\texttt{get\_current\_user}), và kiểm tra vai trò linh hoạt (\texttt{RoleChecker}).
 \end{enumerate}
 
 \subsection{Frontend: React 18, TypeScript và Tailwind CSS}
@@ -54,12 +54,12 @@ Giao diện người dùng được xây dựng theo kiến trúc Single Page Ap
   \item \textbf{Trạng thái tương tác toàn diện (UI Resilience)}: Hệ thống cài đặt các thành phần chuyên biệt: \texttt{Skeleton} cho trạng thái chờ phản hồi mạng, \texttt{Toast} cho thông báo tức thời (thành công/cảnh báo/thất bại), và \texttt{ErrorBoundary} ngăn ngừa hiện tượng màn hình trắng (white screen) khi xảy ra ngoại lệ giao diện.
 \end{enumerate}
 
-\subsection{Hệ sinh thái AI: Google Gemini và cơ chế Smart Fallback}
-Tuân thủ nghiêm ngặt chỉ thị kiến trúc, dự án sử dụng độc quyền hệ sinh thái mô hình Google Gemini (Gemini Pro / Gemini Flash) và tuyệt đối không phụ thuộc vào các dịch vụ bị cấm (như Claude hay GPT):
+\subsection{Hệ sinh thái AI đa nhà cung cấp, BYOK Vault và Smart Fallback}
+Đáp ứng tiêu chí kết nối đa dạng mô hình của học phần AIA331, tầng dịch vụ AI (\texttt{backend/\allowbreak app/\allowbreak services/\allowbreak ai/\allowbreak providers.py}) hỗ trợ nhiều nhà cung cấp mô hình ngôn ngữ lớn (Google Gemini, OpenAI, Anthropic Claude, OpenRouter, Hugging Face, Ollama và OpenCode) thông qua kiến trúc Adapter thống nhất:
 \begin{enumerate}
-  \item \textbf{Kiểm soát ngữ cảnh (Context Whitelisting)}: Trước khi gửi yêu cầu tới mô hình ngôn ngữ, hệ thống chỉ lọc lấy các thông tin tối cần thiết cho tác vụ (tên sản phẩm, mục tiêu chiến dịch, tệp khách hàng mục tiêu, các dòng số liệu metrics đã được phê duyệt). Mọi thông tin nhạy cảm (mật khẩu, khóa API, dữ liệu định danh người dùng) đều bị loại bỏ tuyệt đối khỏi prompt.
-  \item \textbf{Cơ chế Structured Outputs}: Prompt Engine ép buộc Gemini trả về kết quả tuân thủ nghiêm ngặt định dạng JSON Schema quy định trước, ngăn ngừa việc mô hình sinh văn bản tự do khó phân tích cú pháp.
-  \item \textbf{Cơ chế Smart Fallback (De-hallucination Engine)}: Khi gặp sự cố mạng, vượt hạn ngạch (rate limit) hoặc lỗi phản hồi từ LLM, hệ thống tự động kích hoạt bộ sinh nội suy cục bộ theo quy tắc dựa trên số liệu thực chứng. Bộ sinh dự phòng này được thiết kế loại bỏ hoàn toàn các suy đoán ảo giác (ví dụ: không suy diễn về khung giờ đăng hay hành vi cuối tuần khi dữ liệu đầu vào chỉ có metric tổng).
+  \item \textbf{Quản lý khóa API 3 tầng (BYOK Vault)}: Hệ thống cho phép cấu hình khóa API theo thứ tự ưu tiên từ khóa riêng của Workspace, khóa cá nhân của người dùng đến biến môi trường hệ thống (\texttt{AI\_API\_KEY}). Các khóa do người dùng nhập được mã hóa đối xứng bằng thuật toán Fernet (kết hợp dẫn xuất khóa PBKDF2) và chỉ hiển thị dạng che dấu (\texttt{masked\_key}) trên giao diện.
+  \item \textbf{Kiểm soát ngữ cảnh và Prompt tách rời mã nguồn}: Chỉ dẫn prompt được lưu trữ độc lập tại \texttt{backend/\allowbreak prompts/\allowbreak prompts.json} theo 3 phiên bản (\texttt{v1}, \texttt{v2}, \texttt{v3}). Trước khi gửi yêu cầu tới mô hình, hệ thống chỉ trích xuất thông tin nghiệp vụ cần thiết (tên sản phẩm, USP, mục tiêu, kênh, từ khóa cấm trong Brand Kit) và loại bỏ hoàn toàn mật khẩu, khóa bí mật hay dữ liệu ngoài phạm vi quyền hạn.
+  \item \textbf{Cơ chế dự phòng có gắn nhãn (Smart Fallback)}: Khi gặp sự cố mạng, quá thời gian chờ hoặc phản hồi sai định dạng JSON Schema, hệ thống chuyển sang bộ mẫu dự phòng xác định, đồng thời gắn cờ \texttt{is\_fallback = True} và hiển thị cảnh báo rõ ràng trên giao diện để người dùng không nhầm lẫn với kết quả do mô hình AI sinh ra.
 \end{enumerate}
 
 \subsection{Cơ sở dữ liệu: SQLite với WAL Mode và SQLAlchemy 2.0}
@@ -73,7 +73,7 @@ Hệ thống sử dụng SQLite làm hệ quản trị cơ sở dữ liệu hạ
 \subsection{Đóng gói Container và Tự động hóa CI/CD}
 \begin{enumerate}
   \item \textbf{Kiến trúc Containerization}: Ứng dụng được đóng gói thành các dịch vụ độc lập trong \texttt{docker-compose.yml}: dịch vụ Backend chạy trên nền Python 3.11-slim tối giản dung lượng theo chuẩn Non-Root, và dịch vụ Frontend sử dụng kỹ thuật multi-stage build (biên dịch bằng Node.js và phân phối tĩnh bằng máy chủ web siêu nhẹ Nginx Alpine).
-  \item \textbf{Tự động hóa tích hợp liên tục (CI Pipeline)}: Pipeline GitHub Actions (\texttt{.github/workflows/ci.yml}) tự động kích hoạt mỗi khi có mã nguồn mới, thực hiện toàn diện ba giai đoạn: kiểm tra chất lượng mã (Linting/Typecheck), chạy bộ test tự động backend với \texttt{pytest}, và kiểm tra tính toàn vẹn khi đóng gói container Docker.
+  \item \textbf{Tự động hóa tích hợp liên tục (CI Pipeline)}: Pipeline GitHub Actions (\texttt{.github/\allowbreak workflows/\allowbreak ci.yml}) tự động kích hoạt mỗi khi có mã nguồn mới, thực hiện toàn diện ba giai đoạn: kiểm tra chất lượng mã (Linting/Typecheck), chạy bộ test tự động backend với \texttt{pytest}, và kiểm tra tính toàn vẹn khi đóng gói container Docker.
   \item \textbf{Giám sát sức khỏe tự động (Health Check Lifecycle)}: Cài đặt endpoint \texttt{GET /health} trả về trạng thái kết nối CSDL, tính sẵn sàng của Gemini API và tình trạng phân bổ bộ nhớ; tích hợp trực tiếp vào Docker daemon để hỗ trợ cơ chế tự phục hồi dịch vụ (Self-healing).
 \end{enumerate}
 

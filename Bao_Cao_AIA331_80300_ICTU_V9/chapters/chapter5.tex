@@ -4,12 +4,13 @@
 
 Toàn bộ hệ thống MarketFlow AI đã được hiện thực hóa hoàn chỉnh bằng mã nguồn thực tế trong hai thư mục chính: \texttt{backend/} và \texttt{frontend/}. Bảng~\ref{tab:v9-source-tree} mô tả cấu trúc phân bổ mã nguồn của dự án.
 
-\begin{table}[h!]
+\begin{table}[H]
 \centering
-\small
+\footnotesize
+\renewcommand{\arraystretch}{1.00}
 \caption{Cấu trúc phân bổ mã nguồn hệ thống MarketFlow AI}
 \label{tab:v9-source-tree}
-\begin{tabularx}{\textwidth}{|L{4.2cm}|Y|L{3.2cm}|}
+\begin{tabularx}{\textwidth}{|L{4.2cm}|Y|L{3.1cm}|}
 \hline
 \thead{Đường dẫn thư mục} & \thead{Mô tả thành phần mã nguồn} & \thead{Công nghệ sử dụng}\\
 \hline
@@ -44,7 +45,7 @@ Phân hệ an ninh trong \texttt{backend/app/core/security.py} và \texttt{deps.
 
 Để khắc phục triệt để lỗ hổng leo quyền ngang IDOR (Insecure Direct Object Reference), phân hệ triển khai thuật toán giải quyết phạm vi bản ghi (Record Scope Resolution). Quyền thao tác của người dùng trên từng tài nguyên được ma trận hóa chi tiết trong Bảng~\ref{tab:v9-scope-matrix}.
 
-\begin{table}[h!]
+\begin{table}[H]
 \centering
 \small
 \caption{Ma trận phân giải quyền hạn truy cập tài nguyên theo ngữ cảnh nghiệp vụ}
@@ -53,13 +54,13 @@ Phân hệ an ninh trong \texttt{backend/app/core/security.py} và \texttt{deps.
 \hline
 \thead{Tài nguyên} & \thead{Hành động} & \thead{Quản lý (Manager)} & \thead{Nhân viên sở hữu / Được phân công} & \thead{Nhân viên ngoài phạm vi}\\
 \hline
-\multirow{3}{*}{Chiến dịch} & Xem / Tìm kiếm & Toàn quyền & Xem chiến dịch được gán & Từ chối (HTTP 403)\\
+\multirow{3}{2.2cm}{\raggedright Chiến dịch} & Xem / Tìm kiếm & Toàn quyền & Xem chiến dịch được gán & Từ chối (HTTP 403)\\
 \cline{2-5}
 & Tạo mới / Sửa & Toàn quyền & Sửa chiến dịch của mình & Từ chối (HTTP 403)\\
 \cline{2-5}
 & Xóa chiến dịch & Toàn quyền & Từ chối tuyệt đối & Từ chối (HTTP 403)\\
 \hline
-\multirow{2}{*}{Nội dung} & Soạn / Sửa nháp & Toàn quyền & Soạn trong chiến dịch gán & Từ chối (HTTP 403)\\
+\multirow{2}{2.2cm}{\raggedright Nội dung} & Soạn / Sửa nháp & Toàn quyền & Soạn trong chiến dịch gán & Từ chối (HTTP 403)\\
 \cline{2-5}
 & Phê duyệt (Approve) & Toàn quyền & Từ chối tuyệt đối & Từ chối (HTTP 403)\\
 \hline
@@ -70,9 +71,9 @@ Chỉ số kênh & Nhập / Điều chỉnh & Toàn quyền & Nhập cho chiến
 
 \subsection{Hiện thực hóa Máy trạng thái duyệt nội dung (HITL State Machine)}
 
-Để bảo đảm tính toàn vẹn của quy trình Human-in-the-loop, module \texttt{backend/app/api/v1/contents.py} áp dụng các chốt chặn an toàn (Guard Conditions) tại cấp độ bộ điều khiển API. Bảng~\ref{tab:v9-hitl-rules} đặc tả các quy tắc chuyển dịch trạng thái và cơ chế chống gian lận quy trình đã được hiện thực hóa.
+Để bảo đảm tính toàn vẹn của quy trình Human-in-the-loop, module \texttt{backend/\allowbreak app/\allowbreak api/\allowbreak v1/\allowbreak contents.py} áp dụng các chốt chặn an toàn (Guard Conditions) tại cấp độ bộ điều khiển API. Bảng~\ref{tab:v9-hitl-rules} đặc tả các quy tắc chuyển dịch trạng thái và cơ chế chống gian lận quy trình đã được hiện thực hóa.
 
-\begin{table}[h!]
+\begin{table}[H]
 \centering
 \small
 \caption{Quy tắc chuyển dịch trạng thái nội dung và cơ chế chống can thiệp (Anti-tampering)}
@@ -100,10 +101,9 @@ Khởi tạo mới & \texttt{POST /contents} & Marketer, Manager & Trạng thái
 
 Giao diện người dùng được tổ chức mạch lạc, cung cấp trải nghiệm làm việc hiện đại theo kiến trúc Bento Grid và luồng thao tác trực quan.
 
-\begin{figure}[h!]
+\begin{figure}[H]
 \centering
-\resizebox{0.88\textwidth}{!}{\input{figures/ui-wireframe.tex}}
-\vspace{4pt}
+\input{figures/ui-wireframe.tex}
 \caption{Kiến trúc giao diện Bento Grid và các phân vùng thao tác của MarketFlow AI}
 \label{fig:v9-ui-wireframe}
 \end{figure}
@@ -118,7 +118,7 @@ Giao diện người dùng được tổ chức mạch lạc, cung cấp trải 
 
 \section{Hiện thực hóa AI Fallback De-hallucination Engine}
 
-Cơ chế xử lý dự phòng và khử ảo giác được hiện thực hóa trong \texttt{backend/app/services/ai\_service.py}. Khi yêu cầu gửi tới Google Gemini gặp sự cố mạng hoặc vượt quá hạn mức, hệ thống tự động kích hoạt hàm \texttt{\_generate\_fallback} nhằm duy trì tính liên tục của dịch vụ.
+Cơ chế xử lý dự phòng và khử ảo giác được hiện thực hóa trong \texttt{backend/\allowbreak app/\allowbreak services/\allowbreak ai\_service.py}. Khi yêu cầu gửi tới Google Gemini gặp sự cố mạng hoặc vượt quá hạn mức, hệ thống tự động kích hoạt hàm \texttt{\_generate\_fallback} nhằm duy trì tính liên tục của dịch vụ.
 
 Đối với tác vụ tóm tắt hiệu quả chiến dịch (SUMMARY), động cơ Smart Fallback vận hành dựa trên giải thuật suy diễn xác định (Deterministic Rule-based Engine) với các công thức tổng hợp toán học tiền định:
 \begin{align}

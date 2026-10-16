@@ -4,7 +4,7 @@
 
 Hệ thống MarketFlow AI được thiết kế xoay quanh hai nhóm tác nhân con người chính (Manager và Marketer) cùng hai thực thể ngoại vi (Nhà cung cấp dịch vụ AI và Nền tảng phân phối nội dung), được định nghĩa trong Bảng~\ref{tab:v9-actors}.
 
-\begin{table}[h!]
+\begin{table}[H]
 \centering
 \small
 \caption{Tác nhân, mục tiêu và ranh giới quyền hạn trong hệ thống}
@@ -24,7 +24,7 @@ Kênh truyền thông & Tiếp nhận lịch đăng và nội dung đã được
 \end{tabularx}
 \end{table}
 
-\begin{figure}[h!]
+\begin{figure}[H]
 \centering
 \input{figures/usecase.tex}
 \caption{Sơ đồ ca sử dụng chính của hệ thống MarketFlow AI}
@@ -36,21 +36,18 @@ Kênh truyền thông & Tiếp nhận lịch đăng và nội dung đã được
 Hệ thống hiện thực hóa trọn vẹn 14 yêu cầu chức năng cốt lõi (FR01--FR14), toàn bộ đều đã được kiểm chứng bằng các ca kiểm thử tự động, như được chi tiết hóa trong Bảng~\ref{tab:v9-functional}.
 
 \begin{small}
-\begin{longtable}{|C{1.1cm}|L{1.9cm}|L{3.9cm}|L{5.1cm}|C{1.7cm}|}
+\begin{longtable}{|C{0.9cm}|L{1.75cm}|L{3.4cm}|L{4.3cm}|C{2.65cm}|}
 \caption{Danh mục yêu cầu chức năng và kết quả nghiệm thu thực chứng}\label{tab:v9-functional}\\
 \hline
 \thead{Mã} & \thead{Phân hệ} & \thead{Nội dung yêu cầu} & \thead{Kết quả kiểm chứng thực tế} & \thead{Trạng thái}\\
 \hline
 \endfirsthead
 
-\multicolumn{5}{c}{{\small\bfseries Bảng~\ref{tab:v9-functional} (tiếp theo): Danh mục yêu cầu chức năng}}\\
 \hline
 \thead{Mã} & \thead{Phân hệ} & \thead{Nội dung yêu cầu} & \thead{Kết quả kiểm chứng thực tế} & \thead{Trạng thái}\\
 \hline
 \endhead
 
-\hline
-\multicolumn{5}{|r|}{{\footnotesize Tiếp tục sang trang tiếp theo...}}\\
 \hline
 \endfoot
 
@@ -103,7 +100,7 @@ Hệ thống tuân thủ 6 yêu cầu phi chức năng (NFR01--NFR06) đạt ti�
 
 Một trong những cải tiến quan trọng nhất trong kiến trúc an ninh của MarketFlow AI V9 là việc siết chặt phân quyền mức bản ghi (Record-level Authorization), khắc phục hoàn toàn lỗ hổng IDOR (Insecure Direct Object Reference).
 
-\begin{figure}[h!]
+\begin{figure}[H]
 \centering
 \input{figures/approval-sequence.tex}
 \caption{Quy trình phân quyền và kiểm soát phạm vi bản ghi khi xử lý yêu cầu}
@@ -144,7 +141,7 @@ Nếu tài khoản bị vô hiệu hóa (\texttt{user.status == 'INACTIVE'}), h�
 
 Để bảo đảm tính toàn vẹn của nội dung truyền thông doanh nghiệp, vòng đời của mỗi bài viết tiếp thị tuân thủ một máy trạng thái hữu hạn (Finite State Machine) nghiêm ngặt được mô tả tại Hình~\ref{fig:v9-content-state}.
 
-\begin{figure}[h!]
+\begin{figure}[H]
 \centering
 \input{figures/content-state.tex}
 \caption{Máy trạng thái duyệt nội dung Human-in-the-loop}

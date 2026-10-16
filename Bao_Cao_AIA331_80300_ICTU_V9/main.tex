@@ -15,13 +15,14 @@
 \tableofcontents
 \end{spacing}
 \clearpage
-\begin{spacing}{0.85}
+\begin{spacing}{0.92}
 \setlength{\parskip}{0pt}
 \listoftables
-\end{spacing}
-\clearpage
-\begin{spacing}{1.08}
+\vspace{12pt}
+\let\oldclearpage\clearpage
+\let\clearpage\relax
 \listoffigures
+\let\clearpage\oldclearpage
 \end{spacing}
 \clearpage
 
