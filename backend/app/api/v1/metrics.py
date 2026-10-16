@@ -2147,7 +2147,7 @@ def receive_external_pos_webhook(
     matched_kol_name = None
     if req.koc_code:
         try:
-            KolBooking.__table__.create(bind=db.get_bind(), checkfirst=True)
+            _ensure_kol_bookings_seeded(db, campaign.workspace_id or 1)
             koc_clean = req.koc_code.strip().upper()
             kol = (
                 db.query(KolBooking)
