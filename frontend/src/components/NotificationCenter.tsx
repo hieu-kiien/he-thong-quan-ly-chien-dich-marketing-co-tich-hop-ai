@@ -161,16 +161,16 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const getIcon = (type: AppNotification['type']) => {
     switch (type) {
       case 'review':
-        return <Clock className="w-4 h-4 text-amber-400 shrink-0" />;
+        return <Clock className="w-4 h-4 text-[#B45309] shrink-0" />;
       case 'campaign':
-        return <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />;
+        return <CheckCircle2 className="w-4 h-4 text-[#15803D] shrink-0" />;
       case 'ai':
-        return <Sparkles className="w-4 h-4 text-violet-400 shrink-0" />;
+        return <Sparkles className="w-4 h-4 text-[#D95D39] shrink-0" />;
       case 'warning':
-        return <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />;
+        return <AlertTriangle className="w-4 h-4 text-[#BE123C] shrink-0" />;
       case 'info':
       default:
-        return <Info className="w-4 h-4 text-indigo-400 shrink-0" />;
+        return <Info className="w-4 h-4 text-[#121316] shrink-0" />;
     }
   };
 
@@ -183,13 +183,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         aria-label="Thông báo hệ thống"
         aria-expanded={isOpen}
         title="Thông báo"
-        className="relative p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all border border-transparent hover:border-slate-700/80 active:scale-95"
+        className="relative p-2 text-[#5A5E66] hover:text-[#121316] hover:bg-[#F6F5F0] rounded-lg transition-all border border-transparent hover:border-[#E4E2DD] active:scale-95 cursor-pointer"
       >
         <Bell className="w-4 h-4" />
         {unreadCount > 0 && (
           <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 ring-2 ring-slate-900" />
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#D95D39] opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#D95D39] ring-2 ring-white" />
           </span>
         )}
       </button>
@@ -200,15 +200,15 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           ref={modalRef}
           role="dialog"
           aria-label="Trung tâm thông báo"
-          className="absolute right-0 mt-2 w-80 sm:w-96 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col text-slate-100 animate-in fade-in slide-in-from-top-2 duration-150"
+          className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-[#E4E2DD] rounded-xl shadow-xl z-50 overflow-hidden flex flex-col text-[#121316]"
         >
           {/* Header */}
-          <div className="p-4 border-b border-slate-800/80 flex items-center justify-between bg-slate-950/40">
+          <div className="p-3.5 border-b border-[#E4E2DD] flex items-center justify-between bg-[#F6F5F0]/60">
             <div className="flex items-center gap-2">
-              <Bell className="w-4 h-4 text-indigo-400" />
-              <h4 className="text-sm font-bold text-white">Thông báo</h4>
+              <Bell className="w-4 h-4 text-[#D95D39]" />
+              <h4 className="text-xs font-black uppercase tracking-wider text-[#121316]">Thông báo</h4>
               {unreadCount > 0 && (
-                <span className="px-2 py-0.5 text-[10px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full">
+                <span className="px-2 py-0.5 text-[10px] font-bold bg-[#FFF1EE] text-[#D95D39] border border-[#F5D0C5] rounded-md">
                   {unreadCount} mới
                 </span>
               )}
@@ -218,7 +218,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               {unreadCount > 0 && (
                 <button
                   onClick={markAllAsRead}
-                  className="px-2 py-1 text-[11px] font-medium text-slate-400 hover:text-indigo-300 hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-1"
+                  className="px-2 py-1 text-[11px] font-bold text-[#5A5E66] hover:text-[#121316] hover:bg-[#EAE8E1] rounded-md transition-colors flex items-center gap-1 cursor-pointer"
                   title="Đánh dấu tất cả đã đọc"
                 >
                   <CheckCheck className="w-3.5 h-3.5" />
@@ -228,7 +228,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               {notifications.length > 0 && (
                 <button
                   onClick={clearAll}
-                  className="p-1 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                  className="p-1 text-[#5A5E66] hover:text-[#BE123C] hover:bg-[#FFF1F2] rounded-md transition-colors cursor-pointer"
                   title="Xóa tất cả thông báo"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -236,7 +236,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               )}
               <button
                 onClick={() => setIsOpen(false)}
-                className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                className="p-1 text-[#5A5E66] hover:text-[#121316] hover:bg-[#EAE8E1] rounded-md transition-colors cursor-pointer"
                 title="Đóng bảng thông báo"
               >
                 <X className="w-3.5 h-3.5" />
@@ -245,23 +245,23 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           </div>
 
           {/* Filter Bar */}
-          <div className="flex items-center gap-1 px-4 py-2 bg-slate-950/20 border-b border-slate-800 text-xs font-semibold">
+          <div className="flex items-center gap-1 px-3.5 py-2 bg-white border-b border-[#E4E2DD] text-xs font-semibold">
             <button
               onClick={() => setActiveFilter('all')}
-              className={`px-2.5 py-1 rounded-lg transition-colors ${
+              className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
                 activeFilter === 'all'
-                  ? 'bg-slate-800 text-white font-bold'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-[#121316] text-white font-bold'
+                  : 'text-[#5A5E66] hover:text-[#121316] hover:bg-[#F6F5F0]'
               }`}
             >
               Tất cả ({notifications.length})
             </button>
             <button
               onClick={() => setActiveFilter('unread')}
-              className={`px-2.5 py-1 rounded-lg transition-colors ${
+              className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
                 activeFilter === 'unread'
-                  ? 'bg-indigo-600/30 text-indigo-200 font-bold border border-indigo-500/30'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-[#D95D39] text-white font-bold'
+                  : 'text-[#5A5E66] hover:text-[#121316] hover:bg-[#F6F5F0]'
               }`}
             >
               Chưa đọc ({unreadCount})
@@ -269,39 +269,37 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           </div>
 
           {/* List of Notifications */}
-          <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-800/60 p-1">
+          <div className="max-h-[380px] overflow-y-auto divide-y divide-[#F0EFEA] p-1.5">
             {loading && notifications.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 space-y-2">
-                <Loader2 className="w-6 h-6 animate-spin text-indigo-400 mx-auto" />
-                <p className="text-xs font-medium text-slate-300">Đang tải thông báo...</p>
+              <div className="p-8 text-center text-[#5A5E66] space-y-2">
+                <Loader2 className="w-5 h-5 animate-spin text-[#D95D39] mx-auto" />
+                <p className="text-xs font-medium text-[#5A5E66]">Đang tải thông báo...</p>
               </div>
             ) : loadError ? (
               <div role="alert" className="p-8 text-center space-y-2">
-                <AlertTriangle className="w-6 h-6 text-rose-400 mx-auto" />
-                <p className="text-xs font-bold text-rose-300">Không tải được thông báo</p>
-                <p className="text-[11px] text-slate-400">{loadError}</p>
+                <AlertTriangle className="w-6 h-6 text-[#BE123C] mx-auto" />
+                <p className="text-xs font-bold text-[#BE123C]">Không tải được thông báo</p>
+                <p className="text-[11px] text-[#5A5E66]">{loadError}</p>
                 <button
                   type="button"
                   onClick={() => void fetchNotifications()}
-                  className="mt-1 px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[11px] font-bold"
+                  className="mt-1 px-2.5 py-1 bg-[#121316] hover:bg-[#26282D] text-white rounded-lg text-[11px] font-bold"
                 >
                   Thử lại
                 </button>
               </div>
             ) : filteredNotifications.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 space-y-2">
-                <CheckCircle2 className="w-8 h-8 text-emerald-400/80 mx-auto" />
-                <p className="text-xs font-medium text-slate-300">
-                  {activeFilter === 'unread' ? 'Không có thông báo chưa đọc nào.' : 'Không có thông báo nào.'}
+              <div className="p-8 text-center text-[#5A5E66] space-y-1.5">
+                <CheckCircle2 className="w-7 h-7 text-[#15803D] mx-auto" />
+                <p className="text-xs font-bold text-[#121316]">
+                  {activeFilter === 'unread' ? 'Không có thông báo chưa đọc.' : 'Không có thông báo mới.'}
                 </p>
-                <p className="text-[11px] text-slate-500">
-                  Bạn đã cập nhật mọi hoạt động mới nhất của hệ thống!
+                <p className="text-[11px] text-[#5A5E66]">
+                  Mọi hoạt động chiến dịch và duyệt bài đã được cập nhật.
                 </p>
               </div>
             ) : (
               filteredNotifications.map((n) => (
-                // Dùng role="button" + tabIndex + onKeyDown (thay vì <button>) vì thẻ thông báo
-                // chứa nút xoá bên trong; <button> lồng nhau sẽ không hợp lệ về HTML.
                 <div
                   key={n.id}
                   role="button"
@@ -315,31 +313,31 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                       handleActionClick(n);
                     }
                   }}
-                  className={`p-3 rounded-xl transition-all flex items-start gap-3 cursor-pointer group ${
+                  className={`p-3 rounded-lg transition-all flex items-start gap-3 cursor-pointer group ${
                     n.read 
-                      ? 'bg-transparent hover:bg-slate-800/40 text-slate-300' 
-                      : 'bg-indigo-950/30 hover:bg-indigo-950/50 text-white border-l-2 border-indigo-500'
+                      ? 'bg-white hover:bg-[#F6F5F0] text-[#5A5E66]' 
+                      : 'bg-[#FFF9F6] hover:bg-[#FFF1EE] text-[#121316] border-l-2 border-[#D95D39]'
                   }`}
                 >
-                  <div className="p-1.5 rounded-lg bg-slate-800/80 mt-0.5 border border-slate-700/60">
+                  <div className="p-1.5 rounded-md bg-[#F6F5F0] mt-0.5 border border-[#E4E2DD]">
                     {getIcon(n.type)}
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1 mb-0.5">
-                      <h5 className="text-xs font-bold truncate group-hover:text-indigo-300 transition-colors">
+                      <h5 className="text-xs font-bold text-[#121316] truncate group-hover:text-[#D95D39] transition-colors">
                         {n.title}
                       </h5>
-                      <span className="text-[10px] text-slate-500 whitespace-nowrap">
+                      <span className="text-[10px] text-[#8A8F98] whitespace-nowrap font-mono">
                         {n.timestamp}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">
+                    <p className="text-[11px] text-[#5A5E66] leading-relaxed line-clamp-2">
                       {n.message}
                     </p>
 
                     {n.actionLabel && (
-                      <div className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-indigo-400 hover:text-indigo-300">
+                      <div className="mt-1.5 flex items-center gap-1 text-[11px] font-bold text-[#D95D39] hover:underline">
                         <span>{n.actionLabel}</span>
                         <ExternalLink className="w-3 h-3" />
                       </div>
@@ -348,7 +346,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
                   <button
                     onClick={(e) => removeNotification(n.id, e)}
-                    className="p-1 text-slate-500 hover:text-rose-400 rounded-md transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+                    className="p-1 text-[#8A8F98] hover:text-[#BE123C] rounded-md transition-colors opacity-0 group-hover:opacity-100 shrink-0"
                     title="Xóa thông báo này"
                   >
                     <X className="w-3 h-3" />
@@ -359,8 +357,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="p-2.5 bg-slate-950/40 border-t border-slate-800 text-center text-[11px] text-slate-500">
-            <span>MarketFlow AI • Cập nhật tự động thời gian thực</span>
+          <div className="p-2.5 bg-[#F6F5F0]/60 border-t border-[#E4E2DD] text-center text-[11px] text-[#5A5E66]">
+            <span>Trung tâm thông báo chiến dịch &amp; duyệt bài</span>
           </div>
         </div>
       )}

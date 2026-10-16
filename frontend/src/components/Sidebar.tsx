@@ -57,8 +57,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {/* Mobile Drawer Backdrop */}
-      {/* Lớp nền mobile chỉ là phím tắt chuột; nút đóng (icon X) bên trong sidebar là
-          cách đóng bằng bàn phím, nên backdrop không mang ý nghĩa tương tác. */}
       {isOpen && (
         <div
           role="none"
@@ -74,18 +72,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }`}
       >
         {/* Brand Header */}
-        <div className="p-5 flex items-center justify-between border-b border-[#26282D]">
+        <div className="px-5 py-4 flex items-center justify-between border-b border-[#26282D]">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#D95D39] flex items-center justify-center text-white font-bold shadow-sm">
-              <Layers className="w-5 h-5" />
+            <div className="w-8 h-8 rounded-lg bg-[#D95D39] flex items-center justify-center text-white font-bold">
+              <Layers className="w-4 h-4" />
             </div>
             <div>
-              <h1 className="font-bold text-white text-base tracking-tight">MarketFlow</h1>
-              <p className="text-[11px] text-slate-400 font-medium">Quản lý quảng cáo &amp; nội dung</p>
+              <h1 className="font-bold text-white text-sm tracking-tight">MarketFlow</h1>
+              <p className="text-[11px] text-slate-400">Quản lý chiến dịch &amp; nội dung</p>
             </div>
           </div>
 
-          {/* Close button on Mobile */}
           {onClose && (
             <button
               onClick={onClose}
@@ -96,27 +93,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
         </div>
-
-        {/* Role Badge */}
-        <div className="px-5 py-3 border-b border-[#26282D] bg-[#101114]">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">Vai trò:</span>
-            <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
-              currentUser?.role === 'MANAGER' || currentUser?.role === 'AGENCY_MANAGER'
-                ? 'bg-emerald-950 text-emerald-200 border border-emerald-500/40'
-                : currentUser?.role === 'CLIENT_APPROVER'
-                ? 'bg-amber-950 text-amber-200 border border-amber-500/40'
-                : 'bg-[#1E2025] text-slate-200 border border-slate-700'
-            }`}>
-              <ShieldCheck className="w-3 h-3" />
-              {/* Bảng nhãn: role không có trong bảng thì hiện CHÍNH role đó, thay
-                  vì rơi về 'Marketer' — fallback sai khiến người dùng ADMIN tưởng
-                  mình là Marketer. */}
-              {ROLE_LABELS[currentUser?.role ?? ''] ?? currentUser?.role ?? '—'}
-            </span>
-          </div>
-        </div>
-
 
         {/* Navigation */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
@@ -132,9 +108,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onSelectTab(item.id);
                   if (onClose) onClose();
                 }}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-[#D95D39] text-white font-semibold'
+                    ? 'bg-[#D95D39] text-white font-bold'
                     : 'text-slate-300 hover:bg-[#1E2025] hover:text-white'
                 }`}
               >
@@ -156,49 +132,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </nav>
 
-        {/* Subdomain status */}
-        {/* Nhãn môi trường lấy từ chế độ build, không hardcode "PROD".
-            Trước đây mọi bản chạy — kể cả `npm run dev` trên localhost:5173 —
-            đều hiện badge PROD và tên miền production, tức là một chỉ báo môi
-            trường sai trong 100% phiên chạy thật. */}
-        <div className="px-4 py-2 border-t border-[#26282D] bg-[#101114] flex items-center justify-between text-[11px]">
-          <div className="flex items-center gap-1.5 text-slate-400">
-            <span
-              className={`w-2 h-2 rounded-full ${isProd ? 'bg-emerald-400' : 'bg-amber-400'}`}
-              aria-hidden="true"
-            ></span>
-            <span className="font-mono text-[10px] text-slate-300">
-              {isProd ? 'production' : 'development'}
-            </span>
-          </div>
-          <span
-            className={`text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded ${
-              isProd
-                ? 'bg-emerald-500/20 text-emerald-300'
-                : 'bg-amber-500/20 text-amber-300'
-            }`}
-          >
-            {isProd ? 'PROD' : 'DEV'}
-          </span>
-        </div>
-
-        {/* User Info & Logout */}
-        <div className="p-4 border-t border-[#26282D] bg-[#101114]">
-          <div className="flex items-center justify-between">
+        {/* User Info & Role Footer */}
+        <div className="p-3.5 border-t border-[#26282D] bg-[#101114]">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="w-8 h-8 rounded-full bg-[#1E2025] border border-slate-700 flex items-center justify-center font-bold text-xs text-white shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-[#1E2025] border border-[#2E3138] flex items-center justify-center font-bold text-xs text-white shrink-0">
                 {currentUser?.full_name?.charAt(0) || 'U'}
               </div>
               <div className="truncate">
-                <p className="text-xs font-medium text-white truncate">{currentUser?.full_name || 'Người dùng'}</p>
-                <p className="text-[11px] text-slate-400 truncate">{currentUser?.email || ''}</p>
+                <p className="text-xs font-semibold text-white truncate">{currentUser?.full_name || 'Người dùng'}</p>
+                <p className="text-[10px] text-slate-400 truncate flex items-center gap-1 mt-0.5">
+                  <ShieldCheck className="w-3 h-3 text-[#D95D39] shrink-0" />
+                  <span className="truncate">{ROLE_LABELS[currentUser?.role ?? ''] ?? currentUser?.role ?? (isProd ? 'Trực tuyến' : 'Nội bộ')}</span>
+                </p>
               </div>
             </div>
             <button
               onClick={onLogout}
               aria-label="Đăng xuất"
               title="Đăng xuất"
-              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer shrink-0"
             >
               <LogOut className="w-4 h-4" />
             </button>

@@ -78,6 +78,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [dashboardSection, setDashboardSection] = useState<'overview' | 'ad_accounts' | 'channels'>('overview');
 
   const deleteConfirmRef = useFocusTrap<HTMLDivElement>({
     isActive: confirmDeleteId !== null,
@@ -449,96 +450,51 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* QUY TRÌNH 4 BƯỚC QUẢN LÝ CHIẾN DỊCH TỪ A-Z */}
-      <div className="bg-white rounded-xl border border-[#E4E2DD] p-4">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-[11px] font-black uppercase tracking-wider text-[#5A5E66]">
-            Quy trình quản lý chiến dịch thực tế (4 bước nối tiếp nhau)
-          </span>
-          <span className="text-[11px] text-[#5A5E66] hidden sm:inline">
-            Bấm vào bước bất kỳ để mở đúng màn hình thao tác
-          </span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* THANH QUY TRÌNH 4 BƯỚC GỌN TRÊN 1 DÒNG */}
+      <div className="bg-white rounded-xl border border-[#E4E2DD] px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+        <span className="text-[11px] font-black uppercase tracking-wider text-[#5A5E66]">
+          Quy trình 4 bước:
+        </span>
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <button
             type="button"
             onClick={() => onNavigateTab?.('campaigns')}
-            className="text-left p-3 rounded-xl bg-[#F6F5F0]/70 hover:bg-[#F6F5F0] border border-[#E4E2DD] hover:border-[#D95D39] transition-all cursor-pointer group"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#E4E2DD] text-xs font-bold text-[#121316] transition-colors cursor-pointer"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#121316] text-white">
-                Bước 1
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-[#5A5E66] group-hover:text-[#D95D39]" />
-            </div>
-            <p className="text-xs font-extrabold text-[#121316] mt-2">
-              Lập chiến dịch &amp; Ngân sách
-            </p>
-            <p className="text-[11px] text-[#5A5E66] mt-0.5 leading-snug">
-              Chọn sản phẩm cần bán, đặt ngân sách tổng và thời gian chạy ({campaigns.length} chiến dịch).
-            </p>
+            <span className="w-4 h-4 rounded bg-[#121316] text-white text-[10px] font-mono flex items-center justify-center">1</span>
+            <span>Lập chiến dịch ({campaigns.length})</span>
           </button>
-
+          <ChevronRight className="w-3.5 h-3.5 text-[#8A8F98] hidden sm:inline" />
           <button
             type="button"
             onClick={() => onNavigateTab?.('ai_studio')}
-            className="text-left p-3 rounded-xl bg-[#F6F5F0]/70 hover:bg-[#F6F5F0] border border-[#E4E2DD] hover:border-[#D95D39] transition-all cursor-pointer group"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#E4E2DD] text-xs font-bold text-[#121316] transition-colors cursor-pointer"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#D95D39] text-white">
-                Bước 2
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-[#5A5E66] group-hover:text-[#D95D39]" />
-            </div>
-            <p className="text-xs font-extrabold text-[#121316] mt-2">
-              Soạn bài &amp; Mẫu quảng cáo
-            </p>
-            <p className="text-[11px] text-[#5A5E66] mt-0.5 leading-snug">
-              Tự viết hoặc nhờ AI viết bài đăng Facebook, kịch bản TikTok và thư chào hàng.
-            </p>
+            <span className="w-4 h-4 rounded bg-[#D95D39] text-white text-[10px] font-mono flex items-center justify-center">2</span>
+            <span>Soạn mẫu quảng cáo</span>
           </button>
-
+          <ChevronRight className="w-3.5 h-3.5 text-[#8A8F98] hidden sm:inline" />
           <button
             type="button"
             onClick={() => onNavigateTab?.('reviews')}
-            className="text-left p-3 rounded-xl bg-[#F6F5F0]/70 hover:bg-[#F6F5F0] border border-[#E4E2DD] hover:border-[#D95D39] transition-all cursor-pointer group"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#E4E2DD] text-xs font-bold text-[#121316] transition-colors cursor-pointer"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#15803D] text-white">
-                Bước 3
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-[#5A5E66] group-hover:text-[#D95D39]" />
-            </div>
-            <p className="text-xs font-extrabold text-[#121316] mt-2">
-              Quét từ cấm &amp; Duyệt đăng
-            </p>
-            <p className="text-[11px] text-[#5A5E66] mt-0.5 leading-snug">
-              Kiểm tra từ nhạy cảm dễ bị khóa tài khoản và duyệt bài trước khi chạy ({pendingContents.length} chờ duyệt).
-            </p>
+            <span className="w-4 h-4 rounded bg-[#15803D] text-white text-[10px] font-mono flex items-center justify-center">3</span>
+            <span>Quét từ cấm &amp; Duyệt ({pendingContents.length})</span>
           </button>
-
+          <ChevronRight className="w-3.5 h-3.5 text-[#8A8F98] hidden sm:inline" />
           <button
             type="button"
-            onClick={() => setIsSmartCsvModalOpen(true)}
-            className="text-left p-3 rounded-xl bg-[#F6F5F0]/70 hover:bg-[#F6F5F0] border border-[#E4E2DD] hover:border-[#D95D39] transition-all cursor-pointer group"
+            onClick={() => setDashboardSection('ad_accounts')}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#E4E2DD] text-xs font-bold text-[#121316] transition-colors cursor-pointer"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#B45309] text-white">
-                Bước 4
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-[#5A5E66] group-hover:text-[#D95D39]" />
-            </div>
-            <p className="text-xs font-extrabold text-[#121316] mt-2">
-              Nhập số liệu &amp; Tối ưu Lời/Lỗ
-            </p>
-            <p className="text-[11px] text-[#5A5E66] mt-0.5 leading-snug">
-              Ghi nhận chi phí, đơn hàng, doanh thu mỗi ngày để tắt chiến dịch lỗ, tăng tiền chiến dịch lãi.
-            </p>
+            <span className="w-4 h-4 rounded bg-[#B45309] text-white text-[10px] font-mono flex items-center justify-center">4</span>
+            <span>Đồng bộ TK Quảng cáo &amp; Đơn POS</span>
           </button>
         </div>
       </div>
 
-      {/* THÔNG BÁO NGUỒN SỐ LIỆU (CHỈ HIỆN 1 THANH GỌN KHI ĐANG XEM SỐ LIỆU MẪU) */}
+      {/* THÔNG BÁO NGUỒN SỐ LIỆU (CHỈ HIỆN KHI ĐANG XEM SỐ LIỆU MẪU) */}
       {(dataProvenance?.has_demo_data || dataProvenance?.has_unverified_data) && (
         <div
           role="status"
@@ -580,122 +536,102 @@ export const Dashboard: React.FC<DashboardProps> = ({
         onRetry={() => void loadData()}
       />
 
-      {/* KHU VỰC 1B: QUẢN LÝ TÀI KHOẢN QUẢNG CÁO (META BM / TIKTOK BC) & ĐỒNG BỘ ĐƠN HÀNG POS */}
-      <AdAccountsHub onSynced={() => void loadData()} />
+      {/* THANH CHUYỂN CHẾ ĐỘ XEM (3 MỤC RÕ RÀNG, TRÁNH NHỒI NHÉT DỌC) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E4E2DD] pb-3">
+        <div className="inline-flex flex-wrap items-center gap-1.5 bg-white p-1 rounded-xl border border-[#E4E2DD]">
+          <button
+            type="button"
+            data-testid="dashboard-tab-overview"
+            onClick={() => setDashboardSection('overview')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              dashboardSection === 'overview'
+                ? 'bg-[#121316] text-white'
+                : 'text-[#5A5E66] hover:text-[#121316] hover:bg-[#F6F5F0]'
+            }`}
+          >
+            <span>1. Điều hành Chiến dịch &amp; Việc cần xử lý</span>
+            {portfolioAnomalies.length > 0 && (
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
+                dashboardSection === 'overview'
+                  ? 'bg-[#D95D39] text-white'
+                  : 'bg-[#FFF1F2] text-[#BE123C]'
+              }`}>
+                {portfolioAnomalies.length}
+              </span>
+            )}
+          </button>
 
-      {/* KHU VỰC 2: VIỆC CẦN XỬ LÝ NGAY & CÁCH VIẾT ĐANG HIỆU QUẢ NHẤT */}
-      {!loading && (portfolioAnomalies.length > 0 || winningPatterns.length > 0) && (
-        <div
-          data-testid="dashboard-portfolio-intelligence"
-          className="grid grid-cols-1 lg:grid-cols-12 gap-5"
-        >
-          {/* Cột trái (7/12): Chiến dịch cần xử lý ngay */}
-          <div className="lg:col-span-7 bg-white rounded-xl border border-[#E4E2DD] p-5 flex flex-col justify-between space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#F0EFEA] pb-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-black text-[#121316]">
-                    Chiến dịch cần xử lý ngay hôm nay
-                  </h3>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-[#FFF1F2] text-[#BE123C] border border-[#FECDD3]">
-                    {portfolioAnomalies.length} việc cần xem
-                  </span>
-                </div>
-                <p className="text-xs text-[#5A5E66] mt-0.5">
-                  Các chiến dịch đang tiêu tiền quá nhanh, khách đã nhàm quảng cáo hoặc thu về ít hơn số tiền bỏ ra.
-                </p>
-              </div>
+          <button
+            type="button"
+            data-testid="dashboard-tab-ad-accounts"
+            onClick={() => setDashboardSection('ad_accounts')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              dashboardSection === 'ad_accounts'
+                ? 'bg-[#121316] text-white'
+                : 'text-[#5A5E66] hover:text-[#121316] hover:bg-[#F6F5F0]'
+            }`}
+          >
+            <span>2. Tài khoản Quảng cáo &amp; Đơn hàng POS</span>
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
+              dashboardSection === 'ad_accounts'
+                ? 'bg-white/20 text-white'
+                : 'bg-[#F0FDF4] text-[#15803D] border border-[#BBF7D0]'
+            }`}>
+              API + Webhook
+            </span>
+          </button>
 
-              {morningBriefing?.rebalance_action?.available && (
-                <button
-                  type="button"
-                  onClick={handleOneClickRebalance}
-                  disabled={rebalancingBudget}
-                  className="inline-flex items-center gap-1.5 bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#D0CEC7] text-[#121316] font-bold text-xs px-3 py-1.5 rounded-lg transition-all cursor-pointer"
-                >
-                  {rebalancingBudget ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-3.5 h-3.5 text-[#D95D39]" />
-                  )}
-                  <span>Tự chia lại ngân sách theo kênh lãi</span>
-                </button>
-              )}
-            </div>
+          <button
+            type="button"
+            data-testid="dashboard-tab-channels"
+            onClick={() => setDashboardSection('channels')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              dashboardSection === 'channels'
+                ? 'bg-[#121316] text-white'
+                : 'text-[#5A5E66] hover:text-[#121316] hover:bg-[#F6F5F0]'
+            }`}
+          >
+            <span>3. So sánh Kênh &amp; Mẫu bài ra đơn</span>
+            {winningPatterns.length > 0 && (
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
+                dashboardSection === 'channels'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-[#F6F5F0] text-[#121316] border border-[#E4E2DD]'
+              }`}>
+                {winningPatterns.length} mẫu
+              </span>
+            )}
+          </button>
+        </div>
 
-            <div className="space-y-3">
-              {portfolioAnomalies.map((anom) => {
-                const isCrit = anom.severity === 'CRITICAL';
-                return (
-                  <div
-                    key={anom.id}
-                    className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                      isCrit
-                        ? 'bg-[#FFF1F2]/50 border-[#FECDD3]'
-                        : 'bg-[#FFFBEB]/60 border-[#FDE68A]'
-                    }`}
-                  >
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
-                            isCrit ? 'bg-[#BE123C] text-white' : 'bg-[#B45309] text-white'
-                          }`}
-                        >
-                          {anom.anomaly_type === 'OVER_PACING'
-                            ? 'Tiêu tiền quá nhanh'
-                            : anom.anomaly_type === 'CREATIVE_FATIGUE'
-                              ? 'Khách nhàm quảng cáo'
-                              : 'Chi phí cao · Ít đơn'}
-                        </span>
-                        <span className="text-xs font-extrabold text-[#121316] truncate">
-                          {anom.campaign_name}
-                        </span>
-                        <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-white border border-[#E4E2DD] text-[#BE123C]">
-                          {anom.metric_highlight || anom.metric_evidence}
-                        </span>
-                      </div>
-                      <p className="text-xs font-bold text-[#121316]">{anom.title}</p>
-                      {(anom.detail || anom.metric_evidence) && (
-                        <p className="text-xs text-[#5A5E66] leading-relaxed">{anom.detail || anom.metric_evidence}</p>
-                      )}
-                      <p className="text-xs font-semibold text-[#15803D]">
-                        Cách xử lý: {anom.recommended_action}
-                      </p>
-                    </div>
+        {dashboardSection !== 'ad_accounts' && (
+          <button
+            type="button"
+            onClick={() => setDashboardSection('ad_accounts')}
+            className="text-xs font-bold text-[#D95D39] hover:underline flex items-center gap-1 cursor-pointer self-start sm:self-auto"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Đồng bộ Meta BM / TikTok BC / Đơn POS &rarr;</span>
+          </button>
+        )}
+      </div>
 
-                    <div className="shrink-0 flex sm:flex-col items-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleApplyAnomalyFix(anom)}
-                        disabled={applyingAnomalyId === anom.id}
-                        className="px-3.5 py-2 rounded-xl bg-[#121316] hover:bg-[#D95D39] disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
-                      >
-                        {applyingAnomalyId === anom.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : anom.action_type === 'PAUSE_CAMPAIGN' || anom.action_type === 'PAUSE' ? (
-                          <PauseCircle className="w-3.5 h-3.5" />
-                        ) : (
-                          <Zap className="w-3.5 h-3.5" />
-                        )}
-                        <span>
-                          {anom.action_type === 'REFRESH_CREATIVE'
-                            ? 'Viết bài quảng cáo mới'
-                            : anom.action_type === 'ADJUST_BUDGET' || anom.action_type === 'REDUCE_BUDGET'
-                              ? 'Giảm 15% ngân sách'
-                              : anom.action_type === 'PAUSE_CAMPAIGN' || anom.action_type === 'PAUSE'
-                                ? 'Tạm dừng chiến dịch'
-                                : 'Chia lại ngân sách'}
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+      {/* MỤC 2: QUẢN LÝ TÀI KHOẢN QUẢNG CÁO & ĐƠN HÀNG POS */}
+      {dashboardSection === 'ad_accounts' && (
+        <AdAccountsHub onSynced={() => void loadData()} />
+      )}
+
+      {/* MỤC 3: SO SÁNH KÊNH & MẪU BÀI ĐANG RA ĐƠN */}
+      {dashboardSection === 'channels' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-7">
+            <AttributionTrendChart
+              channels={dashboardKpi?.channel_metrics || []}
+              totalCost={dashboardKpi?.total_cost}
+              totalRevenue={dashboardKpi?.total_revenue}
+            />
           </div>
 
-          {/* Cột phải (5/12): Cách viết đang mang lại nhiều đơn nhất (Nền sáng dễ đọc, không tím đen) */}
           <div className="lg:col-span-5 bg-white rounded-xl border border-[#E4E2DD] p-5 flex flex-col justify-between space-y-4">
             <div className="flex items-center justify-between gap-2 border-b border-[#F0EFEA] pb-3">
               <div className="flex items-center gap-2.5">
@@ -715,7 +651,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             <div className="space-y-3">
-              {winningPatterns.slice(0, 2).map((pat, idx) => (
+              {winningPatterns.slice(0, 3).map((pat, idx) => (
                 <div
                   key={pat.id || pat.pattern_id || `pat-${idx}`}
                   className="p-3.5 rounded-xl bg-[#F6F5F0]/70 border border-[#E4E2DD] space-y-1.5"
@@ -729,7 +665,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         ROAS {pat.avg_roas}x
                       </span>
                       <span className="px-2 py-0.5 rounded bg-white text-[#5A5E66] border border-[#E4E2DD]">
-                        Tỷ lệ bấm {pat.avg_ctr ?? pat.avg_ctr_pct ?? 2.4}%
+                        CTR {pat.avg_ctr ?? pat.avg_ctr_pct ?? 2.4}%
                       </span>
                     </div>
                   </div>
@@ -750,206 +686,270 @@ export const Dashboard: React.FC<DashboardProps> = ({
               className="w-full py-2.5 rounded-xl bg-[#D95D39] hover:bg-[#C04E2C] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Viết bài mới theo cách này</span>
+              <span>Viết bài mới theo cấu trúc này</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
       )}
 
-      {/* KHU VỰC 3: BẢNG DANH SÁCH CHIẾN DỊCH & VIỆC CẦN LÀM HÔM NAY */}
-      <div id="ai-doctor-hub" className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Cột trái (8/12): Danh sách chiến dịch + Biểu đồ so sánh kênh */}
-        <div className="lg:col-span-8 space-y-6">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-black text-[#121316]">
-                Danh sách chiến dịch đang quản lý
-              </h3>
-              <button
-                onClick={() => onNavigateTab?.('campaigns')}
-                className="text-xs text-[#D95D39] font-bold cursor-pointer hover:underline"
+      {/* MỤC 1 (MẶC ĐỊNH): ĐIỀU HÀNH CHIẾN DỊCH & VIỆC CẦN XỬ LÝ */}
+      {dashboardSection === 'overview' && (
+        <div id="ai-doctor-hub" className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Cột trái (8/12): Cảnh báo cần xử lý + Bảng chiến dịch */}
+          <div className="lg:col-span-8 space-y-5">
+            {!loading && portfolioAnomalies.length > 0 && (
+              <div
+                data-testid="dashboard-portfolio-intelligence"
+                className="bg-white rounded-xl border border-[#E4E2DD] p-4 space-y-3"
               >
-                Mở bảng điều khiển đầy đủ &rarr;
-              </button>
-            </div>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#F0EFEA] pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-black uppercase tracking-wider text-[#121316]">
+                      Chiến dịch cần xử lý ngay
+                    </h3>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-[#FFF1F2] text-[#BE123C] border border-[#FECDD3]">
+                      {portfolioAnomalies.length} cảnh báo
+                    </span>
+                  </div>
 
-            {loading ? (
-              <CampaignTableSkeleton rows={4} />
-            ) : loadError ? (
-              <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-center">
-                <AlertTriangle className="w-6 h-6 text-rose-500 mx-auto mb-1.5" />
-                <p className="text-xs font-bold text-rose-900">Không tải được danh sách chiến dịch</p>
-                <p className="text-[11px] text-rose-700 mt-0.5">{loadError}</p>
+                  {morningBriefing?.rebalance_action?.available && (
+                    <button
+                      type="button"
+                      onClick={handleOneClickRebalance}
+                      disabled={rebalancingBudget}
+                      className="inline-flex items-center gap-1.5 bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#D0CEC7] text-[#121316] font-bold text-xs px-2.5 py-1 rounded-lg transition-all cursor-pointer"
+                    >
+                      {rebalancingBudget ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-3.5 h-3.5 text-[#D95D39]" />
+                      )}
+                      <span>Chia lại ngân sách theo kênh lãi</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2.5">
+                  {portfolioAnomalies.map((anom) => {
+                    const isCrit = anom.severity === 'CRITICAL';
+                    return (
+                      <div
+                        key={anom.id}
+                        className={`p-3 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                          isCrit
+                            ? 'bg-[#FFF1F2]/40 border-[#FECDD3]'
+                            : 'bg-[#FFFBEB]/50 border-[#FDE68A]'
+                        }`}
+                      >
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                                isCrit ? 'bg-[#BE123C] text-white' : 'bg-[#B45309] text-white'
+                              }`}
+                            >
+                              {anom.anomaly_type === 'OVER_PACING'
+                                ? 'Tiêu tiền nhanh'
+                                : anom.anomaly_type === 'CREATIVE_FATIGUE'
+                                  ? 'Khách nhàm QC'
+                                  : 'Chi phí cao'}
+                            </span>
+                            <span className="text-xs font-extrabold text-[#121316] truncate">
+                              {anom.campaign_name}
+                            </span>
+                            <span className="text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-white border border-[#E4E2DD] text-[#BE123C]">
+                              {anom.metric_highlight || anom.metric_evidence}
+                            </span>
+                          </div>
+                          <p className="text-xs text-[#5A5E66] leading-snug">
+                            {anom.title} — <strong className="text-[#15803D]">{anom.recommended_action}</strong>
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleApplyAnomalyFix(anom)}
+                          disabled={applyingAnomalyId === anom.id}
+                          className="shrink-0 px-3 py-1.5 rounded-lg bg-[#121316] hover:bg-[#D95D39] disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap self-start sm:self-center"
+                        >
+                          {applyingAnomalyId === anom.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : anom.action_type === 'PAUSE_CAMPAIGN' || anom.action_type === 'PAUSE' ? (
+                            <PauseCircle className="w-3.5 h-3.5" />
+                          ) : (
+                            <Zap className="w-3.5 h-3.5" />
+                          )}
+                          <span>
+                            {anom.action_type === 'REFRESH_CREATIVE'
+                              ? 'Viết mẫu bài mới'
+                              : anom.action_type === 'ADJUST_BUDGET' || anom.action_type === 'REDUCE_BUDGET'
+                                ? 'Giảm 15% ngân sách'
+                                : anom.action_type === 'PAUSE_CAMPAIGN' || anom.action_type === 'PAUSE'
+                                  ? 'Tạm dừng'
+                                  : 'Chia lại ngân sách'}
+                          </span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-black text-[#121316]">
+                  Danh sách chiến dịch đang quản lý ({campaigns.length})
+                </h3>
                 <button
-                  type="button"
-                  onClick={() => void loadData()}
-                  className="mt-2 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[11px] font-bold"
+                  onClick={() => onNavigateTab?.('campaigns')}
+                  className="text-xs text-[#D95D39] font-bold cursor-pointer hover:underline"
                 >
-                  Thử tải lại
+                  Mở bảng điều khiển đầy đủ &rarr;
                 </button>
               </div>
-            ) : (
-              <CampaignTable
-                campaigns={campaigns}
-                onSelectCampaign={onSelectCampaign}
-                onOpenWorkflow={onOpenWorkflow}
-                onOpenAIForCampaign={onOpenAI}
-                onRequestDeleteCampaign={setConfirmDeleteId}
-                spendPercentByCampaign={campaignSpendPercent}
-                userRole={userRole}
-              />
-            )}
+
+              {loading ? (
+                <CampaignTableSkeleton rows={4} />
+              ) : loadError ? (
+                <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-center">
+                  <AlertTriangle className="w-6 h-6 text-rose-500 mx-auto mb-1.5" />
+                  <p className="text-xs font-bold text-rose-900">Không tải được danh sách chiến dịch</p>
+                  <p className="text-[11px] text-rose-700 mt-0.5">{loadError}</p>
+                  <button
+                    type="button"
+                    onClick={() => void loadData()}
+                    className="mt-2 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[11px] font-bold"
+                  >
+                    Thử tải lại
+                  </button>
+                </div>
+              ) : (
+                <CampaignTable
+                  campaigns={campaigns}
+                  onSelectCampaign={onSelectCampaign}
+                  onOpenWorkflow={onOpenWorkflow}
+                  onOpenAIForCampaign={onOpenAI}
+                  onRequestDeleteCampaign={setConfirmDeleteId}
+                  spendPercentByCampaign={campaignSpendPercent}
+                  userRole={userRole}
+                />
+              )}
+            </div>
           </div>
 
-          <AttributionTrendChart
-            channels={dashboardKpi?.channel_metrics || []}
-            totalCost={dashboardKpi?.total_cost}
-            totalRevenue={dashboardKpi?.total_revenue}
-          />
-        </div>
-
-        {/* Cột phải (4/12): Việc cần làm hôm nay + Bài chờ duyệt + Chẩn đoán 1 chiến dịch */}
-        <div className="lg:col-span-4 space-y-5">
-          {/* Việc cần làm hôm nay */}
-          <div className="bg-white rounded-xl border border-[#E4E2DD] p-5">
-            <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-[#F0EFEA]">
-              <div className="flex items-center gap-2">
-                <ListTodo className="w-4 h-4 text-[#D95D39]" />
-                <h3 className="text-xs font-black uppercase tracking-wider text-[#121316]">
-                  Việc cần làm hôm nay ({myWorkToday.filter(t => t.status !== 'DONE').length})
-                </h3>
+          {/* Cột phải (4/12): Việc cần làm hôm nay + Bài chờ duyệt */}
+          <div className="lg:col-span-4 space-y-5">
+            {/* Việc cần làm hôm nay */}
+            <div className="bg-white rounded-xl border border-[#E4E2DD] p-5">
+              <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-[#F0EFEA]">
+                <div className="flex items-center gap-2">
+                  <ListTodo className="w-4 h-4 text-[#D95D39]" />
+                  <h3 className="text-xs font-black uppercase tracking-wider text-[#121316]">
+                    Việc cần làm hôm nay ({myWorkToday.filter(t => t.status !== 'DONE').length})
+                  </h3>
+                </div>
+                <button
+                  onClick={() => onNavigateTab?.('my_tasks')}
+                  className="text-xs text-[#D95D39] font-bold hover:underline cursor-pointer"
+                >
+                  Xem hết &rarr;
+                </button>
               </div>
-              <button
-                onClick={() => onNavigateTab?.('my_tasks')}
-                className="text-xs text-[#D95D39] font-bold hover:underline cursor-pointer"
-              >
-                Xem hết &rarr;
-              </button>
-            </div>
 
-            {myWorkToday.length === 0 ? (
-              <div className="py-5 text-center text-[#5A5E66] text-xs">
-                <CheckCircle2 className="w-6 h-6 mx-auto mb-1.5 text-[#15803D]" />
-                Không có đầu việc nào bị tồn đọng hôm nay.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {myWorkToday.slice(0, 4).map((task) => (
-                  <div
-                    key={task.id}
-                    className={`p-2.5 rounded-lg border flex items-center justify-between gap-2.5 transition-colors ${
-                      task.is_overdue
-                        ? 'bg-[#FFF1F2]/50 border-[#FECDD3]'
-                        : 'bg-[#F6F5F0]/60 border-[#E4E2DD]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <button
-                        onClick={() => handleToggleTaskStatus(task.id, task.status)}
-                        className={`w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
-                          task.status === 'DONE'
-                            ? 'bg-[#15803D] border-[#15803D] text-white'
-                            : 'border-slate-300 hover:border-[#D95D39] bg-white'
-                        }`}
-                        title="Đánh dấu hoàn thành"
-                      >
-                        {task.status === 'DONE' && <Check className="w-3 h-3 stroke-[3]" />}
-                      </button>
+              {myWorkToday.length === 0 ? (
+                <div className="py-5 text-center text-[#5A5E66] text-xs">
+                  <CheckCircle2 className="w-6 h-6 mx-auto mb-1.5 text-[#15803D]" />
+                  Không có đầu việc nào bị tồn đọng hôm nay.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {myWorkToday.slice(0, 4).map((task) => (
+                    <div
+                      key={task.id}
+                      className={`p-2.5 rounded-lg border flex items-center justify-between gap-2.5 transition-colors ${
+                        task.is_overdue
+                          ? 'bg-[#FFF1F2]/50 border-[#FECDD3]'
+                          : 'bg-[#F6F5F0]/60 border-[#E4E2DD]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <button
+                          onClick={() => handleToggleTaskStatus(task.id, task.status)}
+                          className={`w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                            task.status === 'DONE'
+                              ? 'bg-[#15803D] border-[#15803D] text-white'
+                              : 'border-slate-300 hover:border-[#D95D39] bg-white'
+                          }`}
+                          title="Đánh dấu hoàn thành"
+                        >
+                          {task.status === 'DONE' && <Check className="w-3 h-3 stroke-[3]" />}
+                        </button>
 
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-[#121316] truncate">{task.title}</p>
-                        <p className="text-[11px] text-[#5A5E66] truncate">
-                          {task.campaign_name} {task.due_date && `· Hạn: ${task.due_date}`}
-                        </p>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-[#121316] truncate">{task.title}</p>
+                          <p className="text-[11px] text-[#5A5E66] truncate">
+                            {task.campaign_name} {task.due_date && `· Hạn: ${task.due_date}`}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Bài viết đang chờ duyệt */}
+            <div className="bg-white rounded-xl border border-[#E4E2DD] p-5">
+              <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-[#F0EFEA]">
+                <span className="text-xs font-black uppercase tracking-wider text-[#121316] flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-[#B45309]" /> Bài viết chờ duyệt ({pendingContents.length})
+                </span>
+                <button
+                  onClick={() => onNavigateTab?.('reviews')}
+                  className="text-xs text-[#D95D39] hover:underline font-bold cursor-pointer"
+                >
+                  Vào duyệt &rarr;
+                </button>
+              </div>
+
+              {pendingContents.length === 0 ? (
+                <p className="text-xs text-[#5A5E66] py-3 text-center">Không có bài viết nào đang chờ duyệt.</p>
+              ) : (
+                <div className="space-y-2.5">
+                  {pendingContents.slice(0, 3).map((item) => (
+                    <div key={item.id} className="p-3 bg-[#F6F5F0]/70 border border-[#E4E2DD] rounded-lg">
+                      <p className="text-xs font-bold text-[#121316] truncate">{item.title}</p>
+                      <p className="text-[11px] text-[#5A5E66] truncate mt-0.5">{item.body}</p>
+                      {isManager && (
+                        <button
+                          type="button"
+                          onClick={() => handleApproveQuick(item.id)}
+                          aria-label={`Phê duyệt ngay bài: ${item.title}`}
+                          className="mt-2 text-[11px] font-bold text-[#15803D] hover:underline flex items-center gap-1"
+                        >
+                          <CheckCircle2 className="w-3 h-3" /> Duyệt bài này
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {commandCenterError && (
+              <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3.5">
+                <p className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Không tải được thông tin việc cần làm
+                </p>
+                <p className="text-[11px] text-amber-800 mt-0.5">{commandCenterError}</p>
               </div>
             )}
           </div>
-
-          {/* Bài viết đang chờ duyệt */}
-          <div className="bg-white rounded-xl border border-[#E4E2DD] p-5">
-            <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-[#F0EFEA]">
-              <span className="text-xs font-black uppercase tracking-wider text-[#121316] flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-[#B45309]" /> Bài viết chờ duyệt ({pendingContents.length})
-              </span>
-              <button
-                onClick={() => onNavigateTab?.('reviews')}
-                className="text-xs text-[#D95D39] hover:underline font-bold cursor-pointer"
-              >
-                Vào duyệt &rarr;
-              </button>
-            </div>
-
-            {pendingContents.length === 0 ? (
-              <p className="text-xs text-[#5A5E66] py-3 text-center">Không có bài viết nào đang chờ duyệt.</p>
-            ) : (
-              <div className="space-y-2.5">
-                {pendingContents.slice(0, 3).map((item) => (
-                  <div key={item.id} className="p-3 bg-[#F6F5F0]/70 border border-[#E4E2DD] rounded-lg">
-                    <p className="text-xs font-bold text-[#121316] truncate">{item.title}</p>
-                    <p className="text-[11px] text-[#5A5E66] truncate mt-0.5">{item.body}</p>
-                    {isManager && (
-                      <button
-                        type="button"
-                        onClick={() => handleApproveQuick(item.id)}
-                        aria-label={`Phê duyệt ngay bài: ${item.title}`}
-                        className="mt-2 text-[11px] font-bold text-[#15803D] hover:underline flex items-center gap-1"
-                      >
-                        <CheckCircle2 className="w-3 h-3" /> Duyệt bài này
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Cập nhật nhanh kết quả chạy quảng cáo */}
-          {commandCenterError ? (
-            <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3.5">
-              <p className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                Không tải được thông tin việc cần làm
-              </p>
-              <p className="text-[11px] text-amber-800 mt-0.5">{commandCenterError}</p>
-            </div>
-          ) : (
-            <div className="bg-white rounded-xl border border-[#E4E2DD] p-5 space-y-3">
-              <div className="flex items-center gap-2">
-                <Upload className="w-4 h-4 text-[#D95D39]" />
-                <h3 className="text-xs font-black uppercase tracking-wider text-[#121316]">
-                  Cập nhật số liệu chạy quảng cáo
-                </h3>
-              </div>
-              <p className="text-xs text-[#5A5E66] leading-relaxed">
-                Bạn có thể tải file báo cáo xuất từ Facebook/TikTok/Google lên hệ thống, hoặc bấm vào từng chiến dịch để nhập trực tiếp số tiền đã chi và doanh thu hôm nay.
-              </p>
-              <div className="flex flex-col gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setIsSmartCsvModalOpen(true)}
-                  className="w-full py-2 px-3 rounded-lg bg-[#121316] hover:bg-[#26282D] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Tải file báo cáo CSV lên</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onNavigateTab?.('campaigns')}
-                  className="w-full py-2 px-3 rounded-lg bg-[#F6F5F0] hover:bg-[#EAE8E1] text-[#121316] border border-[#D0CEC7] text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <Megaphone className="w-3.5 h-3.5" />
-                  <span>Nhập tay trong từng chiến dịch</span>
-                </button>
-              </div>
-            </div>
-          )}
         </div>
-      </div>
+      )}
 
       {/* Xác nhận xóa chiến dịch */}
       {confirmDeleteId !== null && (

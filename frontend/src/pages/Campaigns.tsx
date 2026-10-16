@@ -1696,14 +1696,14 @@ export const Campaigns: React.FC<CampaignsProps> = ({
       {loading ? (
         viewMode === 'table' ? <CampaignTableSkeleton /> : <CampaignCardSkeleton count={6} />
       ) : filteredCampaigns.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-12 text-center">
-          <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 mx-auto mb-4">
-            <Megaphone className="w-7 h-7" />
+        <div className="bg-white rounded-2xl border border-dashed border-[#D0CEC7] p-12 text-center">
+          <div className="w-12 h-12 bg-[#F6F5F0] border border-[#E4E2DD] rounded-xl flex items-center justify-center text-[#D95D39] mx-auto mb-3">
+            <Megaphone className="w-6 h-6" />
           </div>
-          <h3 className="text-base font-bold text-slate-800">Không tìm thấy chiến dịch phù hợp</h3>
-          <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+          <h3 className="text-base font-bold text-[#121316]">Không tìm thấy chiến dịch phù hợp</h3>
+          <p className="text-xs text-[#5A5E66] mt-1 max-w-md mx-auto">
             {searchTerm || statusFilter !== 'ALL' || objectiveFilter !== 'ALL' || smartViewFilter !== 'ALL'
-              ? 'Thử điều chỉnh lại bộ lọc tìm kiếm, trạng thái phân phối hoặc Saved Views.'
+              ? 'Thử điều chỉnh lại bộ lọc tìm kiếm, trạng thái phân phối hoặc chế độ lọc nhanh.'
               : 'Hãy bắt đầu thiết lập chiến dịch đầu tiên theo quy trình chuẩn Meta Ads & Google Ads.'}
           </p>
           <button
@@ -1714,7 +1714,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
               setSmartViewFilter('ALL');
               setIsWizardOpen(true);
             }}
-            className="mt-5 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm"
+            className="mt-5 inline-flex items-center gap-2 px-4 py-2 bg-[#D95D39] hover:bg-[#C04E2C] text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Tạo Chiến Dịch Đầu Tiên</span>
@@ -1735,10 +1735,10 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                   key={`mobile-${c.id}`}
                   role="group"
                   aria-label={`Chiến dịch ${c.name}`}
-                  className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-shadow space-y-3"
+                  className="bg-white rounded-xl border border-[#E4E2DD] p-4 space-y-3"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 truncate max-w-[140px]">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#F6F5F0] text-[#5A5E66] border border-[#E4E2DD] truncate max-w-[140px]">
                       {c.product?.name || `Sản phẩm #${c.product_id}`}
                     </span>
                     <div className="flex items-center gap-2">
@@ -1750,8 +1750,8 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         title="Nhấp để Tạm dừng chiến dịch / Kích hoạt phân phối"
                         role="switch"
                         aria-checked={isActive}
-                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 ${
-                          isActive ? 'bg-emerald-500' : 'bg-slate-300'
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#15803D] focus:ring-offset-2 ${
+                          isActive ? 'bg-[#15803D]' : 'bg-slate-300'
                         }`}
                       >
                         <span
@@ -1761,7 +1761,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         />
                       </button>
                       <span className={`text-[10px] font-bold ${
-                        isActive ? 'text-emerald-700' : isPaused ? 'text-slate-600' : 'text-slate-600'
+                        isActive ? 'text-[#15803D]' : isPaused ? 'text-[#5A5E66]' : 'text-[#5A5E66]'
                       }`}>
                         {isActive ? 'BẬT' : isPaused ? 'TẮT' : c.status}
                       </span>
@@ -1775,33 +1775,33 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                       aria-label={`Xem chi tiết chiến dịch ${c.name}`}
                       className="block w-full text-left"
                     >
-                      <h3 className="text-sm font-bold text-slate-900 line-clamp-1">
+                      <h3 className="text-sm font-bold text-[#121316] line-clamp-1">
                         {c.name}
                       </h3>
-                      <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                      <p className="text-xs text-[#5A5E66] line-clamp-1 mt-0.5">
                         {c.objective}
                       </p>
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-[#F0EFEA]">
                     <div>
-                      <div className="text-[10px] text-slate-600 font-bold uppercase">Ngân sách</div>
-                      <div className="font-mono font-bold text-slate-900 mt-0.5">
+                      <div className="text-[10px] text-[#5A5E66] font-bold uppercase">Ngân sách</div>
+                      <div className="font-mono font-bold text-[#121316] mt-0.5">
                         {formatNumber(c.budget)} đ
                       </div>
                     </div>
                     <div>
-                      <div className="text-[10px] text-slate-600 font-bold uppercase">Hiệu suất</div>
-                      <div className="font-mono font-bold text-slate-900 mt-0.5">
+                      <div className="text-[10px] text-[#5A5E66] font-bold uppercase">Hiệu suất</div>
+                      <div className="font-mono font-bold text-[#121316] mt-0.5">
                         {cardAgg.rowCount > 0 && cardAgg.cost > 0
                           ? `${(cardAgg.revenue / cardAgg.cost).toFixed(2)}x ROAS`
-                          : <span className="text-slate-400 font-normal text-[10px] italic">Chưa có số liệu</span>}
+                          : <span className="text-[#8A8F98] font-normal text-[10px] italic">Chưa có số liệu</span>}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between pt-2 border-t border-[#F0EFEA]">
                     <div className="flex items-center gap-1.5">
                       {(contentStats[c.id]?.channels ?? [])
                         .filter((code) => code !== 'unknown')
@@ -1820,7 +1820,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                           );
                         })}
                       {(contentStats[c.id]?.channels ?? []).length === 0 && (
-                        <span className="text-[9px] text-slate-400 italic">Chưa có kênh</span>
+                        <span className="text-[9px] text-[#8A8F98] italic">Chưa có kênh</span>
                       )}
                     </div>
 
@@ -1830,7 +1830,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         onClick={() => setSelectedDrawerCampaign(c)}
                         aria-label={`Xem chi tiết chiến dịch ${c.name}`}
                         title="Xem chi tiết & Mẫu quảng cáo"
-                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg transition-colors"
+                        className="p-1.5 text-[#5A5E66] hover:text-[#121316] hover:bg-[#F6F5F0] rounded-lg transition-colors"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
@@ -1838,7 +1838,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         onClick={(e) => handleDuplicateCampaign(c, e)}
                         aria-label={`Nhân bản chiến dịch ${c.name}`}
                         title="Nhân bản chiến dịch"
-                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg transition-colors"
+                        className="p-1.5 text-[#5A5E66] hover:text-[#121316] hover:bg-[#F6F5F0] rounded-lg transition-colors"
                       >
                         <Copy className="w-4 h-4" />
                       </button>
@@ -1846,7 +1846,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         onClick={() => onOpenAI(c)}
                         aria-label={`Mở AI sáng tạo nội dung cho chiến dịch ${c.name}`}
                         title="Mở Trợ lý Sáng tạo AI Copilot"
-                        className="p-1.5 text-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg transition-colors"
+                        className="p-1.5 text-[#D95D39] hover:bg-[#FFF1EE] rounded-lg transition-colors"
                       >
                         <Sparkles className="w-4 h-4" />
                       </button>
@@ -1855,7 +1855,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                           onClick={() => setDeletingId(c.id)}
                           aria-label={`Xóa chiến dịch ${c.name}`}
                           title="Xóa chiến dịch"
-                          className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-500 rounded-lg transition-colors"
+                          className="p-1.5 text-[#5A5E66] hover:text-[#BE123C] hover:bg-[#FFF1F2] rounded-lg transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1868,7 +1868,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
           </div>
 
           {/* Desktop Data Table (>=768px) */}
-          <div className="hidden md:block bg-white rounded-2xl border border-slate-200 overflow-hidden shadow">
+          <div className="hidden md:block bg-white rounded-xl border border-[#E4E2DD] overflow-hidden">
             <div
               className="overflow-x-auto"
               role="region"
@@ -1877,7 +1877,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
             >
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
+                  <tr className="bg-[#F6F5F0] border-b border-[#E4E2DD] text-[#5A5E66] font-bold uppercase tracking-wider text-[10px]">
                     <th className="py-3 pl-4 pr-2 w-10 text-center">
                       <input
                         type="checkbox"
@@ -1887,20 +1887,19 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                           filteredCampaigns.every((c) => selectedCampaignIds.includes(c.id))
                         }
                         onChange={handleSelectAllDisplayed}
-                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                        className="rounded border-[#D0CEC7] text-[#D95D39] focus:ring-[#D95D39] cursor-pointer"
                       />
                     </th>
                     <th className="py-3 px-3 w-24">Trạng thái</th>
-                    <th className="py-3 px-4 min-w-[240px]">Chiến dịch & Sản phẩm</th>
-                    <th className="py-3 px-3 min-w-[115px]">Kênh</th>
-                    <th className="py-3 px-4 min-w-[185px]">Ngân sách & Đã chi</th>
-                    <th className="py-3 px-4 min-w-[140px]">Doanh thu & ROAS</th>
-                    <th className="py-3 px-3 min-w-[140px]">Bài viết</th>
-                    <th className="py-3 px-3 w-28 text-center">Kiểm tra</th>
-                    <th className="py-3 px-4 w-32 text-right">Thao tác</th>
+                    <th className="py-3 px-4 min-w-[230px]">Chiến dịch &amp; Sản phẩm</th>
+                    <th className="py-3 px-3 min-w-[100px]">Kênh</th>
+                    <th className="py-3 px-4 min-w-[175px]">Ngân sách &amp; Đã chi</th>
+                    <th className="py-3 px-4 min-w-[140px]">Doanh thu &amp; ROAS</th>
+                    <th className="py-3 px-3 min-w-[125px]">Mẫu bài viết</th>
+                    <th className="py-3 px-4 min-w-[190px] text-right">Kiểm tra &amp; Thao tác</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
+                <tbody className="divide-y divide-[#F0EFEA] text-[#121316]">
                   {filteredCampaigns.map((c, rowIdx) => {
                     const isActive = c.status === 'ACTIVE';
                     const isPaused = c.status === 'PAUSED';
@@ -1922,10 +1921,10 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                     const campCode = c.campaign_code || `CMP_${String(c.id).padStart(3, '0')}`;
                     const funnelStage = c.funnel_stage || (c.objective?.toLowerCase().includes('nhận diện') ? 'ToFU' : c.objective?.toLowerCase().includes('doanh số') ? 'BoFU' : 'MoFU');
                     const funnelLabel = funnelStage === 'BoFU' || funnelStage === 'BOFU'
-                      ? 'Chốt đơn (BoFU)'
+                      ? 'Chốt đơn'
                       : funnelStage === 'ToFU' || funnelStage === 'TOFU'
-                      ? 'Tiếp cận mới (ToFU)'
-                      : 'Tư vấn (MoFU)';
+                      ? 'Tiếp cận'
+                      : 'Tư vấn';
 
                     return (
                       <tr 
@@ -1979,35 +1978,23 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                           </div>
                         </td>
 
-                        {/* Column 2: Campaign & Product Hierarchy + Standardized Code & Funnel Stage */}
+                        {/* Column 2: Campaign & Product Hierarchy (Clean 2-line Editorial layout) */}
                         <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="px-1.5 py-0.5 rounded bg-[#F6F5F0] text-[#5A5E66] font-mono text-[9px] font-bold border border-[#E4E2DD]">
+                          <div className="font-bold text-[#121316] group-hover:text-[#D95D39] transition-colors text-xs flex items-center gap-1.5">
+                            <span>{c.name}</span>
+                            <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 text-[#D95D39] transition-opacity shrink-0" />
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-1 text-[11px] text-[#5A5E66] flex-wrap">
+                            <span className="font-mono text-[10px] font-semibold text-[#5A5E66]">
                               {campCode}
                             </span>
-                            <span
-                              className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                                funnelStage === 'BoFU' || funnelStage === 'BOFU'
-                                  ? 'bg-[#F0FDF4] text-[#15803D] border border-[#BBF7D0]'
-                                  : funnelStage === 'ToFU' || funnelStage === 'TOFU'
-                                  ? 'bg-sky-50 text-sky-700 border border-sky-200'
-                                  : 'bg-[#FFFBEB] text-[#B45309] border border-[#FDE68A]'
-                              }`}
-                            >
+                            <span>·</span>
+                            <span className="font-semibold text-[#121316]">
+                              {c.product?.name || `SP #${c.product_id}`}
+                            </span>
+                            <span>·</span>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#F6F5F0] border border-[#E4E2DD] text-[#5A5E66] font-semibold">
                               {funnelLabel}
-                            </span>
-                          </div>
-                          <div className="font-bold text-[#121316] group-hover:text-[#D95D39] transition-colors text-xs flex items-center gap-1.5 mt-1">
-                            <span>{c.name}</span>
-                            <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 text-[#D95D39] transition-opacity" />
-                          </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#5A5E66] bg-[#F6F5F0] px-2 py-0.5 rounded-md border border-[#E4E2DD]">
-                              <Package className="w-3 h-3 text-[#5A5E66]" />
-                              <span>{c.product?.name || `Sản phẩm #${c.product_id}`}</span>
-                            </span>
-                            <span className="text-[10px] font-medium text-[#5A5E66] truncate max-w-[160px]">
-                              {c.objective}
                             </span>
                           </div>
                         </td>
@@ -2031,7 +2018,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                               })}
                             </div>
                           ) : (
-                            <span className="text-[10px] text-slate-500 italic">Chưa có nội dung</span>
+                            <span className="text-[10px] text-[#8A8F98] italic">Chưa có kênh</span>
                           )}
                         </td>
 
@@ -2092,7 +2079,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                           {pacingInfo.isOverPacing && (
                             <div className="mt-1 inline-flex items-center gap-1 text-[9px] font-bold text-[#BE123C] bg-[#FFF1F2] px-1.5 py-0.5 rounded border border-[#FECDD3]">
                               <Flame className="w-2.5 h-2.5 text-[#BE123C]" />
-                              <span>Tiêu nhanh ({pacingInfo.budgetPct.toFixed(0)}% tiền / {pacingInfo.timePct.toFixed(0)}% ngày)</span>
+                              <span>Tiêu nhanh ({pacingInfo.budgetPct.toFixed(0)}% tiền)</span>
                             </div>
                           )}
                         </td>
@@ -2117,7 +2104,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                               </div>
                             </>
                           ) : (
-                            <span className="text-[10px] text-slate-500 italic">Chưa ghi nhận chỉ số</span>
+                            <span className="text-[10px] text-[#8A8F98] italic">Chưa ghi nhận chỉ số</span>
                           )}
                         </td>
 
@@ -2137,30 +2124,28 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                           )}
                         </td>
 
-                        {/* Column 7: AI Doctor Health */}
-                        <td className="py-3.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedDrawerCampaign(c);
-                              setDrawerTab('ai_doctor');
-                            }}
-                            data-testid={`open-ai-doctor-btn-${c.id}`}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold text-[#121316] bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#D0CEC7] transition-colors"
-                          >
-                            <Sparkles className="w-3 h-3 text-[#D95D39]" />
-                            <span>Khám bệnh</span>
-                          </button>
-                        </td>
-
-                        {/* Column 8: Quick Actions */}
+                        {/* Column 7: Merged Health Check & Quick Actions */}
                         <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedDrawerCampaign(c);
+                                setDrawerTab('ai_doctor');
+                              }}
+                              data-testid={`open-ai-doctor-btn-${c.id}`}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-[#121316] bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#D0CEC7] transition-colors cursor-pointer"
+                              title="Chẩn đoán chi phí & hiệu quả chiến dịch"
+                            >
+                              <Sparkles className="w-3 h-3 text-[#D95D39]" />
+                              <span>Khám bệnh</span>
+                            </button>
+
                             <button
                               onClick={() => setSelectedDrawerCampaign(c)}
                               aria-label={`Xem chi tiết chiến dịch ${c.name}`}
                               title="Xem chi tiết & Mẫu quảng cáo"
-                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg transition-colors"
+                              className="p-1.5 text-[#5A5E66] hover:text-[#121316] hover:bg-[#F6F5F0] rounded-lg transition-colors cursor-pointer"
                             >
                               <Eye className="w-4 h-4" />
                             </button>
@@ -2169,7 +2154,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                               onClick={(e) => handleDuplicateCampaign(c, e)}
                               aria-label={`Nhân bản chiến dịch ${c.name}`}
                               title="Nhân bản chiến dịch để chạy thử nghiệm A/B"
-                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg transition-colors"
+                              className="p-1.5 text-[#5A5E66] hover:text-[#121316] hover:bg-[#F6F5F0] rounded-lg transition-colors cursor-pointer"
                             >
                               <Copy className="w-4 h-4" />
                             </button>
@@ -2178,7 +2163,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                               onClick={() => onOpenAI(c)}
                               aria-label={`Mở AI sáng tạo nội dung cho chiến dịch ${c.name}`}
                               title="Mở Trợ lý Sáng tạo AI Copilot"
-                              className="p-1.5 text-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg transition-colors"
+                              className="p-1.5 text-[#D95D39] hover:bg-[#FFF1EE] rounded-lg transition-colors cursor-pointer"
                             >
                               <Sparkles className="w-4 h-4" />
                             </button>
@@ -2188,7 +2173,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                                 onClick={() => setDeletingId(c.id)}
                                 aria-label={`Xóa chiến dịch ${c.name}`}
                                 title="Xóa chiến dịch"
-                                className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-500 rounded-lg transition-colors"
+                                className="p-1.5 text-[#5A5E66] hover:text-[#BE123C] hover:bg-[#FFF1F2] rounded-lg transition-colors cursor-pointer"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -2200,12 +2185,12 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                   })}
                 </tbody>
 
-                {/* Sticky Summary Footer (Meta Ads Manager Total Row Standard) */}
-                <tfoot className="bg-slate-900 text-white border-t-2 border-slate-800 text-xs font-bold">
+                {/* Sticky Summary Footer (Warm-Stone Editorial Total Row) */}
+                <tfoot className="bg-[#F6F5F0] text-[#121316] border-t border-[#E4E2DD] text-xs font-bold">
                   <tr>
                     <td colSpan={4} className="py-3 px-4">
                       <div className="flex items-center gap-2">
-                        <span className="uppercase tracking-wider text-[10px] text-indigo-300">
+                        <span className="uppercase tracking-wider text-[10px] text-[#5A5E66]">
                           {tableFooterSummary.isSelectionSubset
                             ? `Đang chọn ${tableFooterSummary.count} chiến dịch:`
                             : `Tổng hợp ${tableFooterSummary.count} chiến dịch hiển thị:`}
@@ -2213,26 +2198,26 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                       </div>
                     </td>
                     <td className="py-3 px-4 font-mono">
-                      <div className="text-white">
+                      <div className="text-[#121316]">
                         NS: {formatNumber(tableFooterSummary.totalBudget)} đ
                       </div>
-                      <div className="text-[10px] text-indigo-300 font-normal">
+                      <div className="text-[10px] text-[#5A5E66] font-normal">
                         Đã chi: {formatNumber(tableFooterSummary.totalSpend)} đ
                       </div>
                     </td>
                     <td className="py-3 px-4 font-mono">
-                      <div className="text-emerald-400">
+                      <div className="text-[#15803D]">
                         {tableFooterSummary.weightedRoas !== null
                           ? `${tableFooterSummary.weightedRoas.toFixed(2)}x ROAS TB`
                           : '— ROAS'}
                       </div>
-                      <div className="text-[10px] text-slate-300 font-normal">
-                        DT: {formatNumber(tableFooterSummary.totalRevenue)} đ • {formatNumber(tableFooterSummary.totalConversions)} đơn
+                      <div className="text-[10px] text-[#5A5E66] font-normal">
+                        DT: {formatNumber(tableFooterSummary.totalRevenue)} đ · {formatNumber(tableFooterSummary.totalConversions)} đơn
                       </div>
                     </td>
-                    <td colSpan={3} className="py-3 px-4 text-right text-[11px] text-slate-300 font-normal">
-                      {formatNumber(tableFooterSummary.totalClicks)} Clicks
-                      {tableFooterSummary.avgCvr !== null ? ` • ${tableFooterSummary.avgCvr.toFixed(1)}% CVR TB` : ''}
+                    <td colSpan={2} className="py-3 px-4 text-right text-[11px] text-[#5A5E66] font-normal">
+                      {formatNumber(tableFooterSummary.totalClicks)} lượt bấm
+                      {tableFooterSummary.avgCvr !== null ? ` · ${tableFooterSummary.avgCvr.toFixed(1)}% chốt đơn TB` : ''}
                     </td>
                   </tr>
                 </tfoot>
