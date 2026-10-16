@@ -2353,6 +2353,139 @@ export const adAccountsApi = {
     const res = await apiClient.post('/ad-accounts/external-webhook', data);
     return res.data;
   },
+  quickConnectOAuth: async (data: {
+    provider: 'META_FANPAGE_BM' | 'TIKTOK_SHOP_BC' | 'SAPO_POS_LIVE' | string;
+    campaign_id?: number;
+    workspace_id?: number;
+  }): Promise<{
+    status: string;
+    provider: string;
+    account: AdAccountItem;
+  }> => {
+    const res = await apiClient.post('/ad-accounts/oauth-connect', data);
+    return res.data;
+  },
+  pushTwoWayBudget: async (
+    accountId: number,
+    data: {
+      daily_spend_cap: number;
+      campaign_budget?: number;
+      remote_status?: 'ACTIVE' | 'PAUSED' | string;
+    }
+  ): Promise<{
+    status: string;
+    platform: string;
+    account_code: string;
+    daily_spend_cap: number;
+    remote_status: string;
+    linked_campaign_name: string | null;
+    pushed_at: string;
+    account: AdAccountItem;
+  }> => {
+    const res = await apiClient.post(`/ad-accounts/${accountId}/push-budget`, data);
+    return res.data;
+  },
+  runAutoWorkerTick: async (workspaceId?: number): Promise<{
+    status: string;
+    executed_at: string;
+    auto_published_posts_count: number;
+    auto_published_titles: string[];
+    schedules_triggered: number;
+    synced_accounts_count: number;
+    kol_orders_added: number;
+    kol_revenue_added: number;
+    ad_revenue_added: number;
+  }> => {
+    const params = workspaceId ? { workspace_id: workspaceId } : {};
+    const res = await apiClient.post('/ad-accounts/auto-worker-tick', null, { params });
+    return res.data;
+  },
+};
+
+export interface KolBookingItem {
+  id: number;
+  workspace_id: number;
+  campaign_id: number | null;
+  campaign_name: string | null;
+  campaign_code: string | null;
+  creator_name: string;
+  handle: string;
+  platform: 'TIKTOK' | 'FACEBOOK' | 'INSTAGRAM' | 'YOUTUBE' | string;
+  followers_tier: string;
+  tracking_code: string;
+  utm_link: string;
+  booking_cost: number;
+  commission_pct: number;
+  commission_amount: number;
+  total_cost: number;
+  views_count: number;
+  clicks_count: number;
+  orders_count: number;
+  revenue_generated: number;
+  net_roas: number;
+  cpa: number;
+  status: string;
+  video_or_post_url: string | null;
+}
+
+export const kolBookingsApi = {
+  list: async (workspaceId?: number): Promise<{
+    items: KolBookingItem[];
+    workspace_id: number;
+    summary: {
+      total_creators: number;
+      total_cost: number;
+      total_revenue: number;
+      total_orders: number;
+      avg_roas: number;
+    };
+  }> => {
+    const params = workspaceId ? { workspace_id: workspaceId } : {};
+    const res = await apiClient.get('/kol-bookings', { params });
+    return res.data;
+  },
+  create: async (data: {
+    creator_name: string;
+    handle: string;
+    platform: string;
+    followers_tier: string;
+    campaign_id?: number | null;
+    tracking_code?: string;
+    booking_cost: number;
+    commission_pct: number;
+    video_or_post_url?: string;
+    workspace_id?: number;
+  }): Promise<KolBookingItem> => {
+    const res = await apiClient.post('/kol-bookings', data);
+    return res.data;
+  },
+  delete: async (bookingId: number): Promise<{ status: string; id: number }> => {
+    const res = await apiClient.delete(`/kol-bookings/${bookingId}`);
+    return res.data;
+  },
+  recordOrder: async (
+    bookingId: number,
+    data?: {
+      order_count?: number;
+      order_value?: number;
+      added_views?: number;
+      added_clicks?: number;
+    }
+  ): Promise<{
+    status: string;
+    booking: KolBookingItem;
+    added_orders: number;
+    added_revenue: number;
+    commission_cost_added: number;
+  }> => {
+    const res = await apiClient.post(`/kol-bookings/${bookingId}/record-order`, data || {
+      order_count: 3,
+      order_value: 2450000,
+      added_views: 4800,
+      added_clicks: 190,
+    });
+    return res.data;
+  },
 };
 
 export const scheduleApi = {

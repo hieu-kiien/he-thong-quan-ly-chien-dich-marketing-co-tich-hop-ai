@@ -724,3 +724,40 @@ class AdAccount(Base):
 
     workspace = relationship("Workspace")
     linked_campaign = relationship("Campaign")
+
+
+class KolBooking(Base):
+    """Quản lý thuê KOL / KOC / Affiliate bên thứ 3 (TikTok Shop, Facebook Reels, YouTube, Instagram)
+    kèm mã theo dõi UTM / Voucher riêng để đo lường chính xác Chi phí cát-xê + Hoa hồng so với Doanh thu ra đơn.
+    """
+
+    __tablename__ = "kol_bookings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False, index=True)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False, index=True)
+    creator_name = Column(String(255), nullable=False)
+    handle = Column(String(120), nullable=False)
+    platform = Column(String(50), nullable=False, default="TIKTOK")
+    followers_tier = Column(String(60), nullable=False, default="Micro KOC (50K - 200K)")
+    tracking_code = Column(String(100), nullable=False, index=True)
+    booking_cost = Column(Numeric(12, 2), nullable=False, default=0)
+    commission_pct = Column(Numeric(5, 2), nullable=False, default=10.0)
+    views_count = Column(Integer, nullable=False, default=0)
+    clicks_count = Column(Integer, nullable=False, default=0)
+    orders_count = Column(Integer, nullable=False, default=0)
+    revenue_generated = Column(Numeric(12, 2), nullable=False, default=0)
+    video_or_post_url = Column(String(500), nullable=True)
+    status = Column(String(50), nullable=False, default="AIRING")
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
+
+    __table_args__ = (
+        CheckConstraint("platform IN ('TIKTOK', 'FACEBOOK', 'INSTAGRAM', 'YOUTUBE')", name="chk_kol_platform"),
+        CheckConstraint("status IN ('NEGOTIATING', 'BOOKED', 'AIRING', 'COMPLETED')", name="chk_kol_status"),
+        Index("idx_kol_bookings_ws_camp", "workspace_id", "campaign_id"),
+    )
+
+    workspace = relationship("Workspace")
+    campaign = relationship("Campaign")
+

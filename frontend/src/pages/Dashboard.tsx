@@ -529,7 +529,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 : 'text-[#3B3F46] hover:text-[#121316] hover:bg-[#F6F5F0]'
             }`}
           >
-            <span>Tài khoản QC &amp; Đơn POS</span>
+            <span>Tài khoản QC, KOL/KOC &amp; POS</span>
           </button>
 
           <button

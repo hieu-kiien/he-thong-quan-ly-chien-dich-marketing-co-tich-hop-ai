@@ -1052,6 +1052,31 @@ def publish_content(
 
     ext_prefix = "meta_ad" if (content.channel_id == 1) else ("tt_ad" if content.channel_id == 2 else "crm_post")
     external_delivery_id = f"{ext_prefix}_{content.campaign_id}_{content.id}_{int(now_utc.timestamp())}"
+    publish_engine = "MarketFlow Auto-Publisher"
+    outbound_dispatched = False
+
+    # Nếu tài khoản quảng cáo có Access Token thực tế (EAAB...), thử đẩy bài trực tiếp lên Facebook Fanpage Graph API
+    if matched_ad_acc and matched_ad_acc.access_token_masked and len(matched_ad_acc.access_token_masked) >= 24 and "..." not in matched_ad_acc.access_token_masked:
+        try:
+            import urllib.request
+            import urllib.parse
+
+            fb_msg = f"{content.title}\n\n{content.body or ''}"
+            if content.cta:
+                fb_msg += f"\n\n👉 {content.cta}"
+            post_data = urllib.parse.urlencode({
+                "message": fb_msg,
+                "access_token": matched_ad_acc.access_token_masked.strip(),
+            }).encode("utf-8")
+            fb_req = urllib.request.Request("https://graph.facebook.com/v19.0/me/feed", data=post_data, method="POST")
+            with urllib.request.urlopen(fb_req, timeout=3.0) as fb_resp:
+                fb_json = json.loads(fb_resp.read().decode("utf-8"))
+                if fb_json.get("id"):
+                    external_delivery_id = str(fb_json["id"])
+                    publish_engine = "Facebook Graph API v19.0 (Live Fanpage)"
+                    outbound_dispatched = True
+        except Exception as fb_exc:
+            logger.info("Auto-publish fallback for content %s: %s", content.id, fb_exc)
 
     meta_dict = {}
     if content.ai_metadata_json:
@@ -1068,6 +1093,8 @@ def publish_content(
         "pixel_id": matched_ad_acc.pixel_id if (matched_ad_acc and matched_ad_acc.pixel_id) else "px_88392019283",
         "published_at": now_utc.isoformat(),
         "published_by_id": current_user.id,
+        "publish_engine": publish_engine,
+        "outbound_dispatched": outbound_dispatched,
         "delivery_status": "ACTIVE_DELIVERY",
     })
     content.ai_metadata_json = json.dumps(meta_dict, ensure_ascii=False)
