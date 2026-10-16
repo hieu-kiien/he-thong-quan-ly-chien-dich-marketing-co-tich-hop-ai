@@ -39,25 +39,25 @@ interface MCPAgentStudioProps {
 const PRESET_MISSIONS = [
   {
     id: 'full_audit_budget',
-    label: '📊 Kiểm toán KPI & Tái phân bổ Ngân sách (ROAS)',
-    goal: 'Kiểm toán toàn diện hiệu quả chiến dịch, chẩn đoán sức khỏe KPI và tự động tối ưu phân bổ lại ngân sách (budget rebalance) theo ROAS thực tế.',
+    label: 'Kiểm toán KPI & Tái phân bổ Ngân sách (ROAS)',
+    goal: 'Kiểm toán hiệu quả chi phí — doanh thu chiến dịch, chẩn đoán sức khỏe KPI và tự động tối ưu phân bổ lại ngân sách (budget rebalance) theo ROAS thực tế.',
     withDraft: false,
   },
   {
     id: 'compliance_autofix',
-    label: '🛡️ Quét & Tự động Làm sạch Vi phạm Chính sách (100/100)',
+    label: 'Quét & Tự động Làm sạch Vi phạm Chính sách (100/100)',
     goal: 'Quét tuân thủ quảng cáo (compliance check) và tự động sửa lại các cụm từ vi phạm chính sách để đạt chuẩn an toàn thương hiệu 100/100.',
     withDraft: true,
   },
   {
     id: 'brandkit_draft',
-    label: '✍️ Đọc Brand Kit & Tự động Tạo Bản nháp Chiến dịch',
+    label: 'Đọc Brand Kit & Tự động Tạo Bản nháp Chiến dịch',
     goal: 'Đọc Brand Kit của Workspace qua MCP Resource, kiểm tra chính sách và tự động khởi tạo lưu bản nháp bài viết mới vào chiến dịch.',
     withDraft: true,
   },
   {
     id: 'doctor_overview',
-    label: '🩺 Tổng hợp Danh mục & Khám Sức khỏe Chiến dịch',
+    label: 'Tổng hợp Danh mục & Khám Sức khỏe Chiến dịch',
     goal: 'Liệt kê danh sách chiến dịch trong Workspace, trích xuất số liệu KPI và chạy Bác sĩ AI chẩn đoán điểm mạnh/điểm nghẽn.',
     withDraft: false,
   },
@@ -411,7 +411,7 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
   return (
     <div className="space-y-6" data-testid="mcp-agent-studio">
       {/* Top Architecture Overview Card */}
-      <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white border border-indigo-500/30 shadow-xl">
+      <div className="bg-[#121316] rounded-2xl p-6 text-white border border-indigo-500/30 shadow-xl">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -607,7 +607,7 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
               data-testid="mcp-run-agent-btn"
               onClick={handleRunAgent}
               disabled={agentRunning}
-              className="w-full py-3 px-5 bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-99"
+              className="w-full py-3 px-5 bg-[#D95D39] hover:bg-[#C04E2C] text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-99"
             >
               {agentRunning ? (
                 <>
@@ -759,7 +759,7 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                🤖 Biệt Đội 4 AI Agents
+                Biệt Đội 4 AI Agents
               </button>
               <button
                 type="button"
@@ -771,7 +771,7 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                🔗 A/B Testing &amp; UTM Builder
+                A/B Testing &amp; UTM Builder
               </button>
               <button
                 type="button"
@@ -783,7 +783,7 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                🎨 AI Visual Banner (1:1 • 9:16 • 16:9)
+                AI Visual Banner (1:1 • 9:16 • 16:9)
               </button>
             </div>
 
@@ -844,7 +844,7 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
                   <div className="space-y-3 border border-violet-200 bg-violet-50/30 rounded-xl p-3.5" data-testid="squad-result-panel">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-xs font-black text-violet-950">
-                        ✅ Biệt Đội {squadResult.agents_count || 4} AI Agents • Chiến dịch: {squadResult.campaign_name} (#{squadResult.campaign_id})
+                        Biệt Đội {squadResult.agents_count || 4} AI Agents • Chiến dịch: {squadResult.campaign_name} (#{squadResult.campaign_id})
                       </span>
                       <span className="text-[11px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
                         {squadResult.total_latency_ms}ms • Compliance: 100/100 PASSED
@@ -874,7 +874,7 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
                         />
                         <div className="space-y-1 text-xs min-w-0">
                           <div className="font-bold text-slate-900">
-                            🎨 Banner AI ({squadResult.visual_banner.aspect_ratio} • {squadResult.visual_banner.dimensions?.placement}): {squadResult.visual_banner.banner_overlay?.headline}
+                            Banner AI ({squadResult.visual_banner.aspect_ratio} • {squadResult.visual_banner.dimensions?.placement}): {squadResult.visual_banner.banner_overlay?.headline}
                           </div>
                           <div className="text-[11px] text-slate-600 line-clamp-2">
                             Prompt: {squadResult.visual_banner.visual_prompt}
@@ -1036,7 +1036,7 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
                   ) : (
                     <>
                       <Sparkles className="w-3.5 h-3.5" />
-                      <span>🎨 Kết xuất AI Visual Banner ({visualRatio}) &amp; Đính kèm vào Bài viết Chiến dịch</span>
+                      <span>Kết xuất AI Visual Banner ({visualRatio}) &amp; Đính kèm vào Bài viết Chiến dịch</span>
                     </>
                   )}
                 </button>
@@ -1061,7 +1061,7 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
                         <strong>AI Visual Prompt:</strong> {visualResult.visual_prompt}
                       </p>
                       <div className="text-[11px] text-emerald-800 font-semibold">
-                        ✅ Đã đồng bộ ảnh vào Bài viết #{visualResult.attached_content_id || 'Mới nhất'} trong SQLite Database.
+                        Đã đồng bộ ảnh vào Bài viết #{visualResult.attached_content_id || 'Mới nhất'} trong SQLite Database.
                       </div>
                     </div>
                   </div>
@@ -1165,8 +1165,7 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
                         onClick={() => handleTestToolCall(t.name)}
                         className="text-[11px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1 rounded-lg transition-colors cursor-pointer shrink-0"
                       >
-                        Test RPC ➔
-                      </button>
+                        Test RPC </button>
                     </div>
                     <p className="text-xs text-slate-600 leading-relaxed">{t.description}</p>
                   </div>
@@ -1191,8 +1190,7 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
                         onClick={() => handleTestResourceRead(r.uri)}
                         className="text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg transition-colors cursor-pointer shrink-0"
                       >
-                        Đọc URI ➔
-                      </button>
+                        Đọc URI </button>
                     </div>
                     <div className="text-xs font-bold text-slate-800">{r.name}</div>
                     <p className="text-xs text-slate-600 leading-relaxed">{r.description}</p>
@@ -1242,7 +1240,7 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
                   <div className="text-emerald-400 font-bold">JSON-RPC 2.0 Response Payload</div>
                   <pre className="whitespace-pre-wrap">
                     {rpcResponsePreview ||
-                      '// Bấm "Test RPC ➔" ở tab Tools hoặc "Đọc URI ➔" ở tab Resources để xem phản hồi thực tế từ máy chủ MCP.'}
+                      '// Bấm "Test RPC " ở tab Tools hoặc "Đọc URI " ở tab Resources để xem phản hồi thực tế từ máy chủ MCP.'}
                   </pre>
                 </div>
               </div>
@@ -1286,12 +1284,12 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
                     aria-label="Chọn nền tảng nhận Webhook"
                     className="w-full text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 font-semibold text-slate-800"
                   >
-                    <option value="n8n_zapier">⚡ n8n / Make.com / Zapier</option>
-                    <option value="telegram_bot">✈️ Telegram Bot API</option>
-                    <option value="slack_discord">💬 Slack / Discord Webhook</option>
-                    <option value="facebook_graph">📘 Meta (FB/IG) Graph API</option>
-                    <option value="tiktok_business">🎵 TikTok Business API</option>
-                    <option value="wordpress_cms">🌐 WordPress REST CMS</option>
+                    <option value="n8n_zapier">n8n / Make.com / Zapier</option>
+                    <option value="telegram_bot">Telegram Bot API</option>
+                    <option value="slack_discord">Slack / Discord Webhook</option>
+                    <option value="facebook_graph">Meta (FB/IG) Graph API</option>
+                    <option value="tiktok_business">TikTok Business API</option>
+                    <option value="wordpress_cms">WordPress REST CMS</option>
                   </select>
                 </div>
 
@@ -1328,7 +1326,7 @@ export const MCPAgentStudio: React.FC<MCPAgentStudioProps> = ({
                 ) : (
                   <>
                     <Zap className="w-3.5 h-3.5 text-amber-400" />
-                    <span>🚀 Bắn thử Outbound Webhook &amp; Xem Chữ ký HMAC-SHA256</span>
+                    <span>Bắn thử Outbound Webhook &amp; Xem Chữ ký HMAC-SHA256</span>
                   </>
                 )}
               </button>

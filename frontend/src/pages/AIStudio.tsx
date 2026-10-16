@@ -554,13 +554,13 @@ export const AIStudio: React.FC<AIStudioProps> = ({
     if (channel === 'tiktok' && omniData.tiktok) {
       const tt = omniData.tiktok;
       const scenesText = tt.scenes?.map(s => 
-        `🎬 Cảnh ${s.scene_number}: ${s.scene_name || s.title || ''} (${s.duration_seconds || 5}s)\n- Hành động: ${s.visual_action || s.visual || ''}\n- Lời thoại: ${s.voiceover || s.audio || ''}\n- Hiệu ứng âm thanh: ${s.audio || ''}`
+        `Cảnh ${s.scene_number}: ${s.scene_name || s.title || ''} (${s.duration_seconds || 5}s)\n- Hành động: ${s.visual_action || s.visual || ''}\n- Lời thoại: ${s.voiceover || s.audio || ''}\n- Hiệu ứng âm thanh: ${s.audio || ''}`
       ).join('\n\n') || '';
-      return `🔥 HOOK 3S:\n${tt.hook_3s}\n\n${scenesText}\n\n🎵 GỢI Ý NHẠC NỀN:\n${tt.sound_recommendation || tt.suggested_audio || ''}`;
+      return `HOOK 3S:\n${tt.hook_3s}\n\n${scenesText}\n\nGỢI Ý NHẠC NỀN:\n${tt.sound_recommendation || tt.suggested_audio || ''}`;
     }
     if (channel === 'email' && omniData.email) {
       const em = omniData.email;
-      return `📧 TIÊU ĐỀ A: ${em.subject_line_a || em.subject}\n📧 TIÊU ĐỀ B: ${em.subject_line_b || ''}\n[PREHEADER]: ${em.preheader || ''}\n\n[NỘI DUNG]:\n${em.body_content || em.body}\n\n👉 [NÚT CTA]: ${em.cta_button || em.cta}\n\n[P.S.]: ${em.ps_note || ''}`;
+      return `TIÊU ĐỀ A: ${em.subject_line_a || em.subject}\nTIÊU ĐỀ B: ${em.subject_line_b || ''}\n[PREHEADER]: ${em.preheader || ''}\n\n[NỘI DUNG]:\n${em.body_content || em.body}\n\n[NÚT CTA]: ${em.cta_button || em.cta}\n\n[P.S.]: ${em.ps_note || ''}`;
     }
     return '';
   };
@@ -1321,7 +1321,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                     ) : (
                       <div className="p-5 space-y-4 flex-1 text-xs">
                         <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl">
-                          <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider">🔥 Hook 3 Giây Đầu:</span>
+                          <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider">Hook 3 Giây Đầu:</span>
                           <p className="font-bold text-rose-950 mt-1 text-sm leading-snug">{omniData.tiktok.hook_3s}</p>
                         </div>
 
@@ -1335,14 +1335,14 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                                   <span className="text-slate-400 font-mono text-[10px] bg-slate-200/60 px-1.5 py-0.5 rounded">{sc.duration_seconds || 5}s</span>
                                 </div>
                                 <div className="text-[11px] text-slate-700">
-                                  <strong className="text-slate-900">🎬 Visual:</strong> {sc.visual_action || sc.visual}
+                                  <strong className="text-slate-900">Visual:</strong> {sc.visual_action || sc.visual}
                                 </div>
                                 <div className="text-[11px] text-slate-800 bg-white p-2 rounded border border-slate-100 italic">
-                                  <strong className="text-slate-900 not-italic">🗣️ Lời thoại:</strong> &ldquo;{sc.voiceover || sc.audio}&rdquo;
+                                  <strong className="text-slate-900 not-italic">Lời thoại:</strong> &ldquo;{sc.voiceover || sc.audio}&rdquo;
                                 </div>
                                 {sc.audio && (
                                   <div className="text-[10px] text-slate-500">
-                                    <strong>🎵 Âm thanh:</strong> {sc.audio}
+                                    <strong>Âm thanh:</strong> {sc.audio}
                                   </div>
                                 )}
                               </div>
@@ -1351,7 +1351,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                         </div>
 
                         <div className="p-2.5 bg-slate-100 rounded-lg text-[11px] text-slate-700 flex items-start gap-1.5">
-                          <span className="font-bold text-slate-900 shrink-0">🎵 Gợi ý âm nhạc:</span>
+                          <span className="font-bold text-slate-900 shrink-0">Gợi ý âm nhạc:</span>
                           <span>{omniData.tiktok.sound_recommendation || omniData.tiktok.suggested_audio}</span>
                         </div>
                       </div>
@@ -1420,7 +1420,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                 {/* 3. EMAIL CARD */}
                 {(omniFilter === 'all' || omniFilter === 'email') && omniData.email && (
                   <div className="bg-white rounded-2xl border border-purple-200/80 shadow-sm flex flex-col justify-between overflow-hidden print-card">
-                    <div className="bg-gradient-to-r from-purple-600 to-violet-600 p-4 text-white flex items-center justify-between">
+                    <div className="bg-[#121316] p-4 text-white flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="p-1.5 bg-white/20 rounded-lg">
                           <Mail className="w-4 h-4 text-white" />
@@ -1791,7 +1791,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                   <button
                     onClick={handleGenerateIdeas}
                     disabled={loading}
-                    className="w-full py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 disabled:opacity-60 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 transition-all active:scale-98 cursor-pointer"
+                    className="w-full py-3 bg-[#D95D39] hover:bg-[#C04E2C] disabled:opacity-60 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 transition-all active:scale-98 cursor-pointer"
                   >
                     {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lightbulb className="w-4 h-4 text-amber-300" />}
                     <span>1. Khởi tạo 5 Góc Ý Tưởng Tiếp Thị</span>
@@ -2013,8 +2013,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                                 onClick={onNavigateToReviews}
                                 className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors font-semibold"
                               >
-                                Đến trang duyệt bài ➔
-                              </button>
+                                Đến trang duyệt bài </button>
                             )}
                           </div>
                         ) : (
@@ -2203,7 +2202,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
             <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-12 text-center text-slate-500 text-xs space-y-2">
               <Stethoscope className="w-8 h-8 text-slate-300 mx-auto" />
               <p className="font-semibold text-slate-600">Chưa có kết quả chẩn đoán nào</p>
-              <p>Bấm nút &ldquo;Khám cho: {activeC?.name}&rdquo; ở trên để Bác sĩ AI phân tích toàn diện chiến dịch.</p>
+              <p>Bấm nút &ldquo;Khám cho: {activeC?.name}&rdquo; ở trên để Bác sĩ AI chẩn đoán chi tiết chiến dịch.</p>
             </div>
           )}
         </div>
@@ -2232,7 +2231,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                 onClick={handleGenerateAngleMatrix}
                 disabled={matrixLoading}
                 data-testid="generate-angle-matrix-btn"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white text-xs font-bold shadow-md transition-all shrink-0 disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#121316] hover:bg-black text-white text-xs font-bold shadow-md transition-all shrink-0 disabled:opacity-50"
               >
                 {matrixLoading ? (
                   <>
@@ -2327,7 +2326,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                   ) : (
                     <Rocket className="w-4 h-4" />
                   )}
-                  <span>🚀 Đẩy toàn bộ {matrixData.variants.length} biến thể vào Chiến dịch (1-Click Seed)</span>
+                  <span>Đẩy toàn bộ {matrixData.variants.length} biến thể vào Chiến dịch (1-Click Seed)</span>
                 </button>
               </div>
 
@@ -2335,10 +2334,10 @@ export const AIStudio: React.FC<AIStudioProps> = ({
               <div className="flex flex-wrap items-center gap-2">
                 {[
                   { code: 'ALL', label: `Tất cả (${matrixData.variants.length})` },
-                  { code: 'PAIN_POINT', label: '🔥 Pain Point (Nỗi đau)' },
-                  { code: 'SOCIAL_PROOF', label: '🏆 Social Proof (Bằng chứng)' },
-                  { code: 'MYTH_BUSTER', label: '💡 Myth Buster (Phá ngộ nhận)' },
-                  { code: 'OFFER_FOMO', label: '⚡ Offer / FOMO (Thúc đẩy chốt đơn)' },
+                  { code: 'PAIN_POINT', label: 'Pain Point (Nỗi đau)' },
+                  { code: 'SOCIAL_PROOF', label: 'Social Proof (Bằng chứng)' },
+                  { code: 'MYTH_BUSTER', label: 'Myth Buster (Phá ngộ nhận)' },
+                  { code: 'OFFER_FOMO', label: 'Offer / FOMO (Thúc đẩy chốt đơn)' },
                 ].map((pill) => (
                   <button
                     key={pill.code}
@@ -2376,7 +2375,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
                         <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/80">
                           <div className="text-[10px] font-bold uppercase text-amber-800">
-                            🎯 3s Hook ({v.hook_type}):
+                            3s Hook ({v.hook_type}):
                           </div>
                           <div className="text-xs font-extrabold text-slate-900 mt-0.5">
                             &ldquo;{v.hook_3s}&rdquo;
@@ -2390,7 +2389,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
                       <div className="pt-2.5 border-t border-slate-100 space-y-2">
                         <div className="text-[10px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-200">
-                          <strong className="text-indigo-700">🔬 Giả thuyết A/B:</strong> {v.ab_hypothesis}
+                          <strong className="text-indigo-700">Giả thuyết A/B:</strong> {v.ab_hypothesis}
                         </div>
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[10px] font-mono text-slate-400 truncate max-w-[180px]" title={v.utm_params}>
@@ -2568,7 +2567,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                         data-testid="apply-critic-rewrite-btn"
                         className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all"
                       >
-                        ✨ Áp dụng Bản viết lại (1-Click Upgrade)
+                        Áp dụng Bản viết lại (1-Click Upgrade)
                       </button>
                     </div>
                     <div className="p-3 rounded-xl bg-white border border-emerald-200 text-xs space-y-1">
@@ -2577,7 +2576,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                     </div>
                   </div>
                   <div className="text-[11px] text-emerald-800">
-                    💡 {criticData.rewritten_version.improvement_notes}
+                    {criticData.rewritten_version.improvement_notes}
                   </div>
                 </div>
               </div>
@@ -2613,7 +2612,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                       &ldquo;{p.critique}&rdquo;
                     </p>
                     <div className="text-[11px] text-indigo-700 font-medium">
-                      <strong>🔧 Đề xuất chỉnh sửa:</strong> {p.actionable_fix}
+                      <strong>Đề xuất chỉnh sửa:</strong> {p.actionable_fix}
                     </div>
                   </div>
                 ))}

@@ -26,14 +26,14 @@ interface GlobalCsvImportModalProps {
 }
 
 const COLUMN_LABELS: Record<string, string> = {
-  report_date: '📅 Ngày báo cáo',
-  campaign_name: '🎯 Tên / Mã Chiến dịch',
-  channel: '📡 Kênh quảng cáo',
-  views: '👁️ Hiển thị (Impressions)',
-  clicks: '🖱️ Lượt nhấp (Clicks)',
-  conversions: '🛍️ Chuyển đổi (Orders/Leads)',
-  cost: '💸 Chi phí (Spend VND)',
-  revenue: '💰 Doanh thu (Revenue VND)',
+  report_date: 'Ngày báo cáo',
+  campaign_name: 'Tên / Mã Chiến dịch',
+  channel: 'Kênh quảng cáo',
+  views: 'Hiển thị (Impressions)',
+  clicks: 'Lượt nhấp (Clicks)',
+  conversions: 'Chuyển đổi (Đơn hàng)',
+  cost: 'Chi phí (VND)',
+  revenue: 'Doanh thu (VND)',
 };
 
 export const GlobalCsvImportModal: React.FC<GlobalCsvImportModalProps> = ({
@@ -175,22 +175,22 @@ export const GlobalCsvImportModal: React.FC<GlobalCsvImportModalProps> = ({
     >
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between">
+        <div className="px-6 py-4 bg-[#121316] text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center">
-              <FileSpreadsheet className="w-5 h-5 text-indigo-300" />
+            <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center">
+              <FileSpreadsheet className="w-5 h-5 text-white" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold tracking-tight">
-                  Nạp Báo Cáo Đa Chiến Dịch Thông Minh (AI Smart CSV Importer)
+                  Nhập báo cáo quảng cáo đa chiến dịch (CSV / TSV)
                 </h3>
-                <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-indigo-500/30 text-indigo-200 rounded-full border border-indigo-400/30">
-                  Zero-Touch Auto-Map
+                <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-white/10 text-white/90 rounded border border-white/15">
+                  Tự động nhận cột
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-0.5">
-                Tự động nhận diện cột Meta Ads, TikTok Ads, Google Ads và phân bổ vào hàng chục chiến dịch chỉ trong 1 lần tải.
+                Tự động nhận diện cột xuất từ Meta Ads, TikTok Ads, Google Ads và gộp vào từng chiến dịch.
               </p>
             </div>
           </div>
@@ -204,33 +204,33 @@ export const GlobalCsvImportModal: React.FC<GlobalCsvImportModalProps> = ({
         </div>
 
         {/* Step Indicator */}
-        <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs font-semibold">
+        <div className="px-6 py-3 bg-[#FAF9F5] border-b border-[#E4E2DD] flex items-center justify-between text-xs font-semibold">
           <div className="flex items-center gap-6">
-            <div className={`flex items-center gap-2 ${step === 1 ? 'text-indigo-600' : 'text-emerald-600'}`}>
+            <div className={`flex items-center gap-2 ${step === 1 ? 'text-[#121316]' : 'text-[#15803D]'}`}>
               <span
                 className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                  step === 1 ? 'bg-indigo-600 text-white' : 'bg-emerald-100 text-emerald-700'
+                  step === 1 ? 'bg-[#121316] text-white' : 'bg-[#ECFDF5] text-[#15803D]'
                 }`}
               >
                 {step > 1 ? <Check className="w-3.5 h-3.5" /> : '1'}
               </span>
-              <span>Bước 1: Nạp File Báo Cáo Master CSV</span>
+              <span>Bước 1: Chọn tệp báo cáo CSV</span>
             </div>
             <ArrowRight className="w-4 h-4 text-slate-300" />
-            <div className={`flex items-center gap-2 ${step === 2 ? 'text-indigo-600' : 'text-slate-400'}`}>
+            <div className={`flex items-center gap-2 ${step === 2 ? 'text-[#121316]' : 'text-slate-400'}`}>
               <span
                 className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                  step === 2 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'
+                  step === 2 ? 'bg-[#121316] text-white' : 'bg-slate-200 text-slate-500'
                 }`}
               >
                 2
               </span>
-              <span>Bước 2: AI Auto-Map Cột & Khớp Chiến Dịch Hàng Loạt</span>
+              <span>Bước 2: Kiểm tra ánh xạ cột & lưu vào chiến dịch</span>
             </div>
           </div>
           {fileName && (
-            <span className="px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono text-[11px]">
-              📄 {fileName}
+            <span className="px-2.5 py-1 rounded-md bg-white text-[#121316] border border-[#E4E2DD] font-mono text-[11px]">
+              {fileName}
             </span>
           )}
         </div>
@@ -260,19 +260,19 @@ export const GlobalCsvImportModal: React.FC<GlobalCsvImportModalProps> = ({
               <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto pt-2">
                 <div className="p-3 rounded-xl bg-white border border-emerald-200">
                   <div className="text-[11px] text-slate-500">Dòng dữ liệu đã nạp</div>
-                  <div className="text-lg font-extrabold text-slate-900 mt-0.5">
+                  <div className="text-lg font-extrabold font-mono tabular-nums text-slate-900 mt-0.5">
                     {commitResult.imported_rows}
                   </div>
                 </div>
                 <div className="p-3 rounded-xl bg-white border border-emerald-200">
                   <div className="text-[11px] text-slate-500">Chiến dịch cập nhật</div>
-                  <div className="text-lg font-extrabold text-indigo-600 mt-0.5">
+                  <div className="text-lg font-extrabold font-mono tabular-nums text-[#121316] mt-0.5">
                     {commitResult.updated_campaigns_count}
                   </div>
                 </div>
                 <div className="p-3 rounded-xl bg-white border border-emerald-200">
                   <div className="text-[11px] text-slate-500">Chiến dịch tạo mới</div>
-                  <div className="text-lg font-extrabold text-emerald-600 mt-0.5">
+                  <div className="text-lg font-extrabold font-mono tabular-nums text-emerald-600 mt-0.5">
                     +{commitResult.created_campaigns_count}
                   </div>
                 </div>
@@ -289,15 +289,15 @@ export const GlobalCsvImportModal: React.FC<GlobalCsvImportModalProps> = ({
             </div>
           ) : step === 1 ? (
             <div className="space-y-4">
-              {/* 1-Click Sample Banner */}
-              <div className="p-4 rounded-xl bg-gradient-to-r from-indigo-50 via-violet-50 to-indigo-50 border border-indigo-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {/* Quick Template Banner */}
+              <div className="p-4 rounded-xl bg-[#FAF9F5] border border-[#E4E2DD] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-900">
-                    <Sparkles className="w-4 h-4 text-indigo-600" />
-                    <span>Trải nghiệm nhanh chuẩn Thực tế Doanh nghiệp (1-Click Demo)</span>
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-[#121316]">
+                    <Sparkles className="w-4 h-4 text-[#D95D39]" />
+                    <span>Nạp biểu mẫu báo cáo chuẩn Meta Ads & TikTok Ads</span>
                   </div>
-                  <p className="text-[11px] text-indigo-700/90">
-                    Tự động nạp file xuất báo cáo tổng hợp từ Meta Ads & TikTok Ads gồm nhiều chiến dịch và kênh khác nhau.
+                  <p className="text-[11px] text-[#5A5E66]">
+                    Nạp cấu trúc tệp CSV xuất từ trình quản lý quảng cáo gồm nhiều chiến dịch và kênh để kiểm tra ánh xạ cột.
                   </p>
                 </div>
                 <button
@@ -305,7 +305,7 @@ export const GlobalCsvImportModal: React.FC<GlobalCsvImportModalProps> = ({
                   onClick={handleLoadSampleAndAnalyze}
                   disabled={isAnalyzing}
                   data-testid="global-csv-load-sample-btn"
-                  className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-all disabled:opacity-50"
+                  className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#D95D39] hover:bg-[#C04E2C] text-white text-xs font-bold transition-all disabled:opacity-50"
                 >
                   {isAnalyzing ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -416,7 +416,7 @@ export const GlobalCsvImportModal: React.FC<GlobalCsvImportModalProps> = ({
                       <span>Ánh xạ cột tự động (AI Schema Detection)</span>
                     </div>
                     <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                      ✓ Đã khớp {Object.keys(analysis.column_mapping || {}).length}/8 trường chuẩn
+                      Đã khớp {Object.keys(analysis.column_mapping || {}).length}/8 trường chuẩn
                     </span>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -514,11 +514,11 @@ export const GlobalCsvImportModal: React.FC<GlobalCsvImportModalProps> = ({
                                     }`}
                                   >
                                     <option value={0}>
-                                      ✨ Tự động khởi tạo chiến dịch mới
+                                      Tự động khởi tạo chiến dịch mới
                                     </option>
                                     {campaigns.map(c => (
                                       <option key={c.id} value={c.id}>
-                                        ✓ Khớp: #{c.id} — {c.name}
+                                        Khớp: #{c.id} — {c.name}
                                       </option>
                                     ))}
                                   </select>

@@ -131,7 +131,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
   const handleGenerateDraft = async () => {
     setLoading(true);
     try {
-      const ideaToUse = selectedIdeaText || 'Giải pháp đột phá nâng cao năng suất cùng AI';
+      const ideaToUse = selectedIdeaText || 'Tự động đối soát đơn hàng và tối ưu chi phí quảng cáo';
       const res = await draftJob.run<AIDraftResponse>({
         kind: 'draft',
         selected_idea: ideaToUse,
@@ -371,15 +371,15 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
     if (!omniData?.tiktok) return '';
     const tt = omniData.tiktok;
     const scenesText = tt.scenes?.map(s => 
-      `🎬 Cảnh ${s.scene_number}: ${s.scene_name || s.title || ''} (${s.duration_seconds || 5}s)\n- Hành động: ${s.visual_action || s.visual || ''}\n- Lời thoại: ${s.voiceover || s.audio || ''}\n- Hiệu ứng âm thanh: ${s.audio || ''}`
+      `Cảnh ${s.scene_number}: ${s.scene_name || s.title || ''} (${s.duration_seconds || 5}s)\n- Hành động: ${s.visual_action || s.visual || ''}\n- Lời thoại: ${s.voiceover || s.audio || ''}\n- Hiệu ứng âm thanh: ${s.audio || ''}`
     ).join('\n\n') || '';
-    return `🔥 HOOK 3S:\n${tt.hook_3s}\n\n${scenesText}\n\n🎵 GỢI Ý NHẠC NỀN:\n${tt.sound_recommendation || tt.suggested_audio || ''}`;
+    return `HOOK 3S:\n${tt.hook_3s}\n\n${scenesText}\n\nGỢI Ý NHẠC NỀN:\n${tt.sound_recommendation || tt.suggested_audio || ''}`;
   };
 
   const formatEmailCopy = () => {
     if (!omniData?.email) return '';
     const em = omniData.email;
-    return `📧 TIÊU ĐỀ A: ${em.subject_line_a || em.subject}\n📧 TIÊU ĐỀ B: ${em.subject_line_b || ''}\n[PREHEADER]: ${em.preheader || ''}\n\n[NỘI DUNG]:\n${em.body_content || em.body}\n\n👉 [NÚT CTA]: ${em.cta_button || em.cta}\n\n[P.S.]: ${em.ps_note || ''}`;
+    return `TIÊU ĐỀ A: ${em.subject_line_a || em.subject}\nTIÊU ĐỀ B: ${em.subject_line_b || ''}\n[PREHEADER]: ${em.preheader || ''}\n\n[NỘI DUNG]:\n${em.body_content || em.body}\n\n[NÚT CTA]: ${em.cta_button || em.cta}\n\n[P.S.]: ${em.ps_note || ''}`;
   };
 
   return (
@@ -406,7 +406,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
         {/* Drawer Header */}
         <div className="p-5 border-b border-slate-200/80 bg-slate-50/50 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+            <div className="w-8 h-8 rounded-lg bg-[#121316] flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
               <Sparkles className="w-4 h-4 animate-pulse" />
             </div>
             <div>
@@ -489,7 +489,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
             }`}
           >
             <Zap className="w-3.5 h-3.5 text-amber-500" />
-            <span>⚡ Đa kênh 3-in-1</span>
+            <span>Đa kênh 3-in-1</span>
           </button>
           <button
             onClick={() => setActiveTab('idea')}
@@ -549,7 +549,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
                     }}
                     className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white/80 border border-indigo-200 px-2 py-1 rounded cursor-pointer transition-colors"
                   >
-                    ⚡ Lấy dữ liệu từ {activeCampaign.name}
+                    Lấy dữ liệu từ {activeCampaign.name}
                   </button>
                 )}
               </div>
@@ -681,7 +681,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
                     {omniSubTab === 'tiktok' && omniData.tiktok && (
                       <div className="space-y-3 text-xs">
                         <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg">
-                          <span className="text-[10px] font-bold text-rose-700 uppercase">🔥 Hook 3 giây đầu:</span>
+                          <span className="text-[10px] font-bold text-rose-700 uppercase">Hook 3 giây đầu:</span>
                           <p className="font-bold text-rose-950 mt-0.5">{omniData.tiktok.hook_3s}</p>
                         </div>
 
@@ -711,7 +711,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
                         </div>
 
                         <div className="p-2 bg-slate-100 rounded text-[11px] text-slate-700">
-                          <strong>🎵 Gợi ý âm nhạc:</strong> {omniData.tiktok.sound_recommendation || omniData.tiktok.suggested_audio}
+                          <strong>Gợi ý âm nhạc:</strong> {omniData.tiktok.sound_recommendation || omniData.tiktok.suggested_audio}
                         </div>
                       </div>
                     )}
@@ -882,7 +882,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
               <button
                 onClick={handleGenerateDraft}
                 disabled={loading}
-                className="w-full py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 disabled:bg-slate-300 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-violet-600/20 transition-all cursor-pointer disabled:cursor-not-allowed"
+                className="w-full py-2.5 bg-[#121316] hover:bg-black disabled:bg-slate-300 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-violet-600/20 transition-all cursor-pointer disabled:cursor-not-allowed"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
                 <span>

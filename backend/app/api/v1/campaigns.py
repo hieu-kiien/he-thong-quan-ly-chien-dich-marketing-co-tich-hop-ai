@@ -11,7 +11,7 @@ from app.core.pagination import Page, PageParams, page_params, paginate_query
 from app.core.security import RoleChecker, get_current_user
 from app.services import quota
 from app.services import campaign_lifecycle
-from app.models.entities import Campaign, Product, User, CampaignMember, WorkspaceMember, Workspace, MarketingContent, CampaignBudgetAllocation, CampaignKPITarget, MarketingChannel, Task, CampaignMetric, CampaignPlanApplication
+from app.models.entities import Campaign, Product, User, CampaignMember, WorkspaceMember, Workspace, MarketingContent, CampaignBudgetAllocation, CampaignKPITarget, MarketingChannel, Task, CampaignMetric, CampaignPlanApplication, AdAccount
 from app.schemas.schemas import (
     CampaignCreate,
     CampaignUpdate,
@@ -1108,6 +1108,29 @@ def update_campaign_budget_allocations(
         )
         db.add(item)
         created_allocations.append(item)
+
+    # Đồng bộ hạn mức chi tiêu ngày (daily_spend_cap) cho các Tài khoản Quảng cáo đang gắn với chiến dịch này
+    try:
+        duration_days = 30
+        if campaign.start_date and campaign.end_date:
+            s_d = datetime.strptime(campaign.start_date, "%Y-%m-%d").date()
+            e_d = datetime.strptime(campaign.end_date, "%Y-%m-%d").date()
+            duration_days = max(7, (e_d - s_d).days)
+        ch_objs = db.query(MarketingChannel).filter(MarketingChannel.id.in_(channel_ids)).all() if channel_ids else []
+        ch_code_by_id = {c.id: (c.code or "").lower() for c in ch_objs}
+        linked_accounts = db.query(AdAccount).filter(AdAccount.linked_campaign_id == campaign_id).all()
+        for acc in linked_accounts:
+            plat = (acc.platform or "").upper()
+            matched_amount = None
+            for a in allocations_in:
+                code = ch_code_by_id.get(a.channel_id, "")
+                if (plat == "META_ADS" and "facebook" in code) or (plat == "TIKTOK_ADS" and "tiktok" in code) or (plat == "GOOGLE_ADS" and "google" in code):
+                    matched_amount = float(a.planned_amount or 0)
+                    break
+            if matched_amount is not None and matched_amount > 0:
+                acc.daily_spend_cap = round(matched_amount / duration_days, 0)
+    except Exception:
+        pass
 
     db.commit()
     for item in created_allocations:

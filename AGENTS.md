@@ -42,3 +42,18 @@ This project is indexed by GitNexus as **he-thong-quan-ly-chien-dich-marketing-c
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
+
+# Hạ tầng VPS & Triển khai Production
+
+- **Bảng điều khiển quản lý VPS (Start / Stop / Reboot / Console):** `https://vps.clooud.codes/servers/639a6009`
+- **Tên miền Production (qua Cloudflare Tunnel):** `https://marketing.kienhieu.id.vn/`
+- **Kết nối SSH:**
+  - Host: `root@vn-hn.cloudcode.io.vn` (IP NAT: `27.76.200.123`)
+  - Port: `30513`
+  - SSH Private Key: `$HOME\.ssh\marketflow_vps_ed25519`
+  - Lệnh kết nối: `ssh -i "$HOME\.ssh\marketflow_vps_ed25519" -p 30513 root@vn-hn.cloudcode.io.vn`
+- **Đường dẫn & Dịch vụ trên VPS:**
+  - Backend FastAPI: `/opt/marketflow/backend` (virtualenv tại `/opt/marketflow/.venv`, systemd service: `marketflow-api.service` chạy ở `127.0.0.1:8000`)
+  - Frontend tĩnh (Nginx): `/var/www/marketflow` (Nginx lắng nghe ở `127.0.0.1:8080`, bắt buộc `chmod 755` cho thư mục và `chmod 644` cho file sau khi `scp`)
+  - Dịch vụ hệ thống: `systemctl status nginx postgresql marketflow-api cloudflared`
+

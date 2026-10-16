@@ -45,10 +45,10 @@ export const ExportActions: React.FC<ExportActionsProps> = ({
 
     const textBlocks = contents.map((c, idx) => {
       const channel = c.channel?.name || channelNameById(c.channel_id);
-      return `========================================\n[ BÀI VIẾT #${idx + 1} - ${channel.toUpperCase()} ]\nTIÊU ĐỀ: ${c.title}\n\nNỘI DUNG:\n${c.body}\n${c.cta ? `\n👉 CTA: ${c.cta}` : ''}${c.image_url ? `\n🖼️ ẢNH: ${c.image_url}` : ''}\nTRẠNG THÁI: ${c.status}`;
+      return `========================================\n[ BÀI VIẾT #${idx + 1} - ${channel.toUpperCase()} ]\nTIÊU ĐỀ: ${c.title}\n\nNỘI DUNG:\n${c.body}\n${c.cta ? `\nCTA: ${c.cta}` : ''}${c.image_url ? `\nẢNH: ${c.image_url}` : ''}\nTRẠNG THÁI: ${c.status}`;
     });
 
-    const fullExportText = `📋 KẾ HOẠCH CHIẾN DỊCH: ${campaignName.toUpperCase()}\nTổng số nội dung: ${contents.length}\nNgày tạo: ${formatDateVN(new Date())}\n\n${textBlocks.join('\n\n')}`;
+    const fullExportText = `KẾ HOẠCH CHIẾN DỊCH: ${campaignName.toUpperCase()}\nTổng số nội dung: ${contents.length}\nNgày tạo: ${formatDateVN(new Date())}\n\n${textBlocks.join('\n\n')}`;
 
     const ok = await copyToClipboardWithFormatting(fullExportText);
     if (ok) {

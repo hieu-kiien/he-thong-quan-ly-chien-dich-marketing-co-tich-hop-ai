@@ -271,8 +271,8 @@ function AppContent() {
               <div className="p-8 max-w-7xl mx-auto space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-2xl font-black text-slate-900 tracking-tight">Trung tâm Điều phối Chiến dịch & Pipeline</h2>
-                    <p className="text-xs text-slate-500 mt-1">Không gian điều phối chiến dịch toàn diện: Quản lý Pipeline nội dung, AI Copilot đa kênh, Bác sĩ AI chẩn đoán và Sơ đồ vòng đời.</p>
+                    <h2 className="text-2xl font-bold text-[#121316] tracking-tight">Điều phối Chiến dịch & Tiến độ bài viết</h2>
+                    <p className="text-xs text-[#5A5E66] mt-1">Theo dõi luồng bài viết theo trạng thái, soạn thảo đa kênh, chẩn đoán hiệu suất và sơ đồ vòng đời chiến dịch.</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <select

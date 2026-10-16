@@ -41,7 +41,7 @@ export const EmailInboxPreview: React.FC<EmailInboxPreviewProps> = ({
   onImageChange
 }) => {
   const effectiveSubjectOptions = subjectOptions || [
-    subjectLineA || '🔥 [Chỉ 48H] Giải pháp tự động hóa Marketing x3 ROI doanh nghiệp',
+    subjectLineA || '[Chỉ 48H] Giải pháp tự động hóa Marketing x3 ROI doanh nghiệp',
     ...(subjectLineB ? [subjectLineB] : ['Bí quyết cắt giảm 40% chi phí quảng cáo với MarketFlow AI'])
   ];
   const effectiveBody = bodyContent || body || '';
@@ -71,7 +71,7 @@ export const EmailInboxPreview: React.FC<EmailInboxPreviewProps> = ({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            📋 Hàng Hộp Thư (Inbox)
+            Hàng Hộp Thư (Inbox)
           </button>
           <button
             onClick={() => setViewMode('FULL_READER')}
@@ -81,7 +81,7 @@ export const EmailInboxPreview: React.FC<EmailInboxPreviewProps> = ({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            📖 Đọc Thư Chi Tiết (Reader)
+            Đọc Thư Chi Tiết (Reader)
           </button>
         </div>
       </div>
@@ -195,7 +195,7 @@ export const EmailInboxPreview: React.FC<EmailInboxPreviewProps> = ({
 
           <div className="mt-2 text-center">
             <span className="text-[10px] text-indigo-600 font-medium underline">
-              👉 Bấm vào dòng thư để xem chế độ trình đọc đầy đủ (Full Reader)
+              Bấm vào dòng thư để xem chế độ trình đọc đầy đủ (Full Reader)
             </span>
           </div>
         </div>
@@ -228,7 +228,7 @@ export const EmailInboxPreview: React.FC<EmailInboxPreviewProps> = ({
             </h2>
             <div className="mt-2 flex items-center justify-between text-xs text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-600 text-white font-bold text-xs flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-[#121316] text-white font-bold text-xs flex items-center justify-center">
                   {brandName.slice(0, 2).toUpperCase()}
                 </div>
                 <div>
@@ -311,7 +311,7 @@ export const EmailInboxPreview: React.FC<EmailInboxPreviewProps> = ({
                 onClick={(e) => e.preventDefault()}
                 className="inline-block px-6 py-3 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md hover:shadow-lg transition transform hover:-translate-y-0.5 tracking-wide"
               >
-                👉 {ctaButton}
+                {ctaButton}
               </a>
             </div>
 

@@ -1227,7 +1227,7 @@ const handleTestConnection = async () => {
                     <button
                       type="submit"
                       disabled={isSaving || (selectedProviderRequiresKey && !apiKey.trim())}
-                      className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-sm flex items-center gap-2 transition-all shadow-md hover:shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-6 py-2.5 rounded-xl bg-[#D95D39] hover:bg-[#C04E2C] text-white font-semibold text-sm flex items-center gap-2 transition-all shadow-md hover:shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSaving ? (
                         <>

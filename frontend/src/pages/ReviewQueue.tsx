@@ -777,8 +777,8 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                             }`}
                           >
                             {compScore >= 90
-                              ? `🛡️ Policy Safe (${compScore}/100)`
-                              : `⚠️ Cảnh báo Policy (${compScore}/100)`}
+                              ? `Đạt chuẩn chính sách (${compScore}/100)`
+                              : `Cảnh báo từ cấm (${compScore}/100)`}
                           </span>
                         </div>
 
@@ -789,16 +789,16 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                               type="button"
                               onClick={() => handleBatchAutoFix([item.id])}
                               disabled={isBatchFixing}
-                              className="px-2.5 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg text-xs font-bold flex items-center gap-1 transition-all"
-                              title="AI tự động viết lại bài nháp hợp chuẩn & khắc phục lỗi bị từ chối"
+                              className="px-2.5 py-1.5 bg-[#FFFBEB] hover:bg-amber-100 text-[#B45309] border border-[#FDE68A] rounded-lg text-xs font-bold flex items-center gap-1 transition-all"
+                              title="Tự động viết lại bài nháp hợp chuẩn & khắc phục lỗi bị từ chối"
                             >
                               <Wand2 className="w-3.5 h-3.5" />
-                              <span>AI Viết Lại Hợp Chuẩn</span>
+                              <span>Tự sửa từ cấm</span>
                             </button>
                           )}
                           <button
                             onClick={() => handleStartEdit(item)}
-                            className="px-2.5 py-1.5 border border-slate-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all"
+                            className="px-2.5 py-1.5 border border-[#E4E2DD] text-[#121316] hover:bg-[#FAF9F5] rounded-lg text-xs font-semibold flex items-center gap-1 transition-all"
                             title="Chỉnh sửa nội dung bản nháp"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
@@ -807,10 +807,10 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                           <button
                             onClick={() => handleSubmitDraft(item.id)}
                             disabled={submittingId === item.id}
-                            className={`px-3.5 py-1.5 disabled:bg-slate-300 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md transition-all active:scale-95 ${
+                            className={`px-3.5 py-1.5 disabled:bg-slate-300 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
                               item.status === 'REJECTED'
-                                ? 'bg-gradient-to-r from-amber-600 to-indigo-600 hover:from-amber-700 hover:to-indigo-700 shadow-amber-600/20'
-                                : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-600/20'
+                                ? 'bg-[#D95D39] hover:bg-[#C04E2C]'
+                                : 'bg-[#121316] hover:bg-black'
                             }`}
                           >
                             {submittingId === item.id ? (
@@ -818,7 +818,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                             ) : (
                               <Send className="w-4 h-4" />
                             )}
-                            <span>{item.status === 'REJECTED' ? 'Sửa & Gửi lại (Resubmit)' : 'Gửi Sếp phê duyệt (Submit)'}</span>
+                            <span>{item.status === 'REJECTED' ? 'Gửi duyệt lại' : 'Gửi phê duyệt'}</span>
                           </button>
                         </div>
                       </div>
@@ -898,7 +898,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                                   đây là nhãn chết dễ gây hiểu nhầm khi ai đó đọc
                                   template. Bài bị từ chối hiển thị ở tab "Cần chỉnh
                                   sửa" với nhãn CẦN CHỈNH SỬA (REJECTED). */}
-                              {h.status === 'PUBLISHED' ? '✓ ĐÃ XUẤT BẢN' : '✓ ĐÃ PHÊ DUYỆT'}
+                              {h.status === 'PUBLISHED' ? 'ĐÃ XUẤT BẢN' : 'ĐÃ PHÊ DUYỆT'}
                             </span>
                           </td>
                           <td className="py-3 px-4 text-xs">
@@ -938,7 +938,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
                               )}
                               {h.status === 'PUBLISHED' && (
                                 <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-200">
-                                  ✓ Đã xuất bản
+                                  Đã xuất bản
                                 </span>
                               )}
                             </div>

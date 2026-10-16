@@ -163,34 +163,32 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
           quyết định bố cục thay vì `sm:`/`lg:`. */}
       <div className={`flex ${compact ? 'flex-col' : 'flex-col lg:flex-row'} items-center justify-between gap-3 pb-5 border-b border-slate-100 dark:border-slate-800`}>
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/20 shrink-0">
+          <div className="w-10 h-10 rounded-lg bg-[#121316] text-white flex items-center justify-center shrink-0">
             <Stethoscope className="w-5 h-5" />
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Đánh Giá Hiệu Quả Chiến Dịch
+              <h3 className="text-base font-bold text-[#121316] dark:text-white">
+                Đánh giá hiệu quả chiến dịch
               </h3>
               
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                100% Số liệu thực tế
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#ECFDF5] text-[#15803D] border border-[#A7F3D0]">
+                Đối soát thực tế
               </span>
 
-              {/* R5: Demo Mode Warning Pill Badge */}
               {isDemoMode && (
                 <span 
                   role="status"
-                  aria-label="Chế độ dữ liệu mẫu"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-700 text-[11px] font-bold shadow"
-                  title="Dữ liệu mẫu: Hệ thống đang chạy chế độ mô phỏng do chiến dịch chưa tích lũy đủ số liệu thực tế"
+                  aria-label="Chưa phát sinh chi phí"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-[#FFFBEB] text-[#B45309] border border-[#FDE68A] text-[11px] font-bold"
                 >
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0" aria-hidden="true" />
-                  <span>Dữ liệu Mẫu</span>
+                  <AlertCircle className="w-3.5 h-3.5 text-[#B45309] shrink-0" aria-hidden="true" />
+                  <span>Chưa phát sinh chi phí</span>
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-              Tự động chấm điểm hiệu quả chi phí — doanh thu và gợi ý điều chỉnh ngân sách
+            <p className="text-xs text-[#5A5E66] dark:text-slate-400 mt-0.5">
+              Chấm điểm chi phí — doanh thu và gợi ý điều chỉnh hạn mức theo ROAS
             </p>
           </div>
         </div>
@@ -200,33 +198,31 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
             type="button"
             onClick={() => loadDiagnosis(campaignId)}
             disabled={loading}
-            className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shrink-0 self-start sm:self-auto focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="px-3.5 py-2 bg-[#FAF9F5] hover:bg-[#EFECE6] border border-[#E4E2DD] text-[#121316] rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 shrink-0 self-start sm:self-auto"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-indigo-600' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#D95D39]' : ''}`} />
             <span>{loading ? 'Đang tính toán...' : 'Tính toán lại'}</span>
           </button>
         )}
       </div>
 
-      {/* R5: Demo Mode Informative Banner */}
       {isDemoMode && (
         <div 
           role="status"
-          className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5 shadow"
+          className="p-3.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-lg text-xs text-[#B45309] flex items-start gap-2.5"
         >
-          <Info className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
+          <Info className="w-4 h-4 text-[#B45309] shrink-0 mt-0.5" aria-hidden="true" />
           <div className="leading-relaxed">
-            <span className="font-bold">Chế độ Thử nghiệm (Sample / Demo Mode):</span>{' '}
+            <span className="font-bold">Chiến dịch chưa phát sinh chi phí quảng cáo:</span>{' '}
             <span>
-              Chiến dịch chưa phát sinh đủ số liệu tương tác thực tế (chi phí hoặc chuyển đổi bằng 0), hoặc hệ thống đang hiển thị phân tích dự phòng. 
-              Các chỉ số chẩn đoán và đơn thuốc bên dưới là kịch bản chuẩn để tham khảo. Khi chiến dịch bắt đầu phân phối và ghi nhận số liệu, Bác sĩ AI sẽ tự động phân tích trên 100% dữ liệu thật.
+              Chiến dịch hiện có chi phí hoặc đơn hàng bằng 0. Hãy đồng bộ từ Tài khoản Quảng cáo (Meta BM, TikTok BC, Google MCC) hoặc nhập báo cáo CSV để hệ thống chấm điểm trên số liệu thực tế.
             </span>
           </div>
         </div>
       )}
 
       {/* 2. Health Score Meter & Diagnostic Summary */}
-      <div className={`grid grid-cols-1 ${compact ? '' : 'lg:grid-cols-12'} gap-5 items-center bg-gradient-to-r from-slate-50 via-indigo-50/30 to-emerald-50/30 dark:from-slate-800/40 dark:to-slate-800/20 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800`}>
+      <div className={`grid grid-cols-1 ${compact ? '' : 'lg:grid-cols-12'} gap-5 items-center bg-[#FAF9F5] dark:bg-slate-800/40 p-5 rounded-xl border border-[#E4E2DD] dark:border-slate-800`}>
         
         {/* Circular Gauge Meter */}
         <div className={`${compact ? '' : 'lg:col-span-4'} flex items-center gap-4 justify-center ${compact ? '' : 'lg:justify-start'} min-w-0`}>

@@ -1052,7 +1052,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                 type="button"
                 onClick={handleGenerateIdeas}
                 disabled={generatingIdeas}
-                className="w-full py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-violet-600/20 transition-all active:scale-95"
+                className="w-full py-2.5 bg-[#121316] hover:bg-black disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-violet-600/20 transition-all active:scale-95"
               >
                 <Sparkles className="w-4 h-4" />
                 <span>{generatingIdeas ? (copilotIdeaJob.phase === 'queued' ? 'Đang xếp hàng...' : 'AI đang tìm góc tiếp cận...') : '1. Tìm ý tưởng góc nhìn sáng tạo'}</span>
@@ -1176,7 +1176,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                             <span className="text-[9px] uppercase font-bold text-slate-400">Rủi ro: {item.risk_level}</span>
                           </div>
                           <div className="text-slate-600">{item.reason}</div>
-                          <div className="text-emerald-700 font-semibold">💡 Gợi ý: {item.suggestion}</div>
+                          <div className="text-emerald-700 font-semibold">Gợi ý: {item.suggestion}</div>
                         </div>
                       ))}
 
@@ -1215,9 +1215,9 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                       <div>
                         <div className="flex items-center gap-1.5">
                           <h4 className="font-bold text-xs text-slate-900">MarketFlow Official Page</h4>
-                          <span className="w-3 h-3 rounded-full bg-blue-500 text-white flex items-center justify-center text-[8px]">✓</span>
+                          <span className="w-3 h-3 rounded-full bg-blue-500 text-white flex items-center justify-center text-[8px]"></span>
                         </div>
-                        <p className="text-[10px] text-slate-400">Vừa xong · Được tài trợ (Sponsored) · 🌐</p>
+                        <p className="text-[10px] text-slate-400">Vừa xong · Được tài trợ (Sponsored) · </p>
                       </div>
                     </div>
 
@@ -1228,7 +1228,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                     </div>
 
                     {/* Creative Banner Placeholder */}
-                    <div className="h-48 bg-gradient-to-br from-indigo-900 via-slate-900 to-violet-950 flex flex-col items-center justify-center text-white p-6 text-center">
+                    <div className="h-48 bg-[#121316] flex flex-col items-center justify-center text-white p-6 text-center">
                       <span className="text-[10px] uppercase font-bold tracking-widest text-indigo-400">CHIẾN DỊCH TIẾP THỊ</span>
                       <h3 className="font-black text-base mt-1 line-clamp-2">{campaign.name}</h3>
                       <span className="mt-3 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[11px] font-semibold border border-white/20">

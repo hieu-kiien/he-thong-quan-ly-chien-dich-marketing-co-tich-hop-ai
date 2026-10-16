@@ -9,6 +9,7 @@ import {
   Edit3 
 } from 'lucide-react';
 import { Campaign, KPISummary, KpiProgress } from '../../types';
+import { AdAccountsHub } from '../AdAccountsHub';
 
 interface OverviewTabProps {
   campaign: Campaign | null;
@@ -288,22 +289,22 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       </div>
 
       {/* Section 3: Channel Budget Allocation */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+      <div className="bg-white p-5 rounded-xl border border-[#E4E2DD] space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E4E2DD] pb-4">
           <div>
-            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-amber-500" />
-              Kế Hoạch Phân Bổ Ngân Sách Theo Kênh (Channel Budget Planning)
+            <span className="text-xs font-bold text-[#121316] uppercase tracking-wider flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-[#B45309]" />
+              Phân bổ ngân sách theo kênh & Đồng bộ hạn mức thẻ ngày
             </span>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Phân chia tổng ngân sách chiến dịch cho từng kênh truyền thông trọng điểm.
+            <p className="text-xs text-[#5A5E66] mt-0.5">
+              Khi lưu phân bổ ngân sách kênh, hạn mức chi tiêu ngày (Spending Cap) của Tài khoản Quảng cáo đang gắn với chiến dịch sẽ tự động cập nhật tương ứng.
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <div className="text-right">
-              <span className="text-[10px] text-slate-400 uppercase font-bold block">Tổng ngân sách:</span>
-              <span className="text-sm font-extrabold text-slate-900">
+              <span className="text-[10px] text-[#5A5E66] uppercase font-bold block">Tổng ngân sách:</span>
+              <span className="text-sm font-extrabold font-mono tabular-nums text-[#121316]">
                 {campaign ? Number(campaign.budget).toLocaleString('vi-VN') : 0} ₫
               </span>
             </div>
@@ -311,25 +312,25 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => setIsEditingBudget(false)}
-                  className="px-3 py-1 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  className="px-3 py-1 rounded-lg border border-[#E4E2DD] text-xs font-semibold text-[#5A5E66] hover:bg-[#FAF9F5]"
                 >
                   Hủy
                 </button>
                 <button
                   onClick={handleSaveBudgetAllocations}
-                  className="px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1"
+                  className="px-3 py-1 rounded-lg bg-[#D95D39] hover:bg-[#C04E2C] text-white text-xs font-bold flex items-center gap-1"
                 >
                   <Save className="w-3 h-3" />
-                  <span>Lưu Phân Bổ</span>
+                  <span>Lưu phân bổ</span>
                 </button>
               </div>
             ) : (
               <button
                 onClick={() => setIsEditingBudget(true)}
-                className="px-3 py-1.5 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-bold flex items-center gap-1"
+                className="px-3 py-1.5 rounded-lg border border-[#E4E2DD] bg-[#FAF9F5] text-[#121316] hover:bg-[#EFECE6] text-xs font-bold flex items-center gap-1"
               >
                 <Edit3 className="w-3.5 h-3.5" />
-                <span>Chỉnh Sửa Kênh</span>
+                <span>Chỉnh sửa kênh</span>
               </button>
             )}
           </div>
@@ -340,10 +341,10 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             const totalBudget = campaign ? Number(campaign.budget) : 1;
             const pct = totalBudget > 0 ? Math.round((ch.planned_amount / totalBudget) * 100) : 0;
             return (
-              <div key={ch.channel_id} className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200 space-y-2">
+              <div key={ch.channel_id} className="p-3.5 bg-[#FAF9F5] rounded-xl border border-[#E4E2DD] space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800">{ch.name}</span>
-                  <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                  <span className="text-xs font-bold text-[#121316]">{ch.name}</span>
+                  <span className="text-[11px] font-bold font-mono tabular-nums text-[#B45309] bg-[#FFFBEB] border border-[#FDE68A] px-1.5 py-0.5 rounded">
                     {pct}%
                   </span>
                 </div>
@@ -360,19 +361,19 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                         );
                       }}
                       placeholder="0"
-                      className="w-full text-xs p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-bold text-slate-800"
+                      className="w-full text-xs p-2 rounded-lg border border-[#E4E2DD] focus:outline-none focus:ring-1 focus:ring-[#121316] font-bold font-mono tabular-nums text-[#121316]"
                     />
-                    <span className="text-xs text-slate-500">₫</span>
+                    <span className="text-xs text-[#5A5E66]">₫</span>
                   </div>
                 ) : (
-                  <div className="text-sm font-extrabold text-slate-900">
+                  <div className="text-sm font-extrabold font-mono tabular-nums text-[#121316]">
                     {ch.planned_amount.toLocaleString('vi-VN')} ₫
                   </div>
                 )}
 
-                <div className="w-full h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                <div className="w-full h-1.5 rounded-full bg-[#E4E2DD] overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-amber-500 transition-all duration-300"
+                    className="h-full rounded-full bg-[#D95D39] transition-all duration-300"
                     style={{ width: `${Math.min(100, pct)}%` }}
                   />
                 </div>
@@ -381,6 +382,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           })}
         </div>
       </div>
+
+      {/* Section 4: Ad Accounts & POS Order Sync Hub */}
+      <AdAccountsHub workspaceId={campaign?.workspace_id} />
     </div>
   );
 };

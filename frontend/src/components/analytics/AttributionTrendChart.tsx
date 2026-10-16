@@ -678,8 +678,8 @@ export const AttributionTrendChart: React.FC<AttributionTrendChartProps> = ({
                   const badgeText = isTikTok
                     ? '⭐ Ngôi Sao Sinh Lời'
                     : isFacebook
-                    ? '🚀 Kênh Phủ Rộng'
-                    : '⚠️ Cần Tối Ưu Tiêu Đề';
+                    ? 'Kênh Phủ Rộng'
+                    : 'Cần Tối Ưu Tiêu Đề';
 
                   return (
                     <div 

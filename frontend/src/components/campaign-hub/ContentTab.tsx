@@ -74,7 +74,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({
           <div>
             <span className="font-bold text-slate-900">Chu trình Kiểm duyệt: &ldquo;Duyệt bài xong thì sau đó làm gì?&rdquo;</span>
             <p className="text-slate-600 text-[11px] mt-0.5 leading-relaxed">
-              Khi Quản lý phê duyệt bài viết ở cột <strong>&ldquo;Đã phê duyệt&rdquo;</strong>, hệ thống tự động kích hoạt nút <strong className="text-indigo-700">&ldquo;🚀 Xếp lịch phát sóng vào Giờ vàng&rdquo;</strong>. Sau khi xếp lịch, bài viết tự động chuyển sang cột LIVE và được Bác sĩ AI giám sát dòng tiền.
+              Khi Quản lý phê duyệt bài viết ở cột <strong>&ldquo;Đã phê duyệt&rdquo;</strong>, hệ thống tự động kích hoạt nút <strong className="text-indigo-700">&ldquo;Xếp lịch phát sóng vào Giờ vàng&rdquo;</strong>. Sau khi xếp lịch, bài viết tự động chuyển sang cột LIVE và được Bác sĩ AI giám sát dòng tiền.
             </p>
           </div>
         </div>
@@ -257,7 +257,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({
                     className="w-full text-center text-[11px] font-bold text-white bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
                   >
                     <CalendarCheck className="w-3.5 h-3.5 text-white" />
-                    <span>🚀 Xếp lịch phát sóng vào Giờ vàng</span>
+                    <span>Xếp lịch phát sóng vào Giờ vàng</span>
                   </button>
                 </div>
               </div>
@@ -294,7 +294,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({
                     className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded transition-colors flex items-center gap-1 border border-indigo-200"
                   >
                     <Zap className="w-3 h-3 text-indigo-600" />
-                    <span>⚡ Theo dõi & Tối ưu AI</span>
+                    <span>Theo dõi & Tối ưu AI</span>
                   </button>
                 </div>
               </div>

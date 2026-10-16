@@ -185,8 +185,8 @@ export function parseTikTokScenesFromBody(body?: string | null): TikTokSceneItem
         scene_number: 2,
         title: 'Cảnh 2: Thân bài & Giá trị',
         scene_name: 'Thân bài & Giá trị',
-        visual: 'Mô phỏng trải nghiệm người dùng và kết quả thực tế vượt trội',
-        visual_action: 'Mô phỏng trải nghiệm người dùng và kết quả thực tế vượt trội',
+        visual: 'Quay cận cảnh thao tác sử dụng sản phẩm và số liệu đơn hàng thực tế',
+        visual_action: 'Quay cận cảnh thao tác sử dụng sản phẩm và số liệu đơn hàng thực tế',
         voiceover: sentences[1],
         voiceover_script: sentences[1],
         duration_seconds: 6
@@ -278,8 +278,8 @@ export function parseTikTokScenesFromBody(body?: string | null): TikTokSceneItem
     {
       scene: 3,
       scene_number: 3,
-      title: 'Cảnh 3: Giải pháp đột phá',
-      scene_name: 'Giải pháp đột phá',
+      title: 'Cảnh 3: Điểm khác biệt thực tế',
+      scene_name: 'Điểm khác biệt thực tế',
       visual: 'Màn hình minh họa giải pháp tự động hóa giúp giải quyết triệt để vấn đề',
       visual_action: 'Màn hình minh họa giải pháp tự động hóa giúp giải quyết triệt để vấn đề',
       voiceover: solutionSentence,
@@ -366,7 +366,7 @@ export const SocialPreviewContainer: React.FC<SocialPreviewContainerProps> = ({
         ctaButton: content.cta
       });
     } else {
-      copyText = `${content.title}\n\n${content.body}${content.cta ? `\n\n👉 ${content.cta}` : ''}`;
+      copyText = `${content.title}\n\n${content.body}${content.cta ? `\n\n${content.cta}` : ''}`;
     }
 
     const success = await copyToClipboardWithFormatting(copyText);

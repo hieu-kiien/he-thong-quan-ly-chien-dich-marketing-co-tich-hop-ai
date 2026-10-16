@@ -3726,7 +3726,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         type="button"
                         disabled={isGeneratingAI}
                         onClick={handleGenerateOmnichannelCreatives}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-70"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#D95D39] hover:bg-[#C04E2C] text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-70"
                       >
                         {isGeneratingAI ? (
                           <>
