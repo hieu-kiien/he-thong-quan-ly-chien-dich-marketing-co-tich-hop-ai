@@ -2295,6 +2295,9 @@ export const adAccountsApi = {
     status: string;
     synced_accounts_count: number;
     verified_metric_rows: number;
+    added_spend_today?: number;
+    added_revenue_today?: number;
+    added_orders_today?: number;
     synced_at: string;
     items: AdAccountItem[];
   }> => {
@@ -2320,6 +2323,34 @@ export const adAccountsApi = {
     total_day_revenue: number;
   }> => {
     const res = await apiClient.post('/ad-accounts/webhook-order', data);
+    return res.data;
+  },
+  fireExternalWebhook: async (data: {
+    workspace_id?: number;
+    campaign_id?: number;
+    utm_campaign?: string;
+    utm_source?: string;
+    order_code?: string;
+    order_count: number;
+    order_value: number;
+    ad_spend_delta?: number;
+    source_app?: string;
+  }): Promise<{
+    status: string;
+    source_app: string;
+    order_code: string;
+    campaign_id: number;
+    campaign_code: string | null;
+    campaign_name: string;
+    channel_id: number;
+    metric_date: string;
+    added_orders: number;
+    added_revenue: number;
+    total_day_orders: number;
+    total_day_revenue: number;
+    day_roas: number;
+  }> => {
+    const res = await apiClient.post('/ad-accounts/external-webhook', data);
     return res.data;
   },
 };

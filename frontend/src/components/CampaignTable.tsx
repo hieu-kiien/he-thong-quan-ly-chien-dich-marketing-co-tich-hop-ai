@@ -117,27 +117,25 @@ export const CampaignTable: React.FC<CampaignTableProps> = ({
         </div>
       </div>
 
-      {/* Table Content */}
+      {/* Table Content — Bố cục tự co giãn vừa khít khung, không thanh kéo ngang */}
       <div
-        className="overflow-x-auto"
         role="region"
         aria-label="Bảng danh sách chiến dịch"
-        tabIndex={0}
       >
-        <table className="w-full text-left text-sm text-[#121316]">
-          <thead className="bg-[#F6F5F0] text-[11px] font-bold uppercase tracking-wider text-[#5A5E66] border-b border-[#E4E2DD]">
+        <table className="w-full text-left text-sm text-[#121316] border-collapse">
+          <thead className="bg-[#F6F5F0] text-xs font-bold uppercase tracking-wider text-[#3B3F46] border-b border-[#E4E2DD]">
             <tr>
-              <th className="py-3 px-4">Chiến dịch &amp; Mục tiêu</th>
-              <th className="py-3 px-4">Ngân sách &amp; Đã chi</th>
-              <th className="py-3 px-4">Doanh thu &amp; Lời/Lỗ (ROAS)</th>
-              <th className="py-3 px-4">Trạng thái</th>
-              <th className="py-3 px-4 text-right">Thao tác</th>
+              <th className="py-3.5 px-4 w-[32%]">Chiến dịch &amp; Mục tiêu</th>
+              <th className="py-3.5 px-4 w-[22%]">Đã chi / Ngân sách</th>
+              <th className="py-3.5 px-4 w-[22%]">Doanh thu &amp; ROAS</th>
+              <th className="py-3.5 px-3 w-[11%]">Trạng thái</th>
+              <th className="py-3.5 px-4 w-[13%] text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#F0EFEA]">
             {filteredCampaigns.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-[#5A5E66] text-xs">
+                <td colSpan={5} className="py-8 text-center text-[#3B3F46] text-sm">
                   Không tìm thấy chiến dịch nào phù hợp
                 </td>
               </tr>
@@ -153,33 +151,34 @@ export const CampaignTable: React.FC<CampaignTableProps> = ({
 
                 return (
                   <tr key={c.id} className="hover:bg-[#F6F5F0]/60 transition-colors group">
-                    <td className="py-3.5 px-4">
+                    <td className="py-4 px-4 align-top">
                       <button
                         type="button"
                         onClick={() => onSelectCampaign(c)}
-                        className="font-bold text-[#121316] group-hover:text-[#D95D39] transition-colors flex items-center gap-1.5 text-left cursor-pointer"
+                        className="text-sm font-bold text-[#121316] group-hover:text-[#D95D39] transition-colors flex items-center gap-1.5 text-left cursor-pointer"
                       >
                         <span>{c.name}</span>
-                        <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                        <ArrowUpRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                       </button>
-                      <div className="flex flex-wrap items-center gap-2 mt-1">
-                        <span className="text-xs text-[#5A5E66] truncate">{c.objective}</span>
-                        <span className="text-[11px] text-[#5A5E66] flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-[#5A5E66]" />
-                          {c.start_date} &rarr; {c.end_date}
-                        </span>
+                      <p className="text-xs text-[#3B3F46] mt-1 leading-relaxed">
+                        {c.objective}
+                      </p>
+                      <div className="text-xs text-[#4E535C] flex items-center gap-1.5 mt-1 font-medium">
+                        <Calendar className="w-3.5 h-3.5 text-[#5A5E66] shrink-0" />
+                        <span className="tabular-nums">{c.start_date} &rarr; {c.end_date}</span>
                       </div>
                     </td>
 
-                    <td className="py-3.5 px-4 whitespace-nowrap font-mono">
-                      <div className="font-bold text-[#121316] text-xs">
-                        Đã chi: {formatNumber(spent)} đ
+                    <td className="py-4 px-4 align-top tabular-nums">
+                      <div className="text-sm font-bold text-[#121316]">
+                        <span className="font-medium text-[#3B3F46]">Đã chi: </span>
+                        <span>{formatNumber(spent)} đ</span>
                       </div>
-                      <div className="text-[11px] text-[#5A5E66] mt-0.5">
+                      <div className="text-xs text-[#3B3F46] mt-1 font-medium">
                         Ngân sách: {formatNumber(budgetNum)} đ ({pct.toFixed(0)}%)
                       </div>
                       <div
-                        className="w-28 bg-[#F0EFEA] h-1.5 rounded-full mt-1 overflow-hidden"
+                        className="w-full max-w-[140px] bg-[#E4E2DD] h-1.5 rounded-full mt-2 overflow-hidden"
                         role="img"
                         aria-label={`Đã dùng ${pct.toFixed(1)}% ngân sách`}
                       >
@@ -190,16 +189,17 @@ export const CampaignTable: React.FC<CampaignTableProps> = ({
                       </div>
                     </td>
 
-                    <td className="py-3.5 px-4 whitespace-nowrap font-mono">
+                    <td className="py-4 px-4 align-top tabular-nums">
                       {spent > 0 || revenue > 0 ? (
                         <>
-                          <div className="font-bold text-[#121316] text-xs">
-                            Thu về: {formatNumber(revenue)} đ
+                          <div className="text-sm font-bold text-[#15803D]">
+                            <span className="font-medium text-[#3B3F46]">Thu về: </span>
+                            <span>{formatNumber(revenue)} đ</span>
                           </div>
-                          <div className="flex items-center gap-1.5 mt-1">
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                             {roas !== null && (
                               <span
-                                className={`px-2 py-0.5 rounded text-[11px] font-bold border ${
+                                className={`px-2 py-0.5 rounded-md text-xs font-bold border ${
                                   roas >= 2.0
                                     ? 'bg-[#F0FDF4] text-[#15803D] border-[#BBF7D0]'
                                     : roas >= 1.0
@@ -210,39 +210,39 @@ export const CampaignTable: React.FC<CampaignTableProps> = ({
                                 ROAS {roas.toFixed(2)}x {roas >= 2.0 ? '(Lãi tốt)' : roas >= 1.0 ? '(Lãi mỏng)' : '(Đang lỗ)'}
                               </span>
                             )}
-                            <span className="text-[11px] text-[#5A5E66] font-sans">
+                            <span className="text-xs font-semibold text-[#3B3F46]">
                               · {formatNumber(conversions)} đơn
                             </span>
                           </div>
                         </>
                       ) : (
-                        <span className="text-xs text-[#5A5E66] font-sans italic">Chưa nhập số liệu</span>
+                        <span className="text-xs text-[#4E535C] italic">Chưa nhập số liệu</span>
                       )}
                     </td>
 
-                    <td className="py-3.5 px-4 whitespace-nowrap">
+                    <td className="py-4 px-3 align-top">
                       {getStatusBadge(c.status)}
                     </td>
 
-                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                    <td className="py-4 px-4 text-right align-top">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
                           onClick={() => onSelectCampaign(c)}
                           title="Xem chi tiết, bài quảng cáo và nhập số liệu"
-                          className="px-2.5 py-1.5 bg-[#F6F5F0] hover:bg-[#EAE8E1] text-[#121316] border border-[#D0CEC7] rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                          className="px-3 py-1.5 bg-[#F6F5F0] hover:bg-[#EAE8E1] text-[#121316] border border-[#D0CEC7] rounded-lg text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                         >
                           <Eye className="w-3.5 h-3.5 text-[#121316]" />
-                          <span>Chi tiết &amp; Số liệu</span>
+                          <span>Chi tiết</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => onOpenAIForCampaign(c)}
                           title="Viết bài quảng cáo mới cho chiến dịch này"
-                          className="px-2.5 py-1.5 bg-[#D95D39] hover:bg-[#C04E2C] text-white rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                          className="px-3 py-1.5 bg-[#D95D39] hover:bg-[#C04E2C] text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                         >
                           <Sparkles className="w-3.5 h-3.5" />
-                          <span>Viết bài QC</span>
+                          <span>Soạn QC</span>
                         </button>
                         {(userRole === 'MANAGER' || userRole === 'AGENCY_MANAGER') && onRequestDeleteCampaign && (
                           <button
@@ -250,9 +250,9 @@ export const CampaignTable: React.FC<CampaignTableProps> = ({
                             onClick={() => onRequestDeleteCampaign(c.id)}
                             aria-label={`Xóa chiến dịch ${c.name}`}
                             title="Xóa chiến dịch"
-                            className="p-1.5 text-[#5A5E66] hover:text-[#BE123C] hover:bg-[#FFF1F2] rounded-lg transition-colors cursor-pointer"
+                            className="p-1.5 text-[#3B3F46] hover:text-[#BE123C] hover:bg-[#FFF1F2] rounded-lg transition-colors cursor-pointer"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         )}
                       </div>

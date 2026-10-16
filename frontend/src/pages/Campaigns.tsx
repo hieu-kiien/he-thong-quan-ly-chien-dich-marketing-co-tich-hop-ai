@@ -1802,7 +1802,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                   </div>
 
                   <div className="flex items-center justify-between pt-2 border-t border-[#F0EFEA]">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       {(contentStats[c.id]?.channels ?? [])
                         .filter((code) => code !== 'unknown')
                         .slice(0, 3)
@@ -1813,14 +1813,15 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                             <span
                               key={code}
                               title={pres.label}
-                              className={`w-5 h-5 rounded-md border flex items-center justify-center ${pres.chip}`}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-xs font-bold ${pres.chip}`}
                             >
-                              <ChannelIcon className="w-2.5 h-2.5" />
+                              <ChannelIcon className="w-3 h-3 shrink-0" />
+                              <span>{pres.shortLabel}</span>
                             </span>
                           );
                         })}
                       {(contentStats[c.id]?.channels ?? []).length === 0 && (
-                        <span className="text-[9px] text-[#8A8F98] italic">Chưa có kênh</span>
+                        <span className="text-xs text-[#4E535C] italic">Chưa gắn kênh</span>
                       )}
                     </div>
 
@@ -1830,7 +1831,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         onClick={() => setSelectedDrawerCampaign(c)}
                         aria-label={`Xem chi tiết chiến dịch ${c.name}`}
                         title="Xem chi tiết & Mẫu quảng cáo"
-                        className="p-1.5 text-[#5A5E66] hover:text-[#121316] hover:bg-[#F6F5F0] rounded-lg transition-colors"
+                        className="p-1.5 text-[#3B3F46] hover:text-[#121316] hover:bg-[#F6F5F0] rounded-lg transition-colors"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
@@ -1838,7 +1839,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         onClick={(e) => handleDuplicateCampaign(c, e)}
                         aria-label={`Nhân bản chiến dịch ${c.name}`}
                         title="Nhân bản chiến dịch"
-                        className="p-1.5 text-[#5A5E66] hover:text-[#121316] hover:bg-[#F6F5F0] rounded-lg transition-colors"
+                        className="p-1.5 text-[#3B3F46] hover:text-[#121316] hover:bg-[#F6F5F0] rounded-lg transition-colors"
                       >
                         <Copy className="w-4 h-4" />
                       </button>
@@ -1855,7 +1856,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                           onClick={() => setDeletingId(c.id)}
                           aria-label={`Xóa chiến dịch ${c.name}`}
                           title="Xóa chiến dịch"
-                          className="p-1.5 text-[#5A5E66] hover:text-[#BE123C] hover:bg-[#FFF1F2] rounded-lg transition-colors"
+                          className="p-1.5 text-[#3B3F46] hover:text-[#BE123C] hover:bg-[#FFF1F2] rounded-lg transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1870,15 +1871,15 @@ export const Campaigns: React.FC<CampaignsProps> = ({
           {/* Desktop Data Table (>=768px) */}
           <div className="hidden md:block bg-white rounded-xl border border-[#E4E2DD] overflow-hidden">
             <div
-              className="overflow-x-auto"
+              className="w-full"
               role="region"
               aria-label="Bảng dữ liệu phân phối chiến dịch"
               tabIndex={0}
             >
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-[#F6F5F0] border-b border-[#E4E2DD] text-[#5A5E66] font-bold uppercase tracking-wider text-[10px]">
-                    <th className="py-3 pl-4 pr-2 w-10 text-center">
+                  <tr className="bg-[#F6F5F0] border-b border-[#E4E2DD] text-[#3B3F46] font-extrabold uppercase tracking-wider text-xs">
+                    <th className="py-3 pl-3 pr-2 w-9 text-center">
                       <input
                         type="checkbox"
                         aria-label="Chọn tất cả chiến dịch đang hiển thị"
@@ -1890,13 +1891,13 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         className="rounded border-[#D0CEC7] text-[#D95D39] focus:ring-[#D95D39] cursor-pointer"
                       />
                     </th>
-                    <th className="py-3 px-3 w-24">Trạng thái</th>
-                    <th className="py-3 px-4 min-w-[230px]">Chiến dịch &amp; Sản phẩm</th>
-                    <th className="py-3 px-3 min-w-[100px]">Kênh</th>
-                    <th className="py-3 px-4 min-w-[175px]">Ngân sách &amp; Đã chi</th>
-                    <th className="py-3 px-4 min-w-[140px]">Doanh thu &amp; ROAS</th>
-                    <th className="py-3 px-3 min-w-[125px]">Mẫu bài viết</th>
-                    <th className="py-3 px-4 min-w-[190px] text-right">Kiểm tra &amp; Thao tác</th>
+                    <th className="py-3 px-2.5 w-20">Trạng thái</th>
+                    <th className="py-3 px-3 w-[25%]">Chiến dịch &amp; Sản phẩm</th>
+                    <th className="py-3 px-2.5 w-[13%]">Kênh chạy</th>
+                    <th className="py-3 px-3 w-[18%]">Ngân sách &amp; Đã chi</th>
+                    <th className="py-3 px-3 w-[16%]">Doanh thu &amp; ROAS</th>
+                    <th className="py-3 px-2.5 w-[10%]">Mẫu bài</th>
+                    <th className="py-3 px-3 text-right">Kiểm tra &amp; Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F0EFEA] text-[#121316]">
@@ -1936,7 +1937,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                       >
                         {/* Column 0: Multi-select Checkbox with Shift+Click */}
                         <td
-                          className="py-3.5 pl-4 pr-2 text-center"
+                          className="py-3.5 pl-3 pr-2 text-center"
                           onClick={(e) => handleRowSelect(c.id, rowIdx, e)}
                         >
                           <input
@@ -1949,8 +1950,8 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         </td>
 
                         {/* Column 1: Delivery Toggle Switch */}
-                        <td className="py-3.5 px-3" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center gap-2">
+                        <td className="py-3.5 px-2.5" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-1.5">
                             <button
                               type="button"
                               disabled={isUpdating}
@@ -1970,8 +1971,8 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                               />
                             </button>
                             
-                            <span className={`text-[10px] font-bold ${
-                              isActive ? 'text-[#15803D]' : isPaused ? 'text-slate-600' : 'text-slate-600'
+                            <span className={`text-xs font-extrabold ${
+                              isActive ? 'text-[#15803D]' : isPaused ? 'text-[#3B3F46]' : 'text-[#3B3F46]'
                             }`}>
                               {isActive ? 'BẬT' : isPaused ? 'TẮT' : c.status}
                             </span>
@@ -1979,30 +1980,30 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         </td>
 
                         {/* Column 2: Campaign & Product Hierarchy (Clean 2-line Editorial layout) */}
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-[#121316] group-hover:text-[#D95D39] transition-colors text-xs flex items-center gap-1.5">
+                        <td className="py-3.5 px-3">
+                          <div className="font-bold text-[#121316] group-hover:text-[#D95D39] transition-colors text-sm flex items-center gap-1.5 leading-snug">
                             <span>{c.name}</span>
                             <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 text-[#D95D39] transition-opacity shrink-0" />
                           </div>
-                          <div className="flex items-center gap-1.5 mt-1 text-[11px] text-[#5A5E66] flex-wrap">
-                            <span className="font-mono text-[10px] font-semibold text-[#5A5E66]">
+                          <div className="flex items-center gap-1.5 mt-1 text-xs text-[#3B3F46] flex-wrap">
+                            <span className="font-semibold text-[#3B3F46]">
                               {campCode}
                             </span>
                             <span>·</span>
-                            <span className="font-semibold text-[#121316]">
+                            <span className="font-bold text-[#121316]">
                               {c.product?.name || `SP #${c.product_id}`}
                             </span>
                             <span>·</span>
-                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#F6F5F0] border border-[#E4E2DD] text-[#5A5E66] font-semibold">
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-[#F6F5F0] border border-[#E4E2DD] text-[#3B3F46] font-semibold">
                               {funnelLabel}
                             </span>
                           </div>
                         </td>
 
-                        {/* Column 3: Channels — dẫn xuất từ nội dung thực tế */}
-                        <td className="py-3.5 px-3">
+                        {/* Column 3: Channels — Hiển thị rõ cả Biểu tượng + Tên kênh */}
+                        <td className="py-3.5 px-2.5">
                           {channelCodes.length > 0 ? (
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex flex-wrap items-center gap-1">
                               {channelCodes.map((code) => {
                                 const pres = channelPresentation(code);
                                 const ChannelIcon = pres.icon;
@@ -2010,20 +2011,21 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                                   <span
                                     key={code}
                                     title={pres.label}
-                                    className={`w-6 h-6 rounded-md border flex items-center justify-center ${pres.chip}`}
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-xs font-bold ${pres.chip}`}
                                   >
-                                    <ChannelIcon className="w-3 h-3" />
+                                    <ChannelIcon className="w-3 h-3 shrink-0" />
+                                    <span>{pres.shortLabel}</span>
                                   </span>
                                 );
                               })}
                             </div>
                           ) : (
-                            <span className="text-[10px] text-[#8A8F98] italic">Chưa có kênh</span>
+                            <span className="text-xs text-[#4E535C] italic">Chưa gắn kênh</span>
                           )}
                         </td>
 
                         {/* Column 4: Budget (Inline Edit) & Spend vs Time Pacing */}
-                        <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
+                        <td className="py-3.5 px-3" onClick={(e) => e.stopPropagation()}>
                           {editingBudgetId === c.id ? (
                             <div className="flex items-center gap-1">
                               <input
@@ -2036,7 +2038,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                                   if (e.key === 'Escape') setEditingBudgetId(null);
                                 }}
                                 onBlur={() => void handleSaveInlineBudget(c)}
-                                className="w-28 px-2 py-1 text-xs font-mono font-bold border border-[#D95D39] rounded-lg bg-white text-[#121316] focus:outline-none focus:ring-2 focus:ring-[#D95D39]"
+                                className="w-28 px-2 py-1 text-xs font-bold tabular-nums border border-[#D95D39] rounded-lg bg-white text-[#121316] focus:outline-none focus:ring-2 focus:ring-[#D95D39]"
                               />
                               <button
                                 type="button"
@@ -2055,10 +2057,10 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                                 setEditingBudgetValue(String(c.budget || 0));
                               }}
                               title="Nhấp để sửa nhanh Ngân sách"
-                              className="group/budget inline-flex items-center gap-1.5 font-mono font-bold text-[#121316] hover:text-[#D95D39] text-xs text-left"
+                              className="group/budget inline-flex items-center gap-1.5 font-extrabold tabular-nums text-[#121316] hover:text-[#D95D39] text-sm text-left"
                             >
                               <span>{formatNumber(c.budget)}</span>
-                              <span className="text-[10px] font-normal text-[#5A5E66]">đ</span>
+                              <span className="text-xs font-semibold text-[#3B3F46]">đ</span>
                               <PencilLine className="w-3 h-3 text-slate-400 opacity-0 group-hover/budget:opacity-100 transition-opacity" />
                             </button>
                           )}
@@ -2072,25 +2074,25 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                                 style={{ width: `${spendPercent.toFixed(1)}%` }}
                               ></div>
                             </div>
-                            <span className="text-[10px] font-mono text-[#5A5E66]">
-                              {hasMetrics ? `${spendPercent.toFixed(1)}%` : 'chưa chi'}
+                            <span className="text-xs font-bold tabular-nums text-[#3B3F46]">
+                              {hasMetrics ? `${spendPercent.toFixed(0)}%` : 'chưa chi'}
                             </span>
                           </div>
                           {pacingInfo.isOverPacing && (
-                            <div className="mt-1 inline-flex items-center gap-1 text-[9px] font-bold text-[#BE123C] bg-[#FFF1F2] px-1.5 py-0.5 rounded border border-[#FECDD3]">
-                              <Flame className="w-2.5 h-2.5 text-[#BE123C]" />
+                            <div className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-[#BE123C] bg-[#FFF1F2] px-1.5 py-0.5 rounded border border-[#FECDD3]">
+                              <Flame className="w-3 h-3 text-[#BE123C]" />
                               <span>Tiêu nhanh ({pacingInfo.budgetPct.toFixed(0)}% tiền)</span>
                             </div>
                           )}
                         </td>
 
                         {/* Column 5: Performance Metrics — từ CampaignMetric thật */}
-                        <td className="py-3.5 px-4">
+                        <td className="py-3.5 px-3">
                           {hasMetrics ? (
                             <>
                               <div className="flex items-center gap-1.5">
                                 <span
-                                  className={`px-2 py-0.5 rounded-md font-mono font-bold text-[11px] border ${
+                                  className={`px-2 py-0.5 rounded-md font-bold tabular-nums text-xs border ${
                                     rowRoas !== null && rowRoas >= 1.5
                                       ? 'bg-[#F0FDF4] text-[#15803D] border-[#BBF7D0]'
                                       : 'bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]'
@@ -2099,33 +2101,33 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                                   {rowRoas !== null ? `${rowRoas.toFixed(2)}x ROAS` : 'Chưa có chi phí'}
                                 </span>
                               </div>
-                              <div className="text-[10px] text-[#5A5E66] mt-1">
-                                {formatNumber(agg.clicks)} lượt bấm{rowCvr !== null ? ` · ${rowCvr.toFixed(1)}% chốt đơn` : ''}
+                              <div className="text-xs text-[#3B3F46] font-medium mt-1 tabular-nums">
+                                {formatNumber(agg.clicks)} bấm{rowCvr !== null ? ` · ${rowCvr.toFixed(1)}% chốt` : ''}
                               </div>
                             </>
                           ) : (
-                            <span className="text-[10px] text-[#8A8F98] italic">Chưa ghi nhận chỉ số</span>
+                            <span className="text-xs text-[#4E535C] italic">Chưa ghi nhận</span>
                           )}
                         </td>
 
                         {/* Column 6: Creatives & Ad Fatigue Indicator */}
-                        <td className="py-3.5 px-3">
-                          <div className="inline-flex items-center gap-1 text-[11px] font-bold text-[#121316] bg-[#F6F5F0] border border-[#E4E2DD] px-2 py-1 rounded-lg">
-                            <Layers className="w-3.5 h-3.5 text-[#5A5E66]" />
-                            <span>{creativeCount} bài viết</span>
+                        <td className="py-3.5 px-2.5">
+                          <div className="inline-flex items-center gap-1 text-xs font-bold text-[#121316] bg-[#F6F5F0] border border-[#E4E2DD] px-2 py-1 rounded-lg">
+                            <Layers className="w-3.5 h-3.5 text-[#3B3F46]" />
+                            <span>{creativeCount} bài</span>
                           </div>
                           {pacingInfo.isFatigued && (
                             <div className="mt-1">
-                              <span className="inline-flex items-center gap-1 text-[9px] font-bold text-[#B45309] bg-[#FFFBEB] border border-[#FDE68A] px-1.5 py-0.5 rounded">
-                                <AlertTriangle className="w-2.5 h-2.5 text-[#B45309]" />
-                                <span>Khách nhàm QC</span>
+                              <span className="inline-flex items-center gap-1 text-xs font-bold text-[#B45309] bg-[#FFFBEB] border border-[#FDE68A] px-1.5 py-0.5 rounded">
+                                <AlertTriangle className="w-3 h-3 text-[#B45309]" />
+                                <span>Nhàm QC</span>
                               </span>
                             </div>
                           )}
                         </td>
 
                         {/* Column 7: Merged Health Check & Quick Actions */}
-                        <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                        <td className="py-3.5 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1">
                             <button
                               type="button"
@@ -2134,18 +2136,18 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                                 setDrawerTab('ai_doctor');
                               }}
                               data-testid={`open-ai-doctor-btn-${c.id}`}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-[#121316] bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#D0CEC7] transition-colors cursor-pointer"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold text-[#121316] bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#D0CEC7] transition-colors cursor-pointer"
                               title="Chẩn đoán chi phí & hiệu quả chiến dịch"
                             >
                               <Sparkles className="w-3 h-3 text-[#D95D39]" />
-                              <span>Khám bệnh</span>
+                              <span>Khám</span>
                             </button>
 
                             <button
                               onClick={() => setSelectedDrawerCampaign(c)}
                               aria-label={`Xem chi tiết chiến dịch ${c.name}`}
                               title="Xem chi tiết & Mẫu quảng cáo"
-                              className="p-1.5 text-[#5A5E66] hover:text-[#121316] hover:bg-[#F6F5F0] rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 text-[#3B3F46] hover:text-[#121316] hover:bg-[#F6F5F0] rounded-lg transition-colors cursor-pointer"
                             >
                               <Eye className="w-4 h-4" />
                             </button>
@@ -2154,7 +2156,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                               onClick={(e) => handleDuplicateCampaign(c, e)}
                               aria-label={`Nhân bản chiến dịch ${c.name}`}
                               title="Nhân bản chiến dịch để chạy thử nghiệm A/B"
-                              className="p-1.5 text-[#5A5E66] hover:text-[#121316] hover:bg-[#F6F5F0] rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 text-[#3B3F46] hover:text-[#121316] hover:bg-[#F6F5F0] rounded-lg transition-colors cursor-pointer"
                             >
                               <Copy className="w-4 h-4" />
                             </button>
@@ -2173,7 +2175,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                                 onClick={() => setDeletingId(c.id)}
                                 aria-label={`Xóa chiến dịch ${c.name}`}
                                 title="Xóa chiến dịch"
-                                className="p-1.5 text-[#5A5E66] hover:text-[#BE123C] hover:bg-[#FFF1F2] rounded-lg transition-colors cursor-pointer"
+                                className="p-1.5 text-[#3B3F46] hover:text-[#BE123C] hover:bg-[#FFF1F2] rounded-lg transition-colors cursor-pointer"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>

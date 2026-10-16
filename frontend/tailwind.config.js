@@ -17,17 +17,24 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        // Đăng ký Plus Jakarta Sans vào `font-sans` để `font-sans` (dùng ở
-        // App.tsx và hầu hết page) thật sự dùng font này. Trước đây font chỉ được
-        // gắn ở <body> bằng class arbitrary nhưng App.tsx lại đặt `font-sans`
-        // (ui-sans-serif, system-ui...) ở gốc ứng dụng nên ghi đè — font tải về
-        // không bao giờ được dùng, tốn băng thông mà không có tác dụng.
         sans: [
+          "'Be Vietnam Pro'",
           "'Plus Jakarta Sans'",
-          'ui-sans-serif',
           'system-ui',
           '-apple-system',
           'Segoe UI',
+          'sans-serif',
+        ],
+        display: [
+          "'Be Vietnam Pro'",
+          "'Plus Jakarta Sans'",
+          'system-ui',
+          'sans-serif',
+        ],
+        mono: [
+          "'Be Vietnam Pro'",
+          "'Plus Jakarta Sans'",
+          "'JetBrains Mono'",
           'sans-serif',
         ],
       },

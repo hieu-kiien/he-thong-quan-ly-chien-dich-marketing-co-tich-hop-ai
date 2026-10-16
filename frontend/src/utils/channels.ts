@@ -23,52 +23,53 @@ const UNKNOWN_CHANNEL_CODE = 'unknown';
 
 export interface ChannelPresentation {
   label: string;
+  shortLabel: string;
   chip: string;
   dot: string;
   icon: LucideIcon;
 }
 
-/**
- * Toàn bộ nhãn/màu/icon được khoá theo `code` chứ không theo `id`.
- * `id` là số thứ tự sinh ra bởi database và thay đổi giữa các môi trường;
- * khoá theo id là nguyên nhân gốc của các bảng map mâu thuẫn (id 2 từng
- * được gọi đồng thời là "TikTok" và là "Email").
- */
 const PRESENTATION: Record<string, ChannelPresentation> = {
   facebook: {
     label: 'Facebook Ads / Post',
-    chip: 'bg-blue-50 text-blue-700 border-blue-200',
-    dot: 'bg-blue-500',
+    shortLabel: 'Facebook',
+    chip: 'bg-[#EFF6FF] text-[#1D4ED8] border-[#BFDBFE]',
+    dot: 'bg-[#1D4ED8]',
     icon: ThumbsUp,
   },
   email: {
     label: 'Email Newsletter',
-    chip: 'bg-purple-50 text-purple-700 border-purple-200',
-    dot: 'bg-purple-500',
+    shortLabel: 'Email',
+    chip: 'bg-[#F6F5F0] text-[#121316] border-[#D0CEC7]',
+    dot: 'bg-[#5A5E66]',
     icon: Mail,
   },
   blog: {
     label: 'Blog SEO',
-    chip: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    dot: 'bg-emerald-500',
+    shortLabel: 'Website / SEO',
+    chip: 'bg-[#F0FDF4] text-[#15803D] border-[#BBF7D0]',
+    dot: 'bg-[#15803D]',
     icon: Globe,
   },
   google_ads: {
     label: 'Google Search Ads',
-    chip: 'bg-amber-50 text-amber-700 border-amber-200',
-    dot: 'bg-amber-500',
+    shortLabel: 'Google Ads',
+    chip: 'bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]',
+    dot: 'bg-[#B45309]',
     icon: ExternalLink,
   },
   tiktok: {
     label: 'TikTok Short Video',
-    chip: 'bg-slate-900 text-white border-slate-900',
-    dot: 'bg-slate-900',
+    shortLabel: 'TikTok',
+    chip: 'bg-[#121316] text-white border-[#121316]',
+    dot: 'bg-[#121316]',
     icon: Video,
   },
   [UNKNOWN_CHANNEL_CODE]: {
     label: 'Kênh khác',
-    chip: 'bg-slate-50 text-slate-700 border-slate-200',
-    dot: 'bg-slate-500',
+    shortLabel: 'Kênh khác',
+    chip: 'bg-[#F6F5F0] text-[#121316] border-[#E4E2DD]',
+    dot: 'bg-[#5A5E66]',
     icon: Sparkles,
   },
 };

@@ -695,9 +695,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* MỤC 1 (MẶC ĐỊNH): ĐIỀU HÀNH CHIẾN DỊCH & VIỆC CẦN XỬ LÝ */}
       {dashboardSection === 'overview' && (
-        <div id="ai-doctor-hub" className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Cột trái (8/12): Cảnh báo cần xử lý + Bảng chiến dịch */}
-          <div className="lg:col-span-8 space-y-5">
+        <div id="ai-doctor-hub" className="space-y-6">
+          {/* Cảnh báo cần xử lý + Bảng chiến dịch toàn chiều rộng (100% width — không thanh kéo ngang) */}
+          <div className="space-y-5">
             {!loading && portfolioAnomalies.length > 0 && (
               <div
                 data-testid="dashboard-portfolio-intelligence"
@@ -705,10 +705,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
               >
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#F0EFEA] pb-2.5">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-xs font-black uppercase tracking-wider text-[#121316]">
+                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-[#121316]">
                       Chiến dịch cần xử lý ngay
                     </h3>
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-[#FFF1F2] text-[#BE123C] border border-[#FECDD3]">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-[#FFF1F2] text-[#BE123C] border border-[#FECDD3]">
                       {portfolioAnomalies.length} cảnh báo
                     </span>
                   </div>
@@ -718,7 +718,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       type="button"
                       onClick={handleOneClickRebalance}
                       disabled={rebalancingBudget}
-                      className="inline-flex items-center gap-1.5 bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#D0CEC7] text-[#121316] font-bold text-xs px-2.5 py-1 rounded-lg transition-all cursor-pointer"
+                      className="inline-flex items-center gap-1.5 bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#D0CEC7] text-[#121316] font-bold text-xs px-3 py-1.5 rounded-lg transition-all cursor-pointer"
                     >
                       {rebalancingBudget ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -730,13 +730,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   )}
                 </div>
 
-                <div className="space-y-2.5">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                   {portfolioAnomalies.map((anom) => {
                     const isCrit = anom.severity === 'CRITICAL';
                     return (
                       <div
                         key={anom.id}
-                        className={`p-3 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        className={`p-3.5 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                           isCrit
                             ? 'bg-[#FFF1F2]/40 border-[#FECDD3]'
                             : 'bg-[#FFFBEB]/50 border-[#FDE68A]'
@@ -745,7 +745,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <div className="space-y-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <span
-                              className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                              className={`text-xs font-bold px-2 py-0.5 rounded ${
                                 isCrit ? 'bg-[#BE123C] text-white' : 'bg-[#B45309] text-white'
                               }`}
                             >
@@ -755,14 +755,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                   ? 'Khách nhàm QC'
                                   : 'Chi phí cao'}
                             </span>
-                            <span className="text-xs font-extrabold text-[#121316] truncate">
+                            <span className="text-sm font-bold text-[#121316] truncate">
                               {anom.campaign_name}
                             </span>
-                            <span className="text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-white border border-[#E4E2DD] text-[#BE123C]">
+                            <span className="text-xs font-bold tabular-nums px-2 py-0.5 rounded bg-white border border-[#E4E2DD] text-[#BE123C]">
                               {anom.metric_highlight || anom.metric_evidence}
                             </span>
                           </div>
-                          <p className="text-xs text-[#5A5E66] leading-snug">
+                          <p className="text-xs text-[#3B3F46] leading-relaxed">
                             {anom.title} — <strong className="text-[#15803D]">{anom.recommended_action}</strong>
                           </p>
                         </div>
@@ -799,7 +799,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-black text-[#121316]">
+                <h3 className="text-base font-extrabold text-[#121316]">
                   Danh sách chiến dịch đang quản lý ({campaigns.length})
                 </h3>
                 <button
@@ -816,11 +816,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-center">
                   <AlertTriangle className="w-6 h-6 text-rose-500 mx-auto mb-1.5" />
                   <p className="text-xs font-bold text-rose-900">Không tải được danh sách chiến dịch</p>
-                  <p className="text-[11px] text-rose-700 mt-0.5">{loadError}</p>
+                  <p className="text-xs text-rose-700 mt-0.5">{loadError}</p>
                   <button
                     type="button"
                     onClick={() => void loadData()}
-                    className="mt-2 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[11px] font-bold"
+                    className="mt-2 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold"
                   >
                     Thử tải lại
                   </button>
@@ -839,14 +839,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
 
-          {/* Cột phải (4/12): Việc cần làm hôm nay + Bài chờ duyệt */}
-          <div className="lg:col-span-4 space-y-5">
+          {/* Hàng dưới (2 cột cân đối): Việc cần làm hôm nay + Bài viết chờ duyệt */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             {/* Việc cần làm hôm nay */}
             <div className="bg-white rounded-xl border border-[#E4E2DD] p-5">
               <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-[#F0EFEA]">
                 <div className="flex items-center gap-2">
                   <ListTodo className="w-4 h-4 text-[#D95D39]" />
-                  <h3 className="text-xs font-black uppercase tracking-wider text-[#121316]">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-[#121316]">
                     Việc cần làm hôm nay ({myWorkToday.filter(t => t.status !== 'DONE').length})
                   </h3>
                 </div>
@@ -859,7 +859,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
 
               {myWorkToday.length === 0 ? (
-                <div className="py-5 text-center text-[#5A5E66] text-xs">
+                <div className="py-5 text-center text-[#3B3F46] text-xs">
                   <CheckCircle2 className="w-6 h-6 mx-auto mb-1.5 text-[#15803D]" />
                   Không có đầu việc nào bị tồn đọng hôm nay.
                 </div>
@@ -868,7 +868,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   {myWorkToday.slice(0, 4).map((task) => (
                     <div
                       key={task.id}
-                      className={`p-2.5 rounded-lg border flex items-center justify-between gap-2.5 transition-colors ${
+                      className={`p-3 rounded-lg border flex items-center justify-between gap-2.5 transition-colors ${
                         task.is_overdue
                           ? 'bg-[#FFF1F2]/50 border-[#FECDD3]'
                           : 'bg-[#F6F5F0]/60 border-[#E4E2DD]'
@@ -889,7 +889,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-[#121316] truncate">{task.title}</p>
-                          <p className="text-[11px] text-[#5A5E66] truncate">
+                          <p className="text-xs text-[#3B3F46] truncate mt-0.5">
                             {task.campaign_name} {task.due_date && `· Hạn: ${task.due_date}`}
                           </p>
                         </div>
@@ -903,7 +903,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             {/* Bài viết đang chờ duyệt */}
             <div className="bg-white rounded-xl border border-[#E4E2DD] p-5">
               <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-[#F0EFEA]">
-                <span className="text-xs font-black uppercase tracking-wider text-[#121316] flex items-center gap-1.5">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-[#121316] flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-[#B45309]" /> Bài viết chờ duyệt ({pendingContents.length})
                 </span>
                 <button
@@ -915,38 +915,38 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
 
               {pendingContents.length === 0 ? (
-                <p className="text-xs text-[#5A5E66] py-3 text-center">Không có bài viết nào đang chờ duyệt.</p>
+                <p className="text-xs text-[#3B3F46] py-5 text-center">Không có bài viết nào đang chờ duyệt.</p>
               ) : (
                 <div className="space-y-2.5">
                   {pendingContents.slice(0, 3).map((item) => (
                     <div key={item.id} className="p-3 bg-[#F6F5F0]/70 border border-[#E4E2DD] rounded-lg">
                       <p className="text-xs font-bold text-[#121316] truncate">{item.title}</p>
-                      <p className="text-[11px] text-[#5A5E66] truncate mt-0.5">{item.body}</p>
+                      <p className="text-xs text-[#3B3F46] truncate mt-0.5">{item.body}</p>
                       {isManager && (
                         <button
                           type="button"
                           onClick={() => handleApproveQuick(item.id)}
                           aria-label={`Phê duyệt ngay bài: ${item.title}`}
-                          className="mt-2 text-[11px] font-bold text-[#15803D] hover:underline flex items-center gap-1"
+                          className="mt-2 text-xs font-bold text-[#15803D] hover:underline flex items-center gap-1"
                         >
-                          <CheckCircle2 className="w-3 h-3" /> Duyệt bài này
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Duyệt bài này
                         </button>
                       )}
                     </div>
                   ))}
                 </div>
               )}
-            </div>
 
-            {commandCenterError && (
-              <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3.5">
-                <p className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  Không tải được thông tin việc cần làm
-                </p>
-                <p className="text-[11px] text-amber-800 mt-0.5">{commandCenterError}</p>
-              </div>
-            )}
+              {commandCenterError && (
+                <div role="alert" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3.5">
+                  <p className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    Không tải được thông tin việc cần làm
+                  </p>
+                  <p className="text-xs text-amber-800 mt-0.5">{commandCenterError}</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
