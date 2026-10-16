@@ -59,16 +59,16 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   return (
     <div className="space-y-6">
       {/* Header Action Bar */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white p-5 rounded-xl border border-[#E4E2DD] flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 rounded-lg bg-[#F6F5F0] text-[#D95D39] border border-[#E4E2DD]">
               <Target className="w-5 h-5" />
             </span>
             <div>
-              <h3 className="text-base font-bold text-slate-900">Brief & Mục Tiêu Vận Hành Chiến Dịch</h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Thông điệp định hướng nội dung cốt lõi, lời kêu gọi hành động (CTA) và chỉ tiêu định lượng bắt buộc.
+              <h3 className="text-base font-extrabold text-[#121316]">Đề bài &amp; Mục tiêu vận hành chiến dịch</h3>
+              <p className="text-xs text-[#3B3F46] mt-0.5">
+                Thông điệp định hướng nội dung cốt lõi, lời kêu gọi hành động (CTA) và chỉ tiêu định lượng.
               </p>
             </div>
           </div>
@@ -85,26 +85,26 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                   setBriefTargetKpiName(campaign?.target_kpi_name || '');
                   setBriefTargetKpiValue(campaign?.target_kpi_value || 0);
                 }}
-                className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                className="px-3.5 py-1.5 rounded-lg border border-[#D0CEC7] text-xs font-semibold text-[#3B3F46] hover:bg-[#F6F5F0] transition-colors"
               >
                 Hủy
               </button>
               <button
                 onClick={handleSaveBrief}
                 disabled={isSavingBrief}
-                className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-60"
+                className="px-4 py-1.5 rounded-lg bg-[#D95D39] hover:bg-[#C04E2C] text-white text-xs font-bold transition-colors flex items-center gap-1.5 disabled:opacity-60"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>{isSavingBrief ? 'Đang lưu...' : 'Lưu Thay Đổi'}</span>
+                <span>{isSavingBrief ? 'Đang lưu...' : 'Lưu thay đổi'}</span>
               </button>
             </>
           ) : (
             <button
               onClick={() => setIsEditingBrief(true)}
-              className="px-4 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100 text-xs font-bold transition-colors flex items-center gap-1.5"
+              className="px-4 py-1.5 rounded-lg border border-[#D0CEC7] bg-[#F6F5F0] text-[#121316] hover:bg-[#EAE8E1] text-xs font-bold transition-colors flex items-center gap-1.5"
             >
               <Edit3 className="w-3.5 h-3.5" />
-              <span>Chỉnh Sửa Brief</span>
+              <span>Chỉnh sửa đề bài</span>
             </button>
           )}
         </div>
@@ -113,19 +113,19 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       {/* 2-Column Grid: Strategic Message & Quantified KPI Target */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Box 1: Core Message & CTA */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-              <FileText className="w-4 h-4 text-indigo-600" />
-              Thông Điệp Cốt Lõi & Kêu Gọi Hành Động
+        <div className="bg-white p-5 rounded-xl border border-[#E4E2DD] space-y-4">
+          <div className="flex items-center justify-between border-b border-[#F0EFEA] pb-3">
+            <span className="text-xs font-extrabold text-[#121316] uppercase tracking-wider flex items-center gap-2">
+              <FileText className="w-4 h-4 text-[#D95D39]" />
+              Thông điệp cốt lõi &amp; Kêu gọi hành động
             </span>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-              Brand Messaging
+            <span className="text-xs font-bold px-2 py-0.5 rounded bg-[#F6F5F0] text-[#3B3F46] border border-[#E4E2DD]">
+              Thông điệp thương hiệu
             </span>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+            <label className="block text-xs font-bold text-[#3B3F46] mb-1.5">
               Thông điệp chủ đạo (Key Message)
             </label>
             {isEditingBrief ? (
@@ -134,21 +134,21 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                 value={briefKeyMessage}
                 onChange={(e) => setBriefKeyMessage(e.target.value)}
                 placeholder="Ví dụ: Giảm giá 30% cho 100 khách hàng đầu tiên đăng ký dùng thử phần mềm trong tháng 10..."
-                className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800"
+                className="w-full text-xs p-3 rounded-xl border border-[#D0CEC7] focus:outline-none focus:border-[#121316] text-[#121316]"
               />
             ) : (
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-800 leading-relaxed font-medium min-h-[72px] flex items-center">
+              <div className="p-3.5 bg-[#F6F5F0] rounded-xl border border-[#E4E2DD] text-xs text-[#121316] leading-relaxed font-medium min-h-[72px] flex items-center">
                 {campaign?.key_message || briefKeyMessage ? (
                   <span className="italic">&ldquo;{campaign?.key_message || briefKeyMessage}&rdquo;</span>
                 ) : (
-                  <span className="text-slate-400 italic">Chưa thiết lập thông điệp cốt lõi cho chiến dịch này. Nhấn &ldquo;Chỉnh Sửa Brief&rdquo; để bổ sung.</span>
+                  <span className="text-[#4E535C] italic">Chưa thiết lập thông điệp cốt lõi cho chiến dịch này. Nhấn &ldquo;Chỉnh sửa đề bài&rdquo; để bổ sung.</span>
                 )}
               </div>
             )}
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+            <label className="block text-xs font-bold text-[#3B3F46] mb-1.5">
               Lời kêu gọi hành động chính (Primary CTA)
             </label>
             {isEditingBrief ? (
@@ -157,35 +157,35 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                 value={briefPrimaryCta}
                 onChange={(e) => setBriefPrimaryCta(e.target.value)}
                 placeholder="Ví dụ: Đăng ký trải nghiệm ngay, Nhận ưu đãi 30%..."
-                className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800"
+                className="w-full text-xs p-2.5 rounded-xl border border-[#D0CEC7] focus:outline-none focus:border-[#121316] text-[#121316]"
               />
             ) : (
-              <div className="flex items-center gap-3">
-                <span className="px-3.5 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-xs shadow-sm inline-flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="px-3.5 py-1.5 rounded-lg bg-[#121316] text-white font-bold text-xs inline-flex items-center gap-1.5">
                   <span>{campaign?.primary_cta || briefPrimaryCta || 'Chưa thiết lập CTA'}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </span>
-                <span className="text-[11px] text-slate-500">CTA này sẽ được AI Copilot tự động chèn vào mọi nội dung sinh ra.</span>
+                <span className="text-xs text-[#3B3F46]">CTA này được tự động gắn vào các mẫu bài quảng cáo.</span>
               </div>
             )}
           </div>
         </div>
 
         {/* Box 2: Quantified Target & Metrics */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-emerald-600" />
-              Mục Tiêu Định Lượng (Quantified KPI Target)
+        <div className="bg-white p-5 rounded-xl border border-[#E4E2DD] space-y-4">
+          <div className="flex items-center justify-between border-b border-[#F0EFEA] pb-3">
+            <span className="text-xs font-extrabold text-[#121316] uppercase tracking-wider flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-[#15803D]" />
+              Mục tiêu định lượng (KPI Target)
             </span>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-              Target Outcome
+            <span className="text-xs font-bold px-2 py-0.5 rounded bg-[#F0FDF4] text-[#15803D] border border-[#BBF7D0]">
+              Chỉ tiêu cam kết
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+              <label className="block text-xs font-bold text-[#3B3F46] mb-1.5">
                 Tên chỉ tiêu KPI chính
               </label>
               {isEditingBrief ? (
@@ -193,18 +193,18 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                   type="text"
                   value={briefTargetKpiName}
                   onChange={(e) => setBriefTargetKpiName(e.target.value)}
-                  placeholder="Ví dụ: Khách hàng tiềm năng (Leads)"
-                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-800"
+                  placeholder="Ví dụ: Đơn hàng thành công"
+                  className="w-full text-xs p-2.5 rounded-xl border border-[#D0CEC7] focus:outline-none focus:border-[#121316] text-[#121316]"
                 />
               ) : (
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs font-bold text-slate-800">
+                <div className="p-3 bg-[#F6F5F0] rounded-xl border border-[#E4E2DD] text-xs font-bold text-[#121316]">
                   {campaign?.target_kpi_name || briefTargetKpiName || 'Chưa đặt tên KPI'}
                 </div>
               )}
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+              <label className="block text-xs font-bold text-[#3B3F46] mb-1.5">
                 Chỉ tiêu cam kết (Mục tiêu)
               </label>
               {isEditingBrief ? (
@@ -213,30 +213,30 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                   value={briefTargetKpiValue || ''}
                   onChange={(e) => setBriefTargetKpiValue(Number(e.target.value))}
                   placeholder="1000"
-                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-800 font-bold"
+                  className="w-full text-xs p-2.5 rounded-xl border border-[#D0CEC7] focus:outline-none focus:border-[#121316] text-[#121316] font-bold tabular-nums"
                 />
               ) : (
-                <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200/80 text-xs font-bold text-emerald-700 flex items-center justify-between">
-                  <span className="text-base font-extrabold">
+                <div className="p-3 bg-[#F0FDF4] rounded-xl border border-[#BBF7D0] text-xs font-bold text-[#15803D] flex items-center justify-between">
+                  <span className="text-base font-extrabold tabular-nums">
                     {(campaign?.target_kpi_value || briefTargetKpiValue || 0).toLocaleString('vi-VN')}
                   </span>
-                  <span className="text-[10px] text-emerald-600 font-semibold uppercase">Đơn vị mục tiêu</span>
+                  <span className="text-xs text-[#15803D] font-bold">Mục tiêu</span>
                 </div>
               )}
             </div>
           </div>
 
           {/* KPI Performance summary */}
-          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
+          <div className="p-3.5 bg-[#F6F5F0] rounded-xl border border-[#E4E2DD] space-y-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-600 font-medium">Tiến độ chuyển đổi thực tế:</span>
-              <span className="font-bold text-slate-900">
+              <span className="text-[#3B3F46] font-semibold">Tiến độ chuyển đổi thực tế:</span>
+              <span className="font-extrabold text-[#121316] tabular-nums">
                 {(campaignKpi?.total_conversions || 0).toLocaleString('vi-VN')} / {(campaign?.target_kpi_value || briefTargetKpiValue || 1).toLocaleString('vi-VN')}
               </span>
             </div>
-            <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+            <div className="w-full h-2 rounded-full bg-[#E4E2DD] overflow-hidden">
               <div
-                className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                className="h-full rounded-full bg-[#15803D] transition-all duration-500"
                 style={{
                   width: `${Math.min(
                     100,
@@ -245,9 +245,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                 }}
               />
             </div>
-            <div className="flex items-center justify-between text-[11px] text-slate-500">
+            <div className="flex items-center justify-between text-xs text-[#3B3F46]">
               <span>Tỷ lệ hoàn thành:</span>
-              <span className="font-bold text-slate-800">
+              <span className="font-extrabold text-[#121316] tabular-nums">
                 {Math.min(
                   100,
                   Math.round(((campaignKpi?.total_conversions || 0) / ((campaign?.target_kpi_value || briefTargetKpiValue) || 1)) * 100)
@@ -259,27 +259,27 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           {/* Đích KPI đã khai báo — target vs thực tế (GET /kpi-progress) */}
           {kpiProgress && kpiProgress.targets.length > 0 && (
             <div className="space-y-2">
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              <div className="text-xs font-bold text-[#3B3F46] uppercase tracking-wider">
                 Chỉ tiêu KPI đã khai ({kpiProgress.measurable_count}/{kpiProgress.total_count} đo được)
                 {kpiProgress.overall_achieved_pct !== null && (
-                  <span className="ml-1.5 text-indigo-600">· Đạt TB {kpiProgress.overall_achieved_pct}%</span>
+                  <span className="ml-1.5 text-[#D95D39]">· Đạt TB {kpiProgress.overall_achieved_pct}%</span>
                 )}
               </div>
               {kpiProgress.targets.map((t) => (
-                <div key={t.target_id ?? t.metric_name} className="p-2.5 bg-white rounded-xl border border-slate-100 text-xs space-y-1">
+                <div key={t.target_id ?? t.metric_name} className="p-2.5 bg-white rounded-xl border border-[#E4E2DD] text-xs space-y-1">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-slate-700">{t.metric_name}</span>
+                    <span className="font-bold text-[#121316]">{t.metric_name}</span>
                     {t.achieved_pct !== null ? (
-                      <span className={`font-extrabold ${t.achieved_pct >= 100 ? 'text-emerald-600' : t.achieved_pct >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>
+                      <span className={`font-extrabold tabular-nums ${t.achieved_pct >= 100 ? 'text-[#15803D]' : t.achieved_pct >= 50 ? 'text-[#B45309]' : 'text-[#BE123C]'}`}>
                         {t.achieved_pct}%
                       </span>
                     ) : (
-                      <span className="text-slate-400 font-semibold">Chưa đo được</span>
+                      <span className="text-[#4E535C] font-semibold">Chưa đo được</span>
                     )}
                   </div>
-                  <div className="flex justify-between text-[10px] text-slate-500">
-                    <span>Mục tiêu: <b className="text-slate-700">{t.target_value.toLocaleString('vi-VN')} {t.unit || ''}</b></span>
-                    <span>Thực tế: <b className="text-slate-700">{t.actual_value !== null ? t.actual_value.toLocaleString('vi-VN') : '—'} {t.actual_value !== null ? (t.unit || '') : ''}</b></span>
+                  <div className="flex justify-between text-xs text-[#3B3F46] tabular-nums">
+                    <span>Mục tiêu: <b className="text-[#121316]">{t.target_value.toLocaleString('vi-VN')} {t.unit || ''}</b></span>
+                    <span>Thực tế: <b className="text-[#121316]">{t.actual_value !== null ? t.actual_value.toLocaleString('vi-VN') : '—'} {t.actual_value !== null ? (t.unit || '') : ''}</b></span>
                   </div>
                 </div>
               ))}

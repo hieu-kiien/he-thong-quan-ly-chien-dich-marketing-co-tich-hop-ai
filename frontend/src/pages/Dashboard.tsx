@@ -450,50 +450,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* THANH QUY TRÌNH 4 BƯỚC GỌN TRÊN 1 DÒNG */}
-      <div className="bg-white rounded-xl border border-[#E4E2DD] px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[11px] font-black uppercase tracking-wider text-[#5A5E66]">
-          Quy trình 4 bước:
-        </span>
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-          <button
-            type="button"
-            onClick={() => onNavigateTab?.('campaigns')}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#E4E2DD] text-xs font-bold text-[#121316] transition-colors cursor-pointer"
-          >
-            <span className="w-4 h-4 rounded bg-[#121316] text-white text-[10px] font-mono flex items-center justify-center">1</span>
-            <span>Lập chiến dịch ({campaigns.length})</span>
-          </button>
-          <ChevronRight className="w-3.5 h-3.5 text-[#8A8F98] hidden sm:inline" />
-          <button
-            type="button"
-            onClick={() => onNavigateTab?.('ai_studio')}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#E4E2DD] text-xs font-bold text-[#121316] transition-colors cursor-pointer"
-          >
-            <span className="w-4 h-4 rounded bg-[#D95D39] text-white text-[10px] font-mono flex items-center justify-center">2</span>
-            <span>Soạn mẫu quảng cáo</span>
-          </button>
-          <ChevronRight className="w-3.5 h-3.5 text-[#8A8F98] hidden sm:inline" />
-          <button
-            type="button"
-            onClick={() => onNavigateTab?.('reviews')}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#E4E2DD] text-xs font-bold text-[#121316] transition-colors cursor-pointer"
-          >
-            <span className="w-4 h-4 rounded bg-[#15803D] text-white text-[10px] font-mono flex items-center justify-center">3</span>
-            <span>Quét từ cấm &amp; Duyệt ({pendingContents.length})</span>
-          </button>
-          <ChevronRight className="w-3.5 h-3.5 text-[#8A8F98] hidden sm:inline" />
-          <button
-            type="button"
-            onClick={() => setDashboardSection('ad_accounts')}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#E4E2DD] text-xs font-bold text-[#121316] transition-colors cursor-pointer"
-          >
-            <span className="w-4 h-4 rounded bg-[#B45309] text-white text-[10px] font-mono flex items-center justify-center">4</span>
-            <span>Đồng bộ TK Quảng cáo &amp; Đơn POS</span>
-          </button>
-        </div>
-      </div>
-
       {/* THÔNG BÁO NGUỒN SỐ LIỆU (CHỈ HIỆN KHI ĐANG XEM SỐ LIỆU MẪU) */}
       {(dataProvenance?.has_demo_data || dataProvenance?.has_unverified_data) && (
         <div
@@ -536,26 +492,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
         onRetry={() => void loadData()}
       />
 
-      {/* THANH CHUYỂN CHẾ ĐỘ XEM (3 MỤC RÕ RÀNG, TRÁNH NHỒI NHÉT DỌC) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E4E2DD] pb-3">
-        <div className="inline-flex flex-wrap items-center gap-1.5 bg-white p-1 rounded-xl border border-[#E4E2DD]">
+      {/* THANH CHUYỂN CHẾ ĐỘ XEM: NẰM GỌN TRÊN 1 DÒNG, CÂN ĐỐI, KHÔNG RỚT DÒNG */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white rounded-xl border border-[#E4E2DD] p-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 w-full md:w-auto">
           <button
             type="button"
             data-testid="dashboard-tab-overview"
             onClick={() => setDashboardSection('overview')}
-            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap ${
               dashboardSection === 'overview'
-                ? 'bg-[#121316] text-white'
-                : 'text-[#5A5E66] hover:text-[#121316] hover:bg-[#F6F5F0]'
+                ? 'bg-[#121316] text-white shadow-sm'
+                : 'text-[#3B3F46] hover:text-[#121316] hover:bg-[#F6F5F0]'
             }`}
           >
-            <span>1. Điều hành Chiến dịch &amp; Việc cần xử lý</span>
+            <span>Điều hành chiến dịch</span>
             {portfolioAnomalies.length > 0 && (
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
-                dashboardSection === 'overview'
-                  ? 'bg-[#D95D39] text-white'
-                  : 'bg-[#FFF1F2] text-[#BE123C]'
-              }`}>
+              <span
+                className={`px-1.5 py-0.5 rounded text-xs font-bold tabular-nums leading-none ${
+                  dashboardSection === 'overview'
+                    ? 'bg-[#D95D39] text-white'
+                    : 'bg-[#FFF1F2] text-[#BE123C] border border-[#FECDD3]'
+                }`}
+              >
                 {portfolioAnomalies.length}
               </span>
             )}
@@ -565,55 +523,49 @@ export const Dashboard: React.FC<DashboardProps> = ({
             type="button"
             data-testid="dashboard-tab-ad-accounts"
             onClick={() => setDashboardSection('ad_accounts')}
-            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap ${
               dashboardSection === 'ad_accounts'
-                ? 'bg-[#121316] text-white'
-                : 'text-[#5A5E66] hover:text-[#121316] hover:bg-[#F6F5F0]'
+                ? 'bg-[#121316] text-white shadow-sm'
+                : 'text-[#3B3F46] hover:text-[#121316] hover:bg-[#F6F5F0]'
             }`}
           >
-            <span>2. Tài khoản Quảng cáo &amp; Đơn hàng POS</span>
-            <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
-              dashboardSection === 'ad_accounts'
-                ? 'bg-white/20 text-white'
-                : 'bg-[#F0FDF4] text-[#15803D] border border-[#BBF7D0]'
-            }`}>
-              API + Webhook
-            </span>
+            <span>Tài khoản QC &amp; Đơn POS</span>
           </button>
 
           <button
             type="button"
             data-testid="dashboard-tab-channels"
             onClick={() => setDashboardSection('channels')}
-            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap ${
               dashboardSection === 'channels'
-                ? 'bg-[#121316] text-white'
-                : 'text-[#5A5E66] hover:text-[#121316] hover:bg-[#F6F5F0]'
+                ? 'bg-[#121316] text-white shadow-sm'
+                : 'text-[#3B3F46] hover:text-[#121316] hover:bg-[#F6F5F0]'
             }`}
           >
-            <span>3. So sánh Kênh &amp; Mẫu bài ra đơn</span>
-            {winningPatterns.length > 0 && (
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
-                dashboardSection === 'channels'
-                  ? 'bg-white/20 text-white'
-                  : 'bg-[#F6F5F0] text-[#121316] border border-[#E4E2DD]'
-              }`}>
-                {winningPatterns.length} mẫu
-              </span>
-            )}
+            <span>So sánh kênh &amp; Mẫu bài</span>
           </button>
         </div>
 
-        {dashboardSection !== 'ad_accounts' && (
-          <button
-            type="button"
-            onClick={() => setDashboardSection('ad_accounts')}
-            className="text-xs font-bold text-[#D95D39] hover:underline flex items-center gap-1 cursor-pointer self-start sm:self-auto"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Đồng bộ Meta BM / TikTok BC / Đơn POS &rarr;</span>
-          </button>
-        )}
+        <div className="flex items-center justify-end gap-2 shrink-0 px-1">
+          {dashboardSection !== 'ad_accounts' ? (
+            <button
+              type="button"
+              onClick={() => setDashboardSection('ad_accounts')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#D0CEC7] text-xs font-bold text-[#121316] transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-[#D95D39] shrink-0" />
+              <span>Kết nối &amp; Đồng bộ số liệu</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setDashboardSection('overview')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#F6F5F0] hover:bg-[#EAE8E1] border border-[#D0CEC7] text-xs font-bold text-[#121316] transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <span>Quay lại bảng chiến dịch</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* MỤC 2: QUẢN LÝ TÀI KHOẢN QUẢNG CÁO & ĐƠN HÀNG POS */}
