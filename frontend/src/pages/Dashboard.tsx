@@ -25,6 +25,7 @@ import { useToast } from '../components/Toast';
 import { CampaignTableSkeleton } from '../components/Skeleton';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { GlobalCsvImportModal } from '../components/GlobalCsvImportModal';
+import { AdAccountsHub } from '../components/AdAccountsHub';
 
 interface DashboardProps {
   onSelectCampaign: (campaign: Campaign) => void;
@@ -578,6 +579,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
         error={kpiError}
         onRetry={() => void loadData()}
       />
+
+      {/* KHU VỰC 1B: QUẢN LÝ TÀI KHOẢN QUẢNG CÁO (META BM / TIKTOK BC) & ĐỒNG BỘ ĐƠN HÀNG POS */}
+      <AdAccountsHub onSynced={() => void loadData()} />
 
       {/* KHU VỰC 2: VIỆC CẦN XỬ LÝ NGAY & CÁCH VIẾT ĐANG HIỆU QUẢ NHẤT */}
       {!loading && (portfolioAnomalies.length > 0 || winningPatterns.length > 0) && (

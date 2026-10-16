@@ -135,12 +135,12 @@ function AppContent() {
   // Trạng thái đang tải session đăng nhập
   if (isAuthLoading) {
     return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-950 text-white gap-3 font-sans">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 animate-pulse">
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#141518] text-white gap-3 font-sans">
+        <div className="w-12 h-12 rounded-xl bg-[#D95D39] flex items-center justify-center shadow-sm">
           <Sparkles className="w-6 h-6 text-white" />
         </div>
         <div className="text-center">
-          <h2 className="font-bold text-sm text-slate-100">MarketFlow AI</h2>
+          <h2 className="font-bold text-sm text-slate-100">MarketFlow</h2>
           <p className="text-xs text-slate-400 mt-1 flex items-center justify-center gap-1.5">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
             <span>Đang xác thực thông tin tài khoản...</span>
@@ -154,14 +154,9 @@ function AppContent() {
   if (!isAuthenticated) {
     return (
       <div className="relative min-h-screen">
-        {isOfflineDemoEnabled() && !isBackendConnected() && (
-          <div className="bg-amber-500/20 border-b border-amber-500/40 text-amber-200 px-4 py-2 text-xs text-center font-semibold sticky top-0 z-50">
-            <strong>[CHẾ ĐỘ DEMO OFFLINE]</strong> Hệ thống đang chạy giả lập offline với LocalStorage. Bạn có thể sử dụng email demo để trải nghiệm.
-          </div>
-        )}
         <Suspense fallback={
-          <div className="flex min-h-screen items-center justify-center bg-slate-900">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          <div className="flex min-h-screen items-center justify-center bg-[#141518]">
+            <Loader2 className="h-8 w-8 animate-spin text-[#D95D39]" />
           </div>
         }>
           <LoginPage
@@ -176,7 +171,7 @@ function AppContent() {
 
   // Đã đăng nhập: Giao diện chính của ứng dụng
   return (
-    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans">
+    <div className="flex h-screen bg-[#F6F5F0] overflow-hidden font-sans">
       {/* Sidebar Navigation (with Mobile Drawer support) */}
       <Sidebar
         currentTab={currentTab}

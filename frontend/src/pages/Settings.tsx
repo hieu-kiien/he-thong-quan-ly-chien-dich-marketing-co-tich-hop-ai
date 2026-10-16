@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { KeyRound, ShieldCheck, Zap, CheckCircle2, AlertCircle, Eye, EyeOff, Trash2, ExternalLink, RefreshCw, Loader2, Building2, User, Check, Power, Route, Plus, Star, ArrowDown, X, UserPlus, Lock, Crown } from 'lucide-react';
+import { KeyRound, ShieldCheck, Zap, CheckCircle2, AlertCircle, Eye, EyeOff, Trash2, ExternalLink, RefreshCw, Loader2, Building2, User, Check, Power, Route, Plus, Star, ArrowDown, X, UserPlus, Lock, Crown, CreditCard } from 'lucide-react';
 import { settingsApi, authApi, workspaceApi, getApiErrorMessage } from '../services/api';
 import { useToast } from '../components/Toast';
 import { CustomApiKey, AIKeyTestResponse, User as UserType, Workspace, AIModelListResponse, AIChain, AIChainHop, WorkspaceMemberItem } from '../types';
 import { MCPAgentStudio } from '../components/MCPAgentStudio';
+import { AdAccountsHub } from '../components/AdAccountsHub';
 
 /**
  * Cấu hình hiển thị cho từng nhà cung cấp AI.
@@ -383,7 +384,7 @@ interface SettingsProps {
 
 export const Settings: React.FC<SettingsProps> = ({ currentUser, currentWorkspace }) => {
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState<'byok' | 'chains' | 'profile' | 'workspace'>('byok');
+  const [activeTab, setActiveTab] = useState<'ad_accounts' | 'byok' | 'chains' | 'profile' | 'workspace'>('byok');
 
   // BYOK Form States
   // Khớp SUPPORTED_AI_PROVIDERS của backend (xem backend/app/services/ai/providers.py).
@@ -793,79 +794,95 @@ const handleTestConnection = async () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-12">
-      {/* Top Banner Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden border border-slate-800">
-        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-500/20 via-transparent to-transparent pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-6 pb-12">
+      {/* Top Header theo chuẩn Editorial Warm-Stone (Khử dải màu tím/indigo mặc định của AI) */}
+      <div className="bg-white rounded-xl p-5 sm:p-6 border border-[#E4E2DD]">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="px-2.5 py-1 bg-indigo-500/20 text-indigo-300 text-xs font-semibold rounded-full border border-indigo-400/30 flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
-                Mã hóa Fernet (AES-128-CBC + HMAC-SHA256)
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="px-2.5 py-0.5 bg-[#F6F5F0] text-[#121316] text-[11px] font-bold rounded-md border border-[#E4E2DD] flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#15803D]" />
+                Mã hóa khóa AES-128-CBC + HMAC-SHA256
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-              Trung tâm Cài đặt & Quản trị Doanh nghiệp
+            <h1 className="text-xl sm:text-2xl font-black text-[#121316] tracking-tight">
+              Tài khoản Quảng cáo, Khóa AI &amp; Phân quyền Nhân sự
             </h1>
-            <p className="text-slate-400 text-sm mt-1 max-w-2xl">
-              Cấu hình khóa AI tùy biến (Bring Your Own Key - BYOK), thông số kỹ thuật, hồ sơ tổ chức và chính sách bảo mật đa tầng.
+            <p className="text-[#5A5E66] text-xs mt-1 max-w-2xl">
+              Quản lý tài khoản Meta/TikTok/Google Ads, kết nối đơn hàng POS (Sapo/Pancake), khóa API AI riêng và phân quyền duyệt bài.
             </p>
           </div>
         </div>
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex border-b border-slate-200 gap-2">
+      <div className="flex flex-wrap border-b border-[#E4E2DD] gap-2">
+        <button
+          onClick={() => setActiveTab('ad_accounts')}
+          className={`flex items-center gap-2 px-4 py-3 font-bold text-xs border-b-2 transition-all ${
+            activeTab === 'ad_accounts'
+              ? 'border-[#D95D39] text-[#D95D39]'
+              : 'border-transparent text-[#5A5E66] hover:text-[#121316] hover:border-[#D0CEC7]'
+          }`}
+        >
+          <CreditCard className="w-4 h-4" />
+          Tài khoản Quảng cáo &amp; POS
+        </button>
         <button
           onClick={() => setActiveTab('byok')}
-          className={`flex items-center gap-2 px-5 py-3 font-medium text-sm border-b-2 transition-all ${
+          className={`flex items-center gap-2 px-4 py-3 font-bold text-xs border-b-2 transition-all ${
             activeTab === 'byok'
-              ? 'border-indigo-600 text-indigo-600 font-semibold'
-              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+              ? 'border-[#D95D39] text-[#D95D39]'
+              : 'border-transparent text-[#5A5E66] hover:text-[#121316] hover:border-[#D0CEC7]'
           }`}
         >
           <KeyRound className="w-4 h-4" />
-          Khóa AI Doanh nghiệp (BYOK Vault)
+          Khóa kết nối AI
         </button>
         <button
           onClick={() => setActiveTab('chains')}
-          className={`flex items-center gap-2 px-5 py-3 font-medium text-sm border-b-2 transition-all ${
+          className={`flex items-center gap-2 px-4 py-3 font-bold text-xs border-b-2 transition-all ${
             activeTab === 'chains'
-              ? 'border-indigo-600 text-indigo-600 font-semibold'
-              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+              ? 'border-[#D95D39] text-[#D95D39]'
+              : 'border-transparent text-[#5A5E66] hover:text-[#121316] hover:border-[#D0CEC7]'
           }`}
         >
           <Route className="w-4 h-4" />
-          Chuỗi AI (Fallback)
+          Tự đổi mô hình khi quá tải
         </button>
         <button
           onClick={() => setActiveTab('profile')}
-          className={`flex items-center gap-2 px-5 py-3 font-medium text-sm border-b-2 transition-all ${
+          className={`flex items-center gap-2 px-4 py-3 font-bold text-xs border-b-2 transition-all ${
             activeTab === 'profile'
-              ? 'border-indigo-600 text-indigo-600 font-semibold'
-              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+              ? 'border-[#D95D39] text-[#D95D39]'
+              : 'border-transparent text-[#5A5E66] hover:text-[#121316] hover:border-[#D0CEC7]'
           }`}
         >
           <User className="w-4 h-4" />
-          Hồ sơ & Phân quyền RBAC
+          Hồ sơ &amp; Quyền duyệt bài
         </button>
         <button
           onClick={() => setActiveTab('workspace')}
-          className={`flex items-center gap-2 px-5 py-3 font-medium text-sm border-b-2 transition-all ${
+          className={`flex items-center gap-2 px-4 py-3 font-bold text-xs border-b-2 transition-all ${
             activeTab === 'workspace'
-              ? 'border-indigo-600 text-indigo-600 font-semibold'
-              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+              ? 'border-[#D95D39] text-[#D95D39]'
+              : 'border-transparent text-[#5A5E66] hover:text-[#121316] hover:border-[#D0CEC7]'
           }`}
         >
           <Building2 className="w-4 h-4" />
-          Không gian làm việc (Workspace)
+          Nhóm làm việc
         </button>
       </div>
+
+      {/* Tab 0: Tài khoản Quảng cáo & Đồng bộ POS */}
+      {activeTab === 'ad_accounts' && (
+        <AdAccountsHub workspaceId={currentWorkspace?.id} />
+      )}
 
       {/* Tab 1: BYOK Vault */}
       {activeTab === 'byok' && (
         <div className="space-y-6">
+          <AdAccountsHub workspaceId={currentWorkspace?.id} />
           {/* Card 1: Configuration Form */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">

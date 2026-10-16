@@ -2234,6 +2234,96 @@ export const metricsApi = {
   }
 };
 
+export interface AdAccountItem {
+  id: number;
+  workspace_id: number;
+  platform: 'META_ADS' | 'TIKTOK_ADS' | 'GOOGLE_ADS' | 'POS_SYSTEM' | string;
+  account_code: string;
+  account_name: string;
+  pixel_id: string | null;
+  daily_spend_cap: number;
+  today_spend: number;
+  total_revenue: number;
+  total_orders: number;
+  roas: number;
+  status: 'ACTIVE' | 'SPEND_WARNING' | 'RESTRICTED' | string;
+  linked_campaign_id: number | null;
+  linked_campaign_name: string | null;
+  access_token_masked: string | null;
+  last_synced_at: string | null;
+}
+
+export const adAccountsApi = {
+  list: async (workspaceId?: number): Promise<{ items: AdAccountItem[]; workspace_id: number }> => {
+    const params = workspaceId ? { workspace_id: workspaceId } : {};
+    const res = await apiClient.get('/ad-accounts', { params });
+    return res.data;
+  },
+  create: async (data: {
+    platform: string;
+    account_code: string;
+    account_name: string;
+    pixel_id?: string;
+    daily_spend_cap?: number;
+    status?: string;
+    linked_campaign_id?: number | null;
+    access_token?: string;
+    workspace_id?: number;
+  }): Promise<AdAccountItem> => {
+    const res = await apiClient.post('/ad-accounts', data);
+    return res.data;
+  },
+  update: async (
+    accountId: number,
+    data: {
+      account_name?: string;
+      account_code?: string;
+      pixel_id?: string;
+      daily_spend_cap?: number;
+      status?: string;
+      linked_campaign_id?: number | null;
+    }
+  ): Promise<AdAccountItem> => {
+    const res = await apiClient.put(`/ad-accounts/${accountId}`, data);
+    return res.data;
+  },
+  delete: async (accountId: number): Promise<{ status: string; id: number }> => {
+    const res = await apiClient.delete(`/ad-accounts/${accountId}`);
+    return res.data;
+  },
+  syncAll: async (workspaceId?: number): Promise<{
+    status: string;
+    synced_accounts_count: number;
+    verified_metric_rows: number;
+    synced_at: string;
+    items: AdAccountItem[];
+  }> => {
+    const params = workspaceId ? { workspace_id: workspaceId } : {};
+    const res = await apiClient.post('/ad-accounts/sync', null, { params });
+    return res.data;
+  },
+  recordPosOrder: async (data: {
+    campaign_id: number;
+    channel_id: number;
+    order_code?: string;
+    order_count: number;
+    order_value: number;
+    ad_spend_delta?: number;
+  }): Promise<{
+    status: string;
+    campaign_id: number;
+    campaign_name: string;
+    metric_date: string;
+    added_orders: number;
+    added_revenue: number;
+    total_day_orders: number;
+    total_day_revenue: number;
+  }> => {
+    const res = await apiClient.post('/ad-accounts/webhook-order', data);
+    return res.data;
+  },
+};
+
 export const scheduleApi = {
   getAllPage: async (
     page = 1,

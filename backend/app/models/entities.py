@@ -696,3 +696,31 @@ class CampaignPlanApplication(Base):
     campaign = relationship("Campaign")
 
 
+class AdAccount(Base):
+    """Tài khoản quảng cáo (Meta BM / TikTok BC / Google MCC) & nguồn đơn hàng POS (Pancake/Sapo)."""
+
+    __tablename__ = "ad_accounts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False, index=True)
+    platform = Column(String(50), nullable=False, default="META_ADS")
+    account_code = Column(String(100), nullable=False)
+    account_name = Column(String(255), nullable=False)
+    pixel_id = Column(String(100), nullable=True)
+    daily_spend_cap = Column(Numeric(12, 2), nullable=False, default=15000000)
+    today_spend = Column(Numeric(12, 2), nullable=False, default=0)
+    status = Column(String(50), nullable=False, default="ACTIVE")
+    linked_campaign_id = Column(Integer, ForeignKey("campaigns.id", onupdate="CASCADE", ondelete="SET NULL"), nullable=True, index=True)
+    access_token_masked = Column(String(255), nullable=True)
+    last_synced_at = Column(DateTime, nullable=True, default=utc_now)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
+
+    __table_args__ = (
+        CheckConstraint("platform IN ('META_ADS', 'TIKTOK_ADS', 'GOOGLE_ADS', 'POS_SYSTEM')", name="chk_ad_account_platform"),
+        CheckConstraint("status IN ('ACTIVE', 'SPEND_WARNING', 'RESTRICTED')", name="chk_ad_account_status"),
+        Index("idx_ad_accounts_workspace", "workspace_id", "platform"),
+    )
+
+    workspace = relationship("Workspace")
+    linked_campaign = relationship("Campaign")

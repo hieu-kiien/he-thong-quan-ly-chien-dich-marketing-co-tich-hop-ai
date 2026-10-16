@@ -3889,7 +3889,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                           <div className="space-y-3">
                             <div>
                               <label className="block text-[10px] font-bold text-rose-800 uppercase mb-1">
-                                🎯 Câu Hook 3 giây đầu giữ chân người xem
+                                Câu mở đầu 3 giây đầu giữ chân người xem
                               </label>
                               <input
                                 type="text"
@@ -3916,9 +3916,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                                   <span>Cảnh {s.scene_number || s.scene}</span>
                                   <span className="font-mono text-slate-600 font-semibold">{s.duration_seconds || '0-4s'}</span>
                                 </div>
-                                <div className="text-slate-600">📹 Hình ảnh: {s.visual_action || s.visual}</div>
+                                <div className="text-slate-600">Hình ảnh: {s.visual_action || s.visual}</div>
                                 <div>
-                                  <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">🗣️ Lời thoại:</label>
+                                  <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Lời thoại:</label>
                                   <input
                                     type="text"
                                     value={s.voiceover_script || s.voiceover || ''}
@@ -3952,7 +3952,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                           <div className="space-y-2.5">
                             <div>
                               <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                                📧 Tiêu đề thư (Subject Line)
+                                Tiêu đề thư (Subject Line)
                               </label>
                               <input
                                 type="text"
