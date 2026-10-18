@@ -1480,7 +1480,15 @@ def test_sync_endpoints_marked_deprecated_in_openapi():
 def test_job_enums_are_documented_constants():
     """Ràng buộc CHECK trong entities.py và hằng số ở job_queue phải khớp — nếu lệch
     thì worker ghi trạng thái mà CSDL từ chối, và job kẹt ở trạng thái cũ mãi mãi."""
-    assert set(job_queue.JOB_KINDS) == {"ideas", "draft", "summary", "omnichannel", "plan"}
+    assert set(job_queue.JOB_KINDS) == {
+        "ideas",
+        "draft",
+        "summary",
+        "omnichannel",
+        "plan",
+        "angle_matrix",
+        "prelaunch_critic",
+    }
     assert set(job_queue.JOB_TERMINAL_STATUSES) == {"succeeded", "failed", "cancelled"}
 
 

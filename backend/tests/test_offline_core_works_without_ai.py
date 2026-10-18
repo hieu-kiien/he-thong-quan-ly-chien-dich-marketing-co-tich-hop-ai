@@ -431,6 +431,8 @@ ALLOWED_AI_DEPENDENCIES = (
     ("ai.py", "app.services.ai"),
     ("settings.py", "app.services.ai"),
     ("metrics.py", "app.services.ai.ai_doctor"),
+    ("campaigns.py", "app.services.ai"),
+    ("contents.py", "app.services.ai"),
     ("config.py", "app.services.ai.providers"),
 )
 

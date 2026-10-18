@@ -2054,6 +2054,7 @@ def sync_ad_accounts_metrics(
                 source="live_sync",
             )
             db.add(new_m)
+            db.flush()
 
         acc.today_spend = round(float(acc.today_spend or 0) + delta_spend, 2)
         added_spend_total += delta_spend
@@ -2693,9 +2694,35 @@ def quick_connect_oauth_provider(
     db.add(acc)
     db.commit()
     db.refresh(acc)
+    if platform == "TIKTOK_ADS":
+        oauth_authorize_url = (
+            "https://business-api.tiktok.com/portal/auth"
+            "?app_id=7359001928371&state=mf_vn_oauth2"
+            "&redirect_uri=https%3A%2F%2Fmarketing.kienhieu.id.vn%2Fapi%2Fv1%2Fad-accounts%2Foauth-connect"
+            "&scope=ad.read%2Cad.write%2Ctiktok_shop.affiliate"
+        )
+        scopes = ["ad.read", "ad.write", "tiktok_shop.affiliate"]
+    elif platform == "POS_SYSTEM":
+        oauth_authorize_url = (
+            "https://store.sapo.vn/admin/oauth/authorize"
+            "?client_id=mf_sapo_omni_vn&scope=read_orders,write_orders,webhooks"
+            "&redirect_uri=https%3A%2F%2Fmarketing.kienhieu.id.vn%2Fapi%2Fv1%2Fad-accounts%2Fexternal-webhook"
+        )
+        scopes = ["read_orders", "write_orders", "webhooks"]
+    else:
+        oauth_authorize_url = (
+            "https://www.facebook.com/v19.0/dialog/oauth"
+            "?client_id=109283746519283&state=mf_meta_oauth2"
+            "&redirect_uri=https%3A%2F%2Fmarketing.kienhieu.id.vn%2Fapi%2Fv1%2Fad-accounts%2Foauth-connect"
+            "&scope=ads_management,ads_read,pages_manage_posts,pages_messaging"
+        )
+        scopes = ["ads_management", "ads_read", "pages_manage_posts", "pages_messaging"]
+
     return {
         "status": "oauth_connected",
         "provider": prov,
+        "oauth_authorize_url": oauth_authorize_url,
+        "app_review_scopes": scopes,
         "account": _serialize_ad_account(acc, db),
     }
 

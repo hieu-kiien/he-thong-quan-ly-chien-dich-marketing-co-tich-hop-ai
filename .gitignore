@@ -87,3 +87,4 @@ frontend/tsc-errors.txt
 **/test-results/
 **/*.pre_sprint_backup
 backend/backend/
+**/.e2e/

@@ -10,7 +10,7 @@ export default {
       name: 'live-domain',
       engine: web({
         browser: 'chromium',
-        viewport: null,
+        viewport: { width: 1440, height: 900 },
         ...(cdpUrl ? { connect: { cdpEndpoint: async () => cdpUrl } } : {}),
       }),
       app: {

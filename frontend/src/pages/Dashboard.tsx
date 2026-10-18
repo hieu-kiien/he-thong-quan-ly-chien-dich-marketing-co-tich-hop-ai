@@ -492,9 +492,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
         onRetry={() => void loadData()}
       />
 
-      {/* THANH CHUYỂN CHẾ ĐỘ XEM: NẰM GỌN TRÊN 1 DÒNG, CÂN ĐỐI, KHÔNG RỚT DÒNG */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white rounded-xl border border-[#E4E2DD] p-2">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 w-full md:w-auto">
+      {/* THANH CHUYỂN CHẾ ĐỘ XEM: NẰM GỌN TRÊN 1 DÒNG, CÂN ĐỐI, KHÔNG ĐÈ NHAU Ở MỌI MÀN HÌNH */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white rounded-xl border border-[#E4E2DD] p-2">
+        <div className="flex flex-wrap items-center gap-1.5 w-full lg:w-auto">
           <button
             type="button"
             data-testid="dashboard-tab-overview"

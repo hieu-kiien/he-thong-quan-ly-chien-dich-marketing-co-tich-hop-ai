@@ -1613,7 +1613,7 @@ class AIAngleMatrixVariant(BaseModel):
     ab_hypothesis: str
     predicted_ctr_pct: float
     predicted_cvr_pct: float
-    compliance_score: int = 100
+    compliance_score: int = Field(100, ge=0, le=100)
     compliance_status: str = "PASSED"
     utm_params: str
 

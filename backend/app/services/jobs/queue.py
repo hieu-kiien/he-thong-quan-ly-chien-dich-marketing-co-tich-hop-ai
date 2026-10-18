@@ -72,8 +72,6 @@ JOB_KINDS = (
     KIND_PLAN,
     KIND_ANGLE_MATRIX,
     KIND_PRELAUNCH_CRITIC,
-    KIND_DEEP_DOCTOR,
-    KIND_BATCH_COMPLIANCE_FIX,
 )
 
 # Lý do thất bại dùng chung cho cả API lẫn test, để client đổi chuỗi hiển thị
