@@ -2387,6 +2387,8 @@ export const adAccountsApi = {
   },
   runAutoWorkerTick: async (workspaceId?: number): Promise<{
     status: string;
+    publish_mode?: string;
+    clean_demo_mode?: boolean;
     executed_at: string;
     auto_published_posts_count: number;
     auto_published_titles: string[];
@@ -2395,9 +2397,103 @@ export const adAccountsApi = {
     kol_orders_added: number;
     kol_revenue_added: number;
     ad_revenue_added: number;
+    zns_auto_care_triggered?: number;
   }> => {
     const params = workspaceId ? { workspace_id: workspaceId } : {};
     const res = await apiClient.post('/ad-accounts/auto-worker-tick', null, { params });
+    return res.data;
+  },
+  getBillingPlan: async (workspaceId?: number): Promise<any> => {
+    const params = workspaceId ? { workspace_id: workspaceId } : {};
+    const res = await apiClient.get('/ad-accounts/billing-plan', { params });
+    return res.data;
+  },
+  upgradeBillingPlan: async (data: {
+    workspace_id?: number;
+    plan_tier: 'FREE' | 'PRO' | 'AGENCY';
+    billing_cycle?: 'MONTHLY' | 'YEARLY';
+    payment_ref?: string;
+  }): Promise<any> => {
+    const res = await apiClient.post('/ad-accounts/billing-upgrade', data);
+    return res.data;
+  },
+  simulateSePayWebhook: async (data: {
+    content: string;
+    transferAmount: number;
+    referenceCode?: string;
+  }): Promise<any> => {
+    const res = await apiClient.post('/ad-accounts/billing-webhook', data);
+    return res.data;
+  },
+  updateLiveConnectors: async (data: {
+    workspace_id?: number;
+    webhook_secret_key?: string;
+    zalo_oa_token?: string;
+    smtp_or_resend_key?: string;
+    alert_email?: string;
+  }): Promise<any> => {
+    const res = await apiClient.put('/ad-accounts/live-connectors', data);
+    return res.data;
+  },
+  toggleCleanWorkspace: async (data: {
+    workspace_id?: number;
+    mode: 'purge_demo' | 'restore_demo';
+  }): Promise<any> => {
+    const res = await apiClient.post('/ad-accounts/clean-workspace', data);
+    return res.data;
+  },
+  calculateVnEcommercePnl: async (data: {
+    campaign_id?: number | null;
+    selling_price: number;
+    cogs_per_unit: number;
+    platform_fee_pct: number;
+    affiliate_commission_pct: number;
+    return_rate_pct: number;
+    return_shipping_fee: number;
+    operating_overhead_per_order?: number;
+  }): Promise<any> => {
+    const res = await apiClient.post('/ad-accounts/vn-ecommerce-pnl', data);
+    return res.data;
+  },
+  listVnLeads: async (workspaceId?: number): Promise<any> => {
+    const params = workspaceId ? { workspace_id: workspaceId } : {};
+    const res = await apiClient.get('/ad-accounts/vn-leads', { params });
+    return res.data;
+  },
+  createVnLead: async (data: {
+    workspace_id?: number;
+    campaign_id?: number | null;
+    customer_name: string;
+    phone: string;
+    source_channel: string;
+    lead_stage?: string;
+    product_interest: string;
+    estimated_value: number;
+    assigned_sale?: string;
+    last_message_note?: string;
+  }): Promise<any> => {
+    const res = await apiClient.post('/ad-accounts/vn-leads', data);
+    return res.data;
+  },
+  sendVnLeadZns: async (leadId: number, templateType = 'REMIND_24H_META'): Promise<any> => {
+    const res = await apiClient.post(`/ad-accounts/vn-leads/${leadId}/send-zns`, {
+      template_type: templateType,
+    });
+    return res.data;
+  },
+  closeVnLeadOrder: async (leadId: number): Promise<any> => {
+    const res = await apiClient.post(`/ad-accounts/vn-leads/${leadId}/close-order`);
+    return res.data;
+  },
+  deleteVnLead: async (leadId: number): Promise<any> => {
+    const res = await apiClient.delete(`/ad-accounts/vn-leads/${leadId}`);
+    return res.data;
+  },
+  applyVnMegaSaleBlueprint: async (data: {
+    campaign_id: number;
+    blueprint_code: 'DOUBLE_DAY' | 'PAYDAY_15_25' | 'TET_HOLIDAY' | 'MEGA_LIVESTREAM' | string;
+  }): Promise<any> => {
+    const res = await apiClient.post('/ad-accounts/vn-mega-sale-blueprint', data);
     return res.data;
   },
 };

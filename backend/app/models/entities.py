@@ -761,3 +761,94 @@ class KolBooking(Base):
     workspace = relationship("Workspace")
     campaign = relationship("Campaign")
 
+
+class WorkspaceSubscription(Base):
+    """Gói cước SaaS của Workspace (FREE / PRO / AGENCY), cấu hình VietQR / SePay,
+    khóa bảo mật POS Webhook (webhook_secret_key), cấu hình Zalo ZNS / Email thật
+    và chế độ Làm sạch dữ liệu mẫu (clean_demo_mode).
+    """
+
+    __tablename__ = "workspace_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    workspace_id = Column(
+        Integer,
+        ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    plan_tier = Column(String(30), nullable=False, default="FREE")
+    billing_cycle = Column(String(30), nullable=False, default="MONTHLY")
+    amount_vnd = Column(Numeric(12, 2), nullable=False, default=0)
+    payment_ref = Column(String(120), nullable=True)
+    payment_provider = Column(String(50), nullable=False, default="VIETQR_SEPAY")
+    webhook_secret_key = Column(String(120), nullable=False, default="mf_pos_live_vn2026")
+    zalo_oa_token = Column(String(255), nullable=True)
+    smtp_or_resend_key = Column(String(255), nullable=True)
+    alert_email = Column(String(255), nullable=True)
+    clean_demo_mode = Column(Boolean, nullable=False, default=False)
+    activated_at = Column(DateTime, nullable=True, default=utc_now)
+    expires_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
+
+    __table_args__ = (
+        CheckConstraint("plan_tier IN ('FREE', 'PRO', 'AGENCY')", name="chk_ws_sub_tier"),
+        CheckConstraint("billing_cycle IN ('MONTHLY', 'YEARLY')", name="chk_ws_sub_cycle"),
+        Index("idx_ws_sub_workspace_tier", "workspace_id", "plan_tier"),
+    )
+
+    workspace = relationship("Workspace")
+
+
+class VnLeadCrm(Base):
+    """Phễu khách hàng tiềm năng (Conversational Commerce Việt Nam: Zalo OA / ZNS,
+    Facebook Messenger Click-to-Chat, TikTok Bio, Landing Form) giúp chống rớt khách
+    trong khung 24h của Meta và tự động nhắc lịch chuyển khoản / lương về 15-25.
+    """
+
+    __tablename__ = "vn_lead_crm"
+
+    id = Column(Integer, primary_key=True, index=True)
+    workspace_id = Column(
+        Integer,
+        ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    campaign_id = Column(
+        Integer,
+        ForeignKey("campaigns.id", onupdate="CASCADE", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    customer_name = Column(String(255), nullable=False)
+    phone = Column(String(40), nullable=False)
+    source_channel = Column(String(50), nullable=False, default="FB_MESSENGER")
+    lead_stage = Column(String(50), nullable=False, default="NEW_INBOX")
+    product_interest = Column(String(255), nullable=False, default="Combo Sản phẩm Chủ lực")
+    estimated_value = Column(Numeric(12, 2), nullable=False, default=450000)
+    zns_sent_count = Column(Integer, nullable=False, default=0)
+    last_message_note = Column(Text, nullable=True)
+    assigned_sale = Column(String(120), nullable=True, default="Sale Ca Sáng")
+    last_contacted_at = Column(DateTime, nullable=False, default=utc_now)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
+
+    __table_args__ = (
+        CheckConstraint(
+            "source_channel IN ('FB_MESSENGER', 'ZALO_OA', 'TIKTOK_BIO', 'LANDING_FORM')",
+            name="chk_vn_lead_source",
+        ),
+        CheckConstraint(
+            "lead_stage IN ('NEW_INBOX', 'SILENT_24H', 'WAITING_TRANSFER', 'PAYDAY_15_25', 'CLOSED_POS')",
+            name="chk_vn_lead_stage",
+        ),
+        Index("idx_vn_lead_ws_stage", "workspace_id", "lead_stage"),
+    )
+
+    workspace = relationship("Workspace")
+    campaign = relationship("Campaign")
+
+

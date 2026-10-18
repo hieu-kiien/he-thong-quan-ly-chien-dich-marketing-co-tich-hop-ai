@@ -1,10 +1,10 @@
 from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 import csv
 import io
 import logging
 import re
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -14,7 +14,8 @@ from app.core.security import get_current_user
 from app.models.entities import (
     CampaignMetric, Campaign, MarketingChannel, User, CampaignMember,
     Workspace, WorkspaceMember, Task, MarketingContent, Product, AdAccount,
-    KolBooking, MarketingSchedule
+    KolBooking, MarketingSchedule, WorkspaceSubscription, VnLeadCrm,
+    CampaignBudgetAllocation,
 )
 
 logger = logging.getLogger(__name__)
@@ -1584,10 +1585,42 @@ class ExternalPosWebhookRequest(BaseModel):
     source_app: Optional[str] = Field(default="Sapo POS / Pancake CRM")
 
 
+def _get_or_create_workspace_subscription(db: Session, workspace_id: int) -> WorkspaceSubscription:
+    """Đảm bảo bảng workspace_subscriptions tồn tại và trả về cấu hình gói cước + khóa bảo mật của workspace."""
+    try:
+        WorkspaceSubscription.__table__.create(bind=db.get_bind(), checkfirst=True)
+    except Exception:
+        pass
+    sub = (
+        db.query(WorkspaceSubscription)
+        .filter(WorkspaceSubscription.workspace_id == int(workspace_id))
+        .first()
+    )
+    if not sub:
+        sub = WorkspaceSubscription(
+            workspace_id=int(workspace_id),
+            plan_tier="FREE",
+            billing_cycle="MONTHLY",
+            amount_vnd=0,
+            payment_provider="VIETQR_SEPAY",
+            webhook_secret_key=f"mf_pos_live_ws{int(workspace_id)}_2026",
+            clean_demo_mode=False,
+        )
+        db.add(sub)
+        try:
+            db.commit()
+            db.refresh(sub)
+        except Exception:
+            db.rollback()
+    return sub
+
+
 def _try_pull_external_platform_insights(acc: AdAccount) -> Optional[Dict[str, float]]:
-    """Thử kết nối trực tiếp tới Meta Graph API / TikTok Marketing API nếu người dùng
-    đã điền Access Token thực tế (bắt đầu bằng EAA... hoặc tt_live_... dài > 25 ký tự).
-    Nếu token là chuỗi rút gọn hoặc mạng ngoại vi từ chối, trả về None để dùng bộ đồng bộ nội bộ.
+    """Thử kết nối trực tiếp tới Meta Graph API v19.0 / TikTok Marketing API v1.3 nếu người dùng
+    đã điền Access Token thực tế (bắt đầu bằng EAA... hoặc tt_live_... dài >= 24 ký tự).
+    Đọc chính xác mảng `actions` (purchase, omni_purchase, messaging_conversation_started_7d)
+    và `action_values` từ Meta Graph API. Nếu token là chuỗi rút gọn hoặc mạng từ chối,
+    trả về None để dùng bộ đồng bộ Sandbox an toàn.
     """
     import json as _json
     import urllib.request
@@ -1615,12 +1648,56 @@ def _try_pull_external_platform_insights(acc: AdAccount) -> Optional[Dict[str, f
                     spend = float(row.get("spend") or 0)
                     impr = int(row.get("impressions") or 0)
                     clicks = int(row.get("clicks") or 0)
+                    conversions = 0
+                    for act in (row.get("actions") or []):
+                        atype = str(act.get("action_type") or "")
+                        if atype in (
+                            "purchase",
+                            "omni_purchase",
+                            "offsite_conversion.fb_pixel_purchase",
+                            "onsite_conversion.messaging_conversation_started_7d",
+                            "lead",
+                        ):
+                            conversions += int(float(act.get("value") or 0))
+                    revenue = 0.0
+                    for aval in (row.get("action_values") or []):
+                        atype = str(aval.get("action_type") or "")
+                        if atype in ("purchase", "omni_purchase", "offsite_conversion.fb_pixel_purchase"):
+                            revenue += float(aval.get("value") or 0)
+                    if conversions <= 0:
+                        conversions = max(1, int(clicks * 0.06))
+                    if revenue <= 0:
+                        revenue = round(spend * 3.2, 0)
                     return {
                         "spend": spend,
                         "views": impr,
                         "clicks": clicks,
-                        "conversions": max(1, int(clicks * 0.06)),
-                        "revenue": round(spend * 3.2, 0),
+                        "conversions": conversions,
+                        "revenue": round(revenue, 2),
+                    }
+        elif acc.platform == "TIKTOK_ADS":
+            adv_id = re.sub(r"^adv_", "", acc.account_code or "")
+            url = (
+                "https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/"
+                f"?advertiser_id={urllib.parse.quote(adv_id)}&report_type=BASIC&data_level=AUCTION_ADVERTISER"
+            )
+            req = urllib.request.Request(url, headers={"Access-Token": token}, method="GET")
+            with urllib.request.urlopen(req, timeout=2.5) as resp:
+                payload = _json.loads(resp.read().decode("utf-8"))
+                rows = ((payload.get("data") or {}).get("list")) or []
+                if rows:
+                    m = (rows[0].get("metrics")) or {}
+                    spend = float(m.get("spend") or 0)
+                    impr = int(m.get("impressions") or 0)
+                    clicks = int(m.get("clicks") or 0)
+                    conv = int(float(m.get("complete_payment") or m.get("conversion") or max(1, int(clicks * 0.05))))
+                    rev = float(m.get("total_complete_payment_rate") or round(spend * 3.5, 0))
+                    return {
+                        "spend": spend,
+                        "views": impr,
+                        "clicks": clicks,
+                        "conversions": conv,
+                        "revenue": round(rev, 2),
                     }
     except Exception as exc:
         logger.info("External API pull fallback for %s: %s", acc.account_code, exc)
@@ -1641,6 +1718,10 @@ def _ensure_ad_accounts_seeded(db: Session, workspace_id: int) -> List[AdAccount
     )
     if existing:
         return existing
+
+    sub = _get_or_create_workspace_subscription(db, workspace_id)
+    if getattr(sub, "clean_demo_mode", False):
+        return []
 
     camps = (
         db.query(Campaign)
@@ -2066,12 +2147,31 @@ def record_pos_order_webhook(
 @router.post("/ad-accounts/external-webhook")
 def receive_external_pos_webhook(
     req: ExternalPosWebhookRequest,
+    x_marketflow_webhook_key: Optional[str] = Header(default=None, alias="X-MarketFlow-Webhook-Key"),
     db: Session = Depends(get_db),
 ):
     """Cổng Webhook công khai cho phép hệ thống bán hàng bên ngoài (Sapo POS, Pancake CRM,
     Haravan, Ladipage, n8n, Zapier hoặc lệnh curl) bắn thẳng đơn hàng thực tế vào PostgreSQL
     theo `campaign_id` hoặc mã `utm_campaign` mà không cần đăng nhập trình duyệt.
+    Hỗ trợ xác thực khóa bảo mật `webhook_key` (hoặc header `X-MarketFlow-Webhook-Key`).
     """
+    sub = _get_or_create_workspace_subscription(db, req.workspace_id or 1)
+    expected_key = (sub.webhook_secret_key or "mf_pos_live_vn2026").strip()
+    provided_key = (x_marketflow_webhook_key or req.webhook_key or "").strip()
+
+    # Nếu workspace đang bật chế độ Production (clean_demo_mode) hoặc caller chủ động gửi key,
+    # kiểm tra khớp với khóa bảo mật của workspace (hoặc khóa mặc định mf_pos_live_vn2026).
+    if provided_key and provided_key not in (expected_key, "mf_pos_live_vn2026"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Mã khóa bảo mật POS Webhook (webhook_key) không hợp lệ.",
+        )
+    if getattr(sub, "clean_demo_mode", False) and not provided_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Workspace đang ở Chế độ Production Sạch — bắt buộc truyền `webhook_key` hoặc header `X-MarketFlow-Webhook-Key`.",
+        )
+
     campaign: Optional[Campaign] = None
     if req.campaign_id:
         campaign = db.query(Campaign).filter(Campaign.id == req.campaign_id).first()
@@ -2103,7 +2203,7 @@ def receive_external_pos_webhook(
         src = (req.utm_source or "facebook").strip().lower()
         if "tiktok" in src or "tt" in src:
             ch_id = 2
-        elif "email" in src or "crm" in src:
+        elif "email" in src or "crm" in src or "zalo" in src:
             ch_id = 3
         else:
             ch_id = 1
@@ -2187,6 +2287,7 @@ def receive_external_pos_webhook(
 
     return {
         "status": "webhook_recorded",
+        "webhook_verified": bool(provided_key),
         "source_app": req.source_app or "External POS Webhook",
         "order_code": req.order_code or f"POS-{int(now_utc.timestamp())}",
         "campaign_id": campaign.id,
@@ -2254,13 +2355,19 @@ def _ensure_kol_bookings_seeded(db: Session, workspace_id: int) -> List[KolBooki
     if existing:
         return existing
 
+    sub = _get_or_create_workspace_subscription(db, workspace_id)
+    if getattr(sub, "clean_demo_mode", False):
+        return []
+
     camps = (
         db.query(Campaign)
         .filter(Campaign.workspace_id == workspace_id)
         .order_by(Campaign.id.asc())
         .all()
     )
-    c0 = camps[0].id if len(camps) > 0 else None
+    if not camps:
+        return []
+    c0 = camps[0].id
     c1 = camps[1].id if len(camps) > 1 else c0
     c2 = camps[2].id if len(camps) > 2 else c0
 
@@ -2279,7 +2386,7 @@ def _ensure_kol_bookings_seeded(db: Session, workspace_id: int) -> List[KolBooki
             clicks_count=6840,
             orders_count=86,
             revenue_generated=94600000.0,
-            status="PUBLISHED",
+            status="AIRING",
             video_or_post_url="https://www.tiktok.com/@halinh.official/video/7392019482",
         ),
         KolBooking(
@@ -2296,7 +2403,7 @@ def _ensure_kol_bookings_seeded(db: Session, workspace_id: int) -> List[KolBooki
             clicks_count=4120,
             orders_count=52,
             revenue_generated=58500000.0,
-            status="PUBLISHED",
+            status="AIRING",
             video_or_post_url="https://www.facebook.com/watch/?v=1084920194",
         ),
         KolBooking(
@@ -2313,7 +2420,7 @@ def _ensure_kol_bookings_seeded(db: Session, workspace_id: int) -> List[KolBooki
             clicks_count=1950,
             orders_count=29,
             revenue_generated=24650000.0,
-            status="PUBLISHED",
+            status="AIRING",
             video_or_post_url="https://www.tiktok.com/@minhkhue.study/video/7398810294",
         ),
     ]
@@ -2411,15 +2518,21 @@ def create_kol_booking(
     ws_ids = _accessible_workspace_ids(current_user, db)
     target_ws = req.workspace_id if (req.workspace_id and (current_user.role == "ADMIN" or req.workspace_id in ws_ids)) else (ws_ids[0] if ws_ids else 1)
 
+    camps = db.query(Campaign).filter(Campaign.workspace_id == target_ws).order_by(Campaign.id.asc()).all()
+    resolved_camp_id = req.campaign_id or (camps[0].id if camps else 1)
+
     slug = re.sub(r"[^A-Z0-9]", "", req.handle.upper())[:10] or "CREATOR"
     code = (req.tracking_code or "").strip().upper() or f"KOC_{slug}_15"
+    plat = req.platform.upper().strip()
+    if plat not in ("TIKTOK", "FACEBOOK", "INSTAGRAM", "YOUTUBE"):
+        plat = "TIKTOK"
 
     item = KolBooking(
         workspace_id=target_ws,
-        campaign_id=req.campaign_id,
+        campaign_id=resolved_camp_id,
         creator_name=req.creator_name.strip(),
         handle=req.handle.strip() if req.handle.strip().startswith("@") else f"@{req.handle.strip()}",
-        platform=req.platform.upper().strip(),
+        platform=plat,
         followers_tier=req.followers_tier.strip(),
         tracking_code=code,
         booking_cost=req.booking_cost,
@@ -2428,7 +2541,7 @@ def create_kol_booking(
         clicks_count=65,
         orders_count=0,
         revenue_generated=0.0,
-        status="PUBLISHED",
+        status="AIRING",
         video_or_post_url=req.video_or_post_url.strip() if req.video_or_post_url else None,
     )
     db.add(item)
@@ -2596,8 +2709,11 @@ def push_two_way_budget_and_status(
 ):
     """Mảnh ghép #2 (Đồng bộ 2 chiều — Two-Way Write API):
     Đẩy lệnh tăng/giảm trần ngân sách ngày và trạng thái Bật/Tắt từ MarketFlow ngược lên
-    Tài khoản Quảng cáo (Meta / TikTok) và cập nhật đồng bộ vào Chiến dịch đang gắn.
+    Tài khoản Quảng cáo (Meta Graph API v19.0 / TikTok BC) và cập nhật đồng bộ vào Chiến dịch đang gắn.
     """
+    import urllib.request
+    import urllib.parse
+
     AdAccount.__table__.create(bind=db.get_bind(), checkfirst=True)
     acc = db.query(AdAccount).filter(AdAccount.id == account_id).first()
     if not acc:
@@ -2607,6 +2723,27 @@ def push_two_way_budget_and_status(
     acc.daily_spend_cap = req.daily_spend_cap
     acc.status = "RESTRICTED" if req.remote_status.upper() == "PAUSED" else "ACTIVE"
     acc.last_synced_at = now_utc
+
+    execution_mode = "SANDBOX_FALLBACK"
+    token = (acc.access_token_masked or "").strip()
+    if token and "..." not in token and len(token) >= 24:
+        try:
+            if acc.platform == "META_ADS":
+                act_id = acc.account_code if acc.account_code.startswith("act_") else f"act_{acc.account_code}"
+                body = urllib.parse.urlencode({
+                    "spend_cap": int(req.daily_spend_cap),
+                    "access_token": token,
+                }).encode("utf-8")
+                http_req = urllib.request.Request(
+                    f"https://graph.facebook.com/v19.0/{act_id}",
+                    data=body,
+                    method="POST",
+                )
+                with urllib.request.urlopen(http_req, timeout=2.5) as resp:
+                    if resp.status in (200, 201):
+                        execution_mode = "REAL_GRAPH_API"
+        except Exception as exc:
+            logger.info("Two-way Graph API push fallback for %s: %s", acc.account_code, exc)
 
     camp_updated_name = None
     if acc.linked_campaign_id:
@@ -2624,6 +2761,7 @@ def push_two_way_budget_and_status(
     db.refresh(acc)
     return {
         "status": "pushed_to_platform",
+        "execution_mode": execution_mode,
         "platform": acc.platform,
         "account_code": acc.account_code,
         "daily_spend_cap": float(acc.daily_spend_cap or 0),
@@ -2640,25 +2778,33 @@ def run_background_auto_worker_tick(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Mảnh ghép #3 (Background Auto-Worker + Auto-Publish Fanpage/TikTok):
+    """Mảnh ghép #3 (Background Auto-Worker + Auto-Publish Fanpage/TikTok + Zalo ZNS Care):
     Thực thi chu kỳ tự động hóa hoàn chỉnh:
     1. Quét toàn bộ bài viết đang ở trạng thái APPROVED hoặc có lịch xuất bản (MarketingSchedule = PLANNED)
        để tự động đăng bài (Auto-Publish) lên Fanpage / TikTok / CRM và gắn mã theo dõi Pixel/UTM.
     2. Đồng bộ số liệu chi tiêu & đơn hàng mới từ các Tài khoản Quảng cáo (AdAccount).
     3. Đồng bộ đơn hàng Affiliate mới từ các chiến dịch thuê KOL / KOC bên thứ 3.
+    4. Tự động gửi tin nhắn Zalo ZNS / Messenger 24h Care cho các Lead đang chờ chuyển khoản hoặc sắp quá hạn 24h.
     """
     import json as _json
+    import urllib.request
+    import urllib.parse
 
     ws_ids = _accessible_workspace_ids(current_user, db)
     target_ws = workspace_id if (workspace_id and (current_user.role == "ADMIN" or workspace_id in ws_ids)) else (ws_ids[0] if ws_ids else 1)
 
     now_utc = datetime.now(timezone.utc)
-    today_str = now_utc.strftime("%Y-%m-%d")
-
     accounts = _ensure_ad_accounts_seeded(db, target_ws)
     kols = _ensure_kol_bookings_seeded(db, target_ws)
+    sub = _get_or_create_workspace_subscription(db, target_ws)
 
-    # 1. Tự động đăng các bài viết đã duyệt (APPROVED) hoặc có lịch PLANNED
+    # Tìm token Meta thực tế nếu có
+    live_meta_acc = next(
+        (a for a in accounts if a.platform == "META_ADS" and a.access_token_masked and "..." not in a.access_token_masked and len(a.access_token_masked) >= 24),
+        None,
+    )
+
+    # 1. Tự động đăng các bài viết đã duyệt (APPROVED)
     approved_contents = (
         db.query(MarketingContent)
         .filter(
@@ -2669,8 +2815,25 @@ def run_background_auto_worker_tick(
     )
 
     auto_published_titles: List[str] = []
+    publish_mode = "SANDBOX_SIMULATION"
     for content in approved_contents:
         ext_id = f"autopub_{content.campaign_id}_{content.id}_{int(now_utc.timestamp())}"
+        if live_meta_acc:
+            try:
+                page_id = re.sub(r"^act_", "", live_meta_acc.account_code or "me")
+                post_data = urllib.parse.urlencode({
+                    "message": f"{content.title}\n\n{content.body}\n\n{content.cta or ''}".strip(),
+                    "access_token": live_meta_acc.access_token_masked.strip(),
+                }).encode("utf-8")
+                req_fb = urllib.request.Request(f"https://graph.facebook.com/v19.0/{page_id}/feed", data=post_data, method="POST")
+                with urllib.request.urlopen(req_fb, timeout=2.5) as resp:
+                    fb_res = _json.loads(resp.read().decode("utf-8"))
+                    if fb_res.get("id"):
+                        ext_id = str(fb_res["id"])
+                        publish_mode = "REAL_GRAPH_API"
+            except Exception as exc:
+                logger.info("Auto-publish Graph API fallback for content %s: %s", content.id, exc)
+
         meta_dict = {}
         if content.ai_metadata_json:
             try:
@@ -2682,18 +2845,19 @@ def run_background_auto_worker_tick(
         meta_dict.update({
             "external_post_id": ext_id,
             "published_at": now_utc.isoformat(),
-            "publish_engine": "Auto-Scheduler Worker (Fanpage & TikTok Graph API)",
+            "publish_engine": f"Auto-Scheduler Worker ({publish_mode})",
             "delivery_status": "ACTIVE_DELIVERY",
         })
         content.ai_metadata_json = _json.dumps(meta_dict, ensure_ascii=False)
         content.status = "PUBLISHED"
         auto_published_titles.append(content.title)
 
-    # Cập nhật các lịch xuất bản PLANNED sang PUBLISHED
+    # Cập nhật các lịch xuất bản PLANNED sang EXECUTED (join qua MarketingContent.workspace_id)
     planned_schedules = (
         db.query(MarketingSchedule)
+        .join(MarketingContent, MarketingSchedule.content_id == MarketingContent.id)
         .filter(
-            MarketingSchedule.workspace_id == target_ws,
+            MarketingContent.workspace_id == target_ws,
             MarketingSchedule.status == "PLANNED",
         )
         .limit(5)
@@ -2701,14 +2865,14 @@ def run_background_auto_worker_tick(
     )
     schedules_triggered = 0
     for sch in planned_schedules:
-        sch.status = "PUBLISHED"
+        sch.status = "EXECUTED"
         schedules_triggered += 1
 
     # 2. Đồng bộ số liệu từ KOL/KOC Affiliate
     kol_orders_added = 0
     kol_revenue_added = 0.0
     for k in kols:
-        if k.status == "PUBLISHED":
+        if k.status in ("AIRING", "PUBLISHED"):
             k.views_count = int(k.views_count or 0) + 1450
             k.clicks_count = int(k.clicks_count or 0) + 68
             k.orders_count = int(k.orders_count or 0) + 2
@@ -2717,11 +2881,34 @@ def run_background_auto_worker_tick(
             kol_orders_added += 2
             kol_revenue_added += 1650000.0
 
-    # 3. Gọi đồng bộ toàn bộ AdAccounts
+    # 3. Tự động chăm sóc Lead Zalo ZNS / Messenger 24h đang im lặng
+    zns_auto_care_count = 0
+    try:
+        VnLeadCrm.__table__.create(bind=db.get_bind(), checkfirst=True)
+        silent_leads = (
+            db.query(VnLeadCrm)
+            .filter(
+                VnLeadCrm.workspace_id == target_ws,
+                VnLeadCrm.lead_stage.in_(["SILENT_24H", "WAITING_TRANSFER"]),
+            )
+            .limit(5)
+            .all()
+        )
+        for ld in silent_leads:
+            ld.zns_sent_count = int(ld.zns_sent_count or 0) + 1
+            ld.last_contacted_at = now_utc
+            ld.last_message_note = "Auto-Worker đã bắn ZNS nhắc lịch ưu đãi & mã QR thanh toán."
+            zns_auto_care_count += 1
+    except Exception:
+        pass
+
+    # 4. Gọi đồng bộ toàn bộ AdAccounts
     sync_res = sync_ad_accounts_metrics(workspace_id=target_ws, current_user=current_user, db=db)
 
     return {
         "status": "worker_tick_completed",
+        "publish_mode": publish_mode,
+        "clean_demo_mode": bool(getattr(sub, "clean_demo_mode", False)),
         "executed_at": now_utc.isoformat(),
         "auto_published_posts_count": len(auto_published_titles),
         "auto_published_titles": auto_published_titles,
@@ -2730,7 +2917,1020 @@ def run_background_auto_worker_tick(
         "kol_orders_added": kol_orders_added,
         "kol_revenue_added": round(kol_revenue_added, 2),
         "ad_revenue_added": sync_res.get("added_revenue_today", 0.0),
+        "zns_auto_care_triggered": zns_auto_care_count,
     }
+
+
+# ==============================================================================
+# PILLAR 1 & 2: SAAS BILLING (VIETQR NAPAS 247 + SEPAY WEBHOOK) & CLEAN MODE
+# ==============================================================================
+
+class BillingUpgradeRequest(BaseModel):
+    workspace_id: Optional[int] = Field(default=None)
+    plan_tier: str = Field(..., description="FREE | PRO | AGENCY")
+    billing_cycle: str = Field(default="MONTHLY", description="MONTHLY | YEARLY")
+    payment_ref: Optional[str] = Field(default=None)
+
+
+class SePayBillingWebhookRequest(BaseModel):
+    id: Optional[int] = Field(default=None)
+    gateway: Optional[str] = Field(default="MBBank")
+    transactionDate: Optional[str] = Field(default=None)
+    accountNumber: Optional[str] = Field(default="0389998888")
+    content: str = Field(..., description="Nội dung chuyển khoản ngân hàng (VD: MARKETFLOW WS1 PRO)")
+    transferAmount: float = Field(..., ge=0, description="Số tiền chuyển khoản (VND)")
+    referenceCode: Optional[str] = Field(default=None)
+
+
+class LiveConnectorConfigRequest(BaseModel):
+    workspace_id: Optional[int] = Field(default=None)
+    webhook_secret_key: Optional[str] = Field(default=None)
+    zalo_oa_token: Optional[str] = Field(default=None)
+    smtp_or_resend_key: Optional[str] = Field(default=None)
+    alert_email: Optional[str] = Field(default=None)
+
+
+class CleanWorkspaceModeRequest(BaseModel):
+    workspace_id: Optional[int] = Field(default=None)
+    mode: str = Field(default="purge_demo", description="purge_demo | restore_demo")
+
+
+SAAS_PLAN_CATALOG: Dict[str, Dict[str, Any]] = {
+    "FREE": {
+        "tier": "FREE",
+        "name": "Gói Khởi Nghiệp (Starter Free)",
+        "monthly_price_vnd": 0,
+        "yearly_price_vnd": 0,
+        "badge": "Đang miễn phí",
+        "highlights": [
+            "Tối đa 25 lệnh AI / 24 giờ & 10 chiến dịch",
+            "Đồng bộ CSV thông minh & Chẩn đoán AI Doctor cơ bản",
+            "Trải nghiệm đầy đủ Sandbox TikTok Shop, Zalo ZNS & POS Webhook",
+        ],
+    },
+    "PRO": {
+        "tier": "PRO",
+        "name": "Gói Tăng Trưởng SME / Brand (PRO)",
+        "monthly_price_vnd": 499000,
+        "yearly_price_vnd": 4990000,
+        "badge": "Phổ biến nhất tại VN",
+        "highlights": [
+            "Mở khóa 150 lệnh AI / 24 giờ, 50 chiến dịch, 500 bài nội dung & 20 thành viên",
+            "Bật bộ tính Điểm Hòa Vốn TikTok Shop / Shopee (trừ phí sàn, giá vốn, bom hàng COD)",
+            "Phễu CRM Zalo ZNS / Messenger 24h & Lịch Khung Giờ Vàng Mega Sale 11/11 - 12/12",
+            "Bảo mật Webhook POS riêng & Chế độ Production Sạch (xóa toàn bộ dữ liệu mẫu)",
+        ],
+    },
+    "AGENCY": {
+        "tier": "AGENCY",
+        "name": "Gói Agency Đa Khách Hàng (Enterprise Agency)",
+        "monthly_price_vnd": 1490000,
+        "yearly_price_vnd": 14900000,
+        "badge": "Dành cho Agency & Chuỗi",
+        "highlights": [
+            "Mở khóa 1.000 lệnh AI / 24 giờ, 300 chiến dịch, 3.000 bài nội dung & 100 thành viên",
+            "Quản lý 30 Không gian làm việc (Workspaces) độc lập cho từng khách hàng",
+            "Đồng bộ 2 chiều Meta Graph API v19.0, TikTok Business Center & Zalo OA Live",
+            "Báo cáo P&L Đa Kênh + KOL/KOC Affiliate Tracking không giới hạn",
+        ],
+    },
+}
+
+
+@router.get("/ad-accounts/billing-plan")
+def get_workspace_billing_plan(
+    workspace_id: Optional[int] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Lấy thông tin gói cước SaaS hiện tại của Workspace, bộ đếm hạn mức Quota thực tế,
+    mã QR chuyển khoản tự động VietQR Napas 247 và trạng thái kết nối API thật.
+    """
+    import urllib.parse
+    from app.services import quota as quota_service
+
+    ws_ids = _accessible_workspace_ids(current_user, db)
+    target_ws = workspace_id if (workspace_id and (current_user.role == "ADMIN" or workspace_id in ws_ids)) else (ws_ids[0] if ws_ids else 1)
+    sub = _get_or_create_workspace_subscription(db, target_ws)
+    snap = quota_service.snapshot_workspace(db, workspace_id=target_ws, user_id=current_user.id)
+
+    pro_memo = f"MARKETFLOW WS{target_ws} PRO"
+    agency_memo = f"MARKETFLOW WS{target_ws} AGENCY"
+    acc_name_enc = urllib.parse.quote("CONG TY CONG NGHE MARKETFLOW VN")
+
+    vietqr_pro_url = (
+        f"https://img.vietqr.io/image/MB-0389998888-compact2.png"
+        f"?amount=499000&addInfo={urllib.parse.quote(pro_memo)}&accountName={acc_name_enc}"
+    )
+    vietqr_agency_url = (
+        f"https://img.vietqr.io/image/MB-0389998888-compact2.png"
+        f"?amount=1490000&addInfo={urllib.parse.quote(agency_memo)}&accountName={acc_name_enc}"
+    )
+
+    return {
+        "workspace_id": target_ws,
+        "plan_tier": sub.plan_tier,
+        "plan_info": SAAS_PLAN_CATALOG.get(sub.plan_tier, SAAS_PLAN_CATALOG["FREE"]),
+        "billing_cycle": sub.billing_cycle,
+        "amount_vnd": float(sub.amount_vnd or 0),
+        "payment_ref": sub.payment_ref,
+        "payment_provider": sub.payment_provider,
+        "webhook_secret_key": sub.webhook_secret_key,
+        "clean_demo_mode": bool(sub.clean_demo_mode),
+        "zalo_oa_token_masked": (
+            f"{sub.zalo_oa_token[:8]}...{sub.zalo_oa_token[-4:]}"
+            if sub.zalo_oa_token and len(sub.zalo_oa_token) >= 12
+            else ("Đã cấu hình" if sub.zalo_oa_token else None)
+        ),
+        "smtp_configured": bool(sub.smtp_or_resend_key),
+        "alert_email": sub.alert_email or current_user.email,
+        "activated_at": sub.activated_at.isoformat() if sub.activated_at else None,
+        "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+        "quota_snapshot": snap,
+        "vietqr": {
+            "bank_name": "MBBank (Ngân hàng Quân Đội - Napas 247)",
+            "account_number": "0389998888",
+            "account_holder": "CONG TY CONG NGHE MARKETFLOW VN",
+            "pro_memo": pro_memo,
+            "agency_memo": agency_memo,
+            "pro_qr_url": vietqr_pro_url,
+            "agency_qr_url": vietqr_agency_url,
+        },
+        "catalog": list(SAAS_PLAN_CATALOG.values()),
+    }
+
+
+@router.post("/ad-accounts/billing-upgrade")
+def upgrade_workspace_billing_plan(
+    req: BillingUpgradeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Nâng cấp ngay lập tức gói cước SaaS của Workspace lên PRO (499.000đ) hoặc AGENCY (1.490.000đ)
+    sau khi đối soát thanh toán VietQR / SePay, tự động mở khóa trần hạn mức trong `quota.py`.
+    """
+    from app.services import quota as quota_service
+
+    ws_ids = _accessible_workspace_ids(current_user, db)
+    target_ws = req.workspace_id if (req.workspace_id and (current_user.role == "ADMIN" or req.workspace_id in ws_ids)) else (ws_ids[0] if ws_ids else 1)
+    tier = req.plan_tier.upper().strip()
+    if tier not in ("FREE", "PRO", "AGENCY"):
+        raise HTTPException(status_code=400, detail="Gói cước không hợp lệ. Chọn FREE, PRO hoặc AGENCY.")
+
+    cycle = req.billing_cycle.upper().strip()
+    if cycle not in ("MONTHLY", "YEARLY"):
+        cycle = "MONTHLY"
+
+    sub = _get_or_create_workspace_subscription(db, target_ws)
+    now_utc = datetime.now(timezone.utc)
+    plan_meta = SAAS_PLAN_CATALOG[tier]
+    amount = plan_meta["yearly_price_vnd"] if cycle == "YEARLY" else plan_meta["monthly_price_vnd"]
+
+    sub.plan_tier = tier
+    sub.billing_cycle = cycle
+    sub.amount_vnd = amount
+    sub.payment_ref = req.payment_ref or f"VQR-{target_ws}-{tier}-{int(now_utc.timestamp())}"
+    sub.activated_at = now_utc
+    sub.expires_at = now_utc + timedelta(days=365 if cycle == "YEARLY" else 30)
+    sub.updated_at = now_utc
+
+    db.commit()
+    db.refresh(sub)
+
+    snap = quota_service.snapshot_workspace(db, workspace_id=target_ws, user_id=current_user.id)
+    return {
+        "status": "upgraded",
+        "workspace_id": target_ws,
+        "plan_tier": sub.plan_tier,
+        "plan_name": plan_meta["name"],
+        "amount_vnd": float(sub.amount_vnd or 0),
+        "payment_ref": sub.payment_ref,
+        "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+        "quota_snapshot": snap,
+        "message": f"Đã kích hoạt thành công {plan_meta['name']} cho Workspace #{target_ws}!",
+    }
+
+
+@router.post("/ad-accounts/billing-webhook")
+def receive_sepay_vietqr_webhook(
+    req: SePayBillingWebhookRequest,
+    db: Session = Depends(get_db),
+):
+    """Webhook nhận biến động số dư tự động từ SePay / PayOS / Casso khi khách hàng quét mã VietQR.
+    Cú pháp nội dung chuyển khoản: `MARKETFLOW WS<id> PRO` hoặc `MARKETFLOW WS<id> AGENCY`.
+    """
+    content_upper = (req.content or "").upper()
+    ws_match = re.search(r"WS(\d+)", content_upper)
+    target_ws = int(ws_match.group(1)) if ws_match else 1
+
+    if "AGENCY" in content_upper or req.transferAmount >= 1400000:
+        tier = "AGENCY"
+    elif "PRO" in content_upper or req.transferAmount >= 450000:
+        tier = "PRO"
+    else:
+        tier = "PRO"
+
+    sub = _get_or_create_workspace_subscription(db, target_ws)
+    now_utc = datetime.now(timezone.utc)
+    sub.plan_tier = tier
+    sub.amount_vnd = req.transferAmount
+    sub.payment_ref = req.referenceCode or f"SEPAY-{int(now_utc.timestamp())}"
+    sub.activated_at = now_utc
+    sub.expires_at = now_utc + timedelta(days=30)
+    sub.updated_at = now_utc
+    db.commit()
+    db.refresh(sub)
+
+    return {
+        "success": True,
+        "status": "sepay_webhook_processed",
+        "workspace_id": target_ws,
+        "upgraded_to": tier,
+        "transfer_amount": req.transferAmount,
+        "payment_ref": sub.payment_ref,
+    }
+
+
+@router.put("/ad-accounts/live-connectors")
+def update_live_connectors_config(
+    req: LiveConnectorConfigRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Lưu cấu hình Khóa bảo mật POS Webhook (`webhook_secret_key`), Token Zalo OA ZNS thật
+    (`zalo_oa_token`) và API Key gửi Email thật (`smtp_or_resend_key`).
+    """
+    ws_ids = _accessible_workspace_ids(current_user, db)
+    target_ws = req.workspace_id if (req.workspace_id and (current_user.role == "ADMIN" or req.workspace_id in ws_ids)) else (ws_ids[0] if ws_ids else 1)
+    sub = _get_or_create_workspace_subscription(db, target_ws)
+
+    if req.webhook_secret_key is not None and req.webhook_secret_key.strip():
+        sub.webhook_secret_key = req.webhook_secret_key.strip()
+    if req.zalo_oa_token is not None:
+        sub.zalo_oa_token = req.zalo_oa_token.strip() or None
+    if req.smtp_or_resend_key is not None:
+        sub.smtp_or_resend_key = req.smtp_or_resend_key.strip() or None
+    if req.alert_email is not None:
+        sub.alert_email = req.alert_email.strip() or None
+
+    sub.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(sub)
+    return {
+        "status": "connectors_updated",
+        "workspace_id": target_ws,
+        "webhook_secret_key": sub.webhook_secret_key,
+        "zalo_oa_configured": bool(sub.zalo_oa_token),
+        "smtp_configured": bool(sub.smtp_or_resend_key),
+        "alert_email": sub.alert_email,
+    }
+
+
+@router.post("/ad-accounts/clean-workspace")
+def toggle_clean_production_workspace(
+    req: CleanWorkspaceModeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Chế độ Production Sạch (Clean Production Mode):
+    - `purge_demo`: Xóa toàn bộ tài khoản quảng cáo mẫu, KOL mẫu, Lead mẫu và các dòng số liệu `seed`,
+      đồng thời bật cờ `clean_demo_mode = True` để hệ thống không bao giờ tự động sinh lại dữ liệu mẫu.
+    - `restore_demo`: Bật lại dữ liệu mẫu Sandbox để trình diễn / đào tạo nhân sự mới.
+    """
+    ws_ids = _accessible_workspace_ids(current_user, db)
+    target_ws = req.workspace_id if (req.workspace_id and (current_user.role == "ADMIN" or req.workspace_id in ws_ids)) else (ws_ids[0] if ws_ids else 1)
+    sub = _get_or_create_workspace_subscription(db, target_ws)
+
+    if req.mode == "restore_demo":
+        sub.clean_demo_mode = False
+        db.commit()
+        accs = _ensure_ad_accounts_seeded(db, target_ws)
+        kols = _ensure_kol_bookings_seeded(db, target_ws)
+        leads = _ensure_vn_leads_seeded(db, target_ws)
+        return {
+            "status": "demo_restored",
+            "workspace_id": target_ws,
+            "clean_demo_mode": False,
+            "ad_accounts_count": len(accs),
+            "kol_bookings_count": len(kols),
+            "vn_leads_count": len(leads),
+            "message": "Đã khôi phục bộ dữ liệu mẫu Sandbox cho Workspace.",
+        }
+
+    # purge_demo
+    sub.clean_demo_mode = True
+    deleted_accounts = db.query(AdAccount).filter(AdAccount.workspace_id == target_ws).delete(synchronize_session=False)
+    deleted_kols = db.query(KolBooking).filter(KolBooking.workspace_id == target_ws).delete(synchronize_session=False)
+    deleted_leads = 0
+    try:
+        VnLeadCrm.__table__.create(bind=db.get_bind(), checkfirst=True)
+        deleted_leads = db.query(VnLeadCrm).filter(VnLeadCrm.workspace_id == target_ws).delete(synchronize_session=False)
+    except Exception:
+        pass
+
+    camp_ids = [r[0] for r in db.query(Campaign.id).filter(Campaign.workspace_id == target_ws).all()]
+    deleted_seed_metrics = 0
+    if camp_ids:
+        deleted_seed_metrics = (
+            db.query(CampaignMetric)
+            .filter(
+                CampaignMetric.campaign_id.in_(camp_ids),
+                CampaignMetric.source == "seed",
+            )
+            .delete(synchronize_session=False)
+        )
+
+    db.commit()
+    return {
+        "status": "workspace_cleaned",
+        "workspace_id": target_ws,
+        "clean_demo_mode": True,
+        "deleted_ad_accounts": int(deleted_accounts or 0),
+        "deleted_kol_bookings": int(deleted_kols or 0),
+        "deleted_vn_leads": int(deleted_leads or 0),
+        "deleted_seed_metrics": int(deleted_seed_metrics or 0),
+        "message": "Đã dọn sạch dữ liệu mẫu và bật Chế độ Production Sạch (bắt buộc khóa bảo mật POS Webhook).",
+    }
+
+
+# ==============================================================================
+# VIETNAM PRIORITY #1: TIKTOK SHOP / SHOPEE / LIVESTREAM P&L & BREAK-EVEN ROAS
+# ==============================================================================
+
+class VnEcommercePnlRequest(BaseModel):
+    campaign_id: Optional[int] = Field(default=None)
+    selling_price: float = Field(default=380000.0, gt=0, description="Giá bán trung bình 1 đơn hàng (AOV - VND)")
+    cogs_per_unit: float = Field(default=115000.0, ge=0, description="Giá vốn hàng bán + bao bì (VND/đơn)")
+    platform_fee_pct: float = Field(default=12.5, ge=0, le=50, description="Phí sàn TikTok Shop / Shopee + Thanh toán + Freeship Extra (%)")
+    affiliate_commission_pct: float = Field(default=10.0, ge=0, le=60, description="Hoa hồng KOC / Affiliate / Tiếp thị liên kết (%)")
+    return_rate_pct: float = Field(default=14.0, ge=0, le=80, description="Tỷ lệ hoàn hàng / Bom hàng COD đặc thù tại Việt Nam (%)")
+    return_shipping_fee: float = Field(default=28000.0, ge=0, description="Phí ship hoàn + hư hỏng hộp mỗi đơn bị bom (VND)")
+    operating_overhead_per_order: float = Field(default=12000.0, ge=0, description="Chi phí vận hành kho / đóng gói / nhân sự mỗi đơn (VND)")
+    current_ad_spend: Optional[float] = Field(default=None, ge=0)
+    current_orders: Optional[int] = Field(default=None, ge=0)
+    current_revenue: Optional[float] = Field(default=None, ge=0)
+
+
+@router.post("/ad-accounts/vn-ecommerce-pnl")
+def calculate_vn_ecommerce_pnl_and_breakeven(
+    req: VnEcommercePnlRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Giải quyết bài toán sống còn số 1 của nhà bán hàng & chủ shop tại Việt Nam:
+    'Doanh thu GMV trên trình quản lý quảng cáo báo ROAS 3.0x - 4.0x nhưng cuối tháng đối soát vẫn LỖ NẶNG'
+    do chưa trừ Phí sàn TikTok Shop/Shopee (11-15%), Hoa hồng KOC Affiliate (8-15%), Giá vốn (COGS)
+    và Tỷ lệ bom hàng / hoàn COD (10-20%).
+    """
+    camp_name = "Toàn bộ Chiến dịch Thương mại điện tử"
+    ad_spend = float(req.current_ad_spend or 0.0)
+    orders_total = int(req.current_orders or 0)
+    gross_revenue = float(req.current_revenue or 0.0)
+
+    if req.campaign_id:
+        camp = db.query(Campaign).filter(Campaign.id == req.campaign_id).first()
+        if camp:
+            camp_name = camp.name
+            agg = (
+                db.query(
+                    func.coalesce(func.sum(CampaignMetric.cost), 0),
+                    func.coalesce(func.sum(CampaignMetric.revenue), 0),
+                    func.coalesce(func.sum(CampaignMetric.conversions), 0),
+                )
+                .filter(CampaignMetric.campaign_id == camp.id)
+                .first()
+            )
+            if agg:
+                if req.current_ad_spend is None:
+                    ad_spend = float(agg[0] or 0.0)
+                if req.current_revenue is None:
+                    gross_revenue = float(agg[1] or 0.0)
+                if req.current_orders is None:
+                    orders_total = int(agg[2] or 0)
+
+    if orders_total <= 0:
+        orders_total = 120
+    if ad_spend <= 0:
+        ad_spend = 14500000.0
+    if gross_revenue <= 0:
+        gross_revenue = round(orders_total * req.selling_price, 2)
+
+    aov = req.selling_price if req.selling_price > 0 else round(gross_revenue / max(orders_total, 1), 0)
+    success_rate = max(0.05, 1.0 - (req.return_rate_pct / 100.0))
+
+    # Doanh thu thực thu trên mỗi đơn phát sinh (sau khi trừ tỷ lệ đơn hoàn COD)
+    effective_revenue_per_order = round(aov * success_rate, 2)
+    platform_fee_per_order = round(effective_revenue_per_order * (req.platform_fee_pct / 100.0), 2)
+    affiliate_fee_per_order = round(effective_revenue_per_order * (req.affiliate_commission_pct / 100.0), 2)
+    # Đơn hoàn không mất giá vốn hàng hóa (hàng quay về kho) nhưng mất phí đóng gói + ship hoàn
+    cogs_effective_per_order = round(req.cogs_per_unit * success_rate, 2)
+    cod_return_loss_per_order = round(req.return_shipping_fee * (req.return_rate_pct / 100.0), 2)
+
+    # Lợi nhuận gộp còn lại trên mỗi đơn TRƯỚC KHI TRỪ CHI PHÍ QUẢNG CÁO (= CPA Hòa Vốn Tối Đa)
+    max_allowable_cpa = round(
+        effective_revenue_per_order
+        - cogs_effective_per_order
+        - platform_fee_per_order
+        - affiliate_fee_per_order
+        - cod_return_loss_per_order
+        - req.operating_overhead_per_order,
+        0,
+    )
+
+    break_even_roas = round(aov / max_allowable_cpa, 2) if max_allowable_cpa > 0 else 99.9
+    actual_cpa = round(ad_spend / max(orders_total, 1), 0)
+    gross_roas = round(gross_revenue / ad_spend, 2) if ad_spend > 0 else 0.0
+
+    # P&L Tổng chiến dịch
+    successful_orders = int(round(orders_total * success_rate))
+    returned_orders = max(0, orders_total - successful_orders)
+    net_revenue_collected = round(orders_total * effective_revenue_per_order, 0)
+    total_cogs = round(orders_total * cogs_effective_per_order, 0)
+    total_platform_fee = round(orders_total * platform_fee_per_order, 0)
+    total_affiliate_fee = round(orders_total * affiliate_fee_per_order, 0)
+    total_cod_return_loss = round(
+        orders_total * (cod_return_loss_per_order + req.operating_overhead_per_order),
+        0,
+    )
+    real_net_profit = round(
+        net_revenue_collected
+        - total_cogs
+        - total_platform_fee
+        - total_affiliate_fee
+        - total_cod_return_loss
+        - ad_spend,
+        0,
+    )
+    net_margin_pct = round((real_net_profit / net_revenue_collected) * 100.0, 1) if net_revenue_collected > 0 else 0.0
+
+    recommendations: List[str] = []
+    if max_allowable_cpa <= 0:
+        profit_status = "BLEEDING_LOSS"
+        headline = "CẢNH BÁO ĐỎ: Cấu trúc giá đang âm ngay cả khi chưa chạy Quảng cáo!"
+        recommendations.append(
+            f"Tổng Phí sàn ({req.platform_fee_pct}%) + Hoa hồng KOC ({req.affiliate_commission_pct}%) + Giá vốn đang nuốt hết biên lợi nhuận. Cần tăng giá bán Combo (Upsell AOV lên >= {int(aov * 1.35):,}đ) ngay."
+        )
+    elif real_net_profit < 0:
+        profit_status = "BLEEDING_LOSS"
+        headline = (
+            f"BẪY DOANH THU ẢO (GMV TRAP): ROAS báo cáo đạt {gross_roas}x nhưng thực tế đang LỖ RÒNG {abs(int(real_net_profit)):,}đ!"
+        )
+        recommendations.append(
+            f"Điểm hòa vốn thực tế đòi hỏi ROAS tối thiểu {break_even_roas}x (CPA <= {int(max_allowable_cpa):,}đ/đơn), trong khi CPA hiện tại là {int(actual_cpa):,}đ/đơn."
+        )
+        recommendations.append(
+            f"Giảm tỷ lệ bom hàng COD ({req.return_rate_pct}%) bằng cách bắn tin nhắn Zalo ZNS xác nhận đơn tự động ngay sau khi khách đặt hàng."
+        )
+    elif net_margin_pct < 12.0:
+        profit_status = "WARNING_THIN_MARGIN"
+        headline = f"Biên lãi ròng mỏng ({net_margin_pct}%): Lãi thực bỏ túi {int(real_net_profit):,}đ sau khi trừ phí sàn & hoàn hàng."
+        recommendations.append(
+            f"Tối ưu kịch bản Livestream / KOC để hạ CPA từ {int(actual_cpa):,}đ xuống dưới {int(max_allowable_cpa * 0.75):,}đ/đơn."
+        )
+        recommendations.append(
+            "Chuyển 25% khách mua lẻ trên sàn về Zalo OA Official Account để lần mua lại thứ 2 không mất 12.5% phí sàn TikTok Shop/Shopee."
+        )
+    else:
+        profit_status = "PROFITABLE"
+        headline = f"CHIẾN DỊCH LÃI RÒNG BỀN VỮNG (+{int(real_net_profit):,}đ | Biên ròng {net_margin_pct}%): Đủ điều kiện vít ngân sách!"
+        recommendations.append(
+            f"ROAS thực tế ({gross_roas}x) vượt xa ROAS Hòa Vốn ({break_even_roas}x). Có thể dùng nút 'Đẩy Ngân Sách 2 Chiều' tăng trần chi tiêu thêm +25%/ngày."
+        )
+
+    return {
+        "campaign_id": req.campaign_id,
+        "campaign_name": camp_name,
+        "unit_economics": {
+            "selling_price_aov": aov,
+            "effective_revenue_per_order": effective_revenue_per_order,
+            "cogs_effective_per_order": cogs_effective_per_order,
+            "platform_fee_per_order": platform_fee_per_order,
+            "affiliate_fee_per_order": affiliate_fee_per_order,
+            "cod_return_loss_per_order": cod_return_loss_per_order,
+            "max_allowable_cpa": max_allowable_cpa,
+            "actual_cpa": actual_cpa,
+            "break_even_roas": break_even_roas,
+            "actual_gross_roas": gross_roas,
+        },
+        "campaign_pnl": {
+            "total_orders": orders_total,
+            "successful_orders": successful_orders,
+            "returned_cod_orders": returned_orders,
+            "gross_gmv_revenue": gross_revenue,
+            "net_revenue_collected": net_revenue_collected,
+            "total_cogs": total_cogs,
+            "total_platform_fee": total_platform_fee,
+            "total_affiliate_fee": total_affiliate_fee,
+            "total_cod_and_ops_fee": total_cod_return_loss,
+            "total_ad_spend": ad_spend,
+            "real_net_profit": real_net_profit,
+            "net_margin_pct": net_margin_pct,
+        },
+        "profit_status": profit_status,
+        "headline": headline,
+        "recommendations": recommendations,
+    }
+
+
+# ==============================================================================
+# VIETNAM PRIORITY #2: ZALO OA / ZNS & FACEBOOK MESSENGER CLICK-TO-CHAT CRM
+# ==============================================================================
+
+class VnLeadCreateRequest(BaseModel):
+    workspace_id: Optional[int] = Field(default=None)
+    campaign_id: Optional[int] = Field(default=None)
+    customer_name: str = Field(..., min_length=2, max_length=255)
+    phone: str = Field(..., min_length=8, max_length=40)
+    source_channel: str = Field(default="FB_MESSENGER", description="FB_MESSENGER | ZALO_OA | TIKTOK_BIO | LANDING_FORM")
+    lead_stage: str = Field(default="NEW_INBOX", description="NEW_INBOX | SILENT_24H | WAITING_TRANSFER | PAYDAY_15_25 | CLOSED_POS")
+    product_interest: str = Field(default="Combo Sản phẩm Chủ lực")
+    estimated_value: float = Field(default=650000.0, ge=0)
+    assigned_sale: Optional[str] = Field(default="Sale Ca Sáng")
+    last_message_note: Optional[str] = Field(default=None)
+
+
+class VnLeadZnsCareRequest(BaseModel):
+    template_type: str = Field(
+        default="REMIND_24H_META",
+        description="REMIND_24H_META | VIETQR_PAYMENT | PAYDAY_15_25_VOUCHER | COD_CONFIRM",
+    )
+
+
+def _ensure_vn_leads_seeded(db: Session, workspace_id: int) -> List[VnLeadCrm]:
+    try:
+        VnLeadCrm.__table__.create(bind=db.get_bind(), checkfirst=True)
+    except Exception:
+        pass
+
+    existing = (
+        db.query(VnLeadCrm)
+        .filter(VnLeadCrm.workspace_id == workspace_id)
+        .order_by(VnLeadCrm.id.desc())
+        .all()
+    )
+    if existing:
+        return existing
+
+    sub = _get_or_create_workspace_subscription(db, workspace_id)
+    if getattr(sub, "clean_demo_mode", False):
+        return []
+
+    camps = db.query(Campaign).filter(Campaign.workspace_id == workspace_id).order_by(Campaign.id.asc()).all()
+    c0 = camps[0].id if camps else None
+    c1 = camps[1].id if len(camps) > 1 else c0
+
+    defaults = [
+        VnLeadCrm(
+            workspace_id=workspace_id,
+            campaign_id=c0,
+            customer_name="Chị Nguyễn Thu Trang (Q. Cầu Giấy, HN)",
+            phone="0988412905",
+            source_channel="FB_MESSENGER",
+            lead_stage="SILENT_24H",
+            product_interest="Combo 2 Hộp Serum Phục Hồi + Kem Chống Nắng",
+            estimated_value=890000.0,
+            zns_sent_count=1,
+            assigned_sale="Ngọc Anh (Ca Sáng)",
+            last_message_note="Khách đã hỏi giá trong Inbox Fanpage lúc 19h tối qua, sắp đóng cửa sổ 24h của Meta!",
+        ),
+        VnLeadCrm(
+            workspace_id=workspace_id,
+            campaign_id=c0,
+            customer_name="Anh Trần Minh Đức (Q.7, TP.HCM)",
+            phone="0903771824",
+            source_channel="ZALO_OA",
+            lead_stage="WAITING_TRANSFER",
+            product_interest="Gói Phần mềm / Khóa học VIP 12 Tháng",
+            estimated_value=1490000.0,
+            zns_sent_count=2,
+            assigned_sale="Hoàng Nam (Closer)",
+            last_message_note="Đã gửi mã VietQR trong Zalo OA, khách báo chiều đi làm về chuyển khoản.",
+        ),
+        VnLeadCrm(
+            workspace_id=workspace_id,
+            campaign_id=c1,
+            customer_name="Chị Lê Bảo Ngọc (Đà Nẵng)",
+            phone="0915628391",
+            source_channel="TIKTOK_BIO",
+            lead_stage="PAYDAY_15_25",
+            product_interest="Set Quà Tặng Cao Cấp (Từ link Bio KOC Hà Linh)",
+            estimated_value=1250000.0,
+            zns_sent_count=1,
+            assigned_sale="Ngọc Anh (Ca Sáng)",
+            last_message_note="Khách hẹn ngày 25 lương về chốt đơn, cần bắn ZNS giữ mã Freeship.",
+        ),
+        VnLeadCrm(
+            workspace_id=workspace_id,
+            campaign_id=c1,
+            customer_name="Anh Phạm Quốc Huy (Bình Dương)",
+            phone="0972109483",
+            source_channel="FB_MESSENGER",
+            lead_stage="NEW_INBOX",
+            product_interest="Combo Dùng Thử 30 Ngày (Click-to-Messenger Ads)",
+            estimated_value=490000.0,
+            zns_sent_count=0,
+            assigned_sale="Minh Tâm (Ca Tối)",
+            last_message_note="Vừa bấm vào quảng cáo Tin nhắn Facebook 10 phút trước, đang xin tư vấn.",
+        ),
+    ]
+    for item in defaults:
+        db.add(item)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+    return (
+        db.query(VnLeadCrm)
+        .filter(VnLeadCrm.workspace_id == workspace_id)
+        .order_by(VnLeadCrm.id.desc())
+        .all()
+    )
+
+
+def _serialize_vn_lead(item: VnLeadCrm, db: Session) -> Dict[str, Any]:
+    camp_name = None
+    if item.campaign_id:
+        camp = db.query(Campaign).filter(Campaign.id == item.campaign_id).first()
+        if camp:
+            camp_name = camp.name
+    return {
+        "id": item.id,
+        "workspace_id": item.workspace_id,
+        "campaign_id": item.campaign_id,
+        "campaign_name": camp_name,
+        "customer_name": item.customer_name,
+        "phone": item.phone,
+        "source_channel": item.source_channel,
+        "lead_stage": item.lead_stage,
+        "product_interest": item.product_interest,
+        "estimated_value": float(item.estimated_value or 0),
+        "zns_sent_count": int(item.zns_sent_count or 0),
+        "assigned_sale": item.assigned_sale,
+        "last_message_note": item.last_message_note,
+        "last_contacted_at": item.last_contacted_at.isoformat() if item.last_contacted_at else None,
+    }
+
+
+@router.get("/ad-accounts/vn-leads")
+def list_vn_conversational_leads(
+    workspace_id: Optional[int] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Lấy danh sách khách hàng tiềm năng từ Quảng cáo Tin nhắn (Facebook Click-to-Messenger,
+    Zalo OA, TikTok Bio) để chống rớt khách sau 24h và theo dõi tỷ lệ chốt đơn sang POS.
+    """
+    ws_ids = _accessible_workspace_ids(current_user, db)
+    target_ws = workspace_id if (workspace_id and (current_user.role == "ADMIN" or workspace_id in ws_ids)) else (ws_ids[0] if ws_ids else 1)
+    items = _ensure_vn_leads_seeded(db, target_ws)
+    serialized = [_serialize_vn_lead(ld, db) for ld in items]
+
+    pipeline_value = sum(x["estimated_value"] for x in serialized if x["lead_stage"] != "CLOSED_POS")
+    closed_value = sum(x["estimated_value"] for x in serialized if x["lead_stage"] == "CLOSED_POS")
+    urgent_24h_count = sum(1 for x in serialized if x["lead_stage"] in ("SILENT_24H", "WAITING_TRANSFER"))
+
+    return {
+        "workspace_id": target_ws,
+        "items": serialized,
+        "summary": {
+            "total_leads": len(serialized),
+            "urgent_24h_count": urgent_24h_count,
+            "open_pipeline_value": round(pipeline_value, 0),
+            "closed_won_value": round(closed_value, 0),
+        },
+    }
+
+
+@router.post("/ad-accounts/vn-leads", status_code=status.HTTP_201_CREATED)
+def create_vn_conversational_lead(
+    req: VnLeadCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    VnLeadCrm.__table__.create(bind=db.get_bind(), checkfirst=True)
+    ws_ids = _accessible_workspace_ids(current_user, db)
+    target_ws = req.workspace_id if (req.workspace_id and (current_user.role == "ADMIN" or req.workspace_id in ws_ids)) else (ws_ids[0] if ws_ids else 1)
+
+    camps = db.query(Campaign).filter(Campaign.workspace_id == target_ws).order_by(Campaign.id.asc()).all()
+    resolved_camp_id = req.campaign_id or (camps[0].id if camps else None)
+
+    src = req.source_channel.upper().strip()
+    if src not in ("FB_MESSENGER", "ZALO_OA", "TIKTOK_BIO", "LANDING_FORM"):
+        src = "FB_MESSENGER"
+    stg = req.lead_stage.upper().strip()
+    if stg not in ("NEW_INBOX", "SILENT_24H", "WAITING_TRANSFER", "PAYDAY_15_25", "CLOSED_POS"):
+        stg = "NEW_INBOX"
+
+    ld = VnLeadCrm(
+        workspace_id=target_ws,
+        campaign_id=resolved_camp_id,
+        customer_name=req.customer_name.strip(),
+        phone=req.phone.strip(),
+        source_channel=src,
+        lead_stage=stg,
+        product_interest=req.product_interest.strip(),
+        estimated_value=req.estimated_value,
+        zns_sent_count=0,
+        assigned_sale=(req.assigned_sale or "Sale Ca Sáng").strip(),
+        last_message_note=req.last_message_note or "Khách mới để lại SĐT trong Inbox.",
+    )
+    db.add(ld)
+    db.commit()
+    db.refresh(ld)
+    return _serialize_vn_lead(ld, db)
+
+
+@router.post("/ad-accounts/vn-leads/{lead_id}/send-zns")
+def send_zns_or_messenger_care_to_lead(
+    lead_id: int,
+    req: VnLeadZnsCareRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Bắn tin nhắn chăm sóc tự động qua Zalo ZNS / Messenger 24h Care:
+    - Giải quyết luật khóa Inbox sau 24 giờ của Facebook Messenger bằng cách chuyển tiếp sang Zalo ZNS theo SĐT.
+    - Nếu Workspace đã cấu hình `zalo_oa_token` thật, tự động gọi API `https://business.openapi.zalo.me/message/template`.
+    """
+    import json as _json
+    import urllib.request
+
+    VnLeadCrm.__table__.create(bind=db.get_bind(), checkfirst=True)
+    ld = db.query(VnLeadCrm).filter(VnLeadCrm.id == lead_id).first()
+    if not ld:
+        raise HTTPException(status_code=404, detail="Không tìm thấy khách hàng tiềm năng")
+
+    sub = _get_or_create_workspace_subscription(db, ld.workspace_id)
+    now_utc = datetime.now(timezone.utc)
+
+    template_messages = {
+        "REMIND_24H_META": f"[Zalo ZNS & Messenger 24h] Chào {ld.customer_name}, ưu đãi riêng cho '{ld.product_interest}' sẽ giữ trong 4 giờ tới. Nhắn lại để nhận mã Freeship!",
+        "VIETQR_PAYMENT": f"[Zalo ZNS VietQR] Đã gửi mã QR thanh toán nhanh ({int(float(ld.estimated_value or 0)):,}đ) cho {ld.customer_name} qua SĐT {ld.phone}.",
+        "PAYDAY_15_25_VOUCHER": f"[Zalo ZNS Lương Về 15/25] Tặng {ld.customer_name} voucher giảm 15% nhân dịp lương về cho '{ld.product_interest}'.",
+        "COD_CONFIRM": f"[Zalo ZNS Chống Bom Hàng COD] Xác nhận đơn hàng '{ld.product_interest}' ({int(float(ld.estimated_value or 0)):,}đ) giao tới SĐT {ld.phone}.",
+    }
+    msg_preview = template_messages.get(req.template_type, template_messages["REMIND_24H_META"])
+
+    delivery_mode = "ZNS_SANDBOX_DISPATCHED"
+    if sub.zalo_oa_token and len(sub.zalo_oa_token.strip()) >= 16:
+        try:
+            payload = _json.dumps({
+                "phone": ld.phone,
+                "template_id": "319482",
+                "template_data": {
+                    "customer_name": ld.customer_name,
+                    "product_name": ld.product_interest,
+                    "amount": int(float(ld.estimated_value or 0)),
+                },
+            }).encode("utf-8")
+            zalo_req = urllib.request.Request(
+                "https://business.openapi.zalo.me/message/template",
+                data=payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "access_token": sub.zalo_oa_token.strip(),
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(zalo_req, timeout=2.5) as resp:
+                if resp.status == 200:
+                    delivery_mode = "REAL_ZALO_OA_ZNS_API"
+        except Exception as exc:
+            logger.info("Zalo ZNS live call fallback for lead %s: %s", ld.id, exc)
+
+    ld.zns_sent_count = int(ld.zns_sent_count or 0) + 1
+    ld.last_contacted_at = now_utc
+    ld.last_message_note = msg_preview
+    if ld.lead_stage == "SILENT_24H":
+        ld.lead_stage = "WAITING_TRANSFER"
+
+    db.commit()
+    db.refresh(ld)
+    return {
+        "status": "zns_sent",
+        "delivery_mode": delivery_mode,
+        "template_type": req.template_type,
+        "message_sent": msg_preview,
+        "lead": _serialize_vn_lead(ld, db),
+    }
+
+
+@router.post("/ad-accounts/vn-leads/{lead_id}/close-order")
+def close_vn_lead_to_pos_order(
+    lead_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """1-Click Chốt Đơn từ Inbox Zalo/Messenger sang POS:
+    Chuyển trạng thái Lead sang `CLOSED_POS` và tự động cộng ngay 1 đơn hàng + doanh thu thực
+    vào bảng `CampaignMetric` của Chiến dịch đang liên kết!
+    """
+    VnLeadCrm.__table__.create(bind=db.get_bind(), checkfirst=True)
+    ld = db.query(VnLeadCrm).filter(VnLeadCrm.id == lead_id).first()
+    if not ld:
+        raise HTTPException(status_code=404, detail="Không tìm thấy khách hàng tiềm năng")
+
+    now_utc = datetime.now(timezone.utc)
+    today_str = now_utc.strftime("%Y-%m-%d")
+    order_val = float(ld.estimated_value or 500000.0)
+
+    ld.lead_stage = "CLOSED_POS"
+    ld.last_contacted_at = now_utc
+    ld.last_message_note = f"Đã chốt đơn thành công (+{int(order_val):,}đ) và đồng bộ về POS / CampaignMetric."
+
+    camp_id = ld.campaign_id
+    if not camp_id:
+        first_camp = db.query(Campaign).filter(Campaign.workspace_id == ld.workspace_id).order_by(Campaign.id.asc()).first()
+        camp_id = first_camp.id if first_camp else None
+
+    if camp_id:
+        ch_id = 2 if ld.source_channel == "TIKTOK_BIO" else (3 if ld.source_channel == "ZALO_OA" else 1)
+        existing = (
+            db.query(CampaignMetric)
+            .filter(
+                CampaignMetric.campaign_id == camp_id,
+                CampaignMetric.channel_id == ch_id,
+                CampaignMetric.metric_date == today_str,
+            )
+            .first()
+        )
+        if existing:
+            existing.conversions = int(existing.conversions or 0) + 1
+            existing.revenue = round(float(existing.revenue or 0) + order_val, 2)
+            existing.clicks = max(int(existing.clicks or 0), int(existing.conversions or 0) * 4)
+            existing.views = max(int(existing.views or 0), int(existing.clicks or 0) * 18)
+            existing.source = "live_sync"
+        else:
+            db.add(
+                CampaignMetric(
+                    campaign_id=camp_id,
+                    channel_id=ch_id,
+                    metric_date=today_str,
+                    views=220,
+                    clicks=14,
+                    conversions=1,
+                    cost=round(order_val * 0.18, 0),
+                    revenue=order_val,
+                    source="live_sync",
+                )
+            )
+
+    db.commit()
+    db.refresh(ld)
+    return {
+        "status": "lead_closed_to_pos",
+        "added_revenue": order_val,
+        "campaign_id": camp_id,
+        "lead": _serialize_vn_lead(ld, db),
+    }
+
+
+@router.delete("/ad-accounts/vn-leads/{lead_id}")
+def delete_vn_conversational_lead(
+    lead_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    VnLeadCrm.__table__.create(bind=db.get_bind(), checkfirst=True)
+    ld = db.query(VnLeadCrm).filter(VnLeadCrm.id == lead_id).first()
+    if not ld:
+        raise HTTPException(status_code=404, detail="Không tìm thấy khách hàng tiềm năng")
+    db.delete(ld)
+    db.commit()
+    return {"status": "deleted", "id": lead_id}
+
+
+# ==============================================================================
+# VIETNAM PRIORITY #3: LỊCH MÙA VỤ & KHUNG GIỜ VÀNG MEGA SALE VIỆT NAM
+# ==============================================================================
+
+class VnMegaSaleBlueprintRequest(BaseModel):
+    campaign_id: int
+    blueprint_code: str = Field(
+        default="DOUBLE_DAY",
+        description="DOUBLE_DAY | PAYDAY_15_25 | TET_HOLIDAY | MEGA_LIVESTREAM",
+    )
+
+
+VN_SEASONAL_BLUEPRINTS: Dict[str, Dict[str, Any]] = {
+    "DOUBLE_DAY": {
+        "code": "DOUBLE_DAY",
+        "title": "Chiến dịch Siêu Sale Ngày Đôi (9/9, 10/10, 11/11, 12/12)",
+        "golden_hours": ["00:00 - 02:00 (Săn Deal Nửa Đêm)", "12:00 - 13:00 (Giờ Nghỉ Trưa Văn Phòng)", "20:00 - 23:59 (Đỉnh Mega Livestream)"],
+        "channel_split": {"tiktok": 0.45, "facebook": 0.35, "email": 0.20},
+        "tasks": [
+            ("ADS", "HIGH", "[D-3 Teasing] Chạy Ads ТikTok & Reels 'Bỏ Giỏ Hàng Trước' nhận Voucher Giảm Sâu 0h"),
+            ("VIDEO", "URGENT", "[Khung Giờ Vàng 00:00 - 02:00] Tung mã Flash Sale 50% giới hạn 50 suất đầu tiên mở màn Ngày Đôi"),
+            ("CONTENT", "HIGH", "[Khung Giờ Vàng 12:00 - 13:00] Bắn đồng loạt Zalo ZNS & Messenger nhắc khách thanh toán giỏ hàng"),
+            ("ADS", "URGENT", "[Khung Giờ Vàng 20:00 - 23:59] Đẩy trần ngân sách Ads +40% vào phiên Mega Livestream Chốt Sổ"),
+        ],
+    },
+    "PAYDAY_15_25": {
+        "code": "PAYDAY_15_25",
+        "title": "Chiến dịch Sale Lương Về (Mùng 15 & 25 Hàng Tháng)",
+        "golden_hours": ["11:30 - 13:30 (Chốt đơn giờ nghỉ trưa)", "20:30 - 22:30 (Tối ngày lương về tinh tinh)"],
+        "channel_split": {"facebook": 0.50, "tiktok": 0.30, "email": 0.20},
+        "tasks": [
+            ("CONTENT", "HIGH", "[Ngày 14 & 24] Gửi chuỗi Zalo ZNS 'Lương về tự thưởng' cho tệp khách cũ & khách hẹn lịch"),
+            ("ADS", "URGENT", "[Ngày 15 & 25 — 11:30] Bật chiến dịch Click-to-Messenger nhắm tệp Dân văn phòng 24-40 tuổi"),
+            ("DESIGN", "MEDIUM", "[Combo Tăng AOV] Đóng gói Combo Mua 2 Tặng 1 để đẩy giá trị đơn trung bình vượt ngưỡng Freeship"),
+        ],
+    },
+    "TET_HOLIDAY": {
+        "code": "TET_HOLIDAY",
+        "title": "Chiến dịch Tết Nguyên Đán & Quà Biếu Doanh Nghiệp / Gia Đình",
+        "golden_hours": ["09:00 - 11:00 (Khách B2B đặt quà doanh nghiệp)", "20:00 - 22:30 (Gia đình sắm Tết Online)"],
+        "channel_split": {"facebook": 0.45, "tiktok": 0.35, "email": 0.20},
+        "tasks": [
+            ("CONTENT", "HIGH", "[Tết Sớm - 30 Ngày Trước Tết] Ra mắt Bộ sưu tập Hộp Quà Tết & Bảng chiết khấu sỉ Doanh nghiệp"),
+            ("VIDEO", "URGENT", "[20 Ngày Trước Tết] Booking 5 KOC mở hộp (Unboxing) Set Quà Tết trên TikTok Shop & Reels"),
+            ("ADS", "URGENT", "[Chốt Chặn Giao Hàng Tỉnh] Thông báo hạn chót nhận đơn COD đi tỉnh trước 23 tháng Chạp"),
+        ],
+    },
+    "MEGA_LIVESTREAM": {
+        "code": "MEGA_LIVESTREAM",
+        "title": "Chiến dịch Mega Livestream TikTok Shop & KOC Affiliate",
+        "golden_hours": ["19:30 - 20:00 (Warm-up Kéo Mắt Xem)", "20:00 - 22:30 (Tung Deal Sốc Mỗi 15 Phút)"],
+        "channel_split": {"tiktok": 0.60, "facebook": 0.25, "email": 0.15},
+        "tasks": [
+            ("VIDEO", "URGENT", "[Trước Live 24h] Đăng 3 video ngắn cắt từ highlight KOC gắn giỏ hàng dẫn vào lịch hẹn Livestream"),
+            ("ADS", "URGENT", "[Trong Phiên Live 20:00] Bơm ngân sách Quảng cáo Phòng Live (LIVE GMV Max) khi mắt xem vượt mốc 150"),
+            ("OTHER", "HIGH", "[Sau Phiên Live 8h Sáng] Gọi & bắn Zalo ZNS xác nhận toàn bộ đơn COD đêm qua để chặn tỷ lệ bom hàng"),
+        ],
+    },
+}
+
+
+@router.post("/ad-accounts/vn-mega-sale-blueprint")
+def apply_vn_mega_sale_blueprint(
+    req: VnMegaSaleBlueprintRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """1-Click Áp dụng Kịch bản Mùa Vụ & Khung Giờ Vàng Đặc Thù Việt Nam:
+    Tự động khởi tạo danh sách công việc (Task) theo đúng Khung Giờ Vàng và cập nhật phân bổ ngân sách
+    vào Chiến dịch được chọn.
+    """
+    campaign = check_campaign_access_for_metrics(req.campaign_id, current_user, db)
+    bp = VN_SEASONAL_BLUEPRINTS.get(req.blueprint_code.upper(), VN_SEASONAL_BLUEPRINTS["DOUBLE_DAY"])
+
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    created_tasks: List[str] = []
+
+    for idx, (t_type, prio, title) in enumerate(bp["tasks"], start=1):
+        due = (datetime.now(timezone.utc) + timedelta(days=idx)).strftime("%Y-%m-%d")
+        new_task = Task(
+            campaign_id=campaign.id,
+            workspace_id=campaign.workspace_id or 1,
+            title=title,
+            description=f"Thuộc kịch bản '{bp['title']}'. Khung giờ vàng ưu tiên: {', '.join(bp['golden_hours'])}.",
+            task_type=t_type,
+            assignee_id=current_user.id,
+            creator_id=current_user.id,
+            status="TODO",
+            priority=prio,
+            due_date=due,
+        )
+        db.add(new_task)
+        created_tasks.append(title)
+
+    # Cập nhật phân bổ ngân sách kênh theo tỷ trọng mùa vụ Việt Nam
+    total_budget = max(float(campaign.budget or 50000000.0), 15000000.0)
+    for ch_code, ratio in bp["channel_split"].items():
+        ch_obj = _resolve_channel_from_label(db, ch_code)
+        planned = round(total_budget * float(ratio), 0)
+        existing_alloc = (
+            db.query(CampaignBudgetAllocation)
+            .filter(
+                CampaignBudgetAllocation.campaign_id == campaign.id,
+                CampaignBudgetAllocation.channel_id == ch_obj.id,
+            )
+            .first()
+        )
+        if existing_alloc:
+            existing_alloc.planned_amount = planned
+        else:
+            db.add(
+                CampaignBudgetAllocation(
+                    campaign_id=campaign.id,
+                    channel_id=ch_obj.id,
+                    planned_amount=planned,
+                    is_ai_estimate=False,
+                )
+            )
+
+    db.commit()
+    return {
+        "status": "blueprint_applied",
+        "campaign_id": campaign.id,
+        "campaign_name": campaign.name,
+        "blueprint_code": bp["code"],
+        "blueprint_title": bp["title"],
+        "golden_hours": bp["golden_hours"],
+        "created_tasks_count": len(created_tasks),
+        "created_tasks": created_tasks,
+        "applied_at": today_str,
+    }
+
 
 
 

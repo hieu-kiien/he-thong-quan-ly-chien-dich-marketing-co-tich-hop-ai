@@ -69,6 +69,7 @@ from app.models.entities import (
     MarketingSchedule,
     Workspace,
     WorkspaceMember,
+    WorkspaceSubscription,
 )
 
 logger = logging.getLogger("marketflow.quota")
@@ -156,8 +157,28 @@ class QuotaSnapshot:
 
 
 # ---------------------------------------------------------------------------
-# Đọc giá trị cấu hình
+# Đọc giá trị cấu hình & gói cước SaaS (FREE / PRO / AGENCY)
 # ---------------------------------------------------------------------------
+PLAN_TIER_LIMITS: Dict[str, Dict[str, int]] = {
+    "PRO": {
+        LIMIT_AI_JOBS_PER_DAY: 150,
+        LIMIT_CAMPAIGNS: 50,
+        LIMIT_CONTENTS: 500,
+        LIMIT_WORKSPACE_MEMBERS: 20,
+        LIMIT_SCHEDULES: 300,
+        LIMIT_WORKSPACES_PER_USER: 10,
+    },
+    "AGENCY": {
+        LIMIT_AI_JOBS_PER_DAY: 1000,
+        LIMIT_CAMPAIGNS: 300,
+        LIMIT_CONTENTS: 3000,
+        LIMIT_WORKSPACE_MEMBERS: 100,
+        LIMIT_SCHEDULES: 2000,
+        LIMIT_WORKSPACES_PER_USER: 30,
+    },
+}
+
+
 def _limits_from_settings() -> Dict[str, int]:
     from app.core.config import settings
 
@@ -169,6 +190,34 @@ def _limits_from_settings() -> Dict[str, int]:
         LIMIT_SCHEDULES: int(settings.QUOTA_MAX_SCHEDULES),
         LIMIT_WORKSPACES_PER_USER: int(settings.QUOTA_MAX_WORKSPACES_PER_USER),
     }
+
+
+def get_workspace_plan_tier(db: Session, workspace_id: Optional[int]) -> str:
+    """Đọc gói cước hiện tại của workspace ('FREE', 'PRO', 'AGENCY')."""
+    if workspace_id is None:
+        return "FREE"
+    try:
+        WorkspaceSubscription.__table__.create(bind=db.get_bind(), checkfirst=True)
+        sub = (
+            db.query(WorkspaceSubscription)
+            .filter(WorkspaceSubscription.workspace_id == int(workspace_id))
+            .first()
+        )
+        if sub and sub.plan_tier in ("PRO", "AGENCY"):
+            return str(sub.plan_tier)
+    except Exception:
+        pass
+    return "FREE"
+
+
+def _limits_for_workspace(db: Session, workspace_id: Optional[int]) -> Dict[str, int]:
+    """Trả về bộ hạn mức áp dụng cho workspace. Mặc định FREE đọc từ settings."""
+    base_limits = _limits_from_settings()
+    tier = get_workspace_plan_tier(db, workspace_id)
+    if tier in PLAN_TIER_LIMITS:
+        upgraded = PLAN_TIER_LIMITS[tier]
+        return {k: max(base_limits.get(k, 0), upgraded.get(k, base_limits.get(k, 0))) for k in base_limits}
+    return base_limits
 
 
 def _override_workspace_ids() -> frozenset:
@@ -254,7 +303,7 @@ def measure(
 ) -> QuotaSnapshot:
     """Đo lại một hạn mức. Hàm thuần (chỉ đọc), dùng cho cả lỗi lẫn endpoint báo cáo."""
     now = now or now_utc()
-    limits = _limits_from_settings()
+    limits = _limits_for_workspace(db, workspace_id)
     if limit_code not in limits:
         # Ném ValueError chứ không để KeyInfo lọt ra: đây là lỗi lập trình, gọi
         # sai tên hạn mức, và phải lộ ra ngay ở test chứ không phải lúc chạy thật.
