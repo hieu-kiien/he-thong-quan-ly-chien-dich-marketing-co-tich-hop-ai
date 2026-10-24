@@ -10,7 +10,7 @@
 |---|---|---|
 | Tên miền & TLS | Cloudflare — `marketing.kienhieu.id.vn` | DNS, HTTPS, đẩy traffic qua Tunnel |
 | Frontend (static) + nginx | VPS `/var/www/marketflow` | Phục vụ file tĩnh, proxy `/api/*` |
-| Backend FastAPI | VPS systemd (`marketflow-api`) | Toàn bộ nghiệp vụ, 2 Uvicorn worker |
+| Backend FastAPI | VPS systemd (`marketflow-api`) | Toàn bộ nghiệp vụ, 1 Uvicorn worker (~80–114 MB RAM) |
 | Database | PostgreSQL 16 trên cùng VPS | Mọi trạng thái nghiệp vụ, nghe loopback |
 
 Toàn bộ ứng dụng nằm trên **một** máy. Cloudflare không còn chạy mã ứng dụng —
@@ -24,11 +24,11 @@ ngày và đã được thử khôi phục thật.
 
 ## Dự án giúp ai làm việc gì?
 
-- Quản lý agency xem chiến dịch cần chú ý, công việc bị chặn, deadline, ngân sách và KPI mục tiêu.
-- Marketer nhận brief, giao/hoàn tất tác vụ và gửi nội dung vào quy trình duyệt.
-- Người duyệt kiểm tra nội dung trước khi team đánh dấu trạng thái tiếp theo.
+- **Chủ shop SME & Solo Marketer Việt Nam:** tạo nhanh **Gói Nội Dung Bán Hàng (Creative Pack)** gồm Bài chính + Comment đầu tiên (chứa link/SĐT lách bóp tương tác) + Ghi chú ảnh/video + Tin nhắn mẫu chốt đơn (`blocks_json`), viết nháp tự do không cần tạo chiến dịch trước (`campaign_id`/`product_id` tùy chọn), dùng **👤 Chế độ Chủ Shop (Đơn giản)** kèm nút **⚡ OpenCode 0đ (Sẵn trên VPS)** và 1-Click Xuất bản ngay không qua bước duyệt rườm rà.
+- **Trợ lý AI Copilot lâu dài & Bảng Nhớ Không Gian (kiểu Muse AI):** lưu trữ mạch hội thoại dài hạn theo dự án (`ai_chat_threads`), ghim thẻ ghi chú/ngữ cảnh không gian 2D (`muse_board_cards`) vào bộ nhớ AI, và cho phép LLM đề xuất thao tác dự án qua cơ chế **Staging Diff + 1-Click Hoàn tác (`agent_staged_proposals`)**.
+- **Quản lý agency & đội nhóm:** xem chiến dịch cần chú ý, công việc bị chặn, deadline, ngân sách, KPI mục tiêu và quy trình duyệt bài nhiều bước khi làm việc nhóm.
 
-AI hỗ trợ tạo nháp và phân tích dữ liệu có sẵn. Người dùng vẫn chịu trách nhiệm duyệt nội dung và quyết định hành động.
+AI hỗ trợ tạo nháp, hội thoại chiến lược và đề xuất thay đổi trong khu vực chờ duyệt (Staging). Người dùng luôn nắm quyền kiểm soát tuyệt đối (Human-in-the-loop).
 
 ## Bắt đầu nhanh
 
@@ -83,9 +83,9 @@ Xem [docs/TESTING.md](docs/TESTING.md) để chạy test và hiểu giới hạn
 - frontend/: React + Vite client.
 - backend/: FastAPI, SQLAlchemy và API nghiệp vụ.
 - scripts/: công cụ benchmark; một số script sinh báo cáo vào docs/.
-- docs/: kiến trúc, roadmap, kiểm thử, đánh giá AI và tài liệu đồ án.
-- Bao_Cao_AIA331_80300_ICTU_V9/ và Bao_Cao_AIA331_80300_ICTU_V9.pdf: source LaTeX + PDF báo cáo học thuật (bản đã nộp; bản V8 cũ đã gỡ 2026-10-13, còn trong git history).
-- cloudflare/: Worker static + proxy; xem [cloudflare/README.md](cloudflare/README.md) trước khi dùng dữ liệu thật.
+- docs/: kiến trúc, roadmap, kiểm thử, đánh giá AI và tài liệu thiết kế.
+- deploy/vps/: cấu hình systemd (`marketflow-api.service`), nginx và tinh chỉnh PostgreSQL trên VPS.
+- cloudflare/: di sản tham khảo cấu hình proxy cũ; xem [cloudflare/README.md](cloudflare/README.md).
 
 ## Cổng chất lượng (quality gate) của frontend
 
@@ -108,12 +108,11 @@ Ngoài `.env.example`, ba biến sau ảnh hưởng trực tiếp tới an toàn
 
 | Biến | Mặc định | Vì sao quan trọng |
 | --- | --- | --- |
-| `SCHEDULER_ENABLED` | `true` | Scheduler trong tiến trình backend ghi thẳng vào database ngoài HTTP path, nên lịch đăng do Cron Trigger của Worker điều phối (mỗi 5 phút). Bật cả hai cùng lúc sẽ chạy trùng job. |
-| `SCHEDULER_SECRET` | *(rỗng)* | Dùng Worker gọi `POST /api/v1/schedules/trigger-worker`. Rỗng thì đường gọi bằng secret tắt, endpoint chỉ nhận Bearer token. **Trên Cloudflare đây là secret bắt buộc** (`secrets.required` trong `cloudflare/wrangler.jsonc`): Cron 5 phút/lần sẽ bỏ qua và ghi cảnh báo nếu thiếu. Đặt bằng `wrangler secret put SCHEDULER_SECRET`. |
+| `SCHEDULER_ENABLED` | `true` | Scheduler chạy nền trong tiến trình FastAPI (với `--workers 1` trên VPS để tránh chạy trùng job và tiết kiệm RAM). |
+| `SCHEDULER_SECRET` | *(rỗng)* | Khóa bảo mật tùy chọn cho `POST /api/v1/schedules/trigger-worker`. Rỗng thì endpoint chỉ nhận Bearer token của người dùng hợp lệ. |
 | `BYOK_PBKDF2_SALT` | *(tự sinh)* | Salt của khoá vault. Để trống thì ứng dụng tự sinh salt ngẫu nhiên và lưu ở `backend/.vault_salt` (không commit). Chỉ đặt khi hạ tầng cấp secret riêng. |
-
-| `AI_PROVIDER` | `opencode` | Phải thuộc danh sách provider trong `backend/app/services/ai/providers.py`: `gemini \| openrouter \| openai \| anthropic \| huggingface \| ollama \| opencode`; backend từ chối khởi động nếu không, vì giá trị sai từng khiến hệ thống rơi im lặng xuống template dự phòng. `opencode` trỏ tới endpoint OpenAI-compatible của opencode zen (`https://opencode.ai/zen/v1`) và dùng đúng model bạn đang cấu hình, **không cần mua credits**. `anthropic` dùng Messages API riêng (`/v1/messages`); `ollama` và `huggingface` không bắt buộc khoá. Danh sách model hợp lệ: `GET {AI_BASE_URL}/models`. |
-| `AI_TIMEOUT_SECONDS` | `420` | Timeout gọi provider. Phải lớn hơn thời gian sinh nội dung thật: `/api/v1/ai/omnichannel` đo được 83–214 giây cho 3 kênh. Timeout nhỏ sẽ kích hoạt Smart Fallback dù provider hoàn toàn ổn. Frontend dùng timeout riêng 600s cho nhóm endpoint AI (`AI_LONG_TIMEOUT` trong `frontend/src/services/api.ts`). |
+| `AI_PROVIDER` | `opencode` | Phải thuộc danh sách provider trong `backend/app/services/ai/providers.py`: `gemini \| openrouter \| openai \| anthropic \| groq \| xai \| huggingface \| ollama \| opencode`. `opencode` kết nối tới OpenCode Zen (`https://opencode.ai/zen/v1`, mặc định `mimo-v2.6-flash-free`) kèm cầu nối OpenCode CLI cục bộ trên VPS, **không cần mua credits**. Danh sách model hợp lệ: `GET {AI_BASE_URL}/models`. |
+| `AI_TIMEOUT_SECONDS` | `60` | Timeout gọi provider HTTP. Đối với tác vụ dài, hệ thống hỗ trợ hàng đợi PostgreSQL bất đồng bộ (`/api/v1/ai/jobs`) và cầu nối OpenCode CLI tự động ngắt nhanh (fast-fail ~1.5s–3s) khi hết hạn mức miễn phí. |
 
 ## AI thật hay nội dung dự phòng?
 

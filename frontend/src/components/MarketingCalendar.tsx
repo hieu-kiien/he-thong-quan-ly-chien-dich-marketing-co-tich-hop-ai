@@ -168,6 +168,7 @@ export const MarketingCalendar: React.FC<MarketingCalendarProps> = ({
   const itemsByDay = useMemo(() => {
     const map = new Map<number, CalendarItem[]>();
     calendarItems.forEach((item) => {
+      if (item.timedOut) return;
       const list = map.get(item.day) ?? [];
       list.push(item);
       map.set(item.day, list);

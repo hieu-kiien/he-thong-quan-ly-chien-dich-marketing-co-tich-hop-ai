@@ -91,7 +91,7 @@ def test_ai_endpoints_fail_loudly_when_ai_unavailable(
     """
     resp = client.post(
         path,
-        json={"channel_code": "facebook", "prompt_version": "v3", "selected_idea": "ý tưởng thử"},
+        json={"campaign_id": 1, "channel_code": "facebook", "prompt_version": "v3", "selected_idea": "ý tưởng thử"},
         headers=marketer_headers,
     )
     assert resp.status_code == 502, (

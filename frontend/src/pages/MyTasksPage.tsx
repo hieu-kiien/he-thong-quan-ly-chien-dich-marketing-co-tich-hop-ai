@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { CheckCircle2, Clock, AlertCircle, Calendar, Plus, Search, Tag, Check, RotateCcw } from 'lucide-react';
 import { Task, TaskStatus, TaskPriority, TaskType, Campaign, Page } from '../types';
 import { taskApi, campaignApi, getApiErrorMessage } from '../services/api';
 import { useToast } from '../components/Toast';
 import { Pagination } from '../components/Pagination';
+import { useWorkspace } from '../context/WorkspaceContext';
 
 interface MyTasksPageProps {
   onNavigateToCampaign?: (campaignId: number) => void;
@@ -21,6 +22,7 @@ const EMPTY_PAGE: Page<Task> = {
 
 export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }) => {
   const toast = useToast();
+  const { currentWorkspace } = useWorkspace();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [taskPage, setTaskPage] = useState<Page<Task>>(EMPTY_PAGE);
   const [page, setPage] = useState<number>(1);
@@ -54,9 +56,6 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
   // "còn việc" để tác vụ DONE không lọn vào danh sách việc cần làm.
   const taskQuery = useCallback(() => {
     const statusValues = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
-    if (statusFilter === 'TODAY' || statusFilter === 'OVERDUE') {
-      return { due: statusFilter.toLowerCase() as 'today' | 'overdue' };
-    }
     const params: {
       status?: string;
       priority?: string;
@@ -65,7 +64,9 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
       search?: string;
       due?: 'today' | 'overdue';
     } = {};
-    if (statusFilter !== 'ALL') {
+    if (statusFilter === 'TODAY' || statusFilter === 'OVERDUE') {
+      params.due = statusFilter.toLowerCase() as 'today' | 'overdue';
+    } else if (statusFilter !== 'ALL') {
       params.status = statusFilter;
       if (statusValues.includes(statusFilter) && statusFilter !== 'DONE') {
         params.include_completed = false;
@@ -80,6 +81,7 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
   // Lọc + phân trang ở SERVER. `total` do backend đếm trên tập đã lọc nên con số
   // "Hiển thị x–y trên z" luôn khớp với những gì server trả về.
   const loadTasks = useCallback(async () => {
+    if (currentWorkspace?.id === -1) return;
     try {
       setLoading(true);
       const result = await taskApi.getMyTasksPage(page, pageSize, taskQuery());
@@ -90,24 +92,26 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, taskQuery, toast]);
+  }, [page, pageSize, taskQuery, toast, currentWorkspace?.id]);
 
   // Danh sách chiến dịch chỉ nạp một lần: nó là bộ lọc, không phải nội dung
   // phân trang, nên không cần cắt trang.
   const loadCampaigns = useCallback(async () => {
+    if (currentWorkspace?.id === -1) return;
     const cList = await campaignApi.getAll().catch(() => []);
     setCampaigns(cList);
     if (cList.length > 0) setNewTaskCampaignId((prev) => prev || cList[0].id);
-  }, []);
+  }, [currentWorkspace?.id]);
 
   // Thẻ thống kê không phụ thuộc bộ lọc đang chọn nên nạp một lần.
   const loadSummary = useCallback(async () => {
+    if (currentWorkspace?.id === -1) return;
     try {
       setSummary(await taskApi.getMyTasksSummary());
     } catch {
       setSummary({ overdue: 0, today: 0, in_progress: 0, done: 0, total: 0 });
     }
-  }, []);
+  }, [currentWorkspace?.id]);
 
   useEffect(() => {
     void loadCampaigns();
@@ -134,6 +138,7 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
     try {
       const updated = await taskApi.updateTask(task.id, { status: nextStatus });
       setTasks(prev => prev.map(t => t.id === task.id ? updated : t));
+      void loadSummary();
       toast.success(`Đã cập nhật trạng thái: ${nextStatus}`);
     } catch (e: any) {
       toast.error(getApiErrorMessage(e), 'Lỗi cập nhật trạng thái');
@@ -154,10 +159,11 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
         description: newTaskDescription.trim() || undefined,
         task_type: newTaskType,
         priority: newTaskPriority,
-        due_date: newTaskDueDate || undefined,
+        due_date: newNewTaskDueDateOrUndefined(newTaskDueDate),
         status: 'TODO'
       });
       setTasks(prev => [created, ...prev]);
+      void loadSummary();
       toast.success('Đã tạo tác vụ mới thành công!');
       setIsCreateModalOpen(false);
       setNewTaskTitle('');
@@ -169,10 +175,26 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onNavigateToCampaign }
     }
   };
 
-  // Danh sách đã được lọc ở server (`loadTasks`), nên `tasks` chính là nội dung
-  // trang hiện tại — không lọc lần nữa ở client, nếu không `total` của bộ phân
-  // trang sẽ mâu thuẫn với danh sách đang hiện.
-  const filteredTasks = tasks;
+  function newNewTaskDueDateOrUndefined(d: string): string | undefined {
+    return d || undefined;
+  }
+
+  const filteredTasks = useMemo(() => {
+    if (statusFilter !== 'TODAY' && statusFilter !== 'OVERDUE') {
+      return tasks;
+    }
+    return tasks.filter(t => {
+      if (priorityFilter !== 'ALL' && t.priority !== priorityFilter) return false;
+      if (campaignFilter !== 'ALL' && t.campaign_id !== Number(campaignFilter)) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const matchTitle = (t.title || '').toLowerCase().includes(q);
+        const matchDesc = (t.description || '').toLowerCase().includes(q);
+        if (!matchTitle && !matchDesc) return false;
+      }
+      return true;
+    });
+  }, [tasks, statusFilter, priorityFilter, campaignFilter, searchQuery]);
 
   // Số liệu thẻ thống kê lấy từ endpoint summary (phạm vi toàn bộ), KHÔNG đếm
   // trên `tasks` — `tasks` chỉ là một trang.

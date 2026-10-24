@@ -145,23 +145,23 @@ export const KPIGrid9: React.FC<KPIGrid9Props> = ({ kpi, loading = false, error,
   const roas = kpi.roas !== undefined ? kpi.roas : (cost > 0 ? (revenue / cost) : 0);
 
   const getRoasBadge = (val: number) => {
-    if (val >= 3.0) {
+    if (val >= 2.0) {
       return {
         badge: 'bg-[#F0FDF4] text-[#15803D] border-[#BBF7D0]',
-        text: 'Đang lãi tốt (≥ 3.0x)',
+        text: 'Đang lãi tốt (≥ 2.0x)',
         dot: 'bg-[#15803D]'
       };
     }
-    if (val >= 1.5) {
+    if (val >= 1.0) {
       return {
         badge: 'bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]',
-        text: 'Hòa vốn / Lãi nhẹ',
+        text: 'Hòa vốn / Lãi nhẹ (1.0x–1.99x)',
         dot: 'bg-[#B45309]'
       };
     }
     return {
       badge: 'bg-[#FFF1F2] text-[#BE123C] border-[#FECDD3]',
-      text: 'Đang lỗ (< 1.5x)',
+      text: 'Đang lỗ (< 1.0x)',
       dot: 'bg-[#BE123C]'
     };
   };
@@ -219,7 +219,7 @@ export const KPIGrid9: React.FC<KPIGrid9Props> = ({ kpi, loading = false, error,
           subtext={
             <span>
               {cost > 0
-                ? `Chi 1 đồng thu về ${roas.toFixed(2)} đồng (Chuẩn ≥ 3.0x)`
+                ? `Chi 1 đồng thu về ${roas.toFixed(2)} đồng (Chuẩn ≥ 2.0x)`
                 : 'Chưa có chi phí để tính hệ số'}
             </span>
           }

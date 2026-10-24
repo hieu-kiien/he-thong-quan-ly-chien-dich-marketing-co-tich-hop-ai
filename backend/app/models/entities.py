@@ -265,6 +265,7 @@ class MarketingContent(Base):
     hook_variant = Column(String(50), nullable=True)
     utm_params = Column(String(500), nullable=True)
     ai_metadata_json = Column(Text, nullable=True)
+    blocks_json = Column(Text, nullable=True, default="[]", server_default="[]")
     version_no = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime, default=utc_now, nullable=False)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
@@ -408,7 +409,7 @@ class CustomApiKey(Base):
     workspace_id = Column(Integer, ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=True, index=True)
     provider = Column(String(50), nullable=False, default="gemini")
     encrypted_key = Column(Text, nullable=False)
-    model = Column(String(100), nullable=False, default="gemini-3.8-flash")
+    model = Column(String(100), nullable=False, default="gemini-2.5-flash")
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, default=utc_now, nullable=False)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
@@ -453,7 +454,7 @@ class AIModelChain(Base):
     workspace_id = Column(Integer, ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(100), nullable=False)
-    # JSON mảng có thứ tự: [{"provider": "openai", "model": "gpt-6.1-sol"}, ...]
+    # JSON mảng có thứ tự: [{"provider": "openai", "model": "gpt-4o-mini"}, ...]
     hops_json = Column(Text, nullable=False, default="[]")
     is_active = Column(Boolean, nullable=False, default=True)
     # Chuỗi mặc định được dùng tự động khi request không truyền chain_id.
@@ -852,3 +853,163 @@ class VnLeadCrm(Base):
     campaign = relationship("Campaign")
 
 
+
+
+class AIChatThread(Base):
+    """Phiên trò chuyện lâu dài với AI (Persistent Long-Term Chat Session kiểu Muse AI / Claude Projects)."""
+
+    __tablename__ = "ai_chat_threads"
+
+    id = Column(Integer, primary_key=True, index=True)
+    workspace_id = Column(
+        Integer,
+        ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    campaign_id = Column(
+        Integer,
+        ForeignKey("campaigns.id", onupdate="CASCADE", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    title = Column(String(255), nullable=False, default="Phiên làm việc mới")
+    channel_code = Column(String(60), nullable=False, default="facebook")
+    pinned = Column(Boolean, nullable=False, default=False)
+    canvas_blocks_json = Column(Text, nullable=False, default="[]", server_default="[]")
+    summary_memory = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
+
+    __table_args__ = (
+        Index("idx_ai_chat_threads_ws_user", "workspace_id", "user_id", "updated_at"),
+    )
+
+    workspace = relationship("Workspace")
+    user = relationship("User")
+    campaign = relationship("Campaign")
+    messages = relationship(
+        "AIChatThreadMessage",
+        back_populates="thread",
+        cascade="all, delete-orphan",
+        order_by="AIChatThreadMessage.id.asc()",
+    )
+
+
+class AIChatThreadMessage(Base):
+    """Tin nhắn lưu trữ lâu dài trong từng Phiên trò chuyện AI (`AIChatThread`)."""
+
+    __tablename__ = "ai_chat_thread_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    thread_id = Column(
+        Integer,
+        ForeignKey("ai_chat_threads.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    role = Column(String(20), nullable=False, default="user")
+    content = Column(Text, nullable=False)
+    suggested_canvas_json = Column(Text, nullable=True)
+    alternatives_json = Column(Text, nullable=True, default="[]")
+    staged_proposal_id = Column(Integer, nullable=True)
+    model_used = Column(String(120), nullable=True)
+    model_provider = Column(String(120), nullable=True)
+    is_fallback = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+
+    __table_args__ = (
+        Index("idx_ai_chat_msg_thread", "thread_id", "id"),
+    )
+
+    thread = relationship("AIChatThread", back_populates="messages")
+
+
+class MuseBoardCard(Base):
+    """Thẻ Tư Duy & Bộ Nhớ Dài Hạn kiểu Muse AI (`Muse Spatial Board` + `Winning Posts Vault` + `Custom /skills`)."""
+
+    __tablename__ = "muse_board_cards"
+
+    id = Column(Integer, primary_key=True, index=True)
+    workspace_id = Column(
+        Integer,
+        ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    campaign_id = Column(
+        Integer,
+        ForeignKey("campaigns.id", onupdate="CASCADE", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    card_type = Column(String(50), nullable=False, default="NOTE")
+    title = Column(String(255), nullable=False)
+    content = Column(Text, nullable=False)
+    trigger_command = Column(String(80), nullable=True, index=True)
+    tags_json = Column(Text, nullable=False, default="[]")
+    is_active_memory = Column(Boolean, nullable=False, default=True)
+    color_theme = Column(String(30), nullable=False, default="indigo")
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
+
+    __table_args__ = (
+        Index("idx_muse_cards_ws_type", "workspace_id", "card_type"),
+    )
+
+    workspace = relationship("Workspace")
+    user = relationship("User")
+    campaign = relationship("Campaign")
+
+
+class AgentStagedProposal(Base):
+    """Giỏ hàng Thao tác chờ duyệt khi LLM điều khiển dự án (`Read Freely, Stage Writes` + `Snapshot Rollback`)."""
+
+    __tablename__ = "agent_staged_proposals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    workspace_id = Column(
+        Integer,
+        ForeignKey("workspaces.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    thread_id = Column(
+        Integer,
+        ForeignKey("ai_chat_threads.id", onupdate="CASCADE", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    goal_summary = Column(String(500), nullable=False)
+    status = Column(String(30), nullable=False, default="PENDING")
+    actions_json = Column(Text, nullable=False, default="[]")
+    execution_result_json = Column(Text, nullable=True)
+    rollback_snapshot_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    executed_at = Column(DateTime, nullable=True)
+    rolled_back_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("idx_agent_proposals_ws_status", "workspace_id", "status"),
+    )
+
+    workspace = relationship("Workspace")
+    user = relationship("User")

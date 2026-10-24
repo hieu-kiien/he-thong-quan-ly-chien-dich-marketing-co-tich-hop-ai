@@ -95,13 +95,13 @@ class Settings(BaseSettings):
     AI_PROVIDER: str = "gemini"
     AI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai"
     AI_API_KEY: str = ""
-    AI_MODEL: str = "gemini-3.8-flash"
+    AI_MODEL: str = "gemini-2.5-flash"
     # Mặc định 60s (khớp .env.example). CI/production nên set cao hơn
     # (420s) — mỗi hop chuỗi fallback tự nhận ít nhất 15s nên giá trị này
     # là ngân sách tổng, không phải timeout mỗi lần gọi.
     AI_TIMEOUT_SECONDS: int = 60
     AI_MAX_RETRIES: int = 2
-    AI_ENABLE_FALLBACK: bool = True
+    AI_ENABLE_FALLBACK: bool = False
     # Trần token đầu ra cho adapter Anthropic. Chỉ có tác dụng khi
     # AI_PROVIDER=anthropic; xem app/services/ai/anthropic_adapter.py.
     ANTHROPIC_MAX_TOKENS: int = 8192
@@ -109,7 +109,7 @@ class Settings(BaseSettings):
     # --- Email (tùy chọn) ---
     # Email KHÔNG phải phần bắt buộc: không cấu hình được gửi thì mọi luồng
     # nghiệp vụ vẫn chạy, chỉ việc gửi thông báo là không diễn ra. Mặc định
-    # `none` để không có ai vô tình gửi email khóa học/demo ra ngoài.
+    # `none` để không có ai vô tình gửi email demo ra ngoài.
     EMAIL_PROVIDER: str = "none"  # none | resend | smtp
     EMAIL_FROM_ADDRESS: str = ""
     EMAIL_FROM_NAME: str = "MarketFlow AI"
@@ -216,7 +216,7 @@ class Settings(BaseSettings):
     # (đếm trong RAM, cửa sổ trượt, mất khi restart). Ở đây là GIỚI HẠN SẢN
     # PHẨM: đếm trong CSDL theo workspace, bền qua restart. Hai tầng độc lập.
     #
-    # Vì sao số này: hạn mứng phải đủ rộng để một nhóm sinh viên demo lớp học
+    # Vì sao số này: hạn mức phải đủ rộng để một đội vận hành marketing
     # (20-30 người) chạy trọn buổi mà không vướng, nhưng hữu hạn để còn ý
     # nghĩa. Xem giải thích từng dòng trong .env.example.
     # ------------------------------------------------------------------

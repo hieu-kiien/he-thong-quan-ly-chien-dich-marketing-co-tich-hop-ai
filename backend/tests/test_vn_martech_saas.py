@@ -167,3 +167,86 @@ def test_vn_ecommerce_pnl_and_zalo_lead_crm_and_mega_sale_blueprint(
     )
     assert bp_res.status_code == 200
     assert bp_res.json()["created_tasks_count"] >= 3
+
+
+def test_product_crud_and_campaign_custom_product_and_clean_reads(
+    client, manager_headers, workspace_alpha
+):
+    ws_id = workspace_alpha.id
+
+    # 1. CRUD Sản phẩm & USP
+    create_prod = client.post(
+        "/api/v1/products",
+        headers=manager_headers,
+        json={
+            "name": "Serum Vitamin C 20% Kiên Hiếu",
+            "description": "Tinh chất dưỡng sáng mờ thâm",
+            "usp": "Công nghệ bọc Liposome thẩm thấu gấp 3 lần, không châm chích",
+        },
+    )
+    assert create_prod.status_code == 201
+    prod_data = create_prod.json()
+    prod_id = prod_data["id"]
+    assert prod_data["name"] == "Serum Vitamin C 20% Kiên Hiếu"
+    assert "Liposome" in prod_data["usp"]
+
+    upd_prod = client.put(
+        f"/api/v1/products/{prod_id}",
+        headers=manager_headers,
+        json={"usp": "Bọc Liposome thế hệ mới + Niacinamide 5%"},
+    )
+    assert upd_prod.status_code == 200
+    assert upd_prod.json()["usp"] == "Bọc Liposome thế hệ mới + Niacinamide 5%"
+
+    # 2. Tạo chiến dịch truyền trực tiếp product_name + product_usp mới
+    camp_res = client.post(
+        "/api/v1/campaigns",
+        headers=manager_headers,
+        json={
+            "workspace_id": ws_id,
+            "product_name": "Kem Chống Nắng Phổ Rộng SPF50+",
+            "product_usp": "Kiềm dầu 12h, không nâng tông trắng bệch",
+            "name": "Chiến dịch Ra mắt Kem Chống Nắng Mùa Hè",
+            "objective": "Tối ưu đơn hàng chuyển đổi",
+            "audience": "Nữ 20-35 tuổi da dầu mụn",
+            "start_date": "2026-10-01",
+            "end_date": "2026-11-01",
+            "budget": 15000000,
+        },
+    )
+    assert camp_res.status_code == 201
+    camp_json = camp_res.json()
+    camp_id = camp_json["id"]
+
+    # Cập nhật USP sản phẩm ngay từ PUT /campaigns/{id}
+    upd_camp = client.put(
+        f"/api/v1/campaigns/{camp_id}",
+        headers=manager_headers,
+        json={
+            "product_name": "Kem Chống Nắng Phổ Rộng SPF50+ Pro",
+            "product_usp": "Kiềm dầu 14h, kháng nước vượt trội",
+        },
+    )
+    assert upd_camp.status_code == 200
+
+    # Xóa sản phẩm đầu tiên (chưa gắn chiến dịch)
+    del_prod = client.delete(f"/api/v1/products/{prod_id}", headers=manager_headers)
+    assert del_prod.status_code == 200
+    assert del_prod.json()["status"] == "DELETED"
+
+    # 3. Kiểm tra không tự động seed dữ liệu giả khi GET và luôn che mặt nạ access_token dài
+    acc_create = client.post(
+        "/api/v1/ad-accounts",
+        headers=manager_headers,
+        json={
+            "workspace_id": ws_id,
+            "platform": "META_ADS",
+            "account_name": "BM Chính Hãng",
+            "account_code": "act_9988776655",
+            "access_token": "EAABsbCS1iHgBOlongsecretaccesstoken1234567890",
+        },
+    )
+    assert acc_create.status_code == 201
+    masked_tok = acc_create.json()["access_token_masked"]
+    assert "..." in masked_tok
+    assert "longsecretaccesstoken" not in masked_tok

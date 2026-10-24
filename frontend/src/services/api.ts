@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Campaign, MarketingContent, KPISummary, AIIdeaResponse, AIDraftResponse, AISummaryResponse, AIPlanResponse, PlanApplyRequest, PlanApplyResponse, OmnichannelRequest, OmnichannelResponse, User, Product, MarketingSchedule, ContentComplianceCheck, Workspace, BrandKit, ComplianceCheckRequest, ComplianceCheckResponse, ComplianceViolation, ChannelAttribution, AIDoctorReport, CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse, AIChain, AIChainSaveRequest, AppNotification, Task, TaskCreate, TaskUpdate, BudgetAllocation, BudgetSummary, KPITarget, KpiProgress, CommandCenterResponse, Page, QuotaSnapshot, QuotaErrorDetail, CampaignSort, ContentSort, AIModelListResponse, SmartImportAnalysis, SmartImportCommitResult, AngleMatrixResponse, PrelaunchCriticResponse, PortfolioTriageResponse, WinningPatternsResponse } from '../types';
+import { Campaign, MarketingContent, KPISummary, AIIdeaResponse, AIDraftResponse, AISummaryResponse, AIPlanResponse, PlanApplyRequest, PlanApplyResponse, OmnichannelRequest, OmnichannelResponse, User, Product, MarketingSchedule, ContentComplianceCheck, Workspace, BrandKit, ComplianceCheckRequest, ComplianceCheckResponse, ComplianceViolation, ChannelAttribution, AIDoctorReport, CustomApiKey, AIKeyTestRequest, AIKeyTestResponse, AIKeySaveRequest, AIKeySaveResponse, AIChain, AIChainSaveRequest, AppNotification, Task, TaskCreate, TaskUpdate, BudgetAllocation, BudgetSummary, KPITarget, KpiProgress, CommandCenterResponse, Page, QuotaSnapshot, QuotaErrorDetail, CampaignSort, ContentSort, AIModelListResponse, SmartImportAnalysis, SmartImportCommitResult, AngleMatrixResponse, PrelaunchCriticResponse, PortfolioTriageResponse, WinningPatternsResponse, AIChatCanvasRequest, AIChatCanvasResponse } from '../types';
 import { MarketingChannel, getChannelRegistry } from '../utils/channels';
 import type {
   AIJobAccepted,
@@ -665,7 +665,9 @@ export const campaignApi = {
     }
   },
   create: async (data: {
-    product_id: number;
+    product_id?: number;
+    product_name?: string;
+    product_usp?: string;
     name: string;
     objective: string;
     audience: string;
@@ -686,6 +688,7 @@ export const campaignApi = {
       const newCamp: Campaign = {
         id: Date.now(),
         owner_id: 1,
+        product_id: data.product_id || 1,
         ...data,
         status: (data.status as Campaign['status']) || 'DRAFT',
         created_at: new Date().toISOString(),
@@ -695,7 +698,7 @@ export const campaignApi = {
       return newCamp;
     }
   },
-  update: async (id: number, data: Partial<Campaign>): Promise<Campaign> => {
+  update: async (id: number, data: Partial<Campaign> & { product_name?: string; product_usp?: string }): Promise<Campaign> => {
     try {
       const res = await apiClient.put(`/campaigns/${id}`, data);
       return res.data;
@@ -927,7 +930,8 @@ export const campaignApi = {
       if (workspaceId) params.workspace_id = workspaceId;
       const res = await apiClient.get('/campaigns/portfolio-triage', { params });
       return res.data;
-    } catch {
+    } catch (error: any) {
+      if (!isOfflineDemoEnabled()) throw error;
       return {
         anomalies: [],
         summary: { critical_count: 0, warning_count: 0, opportunity_count: 0, wasted_spend_estimate: 0, health_score: 92 },
@@ -940,7 +944,8 @@ export const campaignApi = {
       if (workspaceId) params.workspace_id = workspaceId;
       const res = await apiClient.get('/campaigns/winning-patterns', { params });
       return res.data;
-    } catch {
+    } catch (error: any) {
+      if (!isOfflineDemoEnabled()) throw error;
       return {
         patterns: [],
         top_hooks: [],
@@ -974,9 +979,58 @@ export const productApi = {
       if (!isOfflineDemoEnabled()) throw e;
       console.warn('[OFFLINE DEMO] Operating on local mock storage: productApi.getAll');
       const { MOCK_PRODUCTS } = await loadMockData();
-      return MOCK_PRODUCTS;
+      return getStoredList<Product>('mf_products', MOCK_PRODUCTS);
     }
-  }
+  },
+  create: async (data: { name: string; category?: string; usp?: string }): Promise<Product> => {
+    try {
+      const res = await apiClient.post('/products', data);
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: productApi.create');
+      const { MOCK_PRODUCTS } = await loadMockData();
+      const list = getStoredList<Product>('mf_products', MOCK_PRODUCTS);
+      const newProd: Product = {
+        id: Date.now(),
+        name: data.name,
+        description: data.category || '',
+        usp: data.usp || '',
+      };
+      setStoredList('mf_products', [newProd, ...list]);
+      return newProd;
+    }
+  },
+  update: async (id: number, data: { name?: string; category?: string; usp?: string }): Promise<Product> => {
+    try {
+      const res = await apiClient.put(`/products/${id}`, data);
+      return res.data;
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: productApi.update');
+      const { MOCK_PRODUCTS } = await loadMockData();
+      const list = getStoredList<Product>('mf_products', MOCK_PRODUCTS);
+      const updated = list.map(p => (p.id === id ? { ...p, ...data } : p));
+      setStoredList('mf_products', updated);
+      const found = updated.find(p => p.id === id);
+      if (found) return found;
+      throw e;
+    }
+  },
+  delete: async (id: number): Promise<void> => {
+    try {
+      await apiClient.delete(`/products/${id}`);
+    } catch (e: any) {
+      if (e?.response) throw e;
+      if (!isOfflineDemoEnabled()) throw e;
+      console.warn('[OFFLINE DEMO] Operating on local mock storage: productApi.delete');
+      const { MOCK_PRODUCTS } = await loadMockData();
+      const list = getStoredList<Product>('mf_products', MOCK_PRODUCTS);
+      setStoredList('mf_products', list.filter(p => p.id !== id));
+    }
+  },
 };
 
 /** Lọc danh sách nội dung trong kho mock offline — dùng chung cho cả hai bản
@@ -1746,7 +1800,8 @@ export const aiApi = {
         };
       }
       throw new Error('Empty variants');
-    } catch {
+    } catch (error: any) {
+      if (!isOfflineDemoEnabled()) throw error;
       const prod = data.product_name?.trim() || 'Giải pháp Marketing AI';
       const usp = data.product_usp?.trim() || 'Tự động hóa quy trình & tối ưu chi phí chuyển đổi 38%';
       const aud = data.audience?.trim() || 'Chủ doanh nghiệp SME & Performance Marketer';
@@ -1846,7 +1901,8 @@ export const aiApi = {
         return raw;
       }
       throw new Error('Invalid critic payload');
-    } catch {
+    } catch (error: any) {
+      if (!isOfflineDemoEnabled()) throw error;
       const bodyText = (data.body || '').trim();
       const sentences = bodyText
         .split(/(?<=[.!?。\n])\s+/)
@@ -1933,7 +1989,95 @@ export const aiApi = {
         ],
       };
     }
-  }
+  },
+  chatCanvas: async (req: AIChatCanvasRequest): Promise<AIChatCanvasResponse> => {
+    const res = await apiClient.post('/ai/chat', req);
+    return res.data;
+  },
+  listThreads: async (params?: { workspace_id?: number; campaign_id?: number }) => {
+    const res = await apiClient.get('/ai/threads', { params });
+    return res.data;
+  },
+  createThread: async (payload: {
+    workspace_id?: number;
+    campaign_id?: number | null;
+    title?: string;
+    channel_code?: string;
+    is_pinned?: boolean;
+    canvas_blocks?: any[];
+  }) => {
+    const res = await apiClient.post('/ai/threads', payload);
+    return res.data;
+  },
+  getThreadDetail: async (threadId: number) => {
+    const res = await apiClient.get(`/ai/threads/${threadId}`);
+    return res.data;
+  },
+  updateThread: async (
+    threadId: number,
+    payload: {
+      title?: string;
+      channel_code?: string;
+      is_pinned?: boolean;
+      summary_memory?: string;
+      canvas_blocks?: any[];
+    }
+  ) => {
+    const res = await apiClient.patch(`/ai/threads/${threadId}`, payload);
+    return res.data;
+  },
+  deleteThread: async (threadId: number) => {
+    const res = await apiClient.delete(`/ai/threads/${threadId}`);
+    return res.data;
+  },
+  listMuseCards: async (params?: { workspace_id?: number; card_type?: string }) => {
+    const res = await apiClient.get('/ai/muse-cards', { params });
+    return res.data;
+  },
+  createMuseCard: async (payload: {
+    workspace_id?: number;
+    campaign_id?: number | null;
+    card_type: string;
+    title: string;
+    content: string;
+    skill_trigger?: string | null;
+    skill_instruction?: string | null;
+    tags?: string[];
+    is_pinned?: boolean;
+    color_accent?: string;
+  }) => {
+    const res = await apiClient.post('/ai/muse-cards', payload);
+    return res.data;
+  },
+  updateMuseCard: async (
+    cardId: number,
+    payload: {
+      title?: string;
+      content?: string;
+      card_type?: string;
+      skill_trigger?: string | null;
+      tags?: string[];
+      is_pinned?: boolean;
+      color_accent?: string;
+    }
+  ) => {
+    const res = await apiClient.patch(`/ai/muse-cards/${cardId}`, payload);
+    return res.data;
+  },
+  deleteMuseCard: async (cardId: number) => {
+    const res = await apiClient.delete(`/ai/muse-cards/${cardId}`);
+    return res.data;
+  },
+  executeProposal: async (proposalId: number, overrideActions?: any[]) => {
+    const res = await apiClient.post(`/ai/proposals/${proposalId}/execute`, {
+      override_actions: overrideActions,
+    });
+    return res.data;
+  },
+  undoProposal: async (proposalId: number) => {
+    const res = await apiClient.post(`/ai/proposals/${proposalId}/undo`);
+    return res.data;
+  },
 };
 
 export const analyticsApi = {
@@ -2075,7 +2219,8 @@ export const metricsApi = {
           estimated_roas: Number(raw.estimated_roas ?? 0),
         },
       };
-    } catch {
+    } catch (error: any) {
+      if (!isOfflineDemoEnabled()) throw error;
       // Client-side resilient CSV analyzer fallback
       const lines = (data.csv_content || '')
         .split(/\r?\n/)
@@ -2219,8 +2364,8 @@ export const metricsApi = {
     try {
       const res = await apiClient.post('/metrics/smart-import/commit', data);
       return res.data;
-    } catch (e: any) {
-      if (e?.response && e.response.status !== 404 && e.response.status !== 405) throw e;
+    } catch (error: any) {
+      if (!isOfflineDemoEnabled()) throw error;
       const analysis = await metricsApi.analyzeSmartImport({ csv_content: data.csv_content, workspace_id: data.workspace_id });
       return {
         status: 'ok',
@@ -2351,18 +2496,6 @@ export const adAccountsApi = {
     day_roas: number;
   }> => {
     const res = await apiClient.post('/ad-accounts/external-webhook', data);
-    return res.data;
-  },
-  quickConnectOAuth: async (data: {
-    provider: 'META_FANPAGE_BM' | 'TIKTOK_SHOP_BC' | 'SAPO_POS_LIVE' | string;
-    campaign_id?: number;
-    workspace_id?: number;
-  }): Promise<{
-    status: string;
-    provider: string;
-    account: AdAccountItem;
-  }> => {
-    const res = await apiClient.post('/ad-accounts/oauth-connect', data);
     return res.data;
   },
   pushTwoWayBudget: async (
@@ -2799,7 +2932,7 @@ const res = await apiClient.post('/settings/test-ai-connection', data);
         : list[0];
       return found || {
         provider: 'gemini',
-        model: 'gemini-3.8-flash',
+        model: 'gemini-2.5-flash',
         masked_key: '',
         is_active: false,
         scope: 'personal',
@@ -2843,7 +2976,7 @@ const res = await apiClient.post('/settings/test-ai-connection', data);
       const newKey: CustomApiKey = {
         id: Date.now(),
         provider: data.provider || 'gemini',
-        model: data.model || 'gemini-3.8-flash',
+        model: data.model || 'gemini-2.5-flash',
         masked_key: masked,
         is_active: data.is_active !== undefined ? data.is_active : true,
         workspace_id: data.workspace_id || null,
@@ -3439,8 +3572,8 @@ export const mcpApi = {
     try {
       const res = await apiClient.get('/mcp/manifest');
       return res.data;
-    } catch (e: any) {
-      if (e?.response) throw e;
+    } catch (error: any) {
+      if (!isOfflineDemoEnabled()) throw error;
       return {
         server: {
           name: 'marketflow-mcp-server',

@@ -111,13 +111,19 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
   if (!isOpen) return null;
 
   const handleGenerateIdeas = async () => {
+    if (!activeCampaign) {
+      toast.warning('Vui lòng chọn một chiến dịch để AI có dữ liệu sản phẩm và mục tiêu trước khi sinh ý tưởng!');
+      return;
+    }
     setLoading(true);
     try {
       const res = await ideaJob.run<AIIdeaResponse>({
         kind: 'ideas',
         channel_code: channelCode,
         prompt_version: promptVersion,
-        ...(activeCampaign?.id ? { campaign_id: activeCampaign.id } : {}),
+        campaign_id: activeCampaign.id,
+        ...(activeCampaign.product?.name ? { custom_product: activeCampaign.product.name } : {}),
+        ...(activeCampaign.product?.usp ? { custom_usp: activeCampaign.product.usp } : {}),
       });
       setIdeaData(res);
       toastGenerated(res, (label) => `Đã sinh thành công ${res.ideas.length} góc ý tưởng tiếp thị bằng ${label}!`);
@@ -129,15 +135,25 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
   };
 
   const handleGenerateDraft = async () => {
+    if (!selectedIdeaText.trim()) {
+      toast.warning('Vui lòng chọn một ý tưởng từ Tab 1 hoặc nhập góc tiếp cận cụ thể trước khi viết bản nháp!');
+      return;
+    }
+    if (!activeCampaign) {
+      toast.warning('Vui lòng chọn một chiến dịch trước khi viết bản nháp!');
+      return;
+    }
     setLoading(true);
     try {
-      const ideaToUse = selectedIdeaText || 'Tự động đối soát đơn hàng và tối ưu chi phí quảng cáo';
+      const ideaToUse = selectedIdeaText.trim();
       const res = await draftJob.run<AIDraftResponse>({
         kind: 'draft',
         selected_idea: ideaToUse,
         channel_code: channelCode,
         prompt_version: promptVersion,
-        ...(activeCampaign?.id ? { campaign_id: activeCampaign.id } : {}),
+        campaign_id: activeCampaign.id,
+        ...(activeCampaign.product?.name ? { custom_product: activeCampaign.product.name } : {}),
+        ...(activeCampaign.product?.usp ? { custom_usp: activeCampaign.product.usp } : {}),
       });
       setDraftData(res);
       setCreatedContent(null);
@@ -477,6 +493,24 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({
             </select>
           </div>
         </div>
+
+        {/* Grounded Campaign Context Summary */}
+        {activeCampaign && (
+          <div className="px-5 py-2.5 bg-stone-50 border-b border-slate-200/80 text-[11px] text-slate-600 grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="truncate" title={activeCampaign.product?.name || activeCampaign.name}>
+              <span className="font-bold text-slate-800">Sản phẩm:</span>{' '}
+              {activeCampaign.product?.name || activeCampaign.name}
+            </div>
+            <div className="truncate" title={activeCampaign.product?.usp || activeCampaign.key_message || activeCampaign.objective}>
+              <span className="font-bold text-slate-800">USP:</span>{' '}
+              {activeCampaign.product?.usp || activeCampaign.key_message || activeCampaign.objective}
+            </div>
+            <div className="truncate" title={activeCampaign.audience}>
+              <span className="font-bold text-slate-800">Khách hàng:</span>{' '}
+              {activeCampaign.audience}
+            </div>
+          </div>
+        )}
 
         {/* Tabs Navigation */}
         <div className="flex border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600 px-5 overflow-x-auto">

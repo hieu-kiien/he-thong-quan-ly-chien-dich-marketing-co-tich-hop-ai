@@ -141,10 +141,11 @@ export interface MarketingContent {
     code: string;
     name: string;
   };
+  blocks_json?: string;
 }
 
 export interface ContentCreate {
-  campaign_id: number;
+  campaign_id?: number | null;
   channel_id: number;
   workspace_id?: number;
   title: string;
@@ -152,6 +153,7 @@ export interface ContentCreate {
   cta?: string;
   image_url?: string;
   status?: string;
+  blocks_json?: string;
 }
 
 export interface ContentUpdate {
@@ -160,6 +162,7 @@ export interface ContentUpdate {
   cta?: string;
   image_url?: string;
   status?: string;
+  blocks_json?: string;
 }
 
 
@@ -351,6 +354,172 @@ export interface OmnichannelRequest {
   product_name?: string;
   product_usp?: string;
   prompt_version?: string;
+  preferred_provider?: string;
+  preferred_model?: string;
+}
+
+export interface CanvasBlockItem {
+  id: string;
+  type: 'hook' | 'body' | 'cta' | 'first_comment' | 'media_brief' | 'zalo_step' | 'custom' | string;
+  label: string;
+  content: string;
+  locked: boolean;
+  metadata?: Record<string, any>;
+}
+
+export interface AIChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AIChatCanvasSuggestion {
+  title: string;
+  body: string;
+  cta: string;
+  first_comment?: string | null;
+  media_brief?: string | null;
+  blocks?: CanvasBlockItem[];
+  patched_block_ids?: string[];
+  change_summary: string;
+  replaced_selection?: string | null;
+}
+
+export interface AgentProposedActionItem {
+  action_id: string;
+  tool_name: string;
+  label: string;
+  summary?: string;
+  description?: string;
+  enabled: boolean;
+  parameters?: Record<string, any>;
+  params?: Record<string, any>;
+}
+
+export interface AgentStagedProposalResponse {
+  id: number;
+  workspace_id?: number | null;
+  thread_id?: number | null;
+  campaign_id?: number | null;
+  goal_summary?: string;
+  summary: string;
+  status: 'PENDING' | 'EXECUTED' | 'ROLLED_BACK' | string;
+  actions: AgentProposedActionItem[];
+  execution_result?: Record<string, any> | null;
+  executed_result?: Record<string, any> | null;
+  can_undo: boolean;
+  created_at?: string;
+  executed_at?: string | null;
+  rolled_back_at?: string | null;
+}
+
+export interface AIChatCanvasRequest {
+  workspace_id?: number;
+  campaign_id?: number | null;
+  thread_id?: number | null;
+  channel_code?: string;
+  message: string;
+  quick_action?: string | null;
+  history?: AIChatMessage[];
+  canvas: {
+    title: string;
+    body: string;
+    cta: string;
+    first_comment?: string;
+    media_brief?: string;
+    playbook_code?: string;
+    blocks?: CanvasBlockItem[];
+    selected_text?: string | null;
+  };
+  context_flags: {
+    include_campaign: boolean;
+    include_product_usp: boolean;
+    include_brand_kit: boolean;
+    include_canvas_draft: boolean;
+    include_muse_memory?: boolean;
+    include_winning_posts?: boolean;
+    enable_project_control?: boolean;
+    custom_product_name?: string;
+    custom_product_usp?: string;
+    custom_target_audience?: string;
+    custom_tone?: string;
+  };
+  preferred_provider?: string;
+  preferred_model?: string;
+  custom_base_url?: string;
+  chain_id?: number;
+}
+
+export interface AIChatCanvasResponse {
+  reply: string;
+  thread_id?: number | null;
+  suggested_canvas?: AIChatCanvasSuggestion | null;
+  staged_proposal?: AgentStagedProposalResponse | null;
+  alternatives: string[];
+  context_used: string[];
+  prompt_preview: string;
+  compliance_score?: number | null;
+  model_used: string;
+  model_provider: string;
+  is_fallback: boolean;
+}
+
+export interface AIChatThreadMessageItem {
+  id: number;
+  thread_id?: number | null;
+  role: 'user' | 'assistant' | string;
+  content: string;
+  quick_action?: string | null;
+  suggested_canvas?: AIChatCanvasSuggestion | null;
+  alternatives: string[];
+  staged_proposal_id?: number | null;
+  staged_proposal?: AgentStagedProposalResponse | null;
+  context_used?: string[];
+  model_used?: string | null;
+  model_provider?: string | null;
+  compliance_score?: number | null;
+  is_fallback?: boolean;
+  created_at: string;
+}
+
+export interface AIChatThreadResponse {
+  id: number;
+  workspace_id?: number | null;
+  user_id: number;
+  campaign_id?: number | null;
+  title: string;
+  channel_code: string;
+  pinned?: boolean;
+  is_pinned?: boolean;
+  canvas_blocks?: CanvasBlockItem[];
+  canvas_snapshot?: Record<string, any> | null;
+  summary_memory?: string | null;
+  message_count: number;
+  messages: AIChatThreadMessageItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MuseBoardCardResponse {
+  id: number;
+  workspace_id?: number | null;
+  user_id: number;
+  campaign_id?: number | null;
+  product_id?: number | null;
+  card_type: 'WINNING_POST' | 'CUSTOM_SKILL' | 'MARKET_INSIGHT' | 'HOOK' | 'IDEA' | 'NOTE' | string;
+  title: string;
+  content: string;
+  trigger_command?: string | null;
+  skill_trigger?: string | null;
+  skill_instruction?: string | null;
+  tags: string[];
+  is_active_memory?: boolean;
+  is_pinned?: boolean;
+  color_theme?: string;
+  color_accent?: string;
+  pos_x?: number;
+  pos_y?: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface OmnichannelResponse {
@@ -450,6 +619,7 @@ export interface CustomApiKey {
   id?: number;
   provider: string;
   model: string;
+  base_url?: string | null;
   masked_key: string;
   is_active: boolean;
   workspace_id?: number | null;
@@ -464,6 +634,7 @@ export interface AIKeyTestRequest {
   provider: string;
   api_key: string;
   model?: string;
+  base_url?: string;
 }
 
 export interface AIKeyTestResponse {
@@ -495,6 +666,7 @@ export interface AIKeySaveRequest {
   provider?: string;
   api_key: string;
   model?: string;
+  base_url?: string;
   workspace_id?: number | null;
   scope?: 'workspace' | 'personal';
   is_active?: boolean;
@@ -504,6 +676,7 @@ export interface AIKeySaveResponse {
   id?: number;
   provider: string;
   model: string;
+  base_url?: string | null;
   masked_key: string;
   is_active: boolean;
   workspace_id?: number | null;

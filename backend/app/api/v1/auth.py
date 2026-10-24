@@ -290,6 +290,18 @@ def switch_demo_role(
       `test_seed_credentials_not_shipped.py`).
     - Chỉ cho phép chuyển sang các tài khoản mẫu nằm trong `DEMO_PERSONA_EMAILS`.
     """
+    from app.core.config import settings
+    env_name = str(getattr(settings, "ENVIRONMENT", None) or getattr(settings, "APP_ENV", "development")).strip().lower()
+    if env_name in ("production", "prod", "staging"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tính năng chuyển nhanh vai trò Demo bị vô hiệu hóa trên môi trường Production.",
+        )
+    if current_user.email not in DEMO_PERSONA_EMAILS.values() and current_user.role != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ các tài khoản mẫu Demo hoặc Quản trị viên mới được phép chuyển vai trò Demo.",
+        )
     role_key = str(payload.get("role_key") or "").strip().lower()
     target_email = DEMO_PERSONA_EMAILS.get(role_key)
     if not target_email:

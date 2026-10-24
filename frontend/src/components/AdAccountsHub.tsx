@@ -32,6 +32,7 @@ import {
   KolBookingItem,
   campaignApi,
   getApiErrorMessage,
+  isOfflineDemoEnabled,
 } from '../services/api';
 import { Campaign } from '../types';
 import { formatNumber } from '../utils/format';
@@ -112,7 +113,6 @@ export const AdAccountsHub: React.FC<AdAccountsHubProps> = ({ workspaceId, onSyn
   const [loading, setLoading] = useState<boolean>(true);
   const [syncing, setSyncing] = useState<boolean>(false);
   const [runningWorker, setRunningWorker] = useState<boolean>(false);
-  const [connectingOAuth, setConnectingOAuth] = useState<string | null>(null);
   const [pushingAccountId, setPushingAccountId] = useState<number | null>(null);
   const [recordingKolId, setRecordingKolId] = useState<number | null>(null);
   const [firingWebhook, setFiringWebhook] = useState<boolean>(false);
@@ -298,28 +298,6 @@ export const AdAccountsHub: React.FC<AdAccountsHubProps> = ({ workspaceId, onSyn
     }
   };
 
-  const handleOAuthQuickConnect = async (provider: string, label: string) => {
-    if (connectingOAuth) return;
-    setConnectingOAuth(provider);
-    try {
-      const targetCampId = posCampaignId ? Number(posCampaignId) : campaigns[0]?.id;
-      const res = await adAccountsApi.quickConnectOAuth({
-        provider,
-        campaign_id: targetCampId,
-        workspace_id: workspaceId,
-      });
-      toast.success(
-        `Đã kết nối OAuth2 1-Click: ${res.account.account_name} (${res.account.account_code}).`
-      );
-      await loadHubData();
-      if (onSynced) onSynced();
-    } catch (err) {
-      toast.error(getApiErrorMessage(err), `Không thể kết nối nhanh ${label}`);
-    } finally {
-      setConnectingOAuth(null);
-    }
-  };
-
   const handlePushTwoWayBudget = async (acc: AdAccountItem) => {
     if (pushingAccountId) return;
     setPushingAccountId(acc.id);
@@ -330,7 +308,9 @@ export const AdAccountsHub: React.FC<AdAccountsHubProps> = ({ workspaceId, onSyn
         remote_status: 'ACTIVE',
       });
       toast.success(
-        `Đồng bộ 2 chiều (${res.account_code}): Đã đẩy trần ngân sách ngày mới ${formatNumber(res.daily_spend_cap)} đ lên nền tảng & chiến dịch "${res.linked_campaign_name || 'Đang gắn'}".`
+        (res as any).execution_mode === 'LIVE_GRAPH_API'
+          ? `Đã đồng bộ hạn mức ngày mới (${formatNumber(res.daily_spend_cap)} đ/ngày) lên ${acc.account_name}.`
+          : `Đã cập nhật hạn mức chi tiêu ngày (${formatNumber(res.daily_spend_cap)} đ/ngày) cho ${acc.account_name}.`
       );
       await loadHubData();
       if (onSynced) onSynced();
@@ -820,43 +800,49 @@ export const AdAccountsHub: React.FC<AdAccountsHubProps> = ({ workspaceId, onSyn
 
         <div className="flex flex-wrap items-center gap-2">
           <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-extrabold border ${
-              isCleanProd
-                ? 'bg-[#ECFDF5] text-[#15803D] border-[#A7F3D0]'
-                : 'bg-[#F6F5F0] text-[#3B3F46] border-[#D0CEC7]'
-            }`}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-extrabold border bg-[#ECFDF5] text-[#15803D] border-[#A7F3D0]"
           >
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>{isCleanProd ? 'Chế độ Production Sạch' : 'Chế độ Kép: API Thật + Mẫu Sandbox'}</span>
+            <span>Chế độ Production (Số liệu thực tế)</span>
           </span>
 
-          <button
-            type="button"
-            disabled={togglingCleanMode}
-            onClick={() => handleToggleCleanWorkspace(isCleanProd ? 'restore_demo' : 'purge_demo')}
-            className="inline-flex items-center gap-1.5 bg-white hover:bg-[#F6F5F0] text-[#121316] border border-[#D0CEC7] text-xs font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-          >
-            {togglingCleanMode ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Sparkles className="w-3.5 h-3.5 text-[#D95D39]" />
-            )}
-            <span>{isCleanProd ? 'Khôi phục dữ liệu mẫu' : 'Dọn sạch mẫu (Production)'}</span>
-          </button>
+          {(!isCleanProd || isOfflineDemoEnabled()) && (
+            <button
+              type="button"
+              disabled={togglingCleanMode}
+              onClick={() =>
+                handleToggleCleanWorkspace(
+                  isCleanProd && isOfflineDemoEnabled() ? 'restore_demo' : 'purge_demo'
+                )
+              }
+              className="inline-flex items-center gap-1.5 bg-white hover:bg-[#F6F5F0] text-[#121316] border border-[#D0CEC7] text-xs font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+            >
+              {togglingCleanMode ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5 text-[#D95D39]" />
+              )}
+              <span>
+                {isCleanProd && isOfflineDemoEnabled()
+                  ? 'Khôi phục dữ liệu mẫu'
+                  : 'Xóa toàn bộ dữ liệu mẫu'}
+              </span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* KHỐI 1: TÀI KHOẢN QUẢNG CÁO, AUTO-PUBLISH FANPAGE & ĐỒNG BỘ 2 CHIỀU */}
+      {/* KHỐI 1: QUẢN LÝ TÀI KHOẢN QUẢNG CÁO, ĐỒNG BỘ CSV & CỔNG WEBHOOK POS */}
       {(activeModuleTab === 'ALL' || activeModuleTab === 'ADS_POS') && (
         <div className="bg-white rounded-xl border border-[#E4E2DD] p-5 space-y-5">
           {/* Header */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#E4E2DD] pb-4">
             <div>
               <h3 className="text-base font-extrabold text-[#121316] tracking-tight">
-                Tài khoản quảng cáo, Tự động đăng bài Fanpage &amp; Bảo mật POS Webhook
+                Quản lý Tài khoản Quảng cáo, Đồng bộ CSV &amp; Cổng Webhook POS
               </h3>
               <p className="text-xs text-[#3B3F46] mt-1">
-                Kết nối OAuth2 1-Click với Meta Business / Fanpage / TikTok Shop / Sapo POS, đẩy trần ngân sách 2 chiều và xác thực khóa bảo mật POS Webhook.
+                Lưu trữ tài khoản quảng cáo, nhập file CSV báo cáo chi phí hoặc đẩy trần ngân sách qua API thực (khi có Access Token) và xác thực khóa bảo mật POS Webhook.
               </p>
             </div>
 
@@ -900,19 +886,21 @@ export const AdAccountsHub: React.FC<AdAccountsHubProps> = ({ workspaceId, onSyn
                 <span>Thêm tài khoản QC</span>
               </button>
 
-              <button
-                type="button"
-                disabled={runningWorker}
-                onClick={handleRunAutoWorkerTick}
-                className="inline-flex items-center gap-1.5 bg-[#121316] hover:bg-[#26282D] text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-colors cursor-pointer"
-              >
-                {runningWorker ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Send className="w-3.5 h-3.5 text-[#FDE68A]" />
-                )}
-                <span>Auto-Publish Fanpage &amp; Chạy Worker</span>
-              </button>
+              {isOfflineDemoEnabled() && (
+                <button
+                  type="button"
+                  disabled={runningWorker}
+                  onClick={handleRunAutoWorkerTick}
+                  className="inline-flex items-center gap-1.5 bg-[#121316] hover:bg-[#26282D] text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-colors cursor-pointer"
+                >
+                  {runningWorker ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5 text-[#FDE68A]" />
+                  )}
+                  <span>Auto-Publish Fanpage &amp; Chạy Worker</span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -1033,58 +1021,72 @@ export const AdAccountsHub: React.FC<AdAccountsHubProps> = ({ workspaceId, onSyn
                   <span>{copiedCurl ? 'Đã chép lệnh cURL' : 'Chép lệnh cURL (Kèm Khóa)'}</span>
                 </button>
 
-                <button
-                  type="button"
-                  disabled={firingWebhook}
-                  onClick={handleFireLiveWebhookTest}
-                  className="inline-flex items-center gap-1.5 bg-[#121316] hover:bg-[#D95D39] text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-                >
-                  {firingWebhook ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Zap className="w-3.5 h-3.5 text-[#FDE68A]" />
-                  )}
-                  <span>Bắn thử đơn Webhook thật (+2 đơn / 1,85tr)</span>
-                </button>
+                {isOfflineDemoEnabled() && (
+                  <button
+                    type="button"
+                    disabled={firingWebhook}
+                    onClick={handleFireLiveWebhookTest}
+                    className="inline-flex items-center gap-1.5 bg-[#121316] hover:bg-[#D95D39] text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                  >
+                    {firingWebhook ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Zap className="w-3.5 h-3.5 text-[#FDE68A]" />
+                    )}
+                    <span>Bắn thử đơn Webhook thật (+2 đơn / 1,85tr)</span>
+                  </button>
+                )}
               </div>
             </div>
 
             <div className="lg:col-span-5 bg-[#F6F5F0] border border-[#E4E2DD] rounded-xl p-3.5 flex flex-col justify-between gap-2.5">
               <div>
                 <div className="text-xs font-extrabold text-[#121316]">
-                  Kết nối nhanh OAuth2 (1-Click Quick-Connect)
+                  Khai báo nhanh theo Nền tảng Quảng cáo / POS
                 </div>
                 <p className="text-xs text-[#3B3F46] mt-0.5">
-                  Ủy quyền tự động đăng bài Fanpage, đồng bộ TikTok Shop BC hoặc gắn Sapo POS không cần nhập Token thủ công.
+                  Chọn nền tảng để mở biểu mẫu nhập Account ID, Pixel ID và Access Token thực tế của doanh nghiệp.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  disabled={connectingOAuth !== null}
-                  onClick={() => handleOAuthQuickConnect('META_FANPAGE_BM', 'Meta Fanpage & BM')}
+                  onClick={() => {
+                    setNewPlatform('META_ADS');
+                    setShowAddForm(true);
+                    setShowPosForm(false);
+                    setShowConnectorForm(false);
+                  }}
                   className="inline-flex items-center gap-1.5 bg-white hover:bg-[#EAE8E1] text-[#121316] border border-[#D0CEC7] text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
                 >
-                  {connectingOAuth === 'META_FANPAGE_BM' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5 text-[#1D4ED8]" />}
+                  <Plus className="w-3.5 h-3.5 text-[#1D4ED8]" />
                   <span>Meta Fanpage &amp; BM</span>
                 </button>
                 <button
                   type="button"
-                  disabled={connectingOAuth !== null}
-                  onClick={() => handleOAuthQuickConnect('TIKTOK_SHOP_BC', 'TikTok Shop BC')}
+                  onClick={() => {
+                    setNewPlatform('TIKTOK_ADS');
+                    setShowAddForm(true);
+                    setShowPosForm(false);
+                    setShowConnectorForm(false);
+                  }}
                   className="inline-flex items-center gap-1.5 bg-white hover:bg-[#EAE8E1] text-[#121316] border border-[#D0CEC7] text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
                 >
-                  {connectingOAuth === 'TIKTOK_SHOP_BC' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5 text-[#121316]" />}
+                  <Plus className="w-3.5 h-3.5 text-[#121316]" />
                   <span>TikTok Shop BC</span>
                 </button>
                 <button
                   type="button"
-                  disabled={connectingOAuth !== null}
-                  onClick={() => handleOAuthQuickConnect('SAPO_POS_LIVE', 'Sapo POS')}
+                  onClick={() => {
+                    setNewPlatform('POS_SYSTEM');
+                    setShowAddForm(true);
+                    setShowPosForm(false);
+                    setShowConnectorForm(false);
+                  }}
                   className="inline-flex items-center gap-1.5 bg-white hover:bg-[#EAE8E1] text-[#121316] border border-[#D0CEC7] text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
                 >
-                  {connectingOAuth === 'SAPO_POS_LIVE' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5 text-[#15803D]" />}
-                  <span>Sapo POS Live</span>
+                  <Plus className="w-3.5 h-3.5 text-[#15803D]" />
+                  <span>Sapo / Pancake POS</span>
                 </button>
               </div>
             </div>
@@ -1278,8 +1280,10 @@ export const AdAccountsHub: React.FC<AdAccountsHubProps> = ({ workspaceId, onSyn
                     className="w-full px-3 py-2 bg-white border border-[#D0CEC7] rounded-lg text-[#121316] font-semibold outline-none"
                   >
                     <option value="1">Facebook Ads</option>
-                    <option value="2">TikTok Ads</option>
-                    <option value="3">Zalo OA / CRM</option>
+                    <option value="5">TikTok Ads</option>
+                    <option value="4">Google Ads</option>
+                    <option value="2">Zalo OA / Email / CRM</option>
+                    <option value="3">Website / Blog SEO</option>
                   </select>
                 </div>
 
@@ -1353,10 +1357,10 @@ export const AdAccountsHub: React.FC<AdAccountsHubProps> = ({ workspaceId, onSyn
           ) : accounts.length === 0 ? (
             <div className="py-8 text-center bg-[#F6F5F0] rounded-xl border border-[#E4E2DD] p-4 space-y-2">
               <div className="text-sm font-extrabold text-[#121316]">
-                Workspace đang ở Chế độ Production Sạch (Đã xóa toàn bộ tài khoản mẫu)
+                Chưa có tài khoản quảng cáo nào được khai báo trong không gian làm việc này
               </div>
               <p className="text-xs text-[#3B3F46]">
-                Hãy bấm &ldquo;Thêm tài khoản QC&rdquo; hoặc &ldquo;Kết nối nhanh OAuth2&rdquo; ở trên để gắn tài khoản thật của doanh nghiệp.
+                Hãy bấm &ldquo;Thêm tài khoản QC&rdquo; ở trên để gắn tài khoản quảng cáo hoặc nguồn POS thực tế của doanh nghiệp.
               </p>
             </div>
           ) : (
@@ -1366,7 +1370,7 @@ export const AdAccountsHub: React.FC<AdAccountsHubProps> = ({ workspaceId, onSyn
                   <tr className="border-b border-[#E4E2DD] text-xs font-extrabold uppercase text-[#3B3F46] bg-[#F6F5F0]/70">
                     <th className="py-3 px-2.5 w-[26%]">Tài khoản &amp; Nền tảng</th>
                     <th className="py-3 px-2.5 w-[19%]">Chiến dịch đang gắn</th>
-                    <th className="py-3 px-2.5 text-right w-[14%]">Trần ngày (2 chiều)</th>
+                    <th className="py-3 px-2.5 text-right w-[14%]">Hạn mức ngày</th>
                     <th className="py-3 px-2.5 text-right w-[12%]">Tổng đã chi</th>
                     <th className="py-3 px-2.5 text-right w-[15%]">Doanh thu &amp; Đơn</th>
                     <th className="py-3 px-2.5 w-[9%]">Trạng thái</th>
@@ -1433,7 +1437,7 @@ export const AdAccountsHub: React.FC<AdAccountsHubProps> = ({ workspaceId, onSyn
                               ) : (
                                 <Sliders className="w-3 h-3" />
                               )}
-                              <span>Đẩy trần +20%</span>
+                              <span>Tăng hạn mức +20%</span>
                             </button>
                           )}
                         </td>
@@ -1965,21 +1969,23 @@ export const AdAccountsHub: React.FC<AdAccountsHubProps> = ({ workspaceId, onSyn
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                        <div className="mt-1.5 flex justify-end">
-                          <button
-                            type="button"
-                            disabled={recordingKolId === kol.id}
-                            onClick={() => handleRecordKolOrder(kol)}
-                            className="inline-flex items-center gap-1 bg-[#15803D] hover:bg-[#166534] text-white font-bold text-[11px] px-2 py-1 rounded-lg cursor-pointer"
-                          >
-                            {recordingKolId === kol.id ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <Plus className="w-3 h-3" />
-                            )}
-                            <span>+3 đơn Affiliate</span>
-                          </button>
-                        </div>
+                        {isOfflineDemoEnabled() && (
+                          <div className="mt-1.5 flex justify-end">
+                            <button
+                              type="button"
+                              disabled={recordingKolId === kol.id}
+                              onClick={() => handleRecordKolOrder(kol)}
+                              className="inline-flex items-center gap-1 bg-[#15803D] hover:bg-[#166534] text-white font-bold text-[11px] px-2 py-1 rounded-lg cursor-pointer"
+                            >
+                              {recordingKolId === kol.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Plus className="w-3 h-3" />
+                              )}
+                              <span>+3 đơn Affiliate</span>
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -2419,34 +2425,36 @@ export const AdAccountsHub: React.FC<AdAccountsHubProps> = ({ workspaceId, onSyn
                 )}
               </div>
 
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  disabled={upgradingTier !== null}
-                  onClick={() => handleSimulateSePayTransfer('PRO')}
-                  className="w-full inline-flex items-center justify-center gap-1.5 bg-[#15803D] hover:bg-[#166534] text-white text-xs font-extrabold py-2 px-3 rounded-lg transition-colors cursor-pointer"
-                >
-                  {upgradingTier === 'SEPAY_PRO' ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Zap className="w-3.5 h-3.5 text-[#FDE68A]" />
-                  )}
-                  <span>Test Webhook Ngân Hàng (+499k Mở Khóa PRO)</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={upgradingTier !== null}
-                  onClick={() => handleSimulateSePayTransfer('AGENCY')}
-                  className="w-full inline-flex items-center justify-center gap-1.5 bg-[#121316] hover:bg-[#D95D39] text-white text-xs font-extrabold py-2 px-3 rounded-lg transition-colors cursor-pointer"
-                >
-                  {upgradingTier === 'SEPAY_AGENCY' ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Sparkles className="w-3.5 h-3.5 text-[#FDE68A]" />
-                  )}
-                  <span>Test Webhook Ngân Hàng (+1,49tr Mở Khóa AGENCY)</span>
-                </button>
-              </div>
+              {isOfflineDemoEnabled() && (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    disabled={upgradingTier !== null}
+                    onClick={() => handleSimulateSePayTransfer('PRO')}
+                    className="w-full inline-flex items-center justify-center gap-1.5 bg-[#15803D] hover:bg-[#166534] text-white text-xs font-extrabold py-2 px-3 rounded-lg transition-colors cursor-pointer"
+                  >
+                    {upgradingTier === 'SEPAY_PRO' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Zap className="w-3.5 h-3.5 text-[#FDE68A]" />
+                    )}
+                    <span>Test Webhook Ngân Hàng (+499k Mở Khóa PRO)</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={upgradingTier !== null}
+                    onClick={() => handleSimulateSePayTransfer('AGENCY')}
+                    className="w-full inline-flex items-center justify-center gap-1.5 bg-[#121316] hover:bg-[#D95D39] text-white text-xs font-extrabold py-2 px-3 rounded-lg transition-colors cursor-pointer"
+                  >
+                    {upgradingTier === 'SEPAY_AGENCY' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5 text-[#FDE68A]" />
+                    )}
+                    <span>Test Webhook Ngân Hàng (+1,49tr Mở Khóa AGENCY)</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

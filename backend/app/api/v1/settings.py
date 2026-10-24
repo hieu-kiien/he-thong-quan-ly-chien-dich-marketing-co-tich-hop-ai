@@ -104,7 +104,11 @@ def test_ai_connection(
                 f"Chỉ hỗ trợ: {', '.join(provider_registry.SUPPORTED_PROVIDER_SLUGS)}."
             )
 
-        if provider == "gemini":
+        custom_base = (req.base_url or "").strip().rstrip("/")
+        if custom_base and not custom_base.startswith(("http://", "https://")):
+            raise ValueError("Custom Base URL phải bắt đầu bằng http:// hoặc https://")
+
+        if provider == "gemini" and not custom_base:
             # M3: KHÔNG bao giờ đặt API key vào query string. `?key=...` bị ghi vào
             # access log của Cloudflare/nginx/proxy và vào lịch sử trình duyệt, tức
             # là rò khoá ra ngoài hệ thống. Gemini REST API hỗ trợ header
@@ -120,13 +124,15 @@ def test_ai_connection(
             # Messages API thật.
             from app.services.ai.anthropic_adapter import build_headers as _anthropic_headers
 
-            url = f"{spec.resolve_base_url(settings.AI_BASE_URL)}{spec.ping_path}"
+            eff_base = custom_base or spec.resolve_base_url(settings.AI_BASE_URL)
+            url = f"{eff_base}{spec.ping_path}"
             headers = _anthropic_headers(clean_key)
         else:
             # Các provider còn lại đều nói giao thức OpenAI: danh sách model ở
             # {base}/models. Base lấy từ registry nên provider mới không cần sửa
             # thêm chỗ này.
-            url = f"{spec.resolve_base_url(settings.AI_BASE_URL)}{spec.ping_path}"
+            eff_base = custom_base or spec.resolve_base_url(settings.AI_BASE_URL)
+            url = f"{eff_base}{spec.ping_path}"
             headers = dict(spec.extra_headers)
             # httpx trả 500 nếu gửi header Authorization rỗng, nên chỉ gửi khi
             # thực sự có khoá (Ollama không cần).
@@ -424,11 +430,13 @@ def store_custom_ai_key(
 @router.get("/ai-keys", response_model=AIKeyResponse)
 def get_custom_ai_keys(
     workspace_id: Optional[int] = Query(None),
+    provider: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Lấy thông tin cấu hình Custom AI Key đã được che mặt nạ (không trả về plain-text key)."""
     key_record = None
+    norm_prov = provider.strip().lower() if provider and provider.strip() else None
 
     if workspace_id is not None:
         if current_user.role != "ADMIN":
@@ -444,24 +452,26 @@ def get_custom_ai_keys(
                     detail="Không có quyền truy cập cấu hình AI của Workspace này."
                 )
 
-        key_record = db.query(CustomApiKey).filter(
-            CustomApiKey.workspace_id == workspace_id,
-            CustomApiKey.provider == "gemini"
-        ).order_by(CustomApiKey.updated_at.desc()).first()
+        ws_query = db.query(CustomApiKey).filter(CustomApiKey.workspace_id == workspace_id)
+        if norm_prov:
+            ws_query = ws_query.filter(CustomApiKey.provider == norm_prov)
+        key_record = ws_query.order_by(CustomApiKey.is_active.desc(), CustomApiKey.updated_at.desc()).first()
 
     if not key_record:
-        key_record = db.query(CustomApiKey).filter(
+        personal_query = db.query(CustomApiKey).filter(
             CustomApiKey.user_id == current_user.id,
             CustomApiKey.workspace_id == None,
-            CustomApiKey.provider == "gemini"
-        ).order_by(CustomApiKey.updated_at.desc()).first()
+        )
+        if norm_prov:
+            personal_query = personal_query.filter(CustomApiKey.provider == norm_prov)
+        key_record = personal_query.order_by(CustomApiKey.is_active.desc(), CustomApiKey.updated_at.desc()).first()
 
     if not key_record:
         # Nếu user chưa có key cá nhân riêng biệt, kiểm tra xem user có bất kỳ key nào không
-        key_record = db.query(CustomApiKey).filter(
-            CustomApiKey.user_id == current_user.id,
-            CustomApiKey.provider == "gemini"
-        ).order_by(CustomApiKey.updated_at.desc()).first()
+        any_query = db.query(CustomApiKey).filter(CustomApiKey.user_id == current_user.id)
+        if norm_prov:
+            any_query = any_query.filter(CustomApiKey.provider == norm_prov)
+        key_record = any_query.order_by(CustomApiKey.is_active.desc(), CustomApiKey.updated_at.desc()).first()
 
     if key_record:
         try:
@@ -487,8 +497,8 @@ def get_custom_ai_keys(
     # Mặc định chưa cấu hình key
     return AIKeyResponse(
         id=None,
-        provider="gemini",
-        model="gemini-3.8-flash",
+        provider=norm_prov or "gemini",
+        model="gemini-2.5-flash",
         masked_key="",
         is_active=False,
         workspace_id=workspace_id,
@@ -560,10 +570,12 @@ def list_custom_ai_keys(
 @router.delete("/ai-keys", status_code=status.HTTP_200_OK)
 def deactivate_or_delete_current_byok_key(
     workspace_id: Optional[int] = Query(None),
+    provider: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Vô hiệu hóa hoặc xóa custom key để hoàn nguyên về System Default Key (theo test_t1_r6_05)."""
+    norm_prov = provider.strip().lower() if provider and provider.strip() else None
     if workspace_id is not None:
         if current_user.role != "ADMIN":
             ws = db.query(Workspace).filter(Workspace.id == workspace_id).first()
@@ -577,21 +589,23 @@ def deactivate_or_delete_current_byok_key(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Không có quyền thao tác trên Workspace này."
                 )
-        key_record = db.query(CustomApiKey).filter(
-            CustomApiKey.workspace_id == workspace_id,
-            CustomApiKey.provider == "gemini"
-        ).first()
+        ws_query = db.query(CustomApiKey).filter(CustomApiKey.workspace_id == workspace_id)
+        if norm_prov:
+            ws_query = ws_query.filter(CustomApiKey.provider == norm_prov)
+        key_record = ws_query.order_by(CustomApiKey.is_active.desc(), CustomApiKey.updated_at.desc()).first()
     else:
-        key_record = db.query(CustomApiKey).filter(
+        personal_query = db.query(CustomApiKey).filter(
             CustomApiKey.user_id == current_user.id,
             CustomApiKey.workspace_id == None,
-            CustomApiKey.provider == "gemini"
-        ).first()
+        )
+        if norm_prov:
+            personal_query = personal_query.filter(CustomApiKey.provider == norm_prov)
+        key_record = personal_query.order_by(CustomApiKey.is_active.desc(), CustomApiKey.updated_at.desc()).first()
         if not key_record:
-            key_record = db.query(CustomApiKey).filter(
-                CustomApiKey.user_id == current_user.id,
-                CustomApiKey.provider == "gemini"
-            ).first()
+            any_query = db.query(CustomApiKey).filter(CustomApiKey.user_id == current_user.id)
+            if norm_prov:
+                any_query = any_query.filter(CustomApiKey.provider == norm_prov)
+            key_record = any_query.order_by(CustomApiKey.is_active.desc(), CustomApiKey.updated_at.desc()).first()
 
     if key_record:
         check_ai_key_access(key_record, current_user, db)

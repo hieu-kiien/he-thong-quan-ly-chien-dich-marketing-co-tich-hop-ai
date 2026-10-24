@@ -933,17 +933,29 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 
             {/* Grounded Context Box */}
             <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-1.5 text-xs">
-              <div className="flex items-center justify-between text-slate-500">
+              <div className="flex items-center justify-between text-slate-500 gap-2">
                 <span>Chiến dịch liên kết:</span>
-                <span className="font-bold text-slate-800">{campaign.name}</span>
+                <span className="font-bold text-slate-800 text-right">{campaign.name}</span>
               </div>
-              <div className="flex items-center justify-between text-slate-500">
+              <div className="flex items-center justify-between text-slate-500 gap-2">
+                <span>Sản phẩm / Dịch vụ:</span>
+                <span className="font-semibold text-slate-800 text-right">
+                  {campaign.product?.name || campaign.name}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-slate-500 gap-2">
+                <span>Lợi thế cốt lõi (USP):</span>
+                <span className="font-semibold text-indigo-700 text-right">
+                  {campaign.product?.usp || campaign.key_message || campaign.objective}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-slate-500 gap-2">
                 <span>Đối tượng tiếp cận:</span>
-                <span className="font-semibold text-slate-700">{campaign.audience}</span>
+                <span className="font-semibold text-slate-700 text-right">{campaign.audience}</span>
               </div>
-              <div className="flex items-center justify-between text-slate-500">
+              <div className="flex items-center justify-between text-slate-500 gap-2">
                 <span>Mục tiêu cốt lõi:</span>
-                <span className="font-semibold text-slate-700">{campaign.objective}</span>
+                <span className="font-semibold text-slate-700 text-right">{campaign.objective}</span>
               </div>
             </div>
 

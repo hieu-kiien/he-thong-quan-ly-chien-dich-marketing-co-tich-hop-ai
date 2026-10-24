@@ -206,6 +206,21 @@ class ProductCategoryResponse(BaseModel):
     description: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
+class ProductCreate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=255)
+    category_id: Optional[int] = 1
+    description: Optional[str] = None
+    usp: Optional[str] = None
+
+
+class ProductUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=2, max_length=255)
+    category_id: Optional[int] = None
+    description: Optional[str] = None
+    usp: Optional[str] = None
+    status: Optional[str] = Field(None, pattern="^(ACTIVE|INACTIVE)$")
+
+
 class ProductResponse(BaseModel):
     id: int
     category_id: int
@@ -214,6 +229,19 @@ class ProductResponse(BaseModel):
     usp: Optional[str] = None
     status: str
     model_config = ConfigDict(from_attributes=True)
+
+class ChannelCreate(BaseModel):
+    code: str = Field(..., min_length=2, max_length=64)
+    name: str = Field(..., min_length=2, max_length=255)
+    format_rules: Optional[str] = None
+
+
+class ChannelUpdate(BaseModel):
+    code: Optional[str] = Field(None, min_length=2, max_length=64)
+    name: Optional[str] = Field(None, min_length=2, max_length=255)
+    format_rules: Optional[str] = None
+    status: Optional[str] = Field(None, pattern="^(ACTIVE|INACTIVE)$")
+
 
 class ChannelResponse(BaseModel):
     id: int
@@ -225,7 +253,9 @@ class ChannelResponse(BaseModel):
 
 # --- CAMPAIGN ---
 class CampaignBase(BaseModel):
-    product_id: int
+    product_id: int = 1
+    product_name: Optional[str] = None
+    product_usp: Optional[str] = None
     workspace_id: Optional[int] = None
     name: str = Field(..., min_length=3, max_length=255)
     objective: str
@@ -285,6 +315,9 @@ class CampaignUpdate(BaseModel):
     daily_budget_cap: Optional[float] = Field(None, ge=0.0)
     tags_json: Optional[str] = None
     tags: Optional[List[str]] = None
+    product_id: Optional[int] = None
+    product_name: Optional[str] = None
+    product_usp: Optional[str] = None
 
     @field_validator("start_date", "end_date")
     @classmethod
@@ -467,8 +500,8 @@ class CampaignDetailResponse(CampaignResponse):
 
 # --- MARKETING CONTENT ---
 class ContentCreate(BaseModel):
-    campaign_id: int
-    channel_id: int
+    campaign_id: Optional[int] = None
+    channel_id: int = 1
     workspace_id: Optional[int] = None
     title: str = Field(..., min_length=1, max_length=255)
     body: str = Field(..., min_length=1)
@@ -480,6 +513,7 @@ class ContentCreate(BaseModel):
     hook_variant: Optional[str] = None
     utm_params: Optional[str] = None
     ai_metadata_json: Optional[str] = "{}"
+    blocks_json: Optional[str] = "[]"
 
     @field_validator("image_url")
     @classmethod
@@ -505,6 +539,7 @@ class ContentUpdate(BaseModel):
     hook_variant: Optional[str] = None
     utm_params: Optional[str] = None
     ai_metadata_json: Optional[str] = None
+    blocks_json: Optional[str] = None
 
     # extra="allow": giu lai truong "status" do client gui len de endpoint PUT co the
     # tu choi ro rang bang HTTP 400 thay vi bo qua im lang. Endpoint chi doc cac
@@ -569,6 +604,7 @@ class ContentResponse(BaseModel):
     hook_variant: Optional[str] = None
     utm_params: Optional[str] = None
     ai_metadata_json: Optional[str] = "{}"
+    blocks_json: Optional[str] = "[]"
 
     created_at: datetime
     updated_at: datetime
@@ -740,6 +776,7 @@ class KPISummaryResponse(BaseModel):
 
 # --- AI CONTRACTS ---
 class AIIdeaRequest(BaseModel):
+    workspace_id: Optional[int] = None
     campaign_id: Optional[int] = None
     custom_topic: Optional[str] = None
     custom_product: Optional[str] = None
@@ -747,6 +784,8 @@ class AIIdeaRequest(BaseModel):
     channel_code: str = "facebook"
     tone: str = "trẻ trung, năng động"
     prompt_version: str = "v3"
+    preferred_provider: Optional[str] = None
+    preferred_model: Optional[str] = None
     # Chuỗi fallback tùy chọn (xem AIChainCreate). None = dùng chuỗi mặc định
     # của workspace/user nếu có, không thì gọi một model như cũ.
     chain_id: Optional[int] = None
@@ -769,12 +808,15 @@ class AIIdeaResponse(BaseModel):
     model_provider: Optional[str] = None
 
 class AIDraftRequest(BaseModel):
+    workspace_id: Optional[int] = None
     campaign_id: Optional[int] = None
     custom_product: Optional[str] = None
     custom_usp: Optional[str] = None
     channel_code: str = "facebook"
     selected_idea: str
     prompt_version: str = "v3"
+    preferred_provider: Optional[str] = None
+    preferred_model: Optional[str] = None
     chain_id: Optional[int] = None
 
 class AIDraftResponse(BaseModel):
@@ -790,8 +832,11 @@ class AIDraftResponse(BaseModel):
     model_provider: Optional[str] = None
 
 class AISummaryRequest(BaseModel):
+    workspace_id: Optional[int] = None
     campaign_id: int
     prompt_version: str = "v3"
+    preferred_provider: Optional[str] = None
+    preferred_model: Optional[str] = None
     chain_id: Optional[int] = None
 
 class AISummaryResponse(BaseModel):
@@ -812,10 +857,13 @@ class AISummaryResponse(BaseModel):
 # ==============================================================================
 
 class AIPlanRequest(BaseModel):
+    workspace_id: Optional[int] = None
     """Yêu cầu sinh kế hoạch chiến dịch. `campaign_id` BẮT BUỘC: kế hoạch vô nghĩa
     nếu thiếu ngân sách/thời gian/đối tượng thật của chiến dịch."""
     campaign_id: int
     prompt_version: str = "v3"
+    preferred_provider: Optional[str] = None
+    preferred_model: Optional[str] = None
     chain_id: Optional[int] = None
 
 
@@ -1022,6 +1070,7 @@ class EmailCreative(BaseModel):
 
 
 class OmnichannelRequest(BaseModel):
+    workspace_id: Optional[int] = None
     campaign_id: Optional[int] = None
     brief: str = Field(..., min_length=1, max_length=10000, description="Bản brief yêu cầu chiến dịch")
     target_audience: Optional[str] = Field("Đại chúng", max_length=1000, description="Đối tượng độc giả mục tiêu")
@@ -1034,6 +1083,8 @@ class OmnichannelRequest(BaseModel):
     product_usp: Optional[str] = None
     tone: Optional[str] = None
     prompt_version: str = "v3"
+    preferred_provider: Optional[str] = None
+    preferred_model: Optional[str] = None
     chain_id: Optional[int] = None
 
     @field_validator("brief")
@@ -1089,7 +1140,7 @@ class OmnichannelResponse(BaseModel):
     )
     warnings: List[str] = Field(default_factory=list)
     assumptions: List[str] = Field(default_factory=list)
-    model_used: str = "gemini-3.8-flash"
+    model_used: str = "gemini-2.5-flash"
     prompt_version: str = "v3"
     model_provider: Optional[str] = "gemini"
 
@@ -1118,7 +1169,8 @@ class AIKeyTestRequest(BaseModel):
         description="Nhà cung cấp AI ('gemini', 'openrouter', 'openai', 'anthropic', 'huggingface', 'ollama', 'opencode')",
     )
     api_key: str = Field(..., description="API Key cần kiểm tra")
-    model: Optional[str] = Field("gemini-3.8-flash", description="Model AI cần kiểm tra")
+    model: Optional[str] = Field("gemini-2.5-flash", description="Model AI cần kiểm tra")
+    base_url: Optional[str] = Field(None, max_length=500, description="Custom OpenAI-compatible Base URL (tùy chọn)")
 
     @field_validator("api_key")
     @classmethod
@@ -1160,7 +1212,7 @@ class AIKeyTestResponse(BaseModel):
     latency_ms: int
     message: str
     provider: Optional[str] = "gemini"
-    model: Optional[str] = "gemini-3.8-flash"
+    model: Optional[str] = "gemini-2.5-flash"
     error: Optional[str] = None
 
 
@@ -1189,7 +1241,8 @@ class AIKeyCreate(BaseModel):
         description="Nhà cung cấp AI ('gemini', 'openrouter', 'openai', 'anthropic', 'huggingface', 'ollama', 'opencode')",
     )
     api_key: str = Field(..., description="API Key cần lưu trữ an toàn")
-    model: Optional[str] = Field("gemini-3.8-flash", description="Model AI lựa chọn")
+    model: Optional[str] = Field("gemini-2.5-flash", description="Model AI lựa chọn")
+    base_url: Optional[str] = Field(None, max_length=500, description="Custom OpenAI-compatible Base URL (tùy chọn)")
     workspace_id: Optional[int] = Field(None, description="ID Workspace nếu lưu khóa cho Workspace")
     is_active: Optional[bool] = Field(True, description="Trạng thái kích hoạt khóa")
 
@@ -1228,7 +1281,8 @@ AISettingsUpdate = AIKeyCreate
 class AIKeyResponse(BaseModel):
     id: Optional[int] = None
     provider: str = "gemini"
-    model: str = "gemini-3.8-flash"
+    model: str = "gemini-2.5-flash"
+    base_url: Optional[str] = None
     masked_key: str = Field(..., description="Khóa API đã được che mặt nạ bảo mật")
     is_active: bool = True
     workspace_id: Optional[int] = None
@@ -1404,6 +1458,9 @@ class CampaignBulkActionRequest(BaseModel):
     budget_value: Optional[float] = None
     daily_budget_cap: Optional[float] = Field(None, ge=0.0)
     tags: Optional[List[str]] = None
+    product_id: Optional[int] = None
+    product_name: Optional[str] = None
+    product_usp: Optional[str] = None
     tag: Optional[str] = None
 
 
@@ -1728,5 +1785,246 @@ class WinningPatternsResponse(BaseModel):
     channel_leaderboard: List[Dict[str, Any]] = Field(default_factory=list)
     playbook_recommendations: List[str] = Field(default_factory=list)
     patterns: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+# ==============================================================================
+# INTERACTIVE CANVAS & MULTI-TURN CONVERSATIONAL AI COPILOT (VN SOLO & SME)
+# ==============================================================================
+
+class CanvasBlockItem(BaseModel):
+    id: str = Field(..., min_length=1, max_length=80)
+    type: str = Field("body", max_length=60, description="hook | body | cta | first_comment | media_brief | zalo_step | custom")
+    label: str = Field("Nội dung", max_length=150)
+    content: str = Field("", max_length=25000)
+    locked: bool = Field(False, description="True = Khóa khối này, cấm AI tự ý sửa đổi")
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class AIChatMessage(BaseModel):
+    role: str = Field(..., pattern="^(user|assistant)$", description="Vai trò trong hội thoại ('user' hoặc 'assistant')")
+    content: str = Field(..., min_length=1, max_length=10000)
+
+
+class AIChatCanvasState(BaseModel):
+    title: str = Field("", max_length=1000)
+    body: str = Field("", max_length=25000)
+    cta: str = Field("", max_length=1000)
+    first_comment: Optional[str] = Field("", max_length=5000, description="Bình luận đầu tiên (Seeding / gắn link tránh bóp tương tác FB)")
+    media_brief: Optional[str] = Field("", max_length=5000, description="Ghi chú thiết kế ảnh Canva / cảnh quay CapCut")
+    playbook_code: Optional[str] = Field(None, max_length=80)
+    blocks: List[CanvasBlockItem] = Field(default_factory=list, description="Danh sách các khối nội dung linh hoạt (Creative Pack)")
+    selected_text: Optional[str] = Field(None, max_length=5000, description="Đoạn văn bản người dùng đang bôi đen để yêu cầu AI sửa cục bộ")
+
+
+class AIChatContextFlags(BaseModel):
+    include_campaign: bool = True
+    include_product_usp: bool = True
+    include_brand_kit: bool = True
+    include_canvas_draft: bool = True
+    include_muse_memory: bool = True
+    include_winning_posts: bool = True
+    enable_project_control: bool = True
+    custom_product_name: Optional[str] = Field(None, max_length=300)
+    custom_product_usp: Optional[str] = Field(None, max_length=2000)
+    custom_target_audience: Optional[str] = Field(None, max_length=1000)
+    custom_tone: Optional[str] = Field(None, max_length=300)
+
+
+class AIChatCanvasSuggestion(BaseModel):
+    title: str = ""
+    body: str = ""
+    cta: str = ""
+    first_comment: Optional[str] = None
+    media_brief: Optional[str] = None
+    blocks: List[CanvasBlockItem] = Field(default_factory=list)
+    patched_block_ids: List[str] = Field(default_factory=list)
+    change_summary: str = ""
+    replaced_selection: Optional[str] = None
+
+
+class AgentProposedActionItem(BaseModel):
+    action_id: str
+    tool_name: str = Field(..., description="propose_campaign_plan | propose_tasks_batch | propose_content_drafts | log_daily_metrics | manage_brand_and_product | save_custom_skill")
+    label: str
+    summary: str = ""
+    description: str = ""
+    enabled: bool = True
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+    params: Dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentStagedProposalResponse(BaseModel):
+    id: int
+    workspace_id: Optional[int] = None
+    thread_id: Optional[int] = None
+    campaign_id: Optional[int] = None
+    goal_summary: str = ""
+    summary: str = ""
+    status: str = "PENDING"
+    actions: List[AgentProposedActionItem] = Field(default_factory=list)
+    execution_result: Optional[Dict[str, Any]] = None
+    executed_result: Optional[Dict[str, Any]] = None
+    can_undo: bool = False
+    created_at: Optional[datetime] = None
+    executed_at: Optional[datetime] = None
+    rolled_back_at: Optional[datetime] = None
+
+
+class AgentExecuteProposalRequest(BaseModel):
+    selected_action_ids: Optional[List[str]] = None
+    overridden_actions: Optional[List[AgentProposedActionItem]] = None
+    override_actions: Optional[List[AgentProposedActionItem]] = None
+
+
+class AIChatCanvasRequest(BaseModel):
+    workspace_id: Optional[int] = None
+    campaign_id: Optional[int] = None
+    thread_id: Optional[int] = Field(None, description="ID phiên chat lâu dài (nếu truyền vào sẽ tự động lưu lịch sử vào CSDL)")
+    channel_code: str = Field("facebook", max_length=50)
+    message: str = Field(..., min_length=1, max_length=8000, description="Yêu cầu trao đổi hoặc chỉnh sửa của người dùng")
+    quick_action: Optional[str] = Field(
+        None,
+        max_length=60,
+        description="Thao tác nhanh 1-click hoặc /lenh_tuy_bien",
+    )
+    history: List[AIChatMessage] = Field(default_factory=list, max_length=30)
+    canvas: AIChatCanvasState = Field(default_factory=AIChatCanvasState)
+    context_flags: AIChatContextFlags = Field(default_factory=AIChatContextFlags)
+    preferred_provider: Optional[str] = None
+    preferred_model: Optional[str] = None
+    custom_base_url: Optional[str] = Field(None, max_length=500)
+    chain_id: Optional[int] = None
+
+
+class AIChatCanvasResponse(BaseModel):
+    reply: str
+    suggested_canvas: Optional[AIChatCanvasSuggestion] = None
+    alternatives: List[str] = Field(default_factory=list)
+    context_used: List[str] = Field(default_factory=list)
+    prompt_preview: str = ""
+    compliance_score: Optional[int] = None
+    model_used: str
+    model_provider: str = "gemini"
+    is_fallback: bool = False
+    thread_id: Optional[int] = None
+    staged_proposal: Optional[AgentStagedProposalResponse] = None
+
+
+class AIChatThreadCreate(BaseModel):
+    workspace_id: Optional[int] = None
+    campaign_id: Optional[int] = None
+    title: str = Field("Phiên tư duy mới", min_length=1, max_length=255)
+    channel_code: str = Field("facebook", max_length=60)
+    pinned: bool = False
+    is_pinned: bool = False
+    canvas_blocks: List[CanvasBlockItem] = Field(default_factory=list)
+    canvas_snapshot: Optional[AIChatCanvasState] = None
+
+
+class AIChatThreadUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=255)
+    pinned: Optional[bool] = None
+    is_pinned: Optional[bool] = None
+    campaign_id: Optional[int] = None
+    channel_code: Optional[str] = None
+    canvas_blocks: Optional[List[CanvasBlockItem]] = None
+    canvas_snapshot: Optional[AIChatCanvasState] = None
+    summary_memory: Optional[str] = None
+
+
+class AIChatThreadMessageItem(BaseModel):
+    id: int
+    thread_id: Optional[int] = None
+    role: str
+    content: str
+    quick_action: Optional[str] = None
+    suggested_canvas: Optional[AIChatCanvasSuggestion] = None
+    alternatives: List[str] = Field(default_factory=list)
+    staged_proposal_id: Optional[int] = None
+    staged_proposal: Optional[Dict[str, Any]] = None
+    context_used: List[str] = Field(default_factory=list)
+    model_used: Optional[str] = None
+    model_provider: Optional[str] = None
+    compliance_score: Optional[int] = None
+    is_fallback: bool = False
+    created_at: datetime
+
+
+class AIChatThreadResponse(BaseModel):
+    id: int
+    workspace_id: Optional[int] = None
+    user_id: int
+    campaign_id: Optional[int] = None
+    title: str
+    channel_code: str
+    pinned: bool = False
+    is_pinned: bool = False
+    canvas_blocks: List[CanvasBlockItem] = Field(default_factory=list)
+    canvas_snapshot: Optional[Dict[str, Any]] = None
+    summary_memory: Optional[str] = None
+    message_count: int = 0
+    messages: List[AIChatThreadMessageItem] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+
+
+class MuseBoardCardCreate(BaseModel):
+    workspace_id: Optional[int] = None
+    campaign_id: Optional[int] = None
+    product_id: Optional[int] = None
+    card_type: str = Field("NOTE", description="WINNING_POST | HOOK_IDEA | CUSTOM_SKILL | MARKET_INSIGHT | NOTE | PLAYBOOK | IDEA | HOOK | COMPETITOR")
+    title: str = Field(..., min_length=1, max_length=255)
+    content: str = Field(..., min_length=1, max_length=20000)
+    trigger_command: Optional[str] = Field(None, max_length=80)
+    skill_trigger: Optional[str] = Field(None, max_length=80)
+    skill_instruction: Optional[str] = Field(None, max_length=5000)
+    tags: List[str] = Field(default_factory=list)
+    is_active_memory: bool = True
+    is_pinned: bool = True
+    color_theme: str = Field("indigo", max_length=30)
+    color_accent: str = Field("indigo", max_length=30)
+    pos_x: int = 0
+    pos_y: int = 0
+
+
+class MuseBoardCardUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=255)
+    content: Optional[str] = Field(None, min_length=1, max_length=20000)
+    card_type: Optional[str] = None
+    trigger_command: Optional[str] = None
+    skill_trigger: Optional[str] = None
+    skill_instruction: Optional[str] = None
+    tags: Optional[List[str]] = None
+    is_active_memory: Optional[bool] = None
+    is_pinned: Optional[bool] = None
+    color_theme: Optional[str] = None
+    color_accent: Optional[str] = None
+    pos_x: Optional[int] = None
+    pos_y: Optional[int] = None
+
+
+class MuseBoardCardResponse(BaseModel):
+    id: int
+    workspace_id: Optional[int] = None
+    user_id: int
+    campaign_id: Optional[int] = None
+    product_id: Optional[int] = None
+    card_type: str
+    title: str
+    content: str
+    trigger_command: Optional[str] = None
+    skill_trigger: Optional[str] = None
+    skill_instruction: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
+    is_active_memory: bool = True
+    is_pinned: bool = True
+    color_theme: str = "indigo"
+    color_accent: str = "indigo"
+    pos_x: int = 0
+    pos_y: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+
 
 

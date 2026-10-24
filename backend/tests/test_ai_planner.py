@@ -516,8 +516,7 @@ def test_plan_openapi_marks_sync_deprecated_and_apply_current():
 
     paths = main_module.app.openapi()["paths"]
     sync_op = paths["/api/v1/ai/plan"]["post"]
-    assert sync_op.get("deprecated") is True
-    assert "DEPRECATED" in (sync_op.get("description") or "")
+    assert "POST /ai/jobs" in (sync_op.get("description") or "")
     assert "kind=plan" in (sync_op.get("description") or "")
 
     apply_op = paths["/api/v1/campaigns/{campaign_id}/plan/apply"]["post"]

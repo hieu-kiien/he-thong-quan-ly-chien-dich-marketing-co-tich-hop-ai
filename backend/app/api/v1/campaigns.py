@@ -11,7 +11,7 @@ from app.core.pagination import Page, PageParams, page_params, paginate_query
 from app.core.security import RoleChecker, get_current_user
 from app.services import quota
 from app.services import campaign_lifecycle
-from app.models.entities import Campaign, Product, User, CampaignMember, WorkspaceMember, Workspace, MarketingContent, CampaignBudgetAllocation, CampaignKPITarget, MarketingChannel, Task, CampaignMetric, CampaignPlanApplication, AdAccount
+from app.models.entities import Campaign, Product, ProductCategory, User, CampaignMember, WorkspaceMember, Workspace, MarketingContent, CampaignBudgetAllocation, CampaignKPITarget, MarketingChannel, Task, CampaignMetric, CampaignPlanApplication, AdAccount
 from app.schemas.schemas import (
     CampaignCreate,
     CampaignUpdate,
@@ -676,6 +676,16 @@ def get_winning_patterns(
     return WinningPatternsResponse.model_validate(data)
 
 
+def _ensure_default_category_id(db: Session) -> int:
+    cat = db.query(ProductCategory).order_by(ProductCategory.id.asc()).first()
+    if cat:
+        return cat.id
+    default_cat = ProductCategory(name="Sản phẩm & Dịch vụ", description="Danh mục mặc định")
+    db.add(default_cat)
+    db.flush()
+    return default_cat.id
+
+
 @router.post("", response_model=CampaignResponse, status_code=status.HTTP_201_CREATED)
 def create_campaign(
     req: CampaignCreate,
@@ -691,9 +701,27 @@ def create_campaign(
         )
     user_id = current_user.id
 
-    product = db.query(Product).filter(Product.id == req.product_id).first()
-    if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sản phẩm không tồn tại")
+    if req.product_name and req.product_name.strip():
+        clean_prod_name = req.product_name.strip()
+        product = db.query(Product).filter(Product.name == clean_prod_name).first()
+        if not product:
+            cat_id = _ensure_default_category_id(db)
+            product = Product(
+                name=clean_prod_name,
+                usp=(req.product_usp or "").strip() or None,
+                category_id=cat_id,
+                status="ACTIVE",
+            )
+            db.add(product)
+            db.flush()
+        elif req.product_usp and req.product_usp.strip():
+            product.usp = req.product_usp.strip()
+    else:
+        product = db.query(Product).filter(Product.id == req.product_id).first()
+        if not product:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sản phẩm không tồn tại")
+        if req.product_usp and req.product_usp.strip():
+            product.usp = req.product_usp.strip()
 
     target_ws_id: Optional[int] = req.workspace_id
     if target_ws_id is None and x_workspace_id:
@@ -748,7 +776,7 @@ def create_campaign(
 
     campaign = Campaign(
         workspace_id=ws_id,
-        product_id=req.product_id,
+        product_id=product.id,
         owner_id=user_id,
         name=req.name,
         objective=req.objective,
@@ -914,6 +942,8 @@ def update_campaign(
     check_campaign_access(campaign, current_user, db)
 
     update_data = req.model_dump(exclude_unset=True)
+    product_name = update_data.pop("product_name", None)
+    product_usp = update_data.pop("product_usp", None)
     if "tags" in update_data:
         tags_val = update_data.pop("tags")
         if tags_val is not None:
@@ -922,7 +952,7 @@ def update_campaign(
     allowed_fields = {
         "name", "objective", "audience", "start_date", "end_date", "budget", "status",
         "key_message", "primary_cta", "target_kpi_name", "target_kpi_value",
-        "campaign_code", "funnel_stage", "daily_budget_cap", "tags_json",
+        "campaign_code", "funnel_stage", "daily_budget_cap", "tags_json", "product_id",
     }
     for field, value in update_data.items():
         if field not in allowed_fields:
@@ -930,6 +960,11 @@ def update_campaign(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Không được cập nhật trường '{field}'.",
             )
+
+    if "product_id" in update_data and update_data["product_id"] is not None:
+        target_prod = db.query(Product).filter(Product.id == update_data["product_id"]).first()
+        if not target_prod:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sản phẩm không tồn tại")
 
     if ("status" in update_data or "budget" in update_data):
         privileged = current_user.role in ("ADMIN", "MANAGER", "AGENCY_MANAGER")
@@ -946,7 +981,31 @@ def update_campaign(
         )
 
     for field, value in update_data.items():
-        setattr(campaign, field, value)
+        if value is not None or field != "product_id":
+            setattr(campaign, field, value)
+
+    if product_name and product_name.strip():
+        clean_prod_name = product_name.strip()
+        existing_prod = db.query(Product).filter(Product.name == clean_prod_name).first()
+        if existing_prod:
+            campaign.product_id = existing_prod.id
+            if product_usp and product_usp.strip():
+                existing_prod.usp = product_usp.strip()
+        else:
+            cat_id = _ensure_default_category_id(db)
+            new_prod = Product(
+                name=clean_prod_name,
+                usp=(product_usp or "").strip() or None,
+                category_id=cat_id,
+                status="ACTIVE",
+            )
+            db.add(new_prod)
+            db.flush()
+            campaign.product_id = new_prod.id
+    elif product_usp is not None and product_usp.strip():
+        cur_prod = db.query(Product).filter(Product.id == campaign.product_id).first()
+        if cur_prod:
+            cur_prod.usp = product_usp.strip()
 
     if campaign.end_date < campaign.start_date:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Ngày kết thúc không được trước ngày bắt đầu")

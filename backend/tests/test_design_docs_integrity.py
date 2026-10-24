@@ -28,23 +28,15 @@ FRONTEND = ROOT / "frontend"
 DOCS = ROOT / "docs"
 
 REQUIREMENTS_DOC = DOCS / "REQUIREMENTS_AND_DESIGN.md"
-RUBRIC_DOC = DOCS / "UNIVERSITY_DEFENSE_RUBRIC_ALIGNMENT.md"
-GAP_DOC = DOCS / "REQUIREMENTS_GAP_ANALYSIS.md"
 
 # Tài liệu nào phải được kiểm tra toàn vẹn đường dẫn và không chứa secret.
-_VERIFIED_DOCS = [REQUIREMENTS_DOC, RUBRIC_DOC, GAP_DOC]
+_VERIFIED_DOCS = [REQUIREMENTS_DOC]
 
 
 @pytest.fixture(scope="module")
 def requirements_text() -> str:
     assert REQUIREMENTS_DOC.exists(), f"Không tìm thấy {REQUIREMENTS_DOC}"
     return REQUIREMENTS_DOC.read_text(encoding="utf-8")
-
-
-@pytest.fixture(scope="module")
-def rubric_text() -> str:
-    assert RUBRIC_DOC.exists(), f"Không tìm thấy {RUBRIC_DOC}"
-    return RUBRIC_DOC.read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize("doc_path", _VERIFIED_DOCS)
@@ -181,97 +173,11 @@ def test_requirements_doc_prompt_variables_match_template():
         assert variable in text, f"Tài liệu không nói tới biến {variable}"
 
 
-def test_rubric_doc_covers_all_four_sections(rubric_text):
-    """Bảng đối chiếu phải có đủ 4 phần của rubric, mỗi phần 10 tiêu chí."""
-    for heading in (
-        "## Phần 1",
-        "## Phần 2",
-        "## Phần 3",
-        "## Phần 4",
-    ):
-        assert heading in rubric_text, f"Tài liệu đối chiếu thiếu {heading}"
-
-
-def test_rubric_doc_has_40_criteria(rubric_text):
-    """Đếm số dòng bảng đánh số ở cột "#". Phải đúng 40 tiêu chí."""
-    rows = re.findall(r"^\|\s*(\d{1,2})\s*\|", rubric_text, flags=re.MULTILINE)
-    numbers = sorted({int(n) for n in rows})
-    # 1..10 xuất hiện ở cả 4 phần; tập hợp các số phải là 1..10 và mỗi số xuất
-    # hiện đúng 4 lần.
-    assert set(numbers) == set(range(1, 11)), f"Thiếu số tiêu chí: {numbers}"
-    from collections import Counter
-
-    counts = Counter(int(n) for n in rows)
-    wrong = {n: c for n, c in counts.items() if c != 4}
-    assert not wrong, (
-        f"Số tiêu chí xuất hiện sai số lần (phải là 4): {wrong}. "
-        "Có thể bảng đối chiếu bị mất hoặc thừa dòng."
-    )
-
-
-def test_rubric_doc_does_not_claim_full_pagination(rubric_text):
-    """Kiểm tra tính nhất quán giữa router /campaigns và tài liệu đối chiếu rubric."""
-    campaigns_router = (BACKEND / "app" / "api" / "v1" / "campaigns.py").read_text(
-        encoding="utf-8"
-    )
-    has_pagination = bool(
-        re.search(r"\b(limit|offset|page_size|skip|page_params)\b", campaigns_router)
-    )
-    assert has_pagination
-    assert "phân trang" in rubric_text.lower()
-
-
-def test_both_docs_are_cross_linked(requirements_text, rubric_text):
-    """Hai tài liệu phải trỏ qua lại, nếu không sẽ tồn tại hai tài liệu mồ côi."""
-    assert "REQUIREMENTS_AND_DESIGN.md" in rubric_text, (
-        "Tài liệu đối chiếu rubric phải trỏ tới tài liệu phân tích yêu cầu."
-    )
-    assert "UNIVERSITY_DEFENSE_RUBRIC_ALIGNMENT.md" in requirements_text, (
-        "Tài liệu phân tích yêu cầu phải trỏ ngược lại tài liệu đối chiếu rubric."
-    )
-
-
 def test_requirements_doc_is_linked_from_docs_index():
     index = (DOCS / "README.md").read_text(encoding="utf-8")
     assert "REQUIREMENTS_AND_DESIGN.md" in index, (
         "docs/README.md chưa liên kết REQUIREMENTS_AND_DESIGN.md."
     )
-
-
-def test_gap_doc_flags_the_model_restriction_conflict():
-    """Tài liệu khoảng cách phải nêu mâu thuẫn cấm Claude/GPT.
-
-    Yêu cầu viết (2026-09-23) cấm Claude/GPT, còn rubric Bài 3 mục 2 bắt buộc hỗ
-    trợ Claude. Đây là nơi dễ mất điểm nhất: nếu tài liệu im lặng, giảng viên mở
-    `ORIGINAL_REQUEST.md` ra thấy mâu thuẫn và hỏi — mà không có sẵn câu trả lời
-    đã nghĩ kỹ.
-    """
-    gap_text = GAP_DOC.read_text(encoding="utf-8")
-    assert "Claude" in gap_text and "GPT" in gap_text
-    for marker in ("TUYỆT ĐỐI KHÔNG", "Bài 3 mục 2"):
-        assert marker in gap_text, (
-            f"Tài liệu khoảng cách phải trích nguyên văn xung đột ({marker!r}) "
-            "để giảng viên thấy rằng mâu thuẫn là có thật và đã được xử lý."
-        )
-    assert "rubric" in gap_text.lower()
-
-
-def test_gap_doc_records_the_realm_of_unmet_requirements():
-    """Phần "chưa làm" phải có đủ các mục thiếu đã biết."""
-    gap_text = GAP_DOC.read_text(encoding="utf-8")
-    for topic in ("Phân trang", "Mutation", "Excel/PDF", "backup/restore", "thiên lệch"):
-        assert topic in gap_text, (
-            f"Tài liệu khoảng cách thiếu mục chưa làm: {topic!r}. "
-            "Giấu khoảng cách tệ hơn thừa nhận nó."
-        )
-    assert "CHƯA LÀM" in gap_text or "MỘT PHẦN" in gap_text
-
-
-def test_gap_doc_concludes_the_it_thesis_subproject():
-    """Phải kết luận về thư mục `it-thesis-...` để không ai hỏi lại."""
-    gap_text = GAP_DOC.read_text(encoding="utf-8")
-    assert "it-thesis-research-documentation-engineer" in gap_text
-    assert "công cụ" in gap_text.lower()
 
 
 def test_role_enum_claim_matches_code(requirements_text):

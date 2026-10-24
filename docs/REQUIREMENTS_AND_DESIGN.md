@@ -1,14 +1,10 @@
 # Phân tích yêu cầu & thiết kế hệ thống MarketFlow AI
 
-**Phục vụ:** Bài kiểm tra thường xuyên 1 — mục 1, 2, 3, 4, 7, 8, 9, 10.
 Mục 5 (ERD) và mục 6 (kiến trúc) đã có ở [ARCHITECTURE.md](ARCHITECTURE.md).
-Bảng đối chiếu 40 tiêu chí của cả 4 phần rubric nằm ở
-[UNIVERSITY_DEFENSE_RUBRIC_ALIGNMENT.md](UNIVERSITY_DEFENSE_RUBRIC_ALIGNMENT.md).
 
 **Nguyên tắc.** Mỗi yêu cầu ở đây đều dẫn tới nơi nó được hiện thực. Yêu cầu nào
-chỉ mới là định hướng thì ghi rõ là đề xuất, không trộn vào phần đã làm. Nếu giảng
-viên hỏi "cái này có thật không", câu trả lời phải là một đường dẫn file hoặc một
-tên test.
+chỉ mới là định hướng thì ghi rõ là đề xuất, không trộn vào phần đã làm. Mọi khẳng định
+trong tài liệu đều đi kèm một đường dẫn file hoặc một tên test.
 
 ---
 
@@ -53,11 +49,11 @@ production. Tài khoản đặc quyền không tự đăng ký được qua API.
 |---|---|
 | Danh tính & tenant | `users`, `workspaces`, `workspace_members`, `campaign_members` |
 | Nghiệp vụ lõi | `campaigns`, `campaign_tasks`, `campaign_budget_allocations`, `campaign_kpi_targets`, `campaign_metrics` |
-| Nội dung & kênh | `marketing_channels`, `marketing_contents`, `content_reviews`, `products`, `product_categories` |
+| Nội dung & kênh | `marketing_channels`, `marketing_contents` (kèm cột `blocks_json` lưu Gói Nội Dung Bán Hàng linh hoạt; `campaign_id` và `product_id` tùy chọn), `content_reviews`, `products`, `product_categories` |
 | Thương hiệu | `brand_kits` (một workspace một bộ) |
 | Vận hành | `marketing_schedules`, `notifications` |
-| AI | `ai_logs` (provider, model, prompt_version, input_hash, source_ids, status, latency) |
-| Cấu hình | `custom_api_keys` (khoá BYOK đã mã hoá) |
+| AI & Copilot | `ai_logs` (provider, model, prompt_version, input_hash, source_ids, status, latency), `ai_chat_threads` (lịch sử chat lâu dài & pinned facts), `muse_board_cards` (Bảng Nhớ Không Gian 2D kiểu Muse AI), `agent_staged_proposals` (LLM điều khiển dự án qua Staging Diff & 1-Click Undo) |
+| Cấu hình | `custom_api_keys` (khoá BYOK đã mã hoá), `ai_model_chains` (chuỗi fallback đa model) |
 
 `content_reviews` lưu lịch sử quyết định của người duyệt (`APPROVED`,
 `REJECTED`, `REQUEST_CHANGES` kèm lý do) — đây là nhật ký kiểm toán của luồng duyệt.
@@ -81,12 +77,12 @@ production. Tài khoản đặc quyền không tự đăng ký được qua API.
 | FR-11 | Brand Kit | thương hiệu, USP, giọng văn, từ khoá cấm | Lưu, dùng làm đầu vào AI và bộ quét | brand kit | `api/v1/brand_kit.py` |
 | FR-12 | Tìm / lọc / sắp xếp | query params | Lọc ở tầng query, có `order_by` xác định | danh sách đã lọc | `campaigns.py` (`search`, `status`, `channel_id`, `start_date`, `end_date`), `contents.py`, `tasks.py` (`status`, `priority`, `assignee_id`) |
 | FR-13 | Cấu hình provider & khoá | provider, base URL, API key | Lưu khoá mã hoá Fernet, kiểm tra kết nối | masked key + trạng thái provider | `api/v1/settings.py` |
+| FR-14 | Hội thoại AI lâu dài, Muse Board & Staging Diff | tin nhắn chat, thẻ không gian, lệnh điều khiển dự án | Lưu luồng chat (`ai_chat_threads`), ghim thẻ (`muse_board_cards`), tạo bản đề xuất kèm snapshot (`agent_staged_proposals`) | phản hồi Copilot + danh sách thay đổi chờ duyệt / hoàn tác 1-Click | `api/v1/ai.py` (`/ai/threads`, `/ai/muse-board`, `/ai/proposals`) |
 
-**Phân trang — nói thẳng phần chưa đủ.** `GET /notifications` có `limit`
-(1–100); `GET /ai/logs` giới hạn 50 bản ghi. Nhưng `GET /campaigns`,
-`GET /contents` và `GET /tasks` trả về **toàn bộ** danh sách, không có `limit`/
-`offset`. Với vài trăm chiến dịch thì chấp nhận được; với dữ liệu thật của agency
-nhiều năm thì đây là điểm thiếu cần bổ sung. Xem [ROADMAP.md](ROADMAP.md).
+**Phân trang.** Các endpoint danh sách chính (`GET /campaigns`, `GET /contents`,
+`GET /tasks`, `GET /schedules`) đã hỗ trợ phân trang `Page[T]` (`page`, `page_size`,
+`total`, `total_pages`); `GET /notifications` có `limit` (1–100) và `GET /ai/logs`
+giới hạn 50 bản ghi. Xem [ROADMAP.md](ROADMAP.md).
 
 **Ngoài phạm vi, đã nói rõ là chưa làm:** gửi email thật, đăng lên mạng xã hội thật.
 `PUBLISHED` hiện chỉ là trạng thái nội bộ.
@@ -107,7 +103,7 @@ nhiều năm thì đây là điểm thiếu cần bổ sung. Xem [ROADMAP.md](RO
 | Hiệu năng | Không để gọi AI treo UI | Frontend dùng timeout riêng cho nhóm AI (`AI_LONG_TIMEOUT`) | `frontend/src/services/api.ts` |
 | Khả dụng | AI hỏng không làm hỏng nghiệp vụ | Fallback có nhãn; 502 khi tắt fallback | `test_offline_core_works_without_ai.py` |
 | Khả dụng | Người không dùng AI vẫn làm được việc | FR-4 + trình soạn thảo thủ công | `works-without-ai.spec.ts` |
-| Sao lưu | Dữ liệu không nằm trong container | Postgres bên ngoài Render | `render.yaml`, [cloudflare/README.md](../cloudflare/README.md) |
+| Sao lưu | Dữ liệu không nằm trong container | PostgreSQL 16 trên VPS + sao lưu offsite | [DEPLOYMENT-VPS.md](DEPLOYMENT-VPS.md), [cloudflare/README.md](../cloudflare/README.md) |
 | Trải nghiệm | Cảnh báo rõ khi dữ liệu mẫu | `data_provenance` + banner | `Dashboard.tsx` |
 | Trải nghiệm | Nội dung dự phòng được dán nhãn | `is_fallback` + bảng cảnh báo | `AIStudio.tsx` |
 | Trải nghiệm | Hỗ trợ trình đọc màn hình | nhãn ARIA, focus trap, `role="alert"` | kiểm thử WCAG trong CI |
@@ -311,7 +307,7 @@ Frontend ──POST /api/v1/ai/*──> FastAPI router
 
 ## 7. Minh chứng cách kiến thức được sinh ra và quản lý cho AI
 
-Rubric hỏi rõ: kiến thức mà AI dùng lấy từ đâu, ai quản lý, và đã chỉnh sửa ra sao.
+Kiến thức mà AI dùng lấy từ đâu, ai quản lý, và đã chỉnh sửa ra sao.
 Trong hệ thống này có ba nguồn kiến thức, tất cả đều nằm ngoài mô hình:
 
 | Nguồn kiến thức | Nơi lưu | Ai quản lý | Cách dùng với AI |
@@ -341,7 +337,7 @@ dạng trong prompt quan trọng hơn độ dài mô tả**, và nên đo thay v
 | Giai đoạn | Nội dung | Điều kiện hoàn tất |
 |---|---|---|
 | GĐ 0 — xong | Đa provider, chạy được không có AI, đo prompt, tài liệu đạo đức | Đã có bằng chứng: test + CI + hai tài liệu trong `docs/` |
-| GĐ 1 | Chốt `DATABASE_URL` production (Neon), có quy trình `ALTER TABLE` | Ghi lại lựa chọn trong `render.yaml`; migration có công cụ |
+| GĐ 1 | Chốt `DATABASE_URL` production (PostgreSQL trên VPS), có quy trình `ALTER TABLE` | Ghi lại lựa chọn trong [DEPLOYMENT-VPS.md](DEPLOYMENT-VPS.md); migration có công cụ |
 | GĐ 2 | Gửi email thật: brief → duyệt → gửi → nhận sự kiện | Có adapter provider + webhook xác nhận; `PUBLISHED` tách khỏi "đã gửi" |
 | GĐ 3 | Đo lường hiệu quả AI có ích không | So sánh có/không AI trên cùng một chiến dịch thật |
 | GĐ 4 | Pilot với agency thật | Có phỏng vấn, chỉ số sử dụng, và quyết định giữ/loại |
@@ -356,8 +352,8 @@ Ghi lại để không bị phát hiện trong lúc bảo vệ:
 
 | Nợ | Mức độ | Ghi chú |
 |---|---|---|
-| `GET /campaigns`, `/contents`, `/tasks` không phân trang | Trung bình | Tìm/lọc/sắp xếp có; `limit`/`offset` thì không. Ảnh hưởng khi dữ liệu lớn |
-| `metrics.py` có cặp route trùng nhau (`/campaigns/{id}/metrics` và `/metrics/campaign/{id}/metrics`) | Thấp | Hai path phục vụ cùng chức năng; nên gộp một |
+| `GET /campaigns`, `/contents`, `/tasks` đã bổ sung phân trang `Page[T]` | Đã xử lý | Đã hỗ trợ `page` và `page_size` chuẩn hoá trên cả backend và frontend |
+| `metrics.py` có cặp route trùng nhau (`/campaigns/{id}/metrics` và `/metrics/campaign/{id}/metrics`) | Thấp | Hai path phục vụ cùng chức năng; giữ tương thích ngược cho bộ test |
 | `config.py` còn `OLLAMA_BASE_URL`, `ANTHROPIC_BASE_URL`, `HF_BASE_URL` không dùng | Thấp | Registry đọc biến `MARKETFLOW_*`; nên dọn |
 | Chưa có công cụ migration | Trung bình | `create_all()` không sửa bảng cũ |
 | Chưa có connector gửi thật | Trung bình | Đã nêu ở FR và UC-08 |

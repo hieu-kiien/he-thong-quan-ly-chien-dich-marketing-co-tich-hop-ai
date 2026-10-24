@@ -37,6 +37,7 @@ LIVE_DB_PATH = BASE_DIR / "data" / "marketing_campaigns.db"
 
 # Redirect global settings and database.SessionLocal to memory engine
 settings.DATABASE_URL = TEST_DB_URL
+settings.AI_ENABLE_FALLBACK = True
 
 test_engine = create_engine(
     TEST_DB_URL,

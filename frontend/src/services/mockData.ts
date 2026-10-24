@@ -391,7 +391,7 @@ export const MOCK_CUSTOM_API_KEYS: CustomApiKey[] = [
   {
     id: 1,
     provider: 'gemini',
-    model: 'gemini-3.8-flash',
+    model: 'gemini-2.5-flash',
     masked_key: 'AIzaSy...4xQ9',
     is_active: true,
     workspace_id: 1,
@@ -404,7 +404,7 @@ export const MOCK_CUSTOM_API_KEYS: CustomApiKey[] = [
   {
     id: 2,
     provider: 'gemini',
-    model: 'gemini-4-argon',
+    model: 'gemini-2.5-pro',
     masked_key: 'AIzaSy...8kP2',
     is_active: false,
     workspace_id: null,

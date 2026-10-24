@@ -298,15 +298,15 @@ def provision_workspace_account(
             email=email_clean,
             password_hash=hash_password(req.password),
             full_name=req.full_name.strip(),
-            role=system_role,
+            role=system_role if current_user.role in ("ADMIN", "MANAGER") else "MARKETER",
             status="ACTIVE",
         )
         db.add(target_user)
         db.flush()
         created_new_user = True
     else:
-        # Nếu người dùng đã tồn tại, cập nhật vai trò và tên theo yêu cầu của Quản lý
-        if target_user.role != "ADMIN":
+        # Nếu người dùng đã tồn tại, chỉ cập nhật vai trò toàn cục khi caller là ADMIN hoặc MANAGER
+        if target_user.role != "ADMIN" and current_user.role in ("ADMIN", "MANAGER"):
             target_user.role = system_role
         if req.full_name and req.full_name.strip():
             target_user.full_name = req.full_name.strip()
@@ -393,7 +393,7 @@ def update_workspace_member_role(
     else:
         member.role = workspace_role
 
-    if target_user.role != "ADMIN":
+    if target_user.role != "ADMIN" and current_user.role in ("ADMIN", "MANAGER"):
         target_user.role = system_role
 
     db.commit()

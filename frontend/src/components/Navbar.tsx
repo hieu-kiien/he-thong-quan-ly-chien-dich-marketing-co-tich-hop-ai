@@ -216,18 +216,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {user.email}
               </span>
             </div>
-            <button
-              type="button"
-              data-testid="navbar-role-switcher-btn"
-              onClick={() => setRoleSwitcherOpen((prev) => !prev)}
-              aria-expanded={roleSwitcherOpen}
-              aria-label="Đổi nhanh tài khoản phân quyền"
-              title="Bấm để chuyển nhanh giữa 3 cấp tài khoản (Quản lý / Chuyên viên / Người duyệt)"
-              className="flex items-center gap-0.5 cursor-pointer hover:opacity-80 transition-opacity"
-            >
-              {getRoleBadge(userRole)}
-              <ChevronDown className="w-3 h-3 text-[#5A5E66]" />
-            </button>
+            {(isOfflineDemoEnabled() || String(userRole) === 'ADMIN') ? (
+              <button
+                type="button"
+                data-testid="navbar-role-switcher-btn"
+                onClick={() => setRoleSwitcherOpen((prev) => !prev)}
+                aria-expanded={roleSwitcherOpen}
+                aria-label="Đổi nhanh tài khoản phân quyền"
+                title="Bấm để chuyển nhanh giữa 3 cấp tài khoản (Quản lý / Chuyên viên / Người duyệt)"
+                className="flex items-center gap-0.5 cursor-pointer hover:opacity-80 transition-opacity"
+              >
+                {getRoleBadge(userRole)}
+                <ChevronDown className="w-3 h-3 text-[#5A5E66]" />
+              </button>
+            ) : (
+              getRoleBadge(userRole)
+            )}
 
             {roleSwitcherOpen && (
               <div

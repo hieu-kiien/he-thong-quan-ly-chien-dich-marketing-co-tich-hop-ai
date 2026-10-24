@@ -27,15 +27,16 @@ WorkingDirectory=/opt/marketflow/backend
 EnvironmentFile=/opt/marketflow/backend/.env
 Environment="PYTHONUNBUFFERED=1"
 Environment="PYTHONDONTWRITEBYTECODE=1"
+Environment="HOME=/opt/marketflow"
 
-# 2 workers cho VPS 2 vCPU (SQLite WAL + busy_timeout=5000ms hỗ trợ đọc song song).
-ExecStart=/opt/marketflow/backend/venv/bin/uvicorn app.main:app \
+# 1 worker async Uvicorn tối ưu bộ nhớ RAM cho VPS 2 GiB (tiết kiệm ~140 MB RAM so với 2 workers).
+ExecStart=/opt/marketflow/.venv/bin/uvicorn app.main:app \
     --host 127.0.0.1 \
     --port 8000 \
-    --workers 2 \
-    --timeout-keep-alive 75 \
-    --limit-concurrency 120 \
-    --backlog 256 \
+    --workers 1 \
+    --timeout-keep-alive 30 \
+    --limit-concurrency 100 \
+    --backlog 128 \
     --proxy-headers \
     --forwarded-allow-ips="127.0.0.1"
 
@@ -44,8 +45,8 @@ RestartSec=3
 TimeoutStopSec=30
 
 # Giới hạn tài nguyên cho VPS 2 vCPU / 2 GiB RAM (tránh OOM toàn máy)
-MemoryHigh=1024M
-MemoryMax=1400M
+MemoryHigh=512M
+MemoryMax=768M
 CPUQuota=180%
 LimitNOFILE=65535
 
@@ -54,7 +55,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/marketflow/backend/data /opt/marketflow/backend
+ReadWritePaths=/opt/marketflow /opt/marketflow/backend/data /opt/marketflow/backend
 
 StandardOutput=journal
 StandardError=journal

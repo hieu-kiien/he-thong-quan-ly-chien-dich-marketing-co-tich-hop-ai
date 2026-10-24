@@ -48,17 +48,17 @@ graph TD
     end
     end
 
-    subgraph App["FastAPI trên VPS (systemd, 2 Uvicorn worker)"]
+    subgraph App["FastAPI trên VPS (systemd, 1 Uvicorn worker ~80-114 MB RAM)"]
         API["REST Engine (Pydantic v2)"]
         Auth["Bảo mật & phân quyền (JWT + RBAC + ranh giới workspace)"]
         Operations["Khối vận hành nghiệp vụ (Command Center, Tasks, Budgets, KPIs)"]
         AIDoctor["Động cơ Bác sĩ AI (quy tắc tất định, KHÔNG gọi LLM)"]
         Compliance["Bộ quét tuân thủ (quy tắc tất định, KHÔNG gọi LLM)"]
-        AIEngine["Động cơ AI sinh nội dung (Prompt Engine v1-v3 + Smart Fallback)"]
+        AIEngine["Động cơ AI & Copilot (Prompt Engine + OpenCode CLI Bridge + Muse Board + Staging Diff)"]
     end
 
     DB[("PostgreSQL 16 trên cùng VPS<br/>nghe loopback, không mở cổng 5432")]
-    ExternalAI["Nhà cung cấp AI: Gemini · OpenRouter · OpenAI ·<br/>Anthropic · HuggingFace · Ollama · OpenCode"]
+    ExternalAI["Nhà cung cấp AI: Gemini · OpenRouter · OpenAI ·<br/>Anthropic · Groq · xAI · HuggingFace · Ollama · OpenCode"]
     Breaker["Circuit breaker theo provider<br/>3 lỗi liên tiếp → ngắt, 60s sau thử lại"]
     Scheduler["Scheduler trong tiến trình FastAPI<br/>(systemd, không còn cron Worker)"]
 
@@ -166,7 +166,11 @@ erDiagram
 | `campaign_tasks` | Quản lý tác vụ marketing của chiến dịch | `task_type IN ('CONTENT', 'DESIGN', 'VIDEO', 'ADS', 'RESEARCH', 'OTHER')`<br>`status IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')`<br>`priority IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')` |
 | `campaign_budget_allocations` | Kế hoạch ngân sách theo từng kênh | `campaign_id -> campaigns.id (CASCADE)`<br>`channel_id -> marketing_channels.id (RESTRICT)` |
 | `campaign_kpi_targets` | Mục tiêu định lượng cam kết của chiến dịch | `kpi_name`, `target_value`, `unit` |
-| `campaign_metrics` | Số liệu đo lường thực nghiệm hàng ngày | `views`, `clicks`, `conversions`, `cost`, `revenue` |
+| `campaign_metrics` | Số liệu đo lường thực nghiệm hàng ngày | `views`, `clicks`, `conversions`, `cost`, `revenue`, `source` (`real`, `seed`, `csv_import`, `live_sync`) |
+| `marketing_contents` | Gói Nội Dung Bán Hàng (Creative Pack) & bản nháp đa kênh | `campaign_id` và `product_id` là `NULLABLE` (hỗ trợ viết nháp tự do Quick Scratchpad); `blocks_json` lưu mảng khối JSON linh hoạt (Hook 3s, Bài chính, Comment đầu tiên chứa link/SĐT, Kịch bản chốt đơn, Ghi chú ảnh/video) |
+| `ai_chat_threads` | Luồng hội thoại AI Copilot lâu dài theo dự án | `workspace_id`, `campaign_id` (nullable), `messages_json`, `pinned_facts_json` (bộ nhớ ghim xuyên suốt các phiên chat) |
+| `muse_board_cards` | Bảng Nhớ Không Gian 2D kiểu Muse AI (Spatial Memory Board) | `workspace_id`, `campaign_id` (nullable), `card_type` (`NOTE`, `BRIEF`, `SWIPE`, `INSIGHT`, `AI_ARTIFACT`), `x_pos`, `y_pos`, `is_pinned_to_ai` |
+| `agent_staged_proposals` | Khu vực chờ duyệt khi LLM điều khiển dự án (Staging + Undo) | `action_type`, `status` (`PROPOSED`, `APPLIED`, `REVERTED`, `REJECTED`), `payload_json`, `before_snapshot_json` (hỗ trợ 1-Click Atomic Undo an toàn) |
 | `ai_logs` | Lưu log ở các đường AI hiện đang ghi nhận | `input_hash`, `provider`, `model`, `output_json`, `latency_ms`; không mặc định rằng mọi lời gọi AI đều có log. |
 
 ---

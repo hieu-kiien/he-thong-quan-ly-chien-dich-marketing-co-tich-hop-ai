@@ -207,7 +207,7 @@ export const CampaignTable: React.FC<CampaignTableProps> = ({
                                       : 'bg-[#FFF1F2] text-[#BE123C] border-[#FECDD3]'
                                 }`}
                               >
-                                ROAS {roas.toFixed(2)}x {roas >= 2.0 ? '(Lãi tốt)' : roas >= 1.0 ? '(Lãi mỏng)' : '(Đang lỗ)'}
+                                ROAS {roas.toFixed(2)}x {roas >= 2.0 ? '(Lãi tốt)' : roas >= 1.0 ? '(Hòa vốn / Lãi nhẹ)' : '(Đang lỗ)'}
                               </span>
                             )}
                             <span className="text-xs font-semibold text-[#3B3F46]">

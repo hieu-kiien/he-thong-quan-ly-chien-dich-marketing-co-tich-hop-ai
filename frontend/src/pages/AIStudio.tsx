@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Lightbulb, FileText, SendHorizontal, Copy, Check, Loader2, ArrowRight, CheckCircle2, Zap, Stethoscope, RefreshCw, AlertTriangle, ThumbsUp, Video, Mail, ExternalLink, ShieldCheck, Eye, Lock, Bot, Target, Scale, Layers, Rocket } from 'lucide-react';
-import { Campaign, AIIdeaResponse, AIDraftResponse, MarketingContent, AISummaryResponse, KPISummary, OmnichannelResponse, ComplianceCheckResponse, AngleMatrixResponse, PrelaunchCriticResponse } from '../types';
-import { contentApi, campaignApi, aiApi, mcpApi, getApiErrorMessage } from '../services/api';
+import { Sparkles, Lightbulb, FileText, SendHorizontal, Copy, Check, Loader2, ArrowRight, CheckCircle2, Zap, Stethoscope, RefreshCw, AlertTriangle, ThumbsUp, Video, Mail, ExternalLink, ShieldCheck, Eye, Lock, MessageSquare, Cpu } from 'lucide-react';
+import { Campaign, AIIdeaResponse, AIDraftResponse, MarketingContent, AISummaryResponse, KPISummary, OmnichannelResponse, ComplianceCheckResponse } from '../types';
+import { contentApi, campaignApi, mcpApi, settingsApi, getApiErrorMessage } from '../services/api';
 import { AIJobError, describeAIJobFailure, describeAIResultOrigin } from '../services/aiJobPoller';
 import { useAIJob } from '../hooks/useAIJob';
 import { AIJobProgress } from '../components/AIJobProgress';
 import { useToast } from '../components/Toast';
 import { ComplianceAlertBadge } from '../components/ComplianceAlertBadge';
 import { AntiAiCopyLinterCard } from '../components/AntiAiCopyLinterCard';
-import { MCPAgentStudio } from '../components/MCPAgentStudio';
 import { FacebookPreviewCard, TikTokPhoneMockup, EmailInboxPreview } from '../components/previews';
 import { ExportActions } from '../components/ExportActions';
 import { copyToClipboardWithFormatting } from '../utils/copyUtils';
+import { InteractiveCanvasCopilot } from '../components/studio/InteractiveCanvasCopilot';
 
 
 interface AIStudioProps {
@@ -34,37 +34,68 @@ export const AIStudio: React.FC<AIStudioProps> = ({
   // Mode: 'campaign' or 'custom'
   const [mode, setMode] = useState<'campaign' | 'custom'>('campaign');
   
-  // Custom Inputs
-  const [customTopic, setCustomTopic] = useState<string>('Chiến dịch Tuyển sinh Chuyên ngành AI & Khoa học Dữ liệu 2026');
-  const [customProduct, setCustomProduct] = useState<string>('Khóa đào tạo Kỹ sư Trí tuệ Nhân tạo Thực chiến');
-  const [customUsp, setCustomUsp] = useState<string>('Chương trình chuẩn quốc tế, thực hành trên GPU hiệu năng cao, cam kết việc làm');
+  // Custom Inputs (empty by default — require real campaign or user input)
+  const [customTopic, setCustomTopic] = useState<string>('');
+  const [customProduct, setCustomProduct] = useState<string>('');
+  const [customUsp, setCustomUsp] = useState<string>('');
   const [tone] = useState<string>('Chuyên nghiệp, truyền cảm hứng, tin cậy');
   const [channelCode, setChannelCode] = useState<string>('facebook');
   const [framework, setFramework] = useState<'AIDA' | 'PAS' | 'FAB'>('AIDA');
 
-  // Studio Modes: 'omnichannel' | 'create' | 'doctor' | 'angle_matrix' | 'persona_critic' | 'mcp'
-  const [studioSection, setStudioSection] = useState<'omnichannel' | 'create' | 'doctor' | 'angle_matrix' | 'persona_critic' | 'mcp'>('omnichannel');
+  // Studio Modes: 'canvas' | 'omnichannel' | 'create' | 'doctor'
+  const [studioSection, setStudioSection] = useState<'canvas' | 'omnichannel' | 'create' | 'doctor'>('omnichannel');
 
-  // Flagship 1: AI Angle × Hook Matrix States
-  const [matrixProduct, setMatrixProduct] = useState<string>('Nền tảng Quản trị Chiến dịch Marketing AI');
-  const [matrixUsp, setMatrixUsp] = useState<string>('Tự động hóa tạo 12 biến thể A/B, cảnh báo Over-pacing và tăng 38% ROAS chỉ sau 14 ngày');
-  const [matrixAudience] = useState<string>('Chủ doanh nghiệp SME, Performance Marketer & Trưởng phòng Tăng trưởng');
-  const [matrixChannel, setMatrixChannel] = useState<string>('Facebook');
-  const [matrixData, setMatrixData] = useState<AngleMatrixResponse | null>(null);
-  const [matrixLoading, setMatrixLoading] = useState<boolean>(false);
-  const [matrixSeeding, setMatrixSeeding] = useState<boolean>(false);
-  const [activeAngleFilter, setActiveAngleFilter] = useState<string>('ALL');
+  // Direct Model & Provider Switcher (Modern AI Connection Control)
+  const [preferredProvider, setPreferredProvider] = useState<string>('gemini');
+  const [preferredModel, setPreferredModel] = useState<string>('gemini-2.5-flash');
+  const [customBaseUrl, setCustomBaseUrl] = useState<string>('');
+  const [expertMode, setExpertMode] = useState<boolean>(false);
+  const [availableModels, setAvailableModels] = useState<string[]>([
+    'gemini-2.5-flash',
+    'gemini-3.8-flash',
+    'gemini-3.1-pro-preview',
+    'gemini-2.5-pro',
+  ]);
+  const [canvasInitialDraft, setCanvasInitialDraft] = useState<{ title: string; body: string; cta: string } | null>(null);
 
-  // Flagship 2: Pre-Launch Persona Critic States
-  const [criticTitle, setCriticTitle] = useState<string>('Giải pháp số 1 thị trường cam kết 100% tăng gấp đôi doanh số sau 3 ngày');
-  const [criticBody, setCriticBody] = useState<string>('Chúng tôi là nền tảng số 1 thị trường giúp bạn cam kết 100% ra đơn ngay lập tức mà không cần tốn công sức. Hãy đăng ký ngay hôm nay để không bỏ lỡ cơ hội tuyệt đối này!');
-  const [criticCta, setCriticCta] = useState<string>('Đăng ký ngay');
-  const [criticData, setCriticData] = useState<PrelaunchCriticResponse | null>(null);
-  const [criticLoading, setCriticLoading] = useState<boolean>(false);
-  const [criticSaving, setCriticSaving] = useState<boolean>(false);
+  useEffect(() => {
+    settingsApi
+      .listModels(preferredProvider)
+      .then((res) => {
+        if (res.models && res.models.length > 0) {
+          setAvailableModels(res.models);
+          setPreferredModel((prev) =>
+            res.models.includes(prev) ? prev : res.default_model || res.models[0],
+          );
+        }
+      })
+      .catch(() => {
+        const fallbackCatalog: Record<string, string[]> = {
+          gemini: ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-3.1-pro-preview', 'gemini-3.6-flash', 'gemini-2.5-pro'],
+          openai: ['gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-luna', 'gpt-5.4', 'gpt-4.1', 'gpt-4o-mini'],
+          anthropic: ['claude-sonnet-5-5', 'claude-opus-5-5', 'claude-haiku-5-5', 'claude-fable-5-1', 'claude-3-5-sonnet-latest'],
+          groq: ['meta-llama/llama-4-maverick-17b-128e-instruct', 'openai/gpt-oss-120b', 'meta-llama/llama-4-scout-17b-16e-instruct', 'qwen/qwen3-32b'],
+          xai: ['grok-4', 'grok-3-mini', 'grok-3'],
+          openrouter: ['openrouter/free', 'google/gemini-3.8-flash', 'deepseek/deepseek-chat-v3-0324:free', 'qwen/qwen3-235b-a22b:free'],
+          ollama: ['qwen3.6:27b', 'qwen3.6:8b', 'gpt-oss:20b', 'gemma4:12b', 'llama4:scout'],
+          huggingface: ['Qwen/Qwen3-235B-A22B', 'deepseek-ai/DeepSeek-V3-0324', 'meta-llama/Llama-4-Maverick-17B-128E-Instruct'],
+          opencode: ['glm-5.3-flash-free', 'deepseek-v4.1-flash-free', 'nemotron-3.5-lightning-free', 'flint-40b-free', 'nemotron-3-ultra-free', 'beam-free', 'big-pickle'],
+        };
+        const list = fallbackCatalog[preferredProvider] || ['gemini-2.5-flash'];
+        setAvailableModels(list);
+        setPreferredModel(list[0]);
+      });
+  }, [preferredProvider]);
+
+  const openInInteractiveCanvas = (draft: { title: string; body: string; cta: string }, ch?: string) => {
+    setCanvasInitialDraft(draft);
+    if (ch) setChannelCode(ch);
+    setStudioSection('canvas');
+    toast.info('Đã chuyển nội dung sang Bàn Soạn Thảo Thủ Công + Chat AI!');
+  };
 
   // Omnichannel States (R2)
-  const [omniBrief, setOmniBrief] = useState<string>('Chiến dịch Tuyển sinh Kỹ sư Trí tuệ Nhân tạo 2026. Khán giả: Sinh viên CNTT, người chuyển ngành công nghệ. USP: Học thực hành GPU xịn, cam kết kết nối việc làm ngay khi tốt nghiệp.');
+  const [omniBrief, setOmniBrief] = useState<string>('');
   const [omniData, setOmniData] = useState<OmnichannelResponse | null>(null);
   const [omniLoading, setOmniLoading] = useState<boolean>(false);
   const [omniFilter, setOmniFilter] = useState<'all' | 'facebook' | 'tiktok' | 'email'>('all');
@@ -162,23 +193,31 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
   const handleGenerateIdeas = async () => {
     if (loading) return;
+    const activeCampaign = selectedCampaign || (campaigns.length > 0 ? campaigns[0] : null);
+    const cid = mode === 'campaign' && activeCampaign ? activeCampaign.id : null;
+    if (mode === 'campaign' && !cid) {
+      toast.warning('Vui lòng chọn một chiến dịch có sẵn hoặc chuyển sang tab Nhập tay tùy chỉnh.');
+      return;
+    }
+    if (mode === 'custom' && (!customTopic.trim() || !customProduct.trim() || !customUsp.trim())) {
+      toast.warning('Vui lòng nhập đầy đủ Tên chiến dịch, Sản phẩm và Điểm nổi bật (USP) trước khi gọi AI.');
+      return;
+    }
+
     setLoading(true);
     setSubmittedSuccess(false);
     try {
-      const activeCampaign = selectedCampaign || (campaigns.length > 0 ? campaigns[0] : null);
-      const cid = mode === 'campaign' && activeCampaign ? activeCampaign.id : null;
       const customData = (mode === 'custom' || !cid) ? {
-        topic: customTopic,
-        product: customProduct,
-        usp: customUsp,
+        topic: customTopic.trim(),
+        product: customProduct.trim(),
+        usp: customUsp.trim(),
         tone: `${tone} (${framework} framework)`
       } : {
+        product: activeCampaign?.product?.name || '',
+        usp: activeCampaign?.product?.usp || '',
         tone: `${tone} (${framework} framework)`
       };
 
-      // Qua hàng đợi, không gọi thẳng `/ai/ideas`. Endpoint đồng bộ giữ một
-      // thread của worker suốt thời gian chờ LLM; qua Worker thì Cloudflare cắt
-      // ở ~100s (error 524) trong khi job thật mất 237s.
       const res = await ideasJob.run<AIIdeaResponse>({
         kind: 'ideas',
         ...(cid ? { campaign_id: cid } : {}),
@@ -206,17 +245,38 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
   const handleGenerateDraft = async (ideaOverride?: string) => {
     if (loading) return;
+    const activeCampaign = selectedCampaign || (campaigns.length > 0 ? campaigns[0] : null);
+    const cid = mode === 'campaign' && activeCampaign ? activeCampaign.id : null;
+    if (mode === 'campaign' && !cid) {
+      toast.warning('Vui lòng chọn một chiến dịch có sẵn hoặc chuyển sang tab Nhập tay tùy chỉnh.');
+      return;
+    }
+    if (mode === 'custom' && (!customProduct.trim() || !customUsp.trim())) {
+      toast.warning('Vui lòng nhập Sản phẩm và Điểm nổi bật (USP) trước khi viết bản nháp.');
+      return;
+    }
+
+    const ideaToUse = (
+      ideaOverride ||
+      selectedIdeaText ||
+      (ideaData?.ideas[0]?.headline ? `${ideaData.ideas[0].headline} - ${ideaData.ideas[0].concept}` : '')
+    ).trim();
+
+    if (!ideaToUse) {
+      toast.warning('Vui lòng khởi tạo ý tưởng hoặc nhập góc tiếp cận bài viết trước khi yêu cầu AI viết bản nháp.');
+      return;
+    }
+
     setLoading(true);
     setSubmittedSuccess(false);
     try {
-      const activeCampaign = selectedCampaign || (campaigns.length > 0 ? campaigns[0] : null);
-      const cid = mode === 'campaign' && activeCampaign ? activeCampaign.id : null;
       const customData = (mode === 'custom' || !cid) ? {
-        product: customProduct,
-        usp: customUsp
-      } : undefined;
-
-      const ideaToUse = ideaOverride || selectedIdeaText || (ideaData?.ideas[0]?.headline ? `${ideaData.ideas[0].headline} - ${ideaData.ideas[0].concept}` : 'Chiến lược tiếp thị số đột phá tiếp cận đúng khách hàng tiềm năng');
+        product: customProduct.trim(),
+        usp: customUsp.trim()
+      } : {
+        product: activeCampaign?.product?.name || '',
+        usp: activeCampaign?.product?.usp || ''
+      };
 
       const res = await draftJob.run<AIDraftResponse>({
         kind: 'draft',
@@ -224,8 +284,8 @@ export const AIStudio: React.FC<AIStudioProps> = ({
         ...(cid ? { campaign_id: cid } : {}),
         channel_code: channelCode,
         prompt_version: 'v3',
-        ...(customData?.product ? { custom_product: customData.product } : {}),
-        ...(customData?.usp ? { custom_usp: customData.usp } : {})
+        ...(customData.product ? { custom_product: customData.product } : {}),
+        ...(customData.usp ? { custom_usp: customData.usp } : {})
       });
       setDraftData(res);
       setActiveTab('draft');
@@ -285,7 +345,8 @@ export const AIStudio: React.FC<AIStudioProps> = ({
         facebook: 1,
         email: 2,
         blog: 3,
-        google_ads: 4
+        google_ads: 4,
+        tiktok: 5
       };
       const chId = chMap[channelCode] || 1;
 
@@ -446,25 +507,31 @@ export const AIStudio: React.FC<AIStudioProps> = ({
   const handleGenerateOmnichannel = async () => {
     if (omniLoading) return;
     const activeCampaign = selectedCampaign || (campaigns.length > 0 ? campaigns[0] : null);
-    const briefToUse = omniBrief.trim() || (activeCampaign ? `Chiến dịch: ${activeCampaign.name}. Mục tiêu: ${activeCampaign.objective || ''}. Khán giả: ${activeCampaign.audience || ''}` : '');
+    const campaignContextBrief = activeCampaign
+      ? [
+          `Chiến dịch: ${activeCampaign.name}`,
+          activeCampaign.product?.name ? `Sản phẩm: ${activeCampaign.product.name}` : '',
+          activeCampaign.product?.usp ? `USP: ${activeCampaign.product.usp}` : '',
+          activeCampaign.objective ? `Mục tiêu: ${activeCampaign.objective}` : '',
+          activeCampaign.audience ? `Khán giả: ${activeCampaign.audience}` : '',
+        ].filter(Boolean).join('. ')
+      : '';
+    const briefToUse = omniBrief.trim() || campaignContextBrief;
     if (!briefToUse) {
-      toast.warning('Vui lòng nhập brief chiến dịch tiếp thị!');
+      toast.warning('Vui lòng chọn một chiến dịch có sẵn hoặc nhập thông tin sản phẩm/chiến dịch vào ô Brief trước khi gọi AI!');
       return;
     }
     setOmniLoading(true);
     try {
-      // Đây là lời gọi nặng nhất của hệ thống: đo thật 237 giây trên Render
-      // free, qua Cloudflare Worker là chết 524. Đi qua hàng đợi để request
-      // trả 202 ngay và việc gọi LLM do worker nền đảm nhiệm.
       const res = await omniJob.run<OmnichannelResponse>({
         kind: 'omnichannel',
         brief: briefToUse,
         ...(activeCampaign?.id ? { campaign_id: activeCampaign.id } : {}),
+        ...(activeCampaign?.product?.name ? { product_name: activeCampaign.product.name } : {}),
+        ...(activeCampaign?.product?.usp ? { product_usp: activeCampaign.product.usp } : {}),
         channels: ['facebook', 'tiktok', 'email']
       });
       setOmniData(res);
-      // Toast phải nói đúng nguồn gốc. Trước đây luôn ghi "(Gemini 2.5 Flash)"
-      // kể cả khi backend đã chuyển sang template dự phòng vì không gọi được AI.
       const origin = describeAIResultOrigin(res);
       if (origin.isFallback) {
         toast.warning(
@@ -595,110 +662,6 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
   const activeC = selectedCampaign || (campaigns.length > 0 ? campaigns[0] : null);
 
-  // Flagship 1: Generate 4 Angles × 3 Hooks = 12 Variants Matrix
-  const handleGenerateAngleMatrix = async () => {
-    if (matrixLoading) return;
-    setMatrixLoading(true);
-    try {
-      const res = await aiApi.generateAngleMatrix({
-        campaign_id: activeC?.id,
-        product_name: activeC?.product?.name || matrixProduct,
-        product_usp: activeC?.product?.usp || matrixUsp,
-        objective: activeC?.objective || 'Tối ưu chuyển đổi & ROAS',
-        audience: activeC?.audience || matrixAudience,
-        channel: matrixChannel,
-        tone,
-      });
-      setMatrixData(res);
-      setActiveAngleFilter('ALL');
-      toast.success(`Đã sinh Ma trận ${res.variants.length} biến thể quảng cáo (4 Góc Tâm lý × 3 Hook 3s)!`);
-    } catch (err) {
-      toast.error(getApiErrorMessage(err), 'Lỗi khi sinh Ma trận Góc tiếp cận');
-    } finally {
-      setMatrixLoading(false);
-    }
-  };
-
-  // 1-Click Seed all 12 Matrix Variants into the selected Campaign
-  const handleSeedMatrixToCampaign = async () => {
-    if (!matrixData || matrixSeeding) return;
-    const targetC = activeC;
-    if (!targetC) {
-      toast.warning('Vui lòng chọn hoặc tạo ít nhất 1 chiến dịch trước khi đẩy biến thể.');
-      return;
-    }
-    setMatrixSeeding(true);
-    try {
-      const res = await campaignApi.seedAngleMatrix(targetC.id, {
-        variants: matrixData.variants,
-        channel_code: matrixChannel.toLowerCase(),
-      });
-      toast.success(`Đã đẩy toàn bộ ${res.created_count || matrixData.variants.length} biến thể A/B vào chiến dịch "${targetC.name}"!`);
-      if (onContentCreated) onContentCreated();
-    } catch (err) {
-      toast.error(getApiErrorMessage(err), 'Không thể đẩy biến thể vào chiến dịch');
-    } finally {
-      setMatrixSeeding(false);
-    }
-  };
-
-  // Flagship 2: Run Pre-Launch Persona Critic
-  const handleRunPrelaunchCritic = async () => {
-    if (criticLoading || !criticBody.trim()) return;
-    setCriticLoading(true);
-    try {
-      const res = await aiApi.simulatePrelaunchCritic({
-        campaign_id: activeC?.id,
-        title: criticTitle,
-        body: criticBody,
-        cta: criticCta,
-        channel: matrixChannel,
-        objective: activeC?.objective,
-      });
-      setCriticData(res);
-      toast.success(`Hội đồng 4 Khán giả AI đã chấm điểm xong (Readiness: ${res.overall_readiness_score}/100)!`);
-    } catch (err) {
-      toast.error(getApiErrorMessage(err), 'Lỗi khi chạy Hội đồng Phản biện');
-    } finally {
-      setCriticLoading(false);
-    }
-  };
-
-  // 1-Click Upgrade Copy from Persona Critic
-  const handleApplyCriticRewrite = () => {
-    if (!criticData?.rewritten_version) return;
-    setCriticTitle(criticData.rewritten_version.title);
-    setCriticBody(criticData.rewritten_version.body);
-    setCriticCta(criticData.rewritten_version.cta);
-    toast.success('Đã áp dụng bản viết lại sắc bén & hợp chuẩn từ Hội đồng Phản biện!');
-  };
-
-  const handleSaveCriticCopyToCampaign = async () => {
-    if (!activeC || criticSaving) return;
-    setCriticSaving(true);
-    try {
-      await contentApi.create({
-        campaign_id: activeC.id,
-        channel_id: 1,
-        created_by: 1,
-        title: criticTitle,
-        body: criticBody,
-        cta: criticCta,
-        status: 'IN_REVIEW',
-        version_no: 1,
-        source_ids_json: '["PERSONA_CRITIC_VERIFIED"]',
-        warnings_json: '[]',
-      });
-      toast.success(`Đã lưu bài viết đã kiểm định vào Hàng đợi Duyệt của "${activeC.name}"!`);
-      if (onContentCreated) onContentCreated();
-      if (onNavigateToReviews) onNavigateToReviews();
-    } catch (err) {
-      toast.error(getApiErrorMessage(err), 'Không thể lưu bài viết');
-    } finally {
-      setCriticSaving(false);
-    }
-  };
-
   // Contents formatted for ExportActions toolbar (R4)
   const omniContentsForExport: MarketingContent[] = [];
   if (omniData) {
@@ -765,16 +728,29 @@ export const AIStudio: React.FC<AIStudioProps> = ({
       <div className="bg-white border border-[#E4E2DD] rounded-xl p-5 flex flex-col lg:flex-row lg:flex-wrap items-start lg:items-center justify-between gap-4 no-print">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-[#121316] tracking-tight">
-            Viết bài &amp; Tạo mẫu quảng cáo
+            AI Marketing Copilot &amp; Performance Doctor
           </h1>
           <p className="text-xs text-[#5A5E66] mt-1 max-w-2xl">
-            Chọn công cụ bên phải: Viết bài cho 3 kênh cùng lúc, tạo 12 mẫu câu mở đầu để thử nghiệm, hoặc chấm điểm bài viết trước khi đăng.
+            Khởi tạo nội dung bám sát dữ liệu Chiến dịch, Sản phẩm (USP) &amp; Brand Kit thực tế — không sinh nội dung sáo rỗng thiếu ngữ cảnh.
           </p>
         </div>
 
         {/* Section Switcher */}
         <div className="flex w-full lg:w-auto flex-wrap items-center gap-1.5 bg-[#F6F5F0] p-1.5 rounded-xl border border-[#E4E2DD] shrink-0">
           <button
+            type="button"
+            data-testid="studio-tab-canvas-copilot"
+            onClick={() => setStudioSection('canvas')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+              studioSection === 'canvas'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-[#5A5E66] hover:text-[#121316]'
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5" /> Bàn Soạn Thảo Thủ Công + Chat AI
+          </button>
+          <button
+            type="button"
             onClick={() => setStudioSection('omnichannel')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
               studioSection === 'omnichannel'
@@ -782,31 +758,10 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                 : 'text-[#5A5E66] hover:text-[#121316]'
             }`}
           >
-            <Zap className="w-3.5 h-3.5" /> Viết 3 kênh cùng lúc
+            <Zap className="w-3.5 h-3.5" /> Đa kênh 3-in-1 (FB / TikTok / Email)
           </button>
           <button
-            data-testid="studio-tab-angle-matrix"
-            onClick={() => setStudioSection('angle_matrix')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
-              studioSection === 'angle_matrix'
-                ? 'bg-[#121316] text-white shadow-xs'
-                : 'text-[#5A5E66] hover:text-[#121316]'
-            }`}
-          >
-            <Target className="w-3.5 h-3.5" /> Tạo 12 mẫu thử nghiệm
-          </button>
-          <button
-            data-testid="studio-tab-persona-critic"
-            onClick={() => setStudioSection('persona_critic')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
-              studioSection === 'persona_critic'
-                ? 'bg-[#121316] text-white shadow-xs'
-                : 'text-[#5A5E66] hover:text-[#121316]'
-            }`}
-          >
-            <Scale className="w-3.5 h-3.5" /> Chấm điểm trước khi đăng
-          </button>
-          <button
+            type="button"
             onClick={() => setStudioSection('create')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
               studioSection === 'create'
@@ -814,9 +769,10 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                 : 'text-[#5A5E66] hover:text-[#121316]'
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5" /> Viết lẻ từng bài
+            <Sparkles className="w-3.5 h-3.5" /> Đơn kênh (Ý tưởng &amp; Bản nháp)
           </button>
           <button
+            type="button"
             onClick={() => setStudioSection('doctor')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
               studioSection === 'doctor'
@@ -826,20 +782,134 @@ export const AIStudio: React.FC<AIStudioProps> = ({
           >
             <Stethoscope className="w-3.5 h-3.5" /> Khám bệnh chiến dịch
           </button>
-          <button
-            data-testid="studio-tab-mcp"
-            onClick={() => setStudioSection('mcp')}
-            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer ${
-              studioSection === 'mcp'
-                ? 'bg-[#121316] text-white shadow-xs'
-                : 'text-[#5A5E66] hover:text-[#121316]'
-            }`}
-            title="Công cụ kiểm tra kỹ thuật (MCP)"
-          >
-            <Bot className="w-3.5 h-3.5" /> Kỹ thuật
-          </button>
+        </div>
+
+        {/* Thanh Chọn Nhanh Nhà Cung Cấp AI & Chế Độ Giao Diện (2-Tier UX: Chủ Shop vs Chuyên Gia) */}
+        <div className="w-full pt-3 border-t border-[#F0EFEA] flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-bold text-slate-700 flex items-center gap-1.5">
+              <Cpu className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Bộ não AI:</span>
+            </span>
+
+            <select
+              value={preferredProvider}
+              onChange={(e) => setPreferredProvider(e.target.value)}
+              aria-label="Chọn nhà cung cấp AI"
+              className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 font-bold text-slate-800 outline-none focus:border-indigo-500"
+            >
+              <option value="gemini">Google Gemini</option>
+              <option value="opencode">OpenCode AI (0đ Miễn phí trên VPS / Custom)</option>
+              <option value="openai">OpenAI (ChatGPT)</option>
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="openrouter">OpenRouter (Đa model / Free)</option>
+              <option value="ollama">Ollama (Chạy máy cục bộ)</option>
+              <option value="huggingface">HuggingFace Inference</option>
+            </select>
+
+            <button
+              type="button"
+              data-testid="studio-quick-opencode-free"
+              onClick={() => {
+                setPreferredProvider('opencode');
+                setPreferredModel('mimo-v2.6-flash-free');
+                toast.success('Đã bật OpenCode AI miễn phí tích hợp sẵn trên VPS (mimo-v2.6-flash-free)!');
+              }}
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition cursor-pointer flex items-center gap-1 ${
+                preferredProvider === 'opencode'
+                  ? 'bg-emerald-600 text-white border-emerald-600'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+              }`}
+              title="Dùng ngay mô hình AI miễn phí tích hợp sẵn trên máy chủ VPS mà không cần nhập API Key"
+            >
+              <Zap className="w-3 h-3" /> OpenCode 0đ (Sẵn trên VPS)
+            </button>
+
+            <button
+              type="button"
+              data-testid="toggle-expert-mode"
+              onClick={() => setExpertMode((prev) => !prev)}
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition cursor-pointer ${
+                expertMode
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              {expertMode ? '⚙️ Chế độ Chuyên Gia (Đang bật)' : '👤 Chế độ Chủ Shop (Đơn giản)'}
+            </button>
+
+            {expertMode && (
+              <>
+                <input
+                  type="text"
+                  list="studio-ai-model-options"
+                  value={preferredModel}
+                  onChange={(e) => setPreferredModel(e.target.value)}
+                  placeholder="Tên model (VD: mimo-v2.6-flash-free, gemini-2.5-flash)"
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-mono text-xs text-slate-800 min-w-[210px] outline-none focus:border-indigo-500"
+                />
+                <datalist id="studio-ai-model-options">
+                  {availableModels.map((m) => (
+                    <option key={m} value={m} />
+                  ))}
+                </datalist>
+
+                {preferredProvider === 'opencode' && (
+                  <input
+                    type="url"
+                    value={customBaseUrl}
+                    onChange={(e) => setCustomBaseUrl(e.target.value)}
+                    placeholder="Để trống dùng OpenCode VPS hoặc nhập Base URL riêng"
+                    className="px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50/40 font-mono text-xs text-slate-800 min-w-[260px] outline-none focus:border-indigo-500"
+                  />
+                )}
+              </>
+            )}
+          </div>
+
+          {campaigns.length > 0 && (
+            <div className="flex items-center gap-1.5 bg-[#F6F5F0] border border-[#D0CEC7] rounded-lg px-2.5 py-1 text-xs">
+              <span className="text-[#5A5E66] font-medium">Chiến dịch làm việc:</span>
+              <select
+                value={selectedCampaign?.id || campaigns[0]?.id || ''}
+                onChange={(e) => {
+                  const found = campaigns.find((c) => c.id === Number(e.target.value)) || null;
+                  onSelectCampaign(found);
+                }}
+                aria-label="Chọn chiến dịch đang làm việc"
+                className="bg-transparent font-bold text-[#121316] outline-none cursor-pointer"
+              >
+                {campaigns.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* SECTION -1: INTERACTIVE MANUAL CANVAS + MULTI-TURN AI CHAT COPILOT */}
+      {studioSection === 'canvas' && (
+        <InteractiveCanvasCopilot
+          activeCampaign={activeC || undefined}
+          workspaceId={activeC?.workspace_id || 1}
+          selectedChannel={channelCode}
+          onChangeChannel={setChannelCode}
+          preferredProvider={preferredProvider}
+          preferredModel={preferredModel}
+          customBaseUrl={customBaseUrl}
+          initialDraft={canvasInitialDraft}
+          customProduct={customProduct}
+          customUsp={customUsp}
+          onChangeCustomProduct={setCustomProduct}
+          onChangeCustomUsp={setCustomUsp}
+          onSavedSuccess={onContentCreated}
+          onNavigateToReviews={onNavigateToReviews}
+          expertMode={expertMode}
+        />
+      )}
 
       {/* SECTION 0: OMNICHANNEL 3-IN-1 (R2) */}
       {studioSection === 'omnichannel' && (
@@ -853,7 +923,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                   <span>Soạn 1 lần — Ra bài viết cho cả Facebook, TikTok &amp; Email</span>
                 </h2>
                 <p className="text-xs text-[#5A5E66] mt-1">
-                  Nhập tóm tắt sản phẩm, điểm mạnh và khách hàng mục tiêu. Hệ thống sẽ viết sẵn bài đăng Facebook, kịch bản quay TikTok và thư gửi khách hàng.
+                  AI kế thừa trực tiếp Sản phẩm, USP, Khách hàng mục tiêu từ chiến dịch đang chọn hoặc từ đề bài (Brief) bạn cung cấp.
                 </p>
               </div>
 
@@ -884,6 +954,53 @@ export const AIStudio: React.FC<AIStudioProps> = ({
               </div>
             </div>
 
+            {/* Grounded Campaign Context Summary */}
+            {activeC && (
+              <div className="p-3.5 bg-[#F6F5F0] border border-[#E4E2DD] rounded-xl text-xs space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-bold text-[#121316] flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-[#D95D39]" />
+                    <span>Ngữ cảnh thực tế AI đang kế thừa từ Chiến dịch #{activeC.id}:</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const briefText = [
+                        `Chiến dịch: ${activeC.name}`,
+                        activeC.product?.name ? `Sản phẩm: ${activeC.product.name}` : '',
+                        activeC.product?.usp ? `Điểm mạnh (USP): ${activeC.product.usp}` : '',
+                        activeC.objective ? `Mục tiêu: ${activeC.objective}` : '',
+                        activeC.audience ? `Khách hàng mục tiêu: ${activeC.audience}` : '',
+                      ].filter(Boolean).join('\n');
+                      setOmniBrief(briefText);
+                      toast.info('Đã đổ dữ liệu chiến dịch vào ô Brief để bạn tùy chỉnh');
+                    }}
+                    className="text-[11px] font-bold text-[#D95D39] hover:underline cursor-pointer"
+                  >
+                    Đổ dữ liệu này vào ô Brief để chỉnh sửa →
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-[11px] text-[#5A5E66]">
+                  <div className="bg-white p-2 rounded-lg border border-[#E4E2DD]">
+                    <span className="font-semibold text-[#121316] block">Sản phẩm liên kết:</span>
+                    <span>{activeC.product?.name || 'Chưa gắn sản phẩm cụ thể'}</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-[#E4E2DD]">
+                    <span className="font-semibold text-[#121316] block">Điểm bán hàng độc nhất (USP):</span>
+                    <span className="line-clamp-2">{activeC.product?.usp || 'Chưa khai báo USP'}</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-[#E4E2DD]">
+                    <span className="font-semibold text-[#121316] block">Khách hàng mục tiêu:</span>
+                    <span className="line-clamp-2">{activeC.audience || 'Chưa khai báo'}</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-[#E4E2DD]">
+                    <span className="font-semibold text-[#121316] block">Mục tiêu chiến dịch:</span>
+                    <span className="line-clamp-2">{activeC.objective || 'Chưa khai báo'}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Presets */}
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="font-semibold text-[#5A5E66]">Điền nhanh đề bài mẫu:</span>
@@ -907,7 +1024,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <label className="font-bold text-[#121316]">
-                  Thông tin sản phẩm, điểm khác biệt và khách hàng bạn muốn nhắm tới:
+                  Yêu cầu cụ thể / Brief bổ sung cho AI {activeC ? '(Để trống nếu dùng nguyên ngữ cảnh chiến dịch ở trên)' : '(Bắt buộc nhập)'}:
                 </label>
                 <span className="text-[#5A5E66] font-mono text-[11px] font-semibold">{omniBrief.length} ký tự</span>
               </div>
@@ -915,7 +1032,11 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                 rows={3}
                 value={omniBrief}
                 onChange={(e) => setOmniBrief(e.target.value)}
-                placeholder="Nhập chi tiết sản phẩm, giá bán, ưu đãi và đối tượng khách hàng..."
+                placeholder={
+                  activeC
+                    ? `Nhập thêm thông điệp ưu đãi, chương trình khuyến mãi hoặc góc tiếp cận riêng cho chiến dịch "${activeC.name}"...`
+                    : 'Nhập chi tiết sản phẩm, điểm khác biệt (USP), ưu đãi và đối tượng khách hàng mục tiêu...'
+                }
                 className="w-full text-xs bg-[#F6F5F0]/60 border border-[#D0CEC7] rounded-xl p-3 text-[#121316] focus:bg-white focus:outline-none focus:border-[#D95D39] leading-relaxed"
               />
             </div>
@@ -946,7 +1067,7 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                 ) : (
                   <>
                     <Zap className="w-4 h-4" />
-                    <span>Tạo bài viết cho cả 3 kênh</span>
+                    <span>Sáng tạo 3 Kênh Đồng Thời</span>
                   </>
                 )}
               </button>
@@ -1145,17 +1266,49 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                     ) : (
                       <div className="p-5 space-y-4 flex-1 text-xs">
                         <div>
-                          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Tiêu đề (Headline):</span>
-                          <h4 className="font-bold text-slate-900 text-sm mt-1 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                            {omniData.facebook.headline || omniData.facebook.title}
-                          </h4>
+                          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Tiêu đề (Headline — Có thể sửa trực tiếp):</span>
+                          <input
+                            type="text"
+                            value={omniData.facebook.headline || omniData.facebook.title || ''}
+                            onChange={(e) =>
+                              setOmniData((prev) =>
+                                prev && prev.facebook
+                                  ? {
+                                      ...prev,
+                                      facebook: {
+                                        ...prev.facebook,
+                                        title: e.target.value,
+                                        headline: e.target.value,
+                                      },
+                                    }
+                                  : prev
+                              )
+                            }
+                            className="w-full font-bold text-slate-900 text-sm mt-1 bg-slate-50 focus:bg-white p-2.5 rounded-lg border border-slate-200 focus:border-blue-500 outline-none"
+                          />
                         </div>
 
                         <div>
-                          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Nội dung bài viết (Primary Text):</span>
-                          <div className="mt-1 bg-slate-50 p-3 rounded-lg border border-slate-200 text-slate-700 whitespace-pre-line leading-relaxed max-h-64 overflow-y-auto font-sans">
-                            {omniData.facebook.primary_text || omniData.facebook.body}
-                          </div>
+                          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Nội dung bài viết (Primary Text — Có thể sửa trực tiếp):</span>
+                          <textarea
+                            rows={7}
+                            value={omniData.facebook.primary_text || omniData.facebook.body || ''}
+                            onChange={(e) =>
+                              setOmniData((prev) =>
+                                prev && prev.facebook
+                                  ? {
+                                      ...prev,
+                                      facebook: {
+                                        ...prev.facebook,
+                                        body: e.target.value,
+                                        primary_text: e.target.value,
+                                      },
+                                    }
+                                  : prev
+                              )
+                            }
+                            className="w-full mt-1 bg-slate-50 focus:bg-white p-3 rounded-lg border border-slate-200 focus:border-blue-500 text-slate-700 leading-relaxed font-sans outline-none resize-y"
+                          />
                         </div>
 
                         {omniData.facebook.hashtags && omniData.facebook.hashtags.length > 0 && (
@@ -1173,10 +1326,43 @@ export const AIStudio: React.FC<AIStudioProps> = ({
 
                         <div>
                           <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Kêu gọi hành động (CTA):</span>
-                          <div className="mt-1 bg-blue-50/70 text-blue-700 font-bold p-2.5 rounded-lg border border-blue-200 text-center">
-                            {omniData.facebook.cta}
-                          </div>
+                          <input
+                            type="text"
+                            value={omniData.facebook.cta || ''}
+                            onChange={(e) =>
+                              setOmniData((prev) =>
+                                prev && prev.facebook
+                                  ? {
+                                      ...prev,
+                                      facebook: {
+                                        ...prev.facebook,
+                                        cta: e.target.value,
+                                      },
+                                    }
+                                  : prev
+                              )
+                            }
+                            className="w-full mt-1 bg-blue-50/70 focus:bg-white text-blue-700 font-bold p-2.5 rounded-lg border border-blue-200 focus:border-blue-500 outline-none"
+                          />
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openInInteractiveCanvas(
+                              {
+                                title: omniData.facebook?.headline || omniData.facebook?.title || '',
+                                body: omniData.facebook?.primary_text || omniData.facebook?.body || '',
+                                cta: omniData.facebook?.cta || '',
+                              },
+                              'facebook'
+                            )
+                          }
+                          className="w-full py-2 px-3 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          <span>Đưa sang Bàn Soạn Thảo + Chat AI để trao đổi sâu hơn</span>
+                        </button>
                       </div>
                     )}
 
@@ -1660,9 +1846,11 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                       </div>
                     )}
                     {activeC && (
-                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-600 space-y-1">
-                        <div><strong>Khách hàng mục tiêu:</strong> {activeC.audience}</div>
-                        <div><strong>Mục tiêu chiến dịch:</strong> {activeC.objective}</div>
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-600 space-y-1.5">
+                        <div><strong>Sản phẩm liên kết:</strong> {activeC.product?.name || 'Chưa gắn sản phẩm cụ thể'}</div>
+                        <div><strong>Điểm nổi bật (USP):</strong> {activeC.product?.usp || 'Chưa khai báo USP'}</div>
+                        <div><strong>Khách hàng mục tiêu:</strong> {activeC.audience || 'Chưa khai báo'}</div>
+                        <div><strong>Mục tiêu chiến dịch:</strong> {activeC.objective || 'Chưa khai báo'}</div>
                       </div>
                     )}
                   </div>
@@ -1783,6 +1971,19 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                         </button>
                       ))}
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Ý tưởng / Góc tiếp cận để viết bản nháp:
+                    </label>
+                    <input
+                      type="text"
+                      value={selectedIdeaText}
+                      onChange={(e) => setSelectedIdeaText(e.target.value)}
+                      placeholder="Chọn 1 góc ý tưởng ở cột phải hoặc tự nhập ý tưởng bài viết tại đây..."
+                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
                   </div>
                 </div>
 
@@ -1938,28 +2139,55 @@ export const AIStudio: React.FC<AIStudioProps> = ({
                         </div>
                       </div>
 
-                      {/* Title & Body */}
+                      {/* Title & Body (Directly Editable) */}
                       <div className="space-y-3">
                         <div>
-                          <label className="text-[11px] font-bold text-slate-600 uppercase block mb-1">Tiêu đề bài viết:</label>
-                          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm text-slate-900">
-                            {draftData.title}
-                          </div>
+                          <label className="text-[11px] font-bold text-slate-600 uppercase block mb-1">Tiêu đề bài viết (Sửa trực tiếp):</label>
+                          <input
+                            type="text"
+                            value={draftData.title}
+                            onChange={(e) => setDraftData({ ...draftData, title: e.target.value })}
+                            className="w-full p-3 bg-slate-50 focus:bg-white border border-slate-200 focus:border-indigo-500 rounded-xl font-bold text-sm text-slate-900 outline-none"
+                          />
                         </div>
 
                         <div>
-                          <label className="text-[11px] font-bold text-slate-600 uppercase block mb-1">Nội dung tiếp thị chi tiết:</label>
-                          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 whitespace-pre-line leading-relaxed">
-                            {draftData.body}
-                          </div>
+                          <label className="text-[11px] font-bold text-slate-600 uppercase block mb-1">Nội dung tiếp thị chi tiết (Sửa trực tiếp):</label>
+                          <textarea
+                            rows={9}
+                            value={draftData.body}
+                            onChange={(e) => setDraftData({ ...draftData, body: e.target.value })}
+                            className="w-full p-4 bg-slate-50 focus:bg-white border border-slate-200 focus:border-indigo-500 rounded-xl text-xs text-slate-700 leading-relaxed outline-none resize-y"
+                          />
                         </div>
 
                         <div>
                           <label className="text-[11px] font-bold text-slate-600 uppercase block mb-1">Lời kêu gọi hành động (Call To Action):</label>
-                          <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl font-bold text-xs text-indigo-800">
-                            {draftData.cta}
-                          </div>
+                          <input
+                            type="text"
+                            value={draftData.cta}
+                            onChange={(e) => setDraftData({ ...draftData, cta: e.target.value })}
+                            className="w-full p-3 bg-indigo-50/70 focus:bg-white border border-indigo-200 focus:border-indigo-500 rounded-xl font-bold text-xs text-indigo-800 outline-none"
+                          />
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openInInteractiveCanvas(
+                              {
+                                title: draftData.title,
+                                body: draftData.body,
+                                cta: draftData.cta,
+                              },
+                              channelCode
+                            )
+                          }
+                          className="w-full py-2.5 px-4 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          <span>Mở trong Bàn Soạn Thảo Thủ Công + Chat AI để tinh chỉnh từng câu</span>
+                        </button>
                       </div>
 
                       {/* Bộ Soi Mùi AI & Bài Thử Xóa Tên Thương Hiệu (5 Luật Viết Chữ) */}
@@ -2206,430 +2434,6 @@ export const AIStudio: React.FC<AIStudioProps> = ({
             </div>
           )}
         </div>
-      )}
-
-      {/* SECTION 4: AI ANGLE × HOOK MATRIX (4 PSYCHOLOGICAL ANGLES × 3 HOOKS = 12 A/B VARIANTS) */}
-      {studioSection === 'angle_matrix' && (
-        <div className="space-y-6" data-testid="angle-matrix-section">
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center shrink-0">
-                  <Target className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-base font-black text-slate-900">
-                    Ma Trận Góc Tiếp Cận &amp; 3s Hook (AI Angle × Hook A/B Matrix)
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Thay vì viết 1 bài đơn lẻ, tạo ngay 4 Góc Tâm lý (Pain Point, Social Proof, Myth Buster, Offer/FOMO) × 3 biến thể Hook 3 giây = 12 mẫu quảng cáo kèm giả thuyết A/B và mã UTM.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleGenerateAngleMatrix}
-                disabled={matrixLoading}
-                data-testid="generate-angle-matrix-btn"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#121316] hover:bg-black text-white text-xs font-bold shadow-md transition-all shrink-0 disabled:opacity-50"
-              >
-                {matrixLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Đang sinh 12 biến thể A/B...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    <span>Sinh Ma trận 12 Biến thể A/B</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Chiến dịch liên kết</label>
-                <select
-                  value={activeC?.id || ''}
-                  onChange={(e) => {
-                    const found = campaigns.find((c) => c.id === Number(e.target.value)) || null;
-                    onSelectCampaign(found);
-                  }}
-                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-800"
-                >
-                  {campaigns.length === 0 && <option value="">Chưa có chiến dịch</option>}
-                  {campaigns.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      #{c.id} — {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Sản phẩm / Giải pháp</label>
-                <input
-                  type="text"
-                  value={matrixProduct}
-                  onChange={(e) => setMatrixProduct(e.target.value)}
-                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-medium text-slate-800"
-                />
-              </div>
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Điểm khác biệt độc tôn (USP)</label>
-                <input
-                  type="text"
-                  value={matrixUsp}
-                  onChange={(e) => setMatrixUsp(e.target.value)}
-                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-medium text-slate-800"
-                />
-              </div>
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Kênh phân phối chủ lực</label>
-                <select
-                  value={matrixChannel}
-                  onChange={(e) => setMatrixChannel(e.target.value)}
-                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-800"
-                >
-                  <option value="Facebook">Facebook Feed &amp; Reels Ads</option>
-                  <option value="TikTok">TikTok Video 9:16 Spark Ads</option>
-                  <option value="Email">Email Conversion Sequence</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {matrixData ? (
-            <div className="space-y-4">
-              {/* Action & Filter Bar */}
-              <div className="bg-slate-900 text-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-xs font-bold">
-                    <Layers className="w-4 h-4 text-violet-400" />
-                    <span>
-                      Đã sẵn sàng {matrixData.variants.length} Biến thể Quảng cáo cho &ldquo;{matrixData.product_name}&rdquo;
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-300">
-                    {matrixData.strategy_summary}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleSeedMatrixToCampaign}
-                  disabled={matrixSeeding}
-                  data-testid="seed-angle-matrix-btn"
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition-all shrink-0 disabled:opacity-50"
-                >
-                  {matrixSeeding ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Rocket className="w-4 h-4" />
-                  )}
-                  <span>Đẩy toàn bộ {matrixData.variants.length} biến thể vào Chiến dịch (1-Click Seed)</span>
-                </button>
-              </div>
-
-              {/* Angle Filter Pills */}
-              <div className="flex flex-wrap items-center gap-2">
-                {[
-                  { code: 'ALL', label: `Tất cả (${matrixData.variants.length})` },
-                  { code: 'PAIN_POINT', label: 'Pain Point (Nỗi đau)' },
-                  { code: 'SOCIAL_PROOF', label: 'Social Proof (Bằng chứng)' },
-                  { code: 'MYTH_BUSTER', label: 'Myth Buster (Phá ngộ nhận)' },
-                  { code: 'OFFER_FOMO', label: 'Offer / FOMO (Thúc đẩy chốt đơn)' },
-                ].map((pill) => (
-                  <button
-                    key={pill.code}
-                    type="button"
-                    onClick={() => setActiveAngleFilter(pill.code)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
-                      activeAngleFilter === pill.code
-                        ? 'bg-violet-600 text-white border-violet-600 shadow-xs'
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    {pill.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Variants Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {matrixData.variants
-                  .filter((v) => activeAngleFilter === 'ALL' || v.angle_code === activeAngleFilter)
-                  .map((v, idx) => (
-                    <div
-                      key={v.id || idx}
-                      className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-3"
-                    >
-                      <div className="space-y-2.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 border border-violet-200 text-[10px] font-bold">
-                            {v.angle_code} • {v.funnel_stage || 'ToFU'}
-                          </span>
-                          <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-mono font-bold">
-                            An toàn: {v.compliance_score}%
-                          </span>
-                        </div>
-
-                        <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/80">
-                          <div className="text-[10px] font-bold uppercase text-amber-800">
-                            3s Hook ({v.hook_type}):
-                          </div>
-                          <div className="text-xs font-extrabold text-slate-900 mt-0.5">
-                            &ldquo;{v.hook_3s}&rdquo;
-                          </div>
-                        </div>
-
-                        <div className="text-xs text-slate-700 whitespace-pre-line line-clamp-4 leading-relaxed">
-                          {v.body}
-                        </div>
-                      </div>
-
-                      <div className="pt-2.5 border-t border-slate-100 space-y-2">
-                        <div className="text-[10px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-200">
-                          <strong className="text-indigo-700">Giả thuyết A/B:</strong> {v.ab_hypothesis}
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] font-mono text-slate-400 truncate max-w-[180px]" title={v.utm_params}>
-                            {v.utm_params}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(`${v.hook_3s}\n\n${v.body}\n\nCTA: ${v.cta}\n${v.utm_params}`)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-[10px] font-bold inline-flex items-center gap-1"
-                          >
-                            <Copy className="w-3 h-3" /> Sao chép
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          ) : (
-            <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-10 text-center space-y-3">
-              <Target className="w-10 h-10 text-violet-400 mx-auto" />
-              <div className="max-w-lg mx-auto space-y-1">
-                <h3 className="text-sm font-bold text-slate-800">
-                  Chưa khởi tạo Ma trận Góc tiếp cận &amp; 3s Hook
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Bấm nút &ldquo;Sinh Ma trận 12 Biến thể A/B&rdquo; phía trên để AI tự động thiết kế 4 góc tiếp cận tâm lý × 3 Hook 3 giây chuẩn Performance Marketing và đẩy vào chiến dịch chỉ với 1 cú nhấp.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* SECTION 5: PRE-LAUNCH PERSONA CRITIC (4 SIMULATED BUYER & POLICY PERSONAS) */}
-      {studioSection === 'persona_critic' && (
-        <div className="space-y-6" data-testid="persona-critic-section">
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
-                  <Scale className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-base font-black text-slate-900">
-                    Hội Đồng Khán Giả Phản Biện Trước Khi Chạy Ads (Pre-Launch Persona Critic)
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Đưa mẫu quảng cáo qua 4 màng lọc giả lập: Khách hàng hoài nghi, Người lướt 3 giây, Người gác cổng Brand Kit và Thuật toán Chính sách Meta/TikTok trước khi tốn tiền thật.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleRunPrelaunchCritic}
-                disabled={criticLoading || !criticBody.trim()}
-                data-testid="run-persona-critic-btn"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 text-white text-xs font-bold shadow-md transition-all shrink-0 disabled:opacity-50"
-              >
-                {criticLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Hội đồng đang thẩm định...</span>
-                  </>
-                ) : (
-                  <>
-                    <Scale className="w-4 h-4" />
-                    <span>Chấm điểm &amp; Phản biện Bản nháp</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-              <div className="md:col-span-2 space-y-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Tiêu đề Quảng cáo (Headline)</label>
-                  <input
-                    type="text"
-                    value={criticTitle}
-                    onChange={(e) => setCriticTitle(e.target.value)}
-                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-900"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Nội dung Chính (Ad Copy / Script)</label>
-                  <textarea
-                    rows={4}
-                    value={criticBody}
-                    onChange={(e) => setCriticBody(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 font-medium text-slate-800 leading-relaxed"
-                  />
-                </div>
-              </div>
-              <div className="space-y-3 flex flex-col justify-between">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Nút Kêu gọi Hành động (CTA)</label>
-                  <input
-                    type="text"
-                    value={criticCta}
-                    onChange={(e) => setCriticCta(e.target.value)}
-                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-900"
-                  />
-                </div>
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                  <div className="text-[11px] font-bold text-slate-800">Lưu vào Hàng đợi Duyệt</div>
-                  <p className="text-[11px] text-slate-500">
-                    Sau khi áp dụng bản viết lại từ Hội đồng Phản biện, bạn có thể đẩy thẳng sang Hàng đợi Duyệt của chiến dịch đang chọn.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleSaveCriticCopyToCampaign}
-                    disabled={criticSaving || !activeC}
-                    className="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors disabled:opacity-50"
-                  >
-                    {criticSaving ? 'Đang lưu...' : `Đẩy sang Duyệt (${activeC?.name || 'Chọn chiến dịch'})`}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {criticData && (
-            <div className="space-y-4">
-              {/* Scorecards */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                  <div className="text-xs font-semibold text-slate-500">Điểm Dừng Ngón Tay 3 Giây (Thumb-Stop Score)</div>
-                  <div className="text-2xl font-black text-indigo-600 font-mono mt-1">
-                    {criticData.thumb_stop_score}/100
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">Khả năng giữ chân người xem ở dòng đầu</div>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                  <div className="text-xs font-semibold text-slate-500">Chỉ số Ma Sát Chuyển Đổi (Conversion Friction)</div>
-                  <div className="text-2xl font-black text-amber-600 font-mono mt-1">
-                    {criticData.conversion_friction_score}/100
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">Càng thấp càng dễ thuyết phục khách mua</div>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                  <div className="text-xs font-semibold text-slate-500">Điểm Sẵn Sàng Chạy Thực Tế (Readiness)</div>
-                  <div className="text-2xl font-black text-emerald-600 font-mono mt-1">
-                    {criticData.overall_readiness_score}/100
-                  </div>
-                  <div className="text-[11px] font-semibold text-slate-700 mt-1">{criticData.verdict_label}</div>
-                </div>
-              </div>
-
-              {/* Weakest Sentence & 1-Click Rewrite Upgrade */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="bg-rose-50/70 border border-rose-200 rounded-2xl p-4 space-y-2">
-                  <div className="text-xs font-bold uppercase text-rose-800 flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4 text-rose-600" />
-                    <span>Câu yếu nhất làm tụt tỷ lệ chuyển đổi</span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-white border border-rose-200 text-xs font-bold text-rose-900 italic">
-                    &ldquo;{criticData.weakest_sentence}&rdquo;
-                  </div>
-                  <p className="text-xs text-rose-800 leading-relaxed">
-                    <strong>Lý do bị bắt lỗi:</strong> {criticData.weakest_reason}
-                  </p>
-                </div>
-
-                <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 space-y-3 flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase text-emerald-900 flex items-center gap-1.5">
-                        <Sparkles className="w-4 h-4 text-emerald-600" />
-                        <span>Bản Viết Lại Sắc Bén &amp; Hợp Chuẩn Chính Sách</span>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleApplyCriticRewrite}
-                        data-testid="apply-critic-rewrite-btn"
-                        className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all"
-                      >
-                        Áp dụng Bản viết lại (1-Click Upgrade)
-                      </button>
-                    </div>
-                    <div className="p-3 rounded-xl bg-white border border-emerald-200 text-xs space-y-1">
-                      <div className="font-bold text-slate-900">{criticData.rewritten_version.title}</div>
-                      <div className="text-slate-700 whitespace-pre-line">{criticData.rewritten_version.body}</div>
-                    </div>
-                  </div>
-                  <div className="text-[11px] text-emerald-800">
-                    {criticData.rewritten_version.improvement_notes}
-                  </div>
-                </div>
-              </div>
-
-              {/* 4 Personas Feedback Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {criticData.personas.map((p) => (
-                  <div
-                    key={p.persona_id}
-                    className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-2.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-2xl">{p.avatar_emoji}</span>
-                        <div>
-                          <div className="text-xs font-extrabold text-slate-900">{p.persona_name}</div>
-                          <div className="text-[11px] text-slate-500">{p.persona_role}</div>
-                        </div>
-                      </div>
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-mono font-bold border ${
-                          p.verdict === 'PASS'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : p.verdict === 'FAIL'
-                            ? 'bg-rose-50 text-rose-700 border-rose-200'
-                            : 'bg-amber-50 text-amber-700 border-amber-200'
-                        }`}
-                      >
-                        {p.score}/100 ({p.verdict})
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                      &ldquo;{p.critique}&rdquo;
-                    </p>
-                    <div className="text-[11px] text-indigo-700 font-medium">
-                      <strong>Đề xuất chỉnh sửa:</strong> {p.actionable_fix}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* SECTION 3: MCP & AGENTIC COPILOT (Developer Inspector) */}
-      {studioSection === 'mcp' && (
-        <MCPAgentStudio
-          campaigns={campaigns}
-          selectedCampaign={selectedCampaign}
-          onSelectCampaign={onSelectCampaign}
-          onContentCreated={onContentCreated}
-        />
       )}
     </div>
   );

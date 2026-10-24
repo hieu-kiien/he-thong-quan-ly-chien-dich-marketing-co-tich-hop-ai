@@ -143,6 +143,17 @@ class AIJobCreateRequest(BaseModel):
     campaign_id: Optional[int] = Field(
         None, description="ID chiến dịch (bắt buộc với kind=summary và kind=plan)"
     )
+    product_id: Optional[int] = None
+    workspace_id: Optional[int] = None
+    channel: Optional[str] = None
+    objective: Optional[str] = None
+    audience: Optional[str] = None
+    key_message: Optional[str] = None
+    angles: Optional[List[str]] = None
+    hooks_per_angle: Optional[int] = None
+    content_id: Optional[int] = None
+    preferred_provider: Optional[str] = None
+    preferred_model: Optional[str] = None
     prompt_version: Optional[str] = None
     chain_id: Optional[int] = Field(
         None,
@@ -309,7 +320,8 @@ def enqueue_ai_job(
 
     _validate_job_payload(kind, payload)
 
-    target_ws_id = resolve_job_workspace(db, current_user, workspace_id, x_workspace_id, payload.get("campaign_id"))
+    eff_ws_query = workspace_id if workspace_id is not None else req.workspace_id
+    target_ws_id = resolve_job_workspace(db, current_user, eff_ws_query, x_workspace_id, payload.get("campaign_id"))
 
     existing = job_queue.find_by_idempotency_key(db, current_user.id, req.idempotency_key)
     if existing is not None:
@@ -511,6 +523,8 @@ def execute_ai_job(db: Session, job: AIJob) -> Dict[str, Any]:
     model = _KIND_REQUEST_MODELS.get(job.kind)
     if model is None:
         raise AIJobExecutionError(f"kind AI job không hợp lệ: {job.kind!r}", transient=False)
+    if job.workspace_id is not None and "workspace_id" in model.model_fields:
+        payload.setdefault("workspace_id", job.workspace_id)
     try:
         request = model.model_validate(payload)
     except ValidationError as exc:

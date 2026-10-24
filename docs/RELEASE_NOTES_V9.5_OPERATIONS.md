@@ -89,7 +89,7 @@ Bản phát hành **v9.5** đánh dấu bước chuyển dịch mang tính chi�
 ## IV. BỘ TÀI LIỆU HỌC THUẬT PHỤC VỤ BẢO VỆ ĐỒ ÁN
 
 Tại thời điểm viết release notes, tài liệu tham khảo gồm:
-1. [Bản nháp đối chiếu đồ án](UNIVERSITY_DEFENSE_RUBRIC_ALIGNMENT.md).
+1. [Phân tích yêu cầu & thiết kế](REQUIREMENTS_AND_DESIGN.md).
 2. [Tài liệu kiến trúc](ARCHITECTURE.md).
 3. [Báo cáo benchmark AI](AI_EVALUATION_REPORT.md), được sinh từ [script benchmark](../scripts/evaluate_ai_grounding.py).
 4. [Script đo độ trễ API](../scripts/measure_api_latency.py).

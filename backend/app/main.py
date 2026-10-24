@@ -43,7 +43,7 @@ async def lifespan(application: FastAPI):
 
 
 API_DESCRIPTION = """
-Hệ thống quản lý chiến dịch marketing có tích hợp AI (AIA331 - Đề tài 80300).
+Hệ thống quản lý chiến dịch marketing có tích hợp AI.
 
 ## Phân trang (áp dụng cho MỌI endpoint trả về danh sách)
 

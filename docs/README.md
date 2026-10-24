@@ -13,10 +13,10 @@ Tài liệu này là mục lục cho **tài liệu sống của dự án**. Các
 | Hiểu phạm vi benchmark AI, kết quả và giới hạn | [AI evaluation report](AI_EVALUATION_REPORT.md) |
 | Xem bối cảnh release V9.5 | [Release notes lịch sử](RELEASE_NOTES_V9.5_OPERATIONS.md) |
 | Đọc phân tích yêu cầu, tác nhân, use case và thiết kế prompt | [Phân tích yêu cầu & thiết kế](REQUIREMENTS_AND_DESIGN.md) |
-| Biết còn thiếu gì so với yêu cầu viết và rubric | [Phân tích khoảng cách](REQUIREMENTS_GAP_ANALYSIS.md) |
+
 | Hiểu cơ chế giám sát của con người và đạo đức AI trong hệ thống | [Đạo đức AI & giám sát](AI_ETHICS_AND_HUMAN_OVERSIGHT.md) |
 | Xem bảng so sánh 3 phiên bản prompt | [So sánh prompt](PROMPT_VARIANT_COMPARISON.md) |
-| Chuẩn bị nội dung đối chiếu đồ án | [Đối chiếu rubric 40 tiêu chí](UNIVERSITY_DEFENSE_RUBRIC_ALIGNMENT.md) |
+
 | Hiểu cách deploy Cloudflare và giới hạn lưu trữ | [Cloudflare README](../cloudflare/README.md) |
 
 ## Nguồn sự thật theo chủ đề
@@ -30,7 +30,7 @@ Tài liệu này là mục lục cho **tài liệu sống của dự án**. Các
 | Kết quả CI | GitHub Actions theo commit; ghi link run và commit khi trích số liệu. |
 | Benchmark AI | `scripts/evaluate_ai_grounding.py` là generator; báo cáo được sinh lại trong Gate 5. Kết quả chỉ đúng với bộ case/môi trường ghi trong báo cáo. |
 | Roadmap | [ROADMAP.md](ROADMAP.md), trạng thái đề xuất cho đến khi có quyết định/evidence mới. |
-| Hồ sơ nộp V9 | PDF và source trong `Bao_Cao_AIA331_80300_ICTU_V9/`; xem README từng thư mục. Bản V8 cũ đã gỡ 2026-10-13 (còn trong git history). |
+| Triển khai VPS | [Hướng dẫn triển khai VPS](DEPLOYMENT-VPS.md) |
 
 ## Quy tắc duy trì
 
@@ -44,6 +44,4 @@ Tài liệu này là mục lục cho **tài liệu sống của dự án**. Các
 ## Tài liệu lịch sử và hồ sơ học thuật
 
 - [Release notes V9.5](RELEASE_NOTES_V9.5_OPERATIONS.md): snapshot lịch sử, không phải trạng thái phát hành hiện tại.
-- [Biên bản nghiệm thu](../BIEN_BAN_NGHIEM_THU.md): hồ sơ lịch sử.
-- [Yêu cầu ban đầu](../ORIGINAL_REQUEST.md): lưu nguyên văn làm nguồn bối cảnh.
-- V8/V9: xem README trong từng thư mục để biết snapshot, nguồn LaTeX và PDF tương ứng.
+- [Đối chiếu rubric 40 tiêu chí](UNIVERSITY_DEFENSE_RUBRIC_ALIGNMENT.md): hồ sơ đối chiếu tiêu chí học thuật.

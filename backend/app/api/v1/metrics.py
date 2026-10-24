@@ -37,6 +37,24 @@ from app.schemas.schemas import (
 )
 from app.services.ai.ai_doctor import AIDoctorEngine
 from app.api.v1.campaigns import _accessible_workspace_ids
+from app.core.crypto import mask_api_key
+
+
+def _resolve_channel_id_by_code(db: Session, code: str) -> int:
+    norm = (code or "facebook").strip().lower()
+    ch = db.query(MarketingChannel).filter(func.lower(MarketingChannel.code) == norm).first()
+    if ch:
+        return ch.id
+    fallback_map = {"facebook": 1, "email": 2, "blog": 3, "google_ads": 4, "tiktok": 5}
+    return fallback_map.get(norm, 1)
+
+
+def _assert_ws_access(db: Session, current_user: User, workspace_id: Optional[int]) -> None:
+    if current_user.role == "ADMIN" or workspace_id is None:
+        return
+    ws_ids = _accessible_workspace_ids(current_user, db)
+    if workspace_id not in ws_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền truy cập dữ liệu của Workspace này")
 
 
 router = APIRouter(prefix="", tags=["Chỉ số Hiệu quả & KPI Dashboard"])
@@ -577,7 +595,7 @@ def get_command_center(
                 type="BUDGET_OVERRUN",
                 severity="CRITICAL",
                 title=f"Vượt ngân sách: {c.name}",
-                message=f"Đã chi ${c_spent:,.2f} trên tổng ngân sách ${c_budget:,.2f} ({budget_pct:.1f}%).",
+                message=f"Đã chi {c_spent:,.0f} đ trên tổng ngân sách {c_budget:,.0f} đ ({budget_pct:.1f}%).",
                 campaign_id=c.id,
                 campaign_name=c.name,
                 link=f"/campaigns/{c.id}",
@@ -601,7 +619,7 @@ def get_command_center(
                 type="BUDGET_OVERRUN",
                 severity="HIGH",
                 title=f"Sắp chạm trần ngân sách: {c.name}",
-                message=f"Đã tiêu thụ {budget_pct:.1f}% ngân sách (${c_spent:,.2f}/${c_budget:,.2f}).",
+                message=f"Đã tiêu thụ {budget_pct:.1f}% ngân sách ({c_spent:,.0f} đ/{c_budget:,.0f} đ).",
                 campaign_id=c.id,
                 campaign_name=c.name,
                 link=f"/campaigns/{c.id}",
@@ -1664,10 +1682,7 @@ def _try_pull_external_platform_insights(acc: AdAccount) -> Optional[Dict[str, f
                         atype = str(aval.get("action_type") or "")
                         if atype in ("purchase", "omni_purchase", "offsite_conversion.fb_pixel_purchase"):
                             revenue += float(aval.get("value") or 0)
-                    if conversions <= 0:
-                        conversions = max(1, int(clicks * 0.06))
-                    if revenue <= 0:
-                        revenue = round(spend * 3.2, 0)
+
                     return {
                         "spend": spend,
                         "views": impr,
@@ -1848,7 +1863,8 @@ def list_ad_accounts(
 ):
     ws_ids = _accessible_workspace_ids(current_user, db)
     target_ws = workspace_id if (workspace_id and (current_user.role == "ADMIN" or workspace_id in ws_ids)) else (ws_ids[0] if ws_ids else 1)
-    accounts = _ensure_ad_accounts_seeded(db, target_ws)
+    AdAccount.__table__.create(bind=db.get_bind(), checkfirst=True)
+    accounts = db.query(AdAccount).filter(AdAccount.workspace_id == target_ws).order_by(AdAccount.id.asc()).all()
     return {
         "items": [_serialize_ad_account(a, db) for a in accounts],
         "workspace_id": target_ws,
@@ -1877,7 +1893,7 @@ def create_ad_account(
     if req.access_token and req.access_token.strip():
         raw = req.access_token.strip()
         # Lưu toàn bộ nếu là token dài để _try_pull_external_platform_insights dùng được
-        masked = raw if len(raw) >= 24 else (f"{raw[:6]}...{raw[-4:]}" if len(raw) >= 10 else "token_configured")
+        masked = mask_api_key(raw)
 
     acc = AdAccount(
         workspace_id=target_ws,
@@ -1963,15 +1979,16 @@ def sync_ad_accounts_metrics(
     """
     ws_ids = _accessible_workspace_ids(current_user, db)
     target_ws = workspace_id if (workspace_id and (current_user.role == "ADMIN" or workspace_id in ws_ids)) else (ws_ids[0] if ws_ids else 1)
-    accounts = _ensure_ad_accounts_seeded(db, target_ws)
+    AdAccount.__table__.create(bind=db.get_bind(), checkfirst=True)
+    accounts = db.query(AdAccount).filter(AdAccount.workspace_id == target_ws).order_by(AdAccount.id.asc()).all()
 
     now_utc = datetime.now(timezone.utc)
     today_str = now_utc.strftime("%Y-%m-%d")
 
     platform_to_channel_id = {
         "META_ADS": 1,
-        "TIKTOK_ADS": 2,
-        "GOOGLE_ADS": 1,
+        "TIKTOK_ADS": _resolve_channel_id_by_code(db, "tiktok"),
+        "GOOGLE_ADS": _resolve_channel_id_by_code(db, "google_ads"),
         "POS_SYSTEM": 1,
     }
 
@@ -1992,38 +2009,13 @@ def sync_ad_accounts_metrics(
         ch_id = platform_to_channel_id.get(acc.platform, 1)
         ext_data = _try_pull_external_platform_insights(acc)
 
-        if ext_data:
-            delta_spend = float(ext_data["spend"])
-            delta_views = int(ext_data["views"])
-            delta_clicks = int(ext_data["clicks"])
-            delta_orders = int(ext_data["conversions"])
-            delta_rev = float(ext_data["revenue"])
-        else:
-            # Tính toán lượng phát sinh theo nhịp phân phối thực tế của từng nền tảng
-            if acc.platform == "META_ADS":
-                delta_spend = 320000.0
-                delta_views = 1850
-                delta_clicks = 64
-                delta_orders = 2
-                delta_rev = 1350000.0
-            elif acc.platform == "TIKTOK_ADS":
-                delta_spend = 280000.0
-                delta_views = 3200
-                delta_clicks = 88
-                delta_orders = 2
-                delta_rev = 1180000.0
-            elif acc.platform == "POS_SYSTEM":
-                delta_spend = 0.0
-                delta_views = 120
-                delta_clicks = 15
-                delta_orders = 1
-                delta_rev = 690000.0
-            else:
-                delta_spend = 250000.0
-                delta_views = 1100
-                delta_clicks = 42
-                delta_orders = 1
-                delta_rev = 850000.0
+        if not ext_data:
+            continue
+        delta_spend = float(ext_data["spend"])
+        delta_views = int(ext_data["views"])
+        delta_clicks = int(ext_data["clicks"])
+        delta_orders = int(ext_data["conversions"])
+        delta_rev = float(ext_data["revenue"])
 
         existing_today = (
             db.query(CampaignMetric)
@@ -2069,7 +2061,7 @@ def sync_ad_accounts_metrics(
     if camp_ids:
         metrics = db.query(CampaignMetric).filter(CampaignMetric.campaign_id.in_(camp_ids)).all()
         for m in metrics:
-            if getattr(m, "source", None) in ("seed", None):
+            if False and getattr(m, "source", None) in ("seed", None):
                 m.source = "live_sync"
                 updated_rows += 1
 
@@ -2110,22 +2102,18 @@ def record_pos_order_webhook(
     if existing:
         existing.conversions = int(existing.conversions or 0) + req.order_count
         existing.revenue = float(existing.revenue or 0) + req.order_value
-        existing.cost = float(existing.cost or 0) + req.ad_spend_delta
-        existing.views = max(int(existing.views or 0), int(existing.clicks or 0) + req.order_count * 15)
-        existing.clicks = max(int(existing.clicks or 0), int(existing.conversions or 0) * 4)
+        existing.cost = float(existing.cost or 0) + (req.ad_spend_delta if req.ad_spend_delta > 0 else 0.0)
         existing.source = "live_sync"
         metric_obj = existing
     else:
-        clicks_est = max(10, req.order_count * 8)
-        views_est = max(200, clicks_est * 25)
         metric_obj = CampaignMetric(
             campaign_id=campaign.id,
             channel_id=req.channel_id,
             metric_date=today_str,
-            views=views_est,
-            clicks=clicks_est,
+            views=0,
+            clicks=0,
             conversions=req.order_count,
-            cost=req.ad_spend_delta if req.ad_spend_delta > 0 else round(req.order_value * 0.22, 0),
+            cost=req.ad_spend_delta if req.ad_spend_delta > 0 else 0.0,
             revenue=req.order_value,
             source="live_sync",
         )
@@ -2167,7 +2155,7 @@ def receive_external_pos_webhook(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Mã khóa bảo mật POS Webhook (webhook_key) không hợp lệ.",
         )
-    if getattr(sub, "clean_demo_mode", False) and not provided_key:
+    if getattr(sub, "clean_demo_mode", False) and (not provided_key or provided_key != expected_key):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Workspace đang ở Chế độ Production Sạch — bắt buộc truyền `webhook_key` hoặc header `X-MarketFlow-Webhook-Key`.",
@@ -2203,9 +2191,9 @@ def receive_external_pos_webhook(
     if not ch_id:
         src = (req.utm_source or "facebook").strip().lower()
         if "tiktok" in src or "tt" in src:
-            ch_id = 2
+            ch_id = _resolve_channel_id_by_code(db, "tiktok")
         elif "email" in src or "crm" in src or "zalo" in src:
-            ch_id = 3
+            ch_id = _resolve_channel_id_by_code(db, "email")
         else:
             ch_id = 1
 
@@ -2224,22 +2212,18 @@ def receive_external_pos_webhook(
     if existing:
         existing.conversions = int(existing.conversions or 0) + req.order_count
         existing.revenue = round(float(existing.revenue or 0) + req.order_value, 2)
-        existing.cost = round(float(existing.cost or 0) + req.ad_spend_delta, 2)
-        existing.views = max(int(existing.views or 0), int(existing.clicks or 0) + req.order_count * 15)
-        existing.clicks = max(int(existing.clicks or 0), int(existing.conversions or 0) * 4)
+        existing.cost = round(float(existing.cost or 0) + (req.ad_spend_delta if req.ad_spend_delta > 0 else 0.0), 2)
         existing.source = "live_sync"
         metric_obj = existing
     else:
-        clicks_est = max(12, req.order_count * 8)
-        views_est = max(240, clicks_est * 25)
         metric_obj = CampaignMetric(
             campaign_id=campaign.id,
             channel_id=ch_id,
             metric_date=today_str,
-            views=views_est,
-            clicks=clicks_est,
+            views=0,
+            clicks=0,
             conversions=req.order_count,
-            cost=req.ad_spend_delta if req.ad_spend_delta > 0 else round(req.order_value * 0.20, 0),
+            cost=req.ad_spend_delta if req.ad_spend_delta > 0 else 0.0,
             revenue=req.order_value,
             source="live_sync",
         )
@@ -2248,7 +2232,7 @@ def receive_external_pos_webhook(
     matched_kol_name = None
     if req.koc_code:
         try:
-            _ensure_kol_bookings_seeded(db, campaign.workspace_id or 1)
+            KolBooking.__table__.create(bind=db.get_bind(), checkfirst=True)
             koc_clean = req.koc_code.strip().upper()
             kol = (
                 db.query(KolBooking)
@@ -2327,12 +2311,6 @@ class KolOrderRecordRequest(BaseModel):
     order_value: float = Field(default=2450000.0, gt=0)
     added_views: int = Field(default=4800, ge=0)
     added_clicks: int = Field(default=190, ge=0)
-
-
-class OAuthQuickConnectRequest(BaseModel):
-    provider: str = Field(default="META_FANPAGE_BM", description="META_FANPAGE_BM | TIKTOK_SHOP_BC | SAPO_POS_LIVE")
-    campaign_id: Optional[int] = Field(default=None)
-    workspace_id: Optional[int] = Field(default=None)
 
 
 class TwoWayBudgetPushRequest(BaseModel):
@@ -2491,7 +2469,8 @@ def list_kol_bookings(
 ):
     ws_ids = _accessible_workspace_ids(current_user, db)
     target_ws = workspace_id if (workspace_id and (current_user.role == "ADMIN" or workspace_id in ws_ids)) else (ws_ids[0] if ws_ids else 1)
-    items = _ensure_kol_bookings_seeded(db, target_ws)
+    KolBooking.__table__.create(bind=db.get_bind(), checkfirst=True)
+    items = db.query(KolBooking).filter(KolBooking.workspace_id == target_ws).order_by(KolBooking.id.asc()).all()
     serialized = [_serialize_kol_booking(k, db) for k in items]
     total_cost = sum(x["total_cost"] for x in serialized)
     total_rev = sum(x["revenue_generated"] for x in serialized)
@@ -2538,8 +2517,8 @@ def create_kol_booking(
         tracking_code=code,
         booking_cost=req.booking_cost,
         commission_pct=req.commission_pct,
-        views_count=1200,
-        clicks_count=65,
+        views_count=0,
+        clicks_count=0,
         orders_count=0,
         revenue_generated=0.0,
         status="AIRING",
@@ -2561,6 +2540,7 @@ def delete_kol_booking(
     item = db.query(KolBooking).filter(KolBooking.id == booking_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Không tìm thấy hợp đồng thuê KOL/KOC")
+    _assert_ws_access(db, current_user, item.workspace_id)
     db.delete(item)
     db.commit()
     return {"status": "deleted", "id": booking_id}
@@ -2580,6 +2560,7 @@ def record_kol_affiliate_order(
     item = db.query(KolBooking).filter(KolBooking.id == booking_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Không tìm thấy KOL/KOC")
+    _assert_ws_access(db, current_user, item.workspace_id)
 
     now_utc = datetime.now(timezone.utc)
     today_str = now_utc.strftime("%Y-%m-%d")
@@ -2593,7 +2574,7 @@ def record_kol_affiliate_order(
     commission_cost = round(req.order_value * (float(item.commission_pct or 0.0) / 100.0), 2)
 
     if item.campaign_id:
-        ch_id = 2 if item.platform == "TIKTOK" else 1
+        ch_id = _resolve_channel_id_by_code(db, "tiktok" if item.platform == "TIKTOK" else "facebook")
         existing = (
             db.query(CampaignMetric)
             .filter(
@@ -2636,97 +2617,6 @@ def record_kol_affiliate_order(
     }
 
 
-@router.post("/ad-accounts/oauth-connect")
-def quick_connect_oauth_provider(
-    req: OAuthQuickConnectRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Mảnh ghép #1 (OAuth2 1-Click Connect):
-    Kết nối nhanh Fanpage / Meta Business Suite, TikTok Shop Affiliate BC hoặc Sapo POS Live
-    không cần copy/paste mã thủ công.
-    """
-    AdAccount.__table__.create(bind=db.get_bind(), checkfirst=True)
-    ws_ids = _accessible_workspace_ids(current_user, db)
-    target_ws = req.workspace_id if (req.workspace_id and (current_user.role == "ADMIN" or req.workspace_id in ws_ids)) else (ws_ids[0] if ws_ids else 1)
-
-    camps = db.query(Campaign).filter(Campaign.workspace_id == target_ws).order_by(Campaign.id.asc()).all()
-    default_camp_id = req.campaign_id or (camps[0].id if camps else None)
-    now_utc = datetime.now(timezone.utc)
-    suffix = str(int(now_utc.timestamp()))[-4:]
-
-    prov = req.provider.upper().strip()
-    if "TIKTOK" in prov:
-        platform = "TIKTOK_ADS"
-        code = f"adv_ttshop_{suffix}"
-        name = f"TikTok Shop & Affiliate Partner Center #{suffix} (OAuth2 Verified)"
-        pixel = f"ttpx_live_{suffix}"
-        token = f"tt_oauth2_live_token_{suffix}992018472"
-        cap = 18000000.0
-    elif "SAPO" in prov or "POS" in prov:
-        platform = "POS_SYSTEM"
-        code = f"sapo_omni_{suffix}"
-        name = f"Sapo Omnichannel & Pancake CRM Live #{suffix} (OAuth2 Webhook)"
-        pixel = f"sapo_wh_{suffix}"
-        token = f"sapo_oauth2_live_secret_{suffix}88319"
-        cap = 0.0
-    else:
-        platform = "META_ADS"
-        code = f"act_fbpage_{suffix}"
-        name = f"Meta Business & Fanpage Auto-Publish #{suffix} (OAuth2 Graph v19.0)"
-        pixel = f"px_meta_{suffix}"
-        token = f"EAABsbOAuth2LiveFanpageToken{suffix}981234"
-        cap = 25000000.0
-
-    acc = AdAccount(
-        workspace_id=target_ws,
-        platform=platform,
-        account_code=code,
-        account_name=name,
-        pixel_id=pixel,
-        daily_spend_cap=cap,
-        today_spend=0.0,
-        status="ACTIVE",
-        linked_campaign_id=default_camp_id,
-        access_token_masked=f"{token[:10]}...{token[-4:]}",
-        last_synced_at=now_utc,
-    )
-    db.add(acc)
-    db.commit()
-    db.refresh(acc)
-    if platform == "TIKTOK_ADS":
-        oauth_authorize_url = (
-            "https://business-api.tiktok.com/portal/auth"
-            "?app_id=7359001928371&state=mf_vn_oauth2"
-            "&redirect_uri=https%3A%2F%2Fmarketing.kienhieu.id.vn%2Fapi%2Fv1%2Fad-accounts%2Foauth-connect"
-            "&scope=ad.read%2Cad.write%2Ctiktok_shop.affiliate"
-        )
-        scopes = ["ad.read", "ad.write", "tiktok_shop.affiliate"]
-    elif platform == "POS_SYSTEM":
-        oauth_authorize_url = (
-            "https://store.sapo.vn/admin/oauth/authorize"
-            "?client_id=mf_sapo_omni_vn&scope=read_orders,write_orders,webhooks"
-            "&redirect_uri=https%3A%2F%2Fmarketing.kienhieu.id.vn%2Fapi%2Fv1%2Fad-accounts%2Fexternal-webhook"
-        )
-        scopes = ["read_orders", "write_orders", "webhooks"]
-    else:
-        oauth_authorize_url = (
-            "https://www.facebook.com/v19.0/dialog/oauth"
-            "?client_id=109283746519283&state=mf_meta_oauth2"
-            "&redirect_uri=https%3A%2F%2Fmarketing.kienhieu.id.vn%2Fapi%2Fv1%2Fad-accounts%2Foauth-connect"
-            "&scope=ads_management,ads_read,pages_manage_posts,pages_messaging"
-        )
-        scopes = ["ads_management", "ads_read", "pages_manage_posts", "pages_messaging"]
-
-    return {
-        "status": "oauth_connected",
-        "provider": prov,
-        "oauth_authorize_url": oauth_authorize_url,
-        "app_review_scopes": scopes,
-        "account": _serialize_ad_account(acc, db),
-    }
-
-
 @router.post("/ad-accounts/{account_id}/push-budget")
 def push_two_way_budget_and_status(
     account_id: int,
@@ -2747,6 +2637,7 @@ def push_two_way_budget_and_status(
         raise HTTPException(status_code=404, detail="Không tìm thấy tài khoản quảng cáo")
 
     now_utc = datetime.now(timezone.utc)
+    _assert_ws_access(db, current_user, acc.workspace_id)
     acc.daily_spend_cap = req.daily_spend_cap
     acc.status = "RESTRICTED" if req.remote_status.upper() == "PAUSED" else "ACTIVE"
     acc.last_synced_at = now_utc
@@ -2821,8 +2712,9 @@ def run_background_auto_worker_tick(
     target_ws = workspace_id if (workspace_id and (current_user.role == "ADMIN" or workspace_id in ws_ids)) else (ws_ids[0] if ws_ids else 1)
 
     now_utc = datetime.now(timezone.utc)
-    accounts = _ensure_ad_accounts_seeded(db, target_ws)
-    kols = _ensure_kol_bookings_seeded(db, target_ws)
+    AdAccount.__table__.create(bind=db.get_bind(), checkfirst=True)
+    KolBooking.__table__.create(bind=db.get_bind(), checkfirst=True)
+    accounts = db.query(AdAccount).filter(AdAccount.workspace_id == target_ws).order_by(AdAccount.id.asc()).all()
     sub = _get_or_create_workspace_subscription(db, target_ws)
 
     # Tìm token Meta thực tế nếu có
@@ -2895,18 +2787,9 @@ def run_background_auto_worker_tick(
         sch.status = "EXECUTED"
         schedules_triggered += 1
 
-    # 2. Đồng bộ số liệu từ KOL/KOC Affiliate
+    # 2. Không tự động cộng số ảo cho KOL/KOC Affiliate khi chạy worker
     kol_orders_added = 0
     kol_revenue_added = 0.0
-    for k in kols:
-        if k.status in ("AIRING", "PUBLISHED"):
-            k.views_count = int(k.views_count or 0) + 1450
-            k.clicks_count = int(k.clicks_count or 0) + 68
-            k.orders_count = int(k.orders_count or 0) + 2
-            k.revenue_generated = round(float(k.revenue_generated or 0.0) + 1650000.0, 2)
-            k.updated_at = now_utc
-            kol_orders_added += 2
-            kol_revenue_added += 1650000.0
 
     # 3. Tự động chăm sóc Lead Zalo ZNS / Messenger 24h đang im lặng
     zns_auto_care_count = 0
@@ -3328,6 +3211,7 @@ def calculate_vn_ecommerce_pnl_and_breakeven(
                 .first()
             )
             if agg:
+                _assert_ws_access(db, current_user, camp.workspace_id)
                 if req.current_ad_spend is None:
                     ad_spend = float(agg[0] or 0.0)
                 if req.current_revenue is None:
@@ -3335,11 +3219,7 @@ def calculate_vn_ecommerce_pnl_and_breakeven(
                 if req.current_orders is None:
                     orders_total = int(agg[2] or 0)
 
-    if orders_total <= 0:
-        orders_total = 120
-    if ad_spend <= 0:
-        ad_spend = 14500000.0
-    if gross_revenue <= 0:
+    if gross_revenue <= 0 and orders_total > 0:
         gross_revenue = round(orders_total * req.selling_price, 2)
 
     aov = req.selling_price if req.selling_price > 0 else round(gross_revenue / max(orders_total, 1), 0)
@@ -3365,7 +3245,7 @@ def calculate_vn_ecommerce_pnl_and_breakeven(
     )
 
     break_even_roas = round(aov / max_allowable_cpa, 2) if max_allowable_cpa > 0 else 99.9
-    actual_cpa = round(ad_spend / max(orders_total, 1), 0)
+    actual_cpa = round(ad_spend / orders_total, 0) if orders_total > 0 else 0.0
     gross_roas = round(gross_revenue / ad_spend, 2) if ad_spend > 0 else 0.0
 
     # P&L Tổng chiến dịch
@@ -3396,6 +3276,14 @@ def calculate_vn_ecommerce_pnl_and_breakeven(
         headline = "CẢNH BÁO ĐỎ: Cấu trúc giá đang âm ngay cả khi chưa chạy Quảng cáo!"
         recommendations.append(
             f"Tổng Phí sàn ({req.platform_fee_pct}%) + Hoa hồng KOC ({req.affiliate_commission_pct}%) + Giá vốn đang nuốt hết biên lợi nhuận. Cần tăng giá bán Combo (Upsell AOV lên >= {int(aov * 1.35):,}đ) ngay."
+        )
+    elif orders_total == 0 and ad_spend == 0:
+        profit_status = "WARNING_THIN_MARGIN"
+        headline = (
+            f"CHƯA PHÁT SINH ĐƠN HÀNG / CHI PHÍ: Điểm hòa vốn yêu cầu ROAS >= {break_even_roas}x (CPA tối đa {int(max_allowable_cpa):,}đ/đơn)."
+        )
+        recommendations.append(
+            f"Với giá bán {int(aov):,}đ và giá vốn {int(req.cogs_per_unit):,}đ, mỗi đơn hàng chỉ được phép tốn tối đa {int(max_allowable_cpa):,}đ tiền quảng cáo để không bị lỗ."
         )
     elif real_net_profit < 0:
         profit_status = "BLEEDING_LOSS"
@@ -3609,7 +3497,8 @@ def list_vn_conversational_leads(
     """
     ws_ids = _accessible_workspace_ids(current_user, db)
     target_ws = workspace_id if (workspace_id and (current_user.role == "ADMIN" or workspace_id in ws_ids)) else (ws_ids[0] if ws_ids else 1)
-    items = _ensure_vn_leads_seeded(db, target_ws)
+    VnLeadCrm.__table__.create(bind=db.get_bind(), checkfirst=True)
+    items = db.query(VnLeadCrm).filter(VnLeadCrm.workspace_id == target_ws).order_by(VnLeadCrm.id.asc()).all()
     serialized = [_serialize_vn_lead(ld, db) for ld in items]
 
     pipeline_value = sum(x["estimated_value"] for x in serialized if x["lead_stage"] != "CLOSED_POS")
@@ -3686,6 +3575,7 @@ def send_zns_or_messenger_care_to_lead(
     if not ld:
         raise HTTPException(status_code=404, detail="Không tìm thấy khách hàng tiềm năng")
 
+    _assert_ws_access(db, current_user, ld.workspace_id)
     sub = _get_or_create_workspace_subscription(db, ld.workspace_id)
     now_utc = datetime.now(timezone.utc)
 
@@ -3760,6 +3650,7 @@ def close_vn_lead_to_pos_order(
     today_str = now_utc.strftime("%Y-%m-%d")
     order_val = float(ld.estimated_value or 500000.0)
 
+    _assert_ws_access(db, current_user, ld.workspace_id)
     ld.lead_stage = "CLOSED_POS"
     ld.last_contacted_at = now_utc
     ld.last_message_note = f"Đã chốt đơn thành công (+{int(order_val):,}đ) và đồng bộ về POS / CampaignMetric."
@@ -3770,7 +3661,7 @@ def close_vn_lead_to_pos_order(
         camp_id = first_camp.id if first_camp else None
 
     if camp_id:
-        ch_id = 2 if ld.source_channel == "TIKTOK_BIO" else (3 if ld.source_channel == "ZALO_OA" else 1)
+        ch_id = _resolve_channel_id_by_code(db, "tiktok" if ld.source_channel == "TIKTOK_BIO" else ("email" if ld.source_channel == "ZALO_OA" else "facebook"))
         existing = (
             db.query(CampaignMetric)
             .filter(
@@ -3783,8 +3674,6 @@ def close_vn_lead_to_pos_order(
         if existing:
             existing.conversions = int(existing.conversions or 0) + 1
             existing.revenue = round(float(existing.revenue or 0) + order_val, 2)
-            existing.clicks = max(int(existing.clicks or 0), int(existing.conversions or 0) * 4)
-            existing.views = max(int(existing.views or 0), int(existing.clicks or 0) * 18)
             existing.source = "live_sync"
         else:
             db.add(
@@ -3792,10 +3681,10 @@ def close_vn_lead_to_pos_order(
                     campaign_id=camp_id,
                     channel_id=ch_id,
                     metric_date=today_str,
-                    views=220,
-                    clicks=14,
+                    views=0,
+                    clicks=0,
                     conversions=1,
-                    cost=round(order_val * 0.18, 0),
+                    cost=0.0,
                     revenue=order_val,
                     source="live_sync",
                 )
@@ -3821,6 +3710,7 @@ def delete_vn_conversational_lead(
     ld = db.query(VnLeadCrm).filter(VnLeadCrm.id == lead_id).first()
     if not ld:
         raise HTTPException(status_code=404, detail="Không tìm thấy khách hàng tiềm năng")
+    _assert_ws_access(db, current_user, ld.workspace_id)
     db.delete(ld)
     db.commit()
     return {"status": "deleted", "id": lead_id}

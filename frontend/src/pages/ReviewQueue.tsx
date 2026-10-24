@@ -9,6 +9,7 @@ import { ExportActions } from '../components/ExportActions';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { Pagination } from '../components/Pagination';
 import { QuotaErrorCard } from '../components/QuotaBadge';
+import { useWorkspace } from '../context/WorkspaceContext';
 
 interface ReviewQueueProps {
   userRole?: string;
@@ -37,7 +38,13 @@ const REJECT_FEEDBACK_TEMPLATES = [
 
 export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
   const toast = useToast();
+  const { currentWorkspace } = useWorkspace();
   const [contents, setContents] = useState<MarketingContent[]>([]);
+  const [tabCounts, setTabCounts] = useState<{ pending: number; drafts: number; history: number }>({
+    pending: 0,
+    drafts: 0,
+    history: 0,
+  });
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<'pending' | 'drafts' | 'history'>('pending');
   // Phân trang theo tab: server lọc theo `TAB_STATUS` rồi cắt trang.
@@ -182,18 +189,29 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
 
   // useCallback để effect mount không thiếu dependency (xem MyTasksPage).
   const loadContents = useCallback(async () => {
+    if (currentWorkspace?.id === -1) return;
     try {
       setLoading(true);
       // Lọc + cắt trang ở SERVER theo trạng thái của tab đang mở. Trước đây màn
       // hình này tải toàn bộ nội dung rồi chia ở client; sau khi có phân trang thì
       // cách đó chỉ lấy được trang đầu và những bài ở trang sau sẽ biến mất khỏi
       // hàng đợi mà bộ đếm vẫn tưởng đủ.
-      const result = await contentApi.getAllPage(page, pageSize, {
-        status: TAB_STATUS[activeTab],
-        sort: 'newest',
-      });
+      const [result, pendingCountRes, draftsCountRes, historyCountRes] = await Promise.all([
+        contentApi.getAllPage(page, pageSize, {
+          status: TAB_STATUS[activeTab],
+          sort: 'newest',
+        }),
+        contentApi.getAllPage(1, 1, { status: TAB_STATUS.pending, sort: 'newest' }).catch(() => null),
+        contentApi.getAllPage(1, 1, { status: TAB_STATUS.drafts, sort: 'newest' }).catch(() => null),
+        contentApi.getAllPage(1, 1, { status: TAB_STATUS.history, sort: 'newest' }).catch(() => null),
+      ]);
       setContents(result.items);
       setContentPage(result);
+      setTabCounts(prev => ({
+        pending: activeTab === 'pending' ? result.total : (pendingCountRes?.total ?? prev.pending),
+        drafts: activeTab === 'drafts' ? result.total : (draftsCountRes?.total ?? prev.drafts),
+        history: activeTab === 'history' ? result.total : (historyCountRes?.total ?? prev.history),
+      }));
       setSelectedContentIds([]);
     } catch (e) {
       const quotaErr = getQuotaError(e);
@@ -203,7 +221,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
     } finally {
       setLoading(false);
     }
-  }, [toast, page, pageSize, activeTab]);
+  }, [toast, page, pageSize, activeTab, currentWorkspace?.id]);
   // Nạp dữ liệu lúc mount (phải sau khai báo loadContents — xem MyTasksPage).
   useEffect(() => {
     void loadContents();
@@ -478,7 +496,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
           <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold tabular-nums ${
             activeTab === 'pending' ? 'bg-white/20 text-white' : 'bg-[#E2E0D8] text-[#121316]'
           }`}>
-            {pendingList.length}
+            {tabCounts.pending}
           </span>
         </button>
 
@@ -495,7 +513,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
           <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold tabular-nums ${
             activeTab === 'drafts' ? 'bg-white/20 text-white' : 'bg-[#E2E0D8] text-[#121316]'
           }`}>
-            {draftList.length}
+            {tabCounts.drafts}
           </span>
         </button>
 
@@ -512,7 +530,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ userRole }) => {
           <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold tabular-nums ${
             activeTab === 'history' ? 'bg-white/20 text-white' : 'bg-[#E2E0D8] text-[#121316]'
           }`}>
-            {historyList.length}
+            {tabCounts.history}
           </span>
         </button>
       </div>

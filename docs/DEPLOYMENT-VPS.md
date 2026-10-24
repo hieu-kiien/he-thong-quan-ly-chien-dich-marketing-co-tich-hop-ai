@@ -16,7 +16,7 @@ gian chờ mô hình chiếm ưu thế hơn CPU của VPS.
 
 - PostgreSQL 16.15 chỉ nghe trên loopback; không mở cổng 5432 ra Internet.
 - FastAPI chạy dưới tài khoản hệ thống `marketflow`, nghe tại `127.0.0.1:8000`
-  (2 Uvicorn worker trên máy thật, xem mục trạng thái bên dưới).
+  (1 Uvicorn worker tối ưu RAM ~80–114 MB, xem mục trạng thái bên dưới).
 - Nginx phục vụ frontend tĩnh và proxy `/api/` tới FastAPI; Nginx chỉ nghe trên
   `127.0.0.1:8080`.
 - Cloudflare Tunnel được quản lý trong Cloudflare Dashboard và trỏ
@@ -114,8 +114,8 @@ Phần trên là kế hoạch. Dưới đây là những gì đã thực sự ch
 | Giao diện tĩnh | `/var/www/marketflow` |
 | Domain | `https://marketing.kienhieu.id.vn` |
 
-Dịch vụ systemd: `marketflow-api` (2 Uvicorn worker, `MemoryMax=1200M`, AI
-concurrency 1 mỗi worker) và `cloudflared-tunnel`.
+Dịch vụ systemd: `marketflow-api` (1 Uvicorn worker, `MemoryHigh=512M`, `MemoryMax=768M`, AI
+concurrency 1) và `cloudflared-tunnel`.
 
 ### Ba sai lệch phát hiện khi dựng thật
 
@@ -333,7 +333,7 @@ trong ba commit dưới chưa được đẩy lên server.
    lỗi mạng, thiếu khoá) thì dùng danh sách dự phòng đã kiểm chứng trong
    `providers.py`. Thử thật: OpenCode Zen trả `source=live` với model
    `space-bunny-free, big-pickle, mimo-v2.6-flash-free…`. Model mặc định cập
-   nhật theo trang chính thức: `gemini-3.8-flash`, `gpt-6.1-sol`,
+   nhật theo trang chính thức: `gemini-2.5-flash`, `gpt-4o-mini`,
    `claude-sonnet-4-6`, `anthropic/claude-sonnet-4-6` cho OpenRouter. Registry
    có thêm `free_tier`/`free_note` để UI gợi ý tầng miễn phí.
 4. **SEO (Lighthouse phàn nàn từ phiên trước)**: thêm meta description + og
@@ -541,4 +541,29 @@ Audit trước khi sửa (2 GB RAM, 2 vCPU, DB 32 MB):
   comment trong `config.py`), không phải biến chết.
 - Chưa có công cụ migration (dùng `create_all()`); chưa bật mutation
   testing; email Resend đã Verified nhưng chưa nối luồng publish tự động.
+
+## Phiên 2026-10-23 — Tối ưu RAM 1-Worker, Cầu nối OpenCode CLI, Creative Pack & Muse AI Board
+
+### 1. Tối ưu RAM (`marketflow-api.service`)
+
+- Hợp nhất và đồng bộ `deploy/vps/marketflow-api.service` với máy chủ thật: giảm từ `--workers 2` xuống `--workers 1`, đặt giới hạn `MemoryHigh=512M` và `MemoryMax=768M`.
+- Kết quả đo thực tế trên VPS (2 GiB RAM): tiến trình `marketflow-api` chỉ tiêu thụ **~80,3 MB – 114 MB RAM** (thấp hơn 4 lần so với ngưỡng cảnh báo), giúp VPS luôn duy trì **~1,25 – 1,45 GiB RAM khả dụng**.
+
+### 2. Cầu nối OpenCode CLI cục bộ trên VPS (`v1.19.4`)
+
+- Tích hợp binary `/root/.opencode/bin/opencode` (symlink `/usr/local/bin/opencode`) vào `AIService._try_opencode_cli_bridge` (`backend/app/services/ai/ai_service.py`).
+- Khắc phục triệt để 2 nút thắt của OpenCode CLI:
+  1. Chạy trong thư mục rỗng có `.git` cô lập (`/tmp/marketflow_oc_empty/.git`) + `stdin=subprocess.DEVNULL` để OpenCode không quét toàn bộ filesystem từ `/`.
+  2. Đọc luồng `--print-logs --format json` theo thời gian thực để ngắt nhanh (**fast-fail ~1,5s–3s** thay vì treo retry ngầm) ngay khi gặp `AI_APICallError` hoặc `Free usage limit reached`.
+- Cập nhật model mặc định của provider `opencode` từ `space-bunny-free` (đã ngừng phục vụ) sang `mimo-v2.6-flash-free` (`AI_TIMEOUT_SECONDS=60`).
+
+### 3. Kiến trúc 2 Chế độ UX, Creative Pack, Muse AI Board & Staging Diff
+
+- **2 Chế độ hiển thị trên AI Studio (`frontend/src/pages/AIStudio.tsx`)**:
+  - **👤 Chế độ Chủ Shop (Đơn giản)** (Mặc định): ẩn toàn bộ thông số kỹ thuật phức tạp, tích hợp nút **⚡ OpenCode 0đ (Sẵn trên VPS)** và 1-Click Xuất bản ngay.
+  - **⚙️ Chế độ Chuyên Gia**: mở khóa Ma trận 12 Góc tiếp cận, Hội đồng 4 Persona chấm điểm và tuỳ chỉnh Provider/Model nâng cao.
+- **Dọn dẹp mã giả lập & file rác**:
+  - Xoá endpoint giả lập OAuth (`POST /ad-accounts/oauth-connect`) và nhánh cộng số liệu giả trong `backend/app/api/v1/metrics.py`.
+  - Dọn sạch hơn 50 script/file debug tạm thời trong `/root` trên VPS (bao gồm `/root/inspect.py` từng che khuất module chuẩn `inspect` của Python).
+
 

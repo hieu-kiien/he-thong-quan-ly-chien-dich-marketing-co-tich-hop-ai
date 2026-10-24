@@ -27,7 +27,9 @@ if db_url.startswith("sqlite"):
     engine_kwargs["connect_args"] = {"check_same_thread": False}
 else:
     engine_kwargs["pool_pre_ping"] = True
-    engine_kwargs["pool_recycle"] = 300
+    engine_kwargs["pool_recycle"] = 180
+    engine_kwargs["pool_size"] = 2
+    engine_kwargs["max_overflow"] = 3
 
 engine = create_engine(db_url, **engine_kwargs)
 
@@ -40,8 +42,8 @@ if db_url.startswith("sqlite"):
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.execute("PRAGMA busy_timeout=15000")
-        cursor.execute("PRAGMA cache_size=-16000")
-        cursor.execute("PRAGMA temp_store=MEMORY")
+        cursor.execute("PRAGMA cache_size=-4000")
+        cursor.execute("PRAGMA temp_store=DEFAULT")
         cursor.close()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -298,6 +300,8 @@ def ensure_sqlite_schema_compatibility(db_engine=engine):
                     conn.exec_driver_sql("ALTER TABLE marketing_contents ADD COLUMN utm_params VARCHAR(500)")
                 if "ai_metadata_json" not in existing_cols:
                     conn.exec_driver_sql("ALTER TABLE marketing_contents ADD COLUMN ai_metadata_json TEXT")
+                if "blocks_json" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE marketing_contents ADD COLUMN blocks_json TEXT DEFAULT '[]'")
 
             # 2. Bảng custom_api_keys (Zero Migration Failure)
             table_check = conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='custom_api_keys'")
@@ -493,6 +497,7 @@ def ensure_postgres_schema_compatibility(db_engine=engine) -> None:
         ("marketing_contents", "hook_variant", "VARCHAR(50)"),
         ("marketing_contents", "utm_params", "VARCHAR(500)"),
         ("marketing_contents", "ai_metadata_json", "TEXT"),
+        ("marketing_contents", "blocks_json", "TEXT DEFAULT '[]'"),
         # Revocation phiên đăng nhập: token cũ phải bị từ chối ngay khi cột này
         # được thêm (mọi token phát hành trước đây coi như phiên 0 đã hết hiệu lực
         # sau lần logout/đổi mật khẩu đầu tiên).

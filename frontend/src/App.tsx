@@ -49,7 +49,7 @@ function AppContent() {
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
   const [isBrandKitModalOpen, setIsBrandKitModalOpen] = useState<boolean>(false);
-  const [isOffline, setIsOffline] = useState<boolean>(typeof navigator !== 'undefined' ? !navigator.onLine : false);
+  const [isOffline, setIsOffline] = useState<boolean>(false);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -199,7 +199,7 @@ function AppContent() {
         )}
 
         {/* Offline Network Warning Banner */}
-        {isOffline && (
+        {isOffline && !isBackendConnected() && (
           <div className="bg-rose-600 text-white px-4 py-2 text-xs flex items-center justify-between font-semibold z-50 shrink-0 shadow-md">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />

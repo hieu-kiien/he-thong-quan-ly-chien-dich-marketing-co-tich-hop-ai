@@ -42,7 +42,7 @@ describe('MarketFlow AI Live Production E2E Suite (marketing.kienhieu.id.vn)', {
     // Phân hệ 1: Tài khoản QC & POS Webhook
     await screen.getByRole('button', '1. Tài khoản QC & POS Webhook', { exact: false }).tap();
     await expect(
-      screen.getByText('Tài khoản quảng cáo, Tự động đăng bài Fanpage & Bảo mật POS Webhook', { exact: false }).first()
+      screen.getByText('Quản lý Tài khoản Quảng cáo, Đồng bộ CSV & Cổng Webhook POS', { exact: false }).first()
     ).toBeVisible({ timeout: 15_000 });
 
     // Mở form Khóa bảo mật POS Webhook & Zalo/Email API
@@ -97,6 +97,10 @@ describe('MarketFlow AI Live Production E2E Suite (marketing.kienhieu.id.vn)', {
     await expect(
       screen.getByRole('heading', 'Viết bài & Tạo mẫu quảng cáo', { exact: false })
     ).toBeVisible({ timeout: 15_000 });
+    const expertModeBtn = screen.getByRole('button', 'Chế độ Chuyên Gia', { exact: false }).first();
+    if (await expertModeBtn.isVisible()) {
+      await expertModeBtn.tap();
+    }
     await screen.getByTestId('studio-tab-angle-matrix').tap();
     await screen.getByTestId('studio-tab-persona-critic').tap();
 
@@ -116,7 +120,7 @@ describe('MarketFlow AI Live Production E2E Suite (marketing.kienhieu.id.vn)', {
     await screen.getByTestId('sidebar-tab-settings').tap();
     const customModelInput = browser.locator('#byok-custom-model-input');
     await customModelInput.waitFor({ state: 'visible', timeout: 15_000 });
-    await customModelInput.fill('gemini-3.8-flash');
+    await customModelInput.fill('gemini-2.5-flash');
 
     const rbacTab = screen.getByRole('button', 'Hồ sơ & Phân quyền', { exact: false }).first();
     if (await rbacTab.isVisible()) {

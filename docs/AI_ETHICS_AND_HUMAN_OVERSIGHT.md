@@ -1,13 +1,12 @@
-# Đạo đức AI & Giám sát của con người (Tuần 3 mục 5–6; Thiết kế mục 5–6)
+# Đạo đức AI & Giám sát của con người
 
-**Phạm vi.** Tài liệu này gom những cơ chế **đã có trong mã nguồn** thành một lập
-luận có thể trình bày khi bảo vệ. Mỗi mục đều dẫn tới file và — nếu có — test
+**Phạm vi.** Tài liệu này gom những cơ chế **đã có trong mã nguồn** thành một bản
+mô tả kỹ thuật rõ ràng. Mỗi mục đều dẫn tới file và — nếu có — test
 tương ứng.
 
 > **Nguyên tắc trình bày.** Mục tiêu của tài liệu là cho biết **cơ chế nào tồn
 > tại và được kiểm chứng tới đâu**, không phải để tuyên bố hệ thống "an toàn" hay
 > "đạt đạo đức". Ở mục 8 liệt kê những gì **không** có cơ sở để khẳng định.
-> Khi bảo vệ, phần thiếu phải nói trước phần có, không phải sau.
 
 ---
 

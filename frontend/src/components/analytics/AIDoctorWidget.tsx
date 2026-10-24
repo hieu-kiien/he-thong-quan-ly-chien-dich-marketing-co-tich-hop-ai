@@ -59,18 +59,45 @@ export const AIDoctorWidget: React.FC<AIDoctorWidgetProps> = ({
     }
   }, [campaignId, initialReport, loadDiagnosis]);
 
-  const handleApplyAction = (index: number, rec: AIDoctorRecommendation) => {
-    setAppliedActions(prev => ({ ...prev, [index]: true }));
-
-    if (rec.action === 'SCALE') {
-      toast.success(`Đã áp dụng đơn thuốc SCALE: Tăng ngân sách cho kênh ${rec.channel || 'mục tiêu'}!`);
-    } else if (rec.action === 'OPTIMIZE') {
-      toast.info(`Đã kích hoạt chế độ TỐI ƯU HÓA: Mở AI Studio để tinh chỉnh thông điệp!`);
+  const handleApplyAction = async (index: number, rec: AIDoctorRecommendation) => {
+    if (rec.action === 'OPTIMIZE') {
+      setAppliedActions(prev => ({ ...prev, [index]: true }));
+      toast.info('Đã mở AI Studio để tinh chỉnh thông điệp quảng cáo.');
       if (onOpenAIStudio) {
         onOpenAIStudio();
       }
-    } else if (rec.action === 'PAUSE' || rec.action === 'REDUCE') {
-      toast.warning(`Đã áp dụng đơn thuốc CẮT LỖ: Tạm hoãn chi tiêu trên kênh ${rec.channel || 'mục tiêu'}!`);
+      return;
+    }
+
+    if (!campaignId) {
+      setAppliedActions(prev => ({ ...prev, [index]: true }));
+      return;
+    }
+
+    try {
+      const currentCamp = await campaignApi.getById(campaignId);
+      const currentBudget = Number(currentCamp.budget) || 0;
+      if (rec.action === 'SCALE') {
+        const nextBudget = currentBudget > 0 ? Math.round(currentBudget * 1.15) : 10000000;
+        await campaignApi.update(campaignId, { budget: nextBudget });
+        setAppliedActions(prev => ({ ...prev, [index]: true }));
+        toast.success(
+          `Đã tăng 15% ngân sách chiến dịch lên ${nextBudget.toLocaleString('vi-VN')} đ theo khuyến nghị SCALE.`
+        );
+      } else if (rec.action === 'PAUSE') {
+        await campaignApi.update(campaignId, { status: 'PAUSED' });
+        setAppliedActions(prev => ({ ...prev, [index]: true }));
+        toast.warning(`Đã chuyển trạng thái chiến dịch "${currentCamp.name}" sang Tạm dừng (PAUSED).`);
+      } else if (rec.action === 'REDUCE') {
+        const nextBudget = Math.max(1000000, Math.round(currentBudget * 0.85));
+        await campaignApi.update(campaignId, { budget: nextBudget });
+        setAppliedActions(prev => ({ ...prev, [index]: true }));
+        toast.warning(
+          `Đã giảm 15% ngân sách chiến dịch xuống ${nextBudget.toLocaleString('vi-VN')} đ để cắt lỗ.`
+        );
+      }
+    } catch {
+      toast.error('Không thể cập nhật ngân sách / trạng thái chiến dịch.');
     }
   };
 

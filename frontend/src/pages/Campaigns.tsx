@@ -169,11 +169,11 @@ export const Campaigns: React.FC<CampaignsProps> = ({
   const [quickMetricForm, setQuickMetricForm] = useState({
     channel_code: 'facebook',
     metric_date: todayLocalISO(),
-    views: 15000,
-    cost: 1500000,
-    clicks: 350,
-    conversions: 15,
-    revenue: 4800000,
+    views: 0,
+    cost: 0,
+    clicks: 0,
+    conversions: 0,
+    revenue: 0,
   });
   const [isRecordingMetric, setIsRecordingMetric] = useState<boolean>(false);
 
@@ -226,6 +226,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
     objectiveId: 'SALES',
     objectiveTitle: CAMPAIGN_OBJECTIVES[0].title,
     product_id: 1,
+    isCreatingNewProduct: false,
+    newProductName: '',
+    productUsp: '',
     name: '',
     budget: 15000000,
     start_date: todayLocalISO(),
@@ -288,7 +291,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
     }
     if (generatedCreatives.email && wizardData.channels.includes('email')) {
       pieces.push({
-        title: generatedCreatives.email.subject || '',
+        title: generatedCreatives.email.subject_line_a || generatedCreatives.email.subject || '(Chưa có tiêu đề)',
         body: generatedCreatives.email.body,
         cta: generatedCreatives.email.cta
       });
@@ -344,6 +347,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
   // Edit Drawer Form
   const [editFormData, setEditFormData] = useState({
     name: '',
+    product_id: 1,
+    product_usp: '',
+    objective: '',
     budget: 0,
     start_date: '',
     end_date: '',
@@ -474,11 +480,15 @@ export const Campaigns: React.FC<CampaignsProps> = ({
       setProducts(pList);
 
       if (pList.length > 0) {
-        setWizardData(prev => ({
-          ...prev,
-          product_id: prev.product_id || pList[0].id,
-          name: prev.name || `Chiến dịch ${prev.objectiveTitle} - ${pList[0].name}`
-        }));
+        setWizardData(prev => {
+          const targetProd = pList.find(p => p.id === prev.product_id) || pList[0];
+          return {
+            ...prev,
+            product_id: prev.product_id || pList[0].id,
+            productUsp: prev.productUsp || targetProd?.usp || '',
+            name: prev.name || `Chiến dịch ${prev.objectiveTitle} - ${targetProd?.name || pList[0].name}`
+          };
+        });
       }
 
       void loadCampaignMetrics(cList, signal);
@@ -535,8 +545,12 @@ export const Campaigns: React.FC<CampaignsProps> = ({
   // Load details when Drawer opens
   useEffect(() => {
     if (selectedDrawerCampaign) {
+      const prod = products.find(p => p.id === selectedDrawerCampaign.product_id);
       setEditFormData({
         name: selectedDrawerCampaign.name,
+        product_id: selectedDrawerCampaign.product_id || (products[0]?.id ?? 1),
+        product_usp: prod?.usp || '',
+        objective: selectedDrawerCampaign.objective || '',
         budget: selectedDrawerCampaign.budget,
         start_date: selectedDrawerCampaign.start_date,
         end_date: selectedDrawerCampaign.end_date,
@@ -545,7 +559,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
       });
       loadDrawerDetails(selectedDrawerCampaign.id);
     }
-  }, [selectedDrawerCampaign]);
+  }, [selectedDrawerCampaign, products]);
 
   const loadDrawerDetails = async (campaignId: number) => {
     try {
@@ -851,8 +865,20 @@ export const Campaigns: React.FC<CampaignsProps> = ({
 
     setIsSavingDrawer(true);
     try {
+      if (editFormData.product_id && editFormData.product_usp !== undefined) {
+        const updatedProd = await productApi.update(Number(editFormData.product_id), {
+          usp: editFormData.product_usp.trim()
+        }).catch(() => null);
+        if (updatedProd) {
+          setProducts(prev => prev.map(p => p.id === updatedProd.id ? updatedProd : p));
+        }
+      }
+
       const updated = await campaignApi.update(selectedDrawerCampaign.id, {
         name: editFormData.name,
+        product_id: Number(editFormData.product_id),
+        product_usp: editFormData.product_usp.trim(),
+        objective: editFormData.objective.trim(),
         budget: Number(editFormData.budget),
         start_date: editFormData.start_date,
         end_date: editFormData.end_date,
@@ -877,6 +903,10 @@ export const Campaigns: React.FC<CampaignsProps> = ({
     try {
       setIsGeneratingAI(true);
       const selectedProd = products.find(p => p.id === Number(wizardData.product_id));
+      const effectiveProductName = wizardData.isCreatingNewProduct
+        ? wizardData.newProductName.trim()
+        : (selectedProd?.name || '');
+      const effectiveProductUsp = wizardData.productUsp.trim() || selectedProd?.usp || '';
       // Qua hàng đợi: `POST /ai/omnichannel` đồng bộ mất 237 giây và chết 524
       // qua Cloudflare Worker, còn hàng đợi trả 202 ngay rồi thăm dò kết quả.
       const res = await wizardCreativeJob.run<OmnichannelResponse>({
@@ -884,8 +914,8 @@ export const Campaigns: React.FC<CampaignsProps> = ({
         brief: `${wizardData.name} - Mục tiêu: ${wizardData.objectiveTitle} - Đối tượng: ${wizardData.audience}`,
         tone: brandKit?.tone_of_voice || 'Chuyên nghiệp, lôi cuốn, thúc đẩy hành động',
         prompt_version: 'v3',
-        ...(selectedProd?.name ? { product_name: selectedProd.name } : {}),
-        ...(selectedProd?.usp ? { product_usp: selectedProd.usp } : {}),
+        ...(effectiveProductName ? { product_name: effectiveProductName } : {}),
+        ...(effectiveProductUsp ? { product_usp: effectiveProductUsp } : {}),
       });
       setGeneratedCreatives(res);
       // Nhãn provider đọc từ kết quả thật. Ghi cứng "Google Gemini" là nói dối
@@ -922,9 +952,28 @@ export const Campaigns: React.FC<CampaignsProps> = ({
       // 1. Create Campaign — gửi thẳng trạng thái wizard chọn (ACTIVE/PLANNED/DRAFT).
       // Trước đây luôn create DRAFT rồi chỉ update khi launchStatus==='DRAFT'
       // (ngược logic) → user chọn ACTIVE nhưng campaign vẫn DRAFT.
+      let targetProductId = Number(wizardData.product_id);
+      if (wizardData.isCreatingNewProduct && wizardData.newProductName.trim()) {
+        const createdProd = await productApi.create({
+          name: wizardData.newProductName.trim(),
+          usp: wizardData.productUsp.trim()
+        }).catch(() => null);
+        if (createdProd?.id) {
+          targetProductId = createdProd.id;
+        }
+      } else if (targetProductId && wizardData.productUsp.trim()) {
+        await productApi.update(targetProductId, {
+          usp: wizardData.productUsp.trim()
+        }).catch(() => null);
+      }
+
       newCamp = await campaignApi.create({
         name: wizardData.name.trim(),
-        product_id: Number(wizardData.product_id),
+        product_id: targetProductId,
+        ...(wizardData.isCreatingNewProduct && wizardData.newProductName.trim()
+          ? { product_name: wizardData.newProductName.trim() }
+          : {}),
+        ...(wizardData.productUsp.trim() ? { product_usp: wizardData.productUsp.trim() } : {}),
         objective: wizardData.objectiveTitle,
         audience: wizardData.audience.trim(),
         start_date: wizardData.start_date,
@@ -997,11 +1046,12 @@ export const Campaigns: React.FC<CampaignsProps> = ({
 
         // Email Newsletter Creative
         if (mailChannelId !== null && generatedCreatives.email && wizardData.channels.includes('email')) {
+          const emailSubject = generatedCreatives.email.subject_line_a || generatedCreatives.email.subject || '(Chưa có tiêu đề)';
           creativePromises.push(contentApi.create({
             campaign_id: newCamp.id,
             channel_id: mailChannelId,
-            title: `[Email Newsletter] ${generatedCreatives.email.subject || 'Ưu đãi đặc biệt'}`,
-            body: `Tiêu đề: ${generatedCreatives.email.subject || ''}\nLời chào: ${generatedCreatives.email.preheader || generatedCreatives.email.greeting || ''}\n\n${generatedCreatives.email.body}`,
+            title: `[Email Newsletter] ${emailSubject}`,
+            body: `Tiêu đề: ${emailSubject}\nLời chào: ${generatedCreatives.email.preheader || generatedCreatives.email.greeting || ''}\n\n${generatedCreatives.email.body}`,
             cta: generatedCreatives.email.cta,
             status: 'AI_DRAFT'
           }));
@@ -2577,7 +2627,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-bold text-[10px] uppercase">
-                                  {item.channel?.name || (item.channel_id === 1 ? 'Facebook Ad' : item.channel_id === 2 ? 'TikTok Script' : 'Email')}
+                                  {item.channel?.name || (item.channel_id === 1 ? 'Facebook Ads' : item.channel_id === 2 ? 'Email Marketing' : item.channel_id === 3 ? 'Blog & SEO' : item.channel_id === 4 ? 'Google Ads' : 'TikTok')}
                                 </span>
                                 <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-mono text-[10px] font-bold">
                                   v{item.version_no || 1}
@@ -3270,6 +3320,62 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                       />
                     </div>
 
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label htmlFor="drawer-campaign-product" className="block font-bold text-slate-700 mb-1">Sản phẩm Tiếp thị</label>
+                        <select
+                          id="drawer-campaign-product"
+                          value={editFormData.product_id}
+                          onChange={(e) => {
+                            const pid = Number(e.target.value);
+                            const prod = products.find(p => p.id === pid);
+                            setEditFormData(prev => ({
+                              ...prev,
+                              product_id: pid,
+                              product_usp: prod?.usp || ''
+                            }));
+                          }}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold outline-none focus:bg-white focus:border-indigo-500"
+                        >
+                          {products.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label htmlFor="drawer-campaign-objective" className="block font-bold text-slate-700 mb-1">Mục tiêu Chiến dịch</label>
+                        <input
+                          id="drawer-campaign-objective"
+                          type="text"
+                          list="drawer-objective-options"
+                          value={editFormData.objective}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, objective: e.target.value }))}
+                          placeholder="Chọn hoặc nhập mục tiêu..."
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold outline-none focus:bg-white focus:border-indigo-500"
+                        />
+                        <datalist id="drawer-objective-options">
+                          {CAMPAIGN_OBJECTIVES.map(obj => (
+                            <option key={obj.id} value={obj.title}>{obj.subtitle}</option>
+                          ))}
+                        </datalist>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="drawer-product-usp" className="block font-bold text-slate-700 mb-1">
+                        Điểm khác biệt sản phẩm (USP)
+                      </label>
+                      <input
+                        id="drawer-product-usp"
+                        type="text"
+                        value={editFormData.product_usp}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, product_usp: e.target.value }))}
+                        placeholder="Nhập lợi thế cạnh tranh / điểm khác biệt của sản phẩm..."
+                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none focus:bg-white focus:border-indigo-500"
+                      />
+                    </div>
+
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label htmlFor="drawer-campaign-budget" className="block font-bold text-slate-700 mb-1">Ngân sách (VNĐ)</label>
@@ -3434,14 +3540,12 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         const Icon = obj.icon;
                         const isSelected = wizardData.objectiveId === obj.id;
                         const applyObjective = () => {
-                          const selectedProd = products.find(p => p.id === Number(wizardData.product_id));
                           setWizardData(prev => ({
                             ...prev,
                             objectiveId: obj.id,
                             objectiveTitle: obj.title,
-                            audience: obj.defaultAudience,
                             funnelStage: obj.funnelStage,
-                            name: `Chiến dịch ${obj.title} - ${selectedProd?.name || 'Sản phẩm'}`
+                            audience: prev.audience.trim() ? prev.audience : obj.defaultAudience,
                           }));
                         };
                         return (
@@ -3482,25 +3586,58 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                   {/* Product & Campaign Name */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label htmlFor="wizard-product-select" className="block text-xs font-bold text-slate-700 mb-1">Sản phẩm Tiếp thị</label>
-                      <select
-                        id="wizard-product-select"
-                        value={wizardData.product_id}
-                        onChange={(e) => {
-                          const pid = Number(e.target.value);
-                          const p = products.find(prod => prod.id === pid);
-                          setWizardData(prev => ({
-                            ...prev,
-                            product_id: pid,
-                            name: `Chiến dịch ${prev.objectiveTitle} - ${p?.name || 'Sản phẩm'}`
-                          }));
-                        }}
-                        className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold outline-none focus:bg-white focus:border-indigo-500"
-                      >
-                        {products.map(p => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </select>
+                      <div className="flex items-center justify-between mb-1">
+                        <label htmlFor="wizard-product-select" className="block text-xs font-bold text-slate-700">
+                          Sản phẩm Tiếp thị
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setWizardData(prev => {
+                              const nextCreating = !prev.isCreatingNewProduct;
+                              const curProd = products.find(prod => prod.id === Number(prev.product_id));
+                              return {
+                                ...prev,
+                                isCreatingNewProduct: nextCreating,
+                                productUsp: nextCreating ? prev.productUsp : (curProd?.usp || prev.productUsp),
+                              };
+                            })
+                          }
+                          className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                        >
+                          {wizardData.isCreatingNewProduct ? 'Chọn sản phẩm có sẵn' : '+ Tạo sản phẩm mới'}
+                        </button>
+                      </div>
+                      {wizardData.isCreatingNewProduct ? (
+                        <input
+                          id="wizard-new-product-name"
+                          type="text"
+                          value={wizardData.newProductName}
+                          onChange={(e) => setWizardData(prev => ({ ...prev, newProductName: e.target.value }))}
+                          placeholder="Nhập tên sản phẩm / dịch vụ mới..."
+                          className="w-full text-xs p-2.5 bg-white border border-indigo-300 rounded-xl font-semibold outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      ) : (
+                        <select
+                          id="wizard-product-select"
+                          value={wizardData.product_id}
+                          onChange={(e) => {
+                            const pid = Number(e.target.value);
+                            const p = products.find(prod => prod.id === pid);
+                            setWizardData(prev => ({
+                              ...prev,
+                              product_id: pid,
+                              productUsp: p?.usp || '',
+                              name: prev.name.trim() ? prev.name : `Chiến dịch ${prev.objectiveTitle} - ${p?.name || 'Sản phẩm'}`
+                            }));
+                          }}
+                          className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold outline-none focus:bg-white focus:border-indigo-500"
+                        >
+                          {products.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                      )}
                     </div>
 
                     <div>
@@ -3515,6 +3652,21 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         required
                       />
                     </div>
+                  </div>
+
+                  {/* Product USP Input */}
+                  <div>
+                    <label htmlFor="wizard-product-usp" className="block text-xs font-bold text-slate-700 mb-1">
+                      Lợi thế cạnh tranh / Điểm khác biệt (USP sản phẩm)
+                    </label>
+                    <input
+                      id="wizard-product-usp"
+                      type="text"
+                      value={wizardData.productUsp}
+                      onChange={(e) => setWizardData(prev => ({ ...prev, productUsp: e.target.value }))}
+                      placeholder="VD: Tự động hóa quy trình, tiết kiệm 40% chi phí, bảo hành 1 đổi 1..."
+                      className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none focus:bg-white focus:border-indigo-500"
+                    />
                   </div>
 
                   {/* Budget & Presets */}
@@ -3604,7 +3756,9 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                           className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full ${
                             wizardData.budgetSplit.facebook + wizardData.budgetSplit.tiktok + wizardData.budgetSplit.email === 100
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : wizardData.budgetSplit.facebook + wizardData.budgetSplit.tiktok + wizardData.budgetSplit.email > 100
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                : 'bg-amber-50 text-amber-700 border border-amber-200'
                           }`}
                         >
                           Tổng: {wizardData.budgetSplit.facebook + wizardData.budgetSplit.tiktok + wizardData.budgetSplit.email}%
@@ -3612,17 +3766,33 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                         <button
                           type="button"
                           onClick={() =>
-                            setWizardData((prev) => ({
-                              ...prev,
-                              budgetSplit: { facebook: 50, tiktok: 35, email: 15 },
-                            }))
+                            setWizardData((prev) => {
+                              const sum = prev.budgetSplit.facebook + prev.budgetSplit.tiktok + prev.budgetSplit.email;
+                              if (sum <= 0) {
+                                return { ...prev, budgetSplit: { facebook: 50, tiktok: 35, email: 15 } };
+                              }
+                              const fb = Math.round((prev.budgetSplit.facebook / sum) * 100);
+                              const tt = Math.round((prev.budgetSplit.tiktok / sum) * 100);
+                              const em = Math.max(0, 100 - fb - tt);
+                              return {
+                                ...prev,
+                                budgetSplit: { facebook: fb, tiktok: tt, email: em },
+                              };
+                            })
                           }
-                          className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 underline"
+                          className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
                         >
-                          Chuẩn 50/35/15%
+                          Tự động cân bằng 100%
                         </button>
                       </div>
                     </div>
+                    {wizardData.budgetSplit.facebook + wizardData.budgetSplit.tiktok + wizardData.budgetSplit.email > 100 && (
+                      <div role="alert" className="mb-3 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center justify-between gap-2">
+                        <span>
+                          Tổng tỷ lệ phân bổ ngân sách đang là {wizardData.budgetSplit.facebook + wizardData.budgetSplit.tiktok + wizardData.budgetSplit.email}% (vượt quá 100%). Vui lòng điều chỉnh về tối đa 100% trước khi tiếp tục.
+                        </span>
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {(
                         [
@@ -3943,7 +4113,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                               </label>
                               <input
                                 type="text"
-                                value={generatedCreatives.email.subject || ''}
+                                value={generatedCreatives.email.subject_line_a || generatedCreatives.email.subject || '(Chưa có tiêu đề)'}
                                 onChange={(e) =>
                                   setGeneratedCreatives((prev) =>
                                     prev && prev.email
@@ -3952,6 +4122,7 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                                           email: {
                                             ...prev.email,
                                             subject: e.target.value,
+                                            subject_line_a: e.target.value,
                                           },
                                         }
                                       : prev
@@ -4206,10 +4377,14 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || (wizardStep === 2 && wizardData.budgetSplit.facebook + wizardData.budgetSplit.tiktok + wizardData.budgetSplit.email > 100)}
                       onClick={() => {
                         if (!wizardData.name.trim()) {
                           toast.warning('Vui lòng nhập tên chiến dịch');
+                          return;
+                        }
+                        if (wizardData.isCreatingNewProduct && !wizardData.newProductName.trim()) {
+                          toast.warning('Vui lòng nhập tên sản phẩm mới');
                           return;
                         }
                         if (!wizardData.start_date || !wizardData.end_date || wizardData.end_date < wizardData.start_date) {
@@ -4220,9 +4395,13 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                           toast.warning('Ngân sách phải lớn hơn 0');
                           return;
                         }
+                        if (wizardData.budgetSplit.facebook + wizardData.budgetSplit.tiktok + wizardData.budgetSplit.email > 100) {
+                          toast.warning('Tổng tỷ lệ phân bổ ngân sách các kênh không được vượt quá 100%');
+                          return;
+                        }
                         void handleFinishWizard();
                       }}
-                      className="inline-flex items-center gap-1.5 px-4 py-2.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 rounded-xl text-xs font-bold transition-all"
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 rounded-xl text-xs font-bold transition-all disabled:opacity-40"
                       title="Lưu và tạo chiến dịch ngay mà không cần qua các bước phụ"
                     >
                       <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -4230,9 +4409,14 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                     </button>
                     <button
                       type="button"
+                      disabled={wizardStep === 2 && wizardData.budgetSplit.facebook + wizardData.budgetSplit.tiktok + wizardData.budgetSplit.email > 100}
                       onClick={() => {
                         if (wizardStep === 1 && !wizardData.name.trim()) {
                           toast.warning('Vui lòng nhập tên chiến dịch');
+                          return;
+                        }
+                        if (wizardStep === 1 && wizardData.isCreatingNewProduct && !wizardData.newProductName.trim()) {
+                          toast.warning('Vui lòng nhập tên sản phẩm mới');
                           return;
                         }
                         if (!wizardData.start_date || !wizardData.end_date) {
@@ -4247,9 +4431,13 @@ export const Campaigns: React.FC<CampaignsProps> = ({
                           toast.warning('Ngân sách phải lớn hơn 0', 'Ngân sách không hợp lệ');
                           return;
                         }
+                        if (wizardStep === 2 && wizardData.budgetSplit.facebook + wizardData.budgetSplit.tiktok + wizardData.budgetSplit.email > 100) {
+                          toast.warning('Tổng tỷ lệ phân bổ ngân sách các kênh không được vượt quá 100%', 'Phân bổ ngân sách không hợp lệ');
+                          return;
+                        }
                         setWizardStep(prev => Math.min(prev + 1, 4));
                       }}
-                      className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                      className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-40"
                     >
                       <span>Tiếp theo (Phân bổ & Soạn bài)</span>
                       <ChevronRight className="w-4 h-4" />

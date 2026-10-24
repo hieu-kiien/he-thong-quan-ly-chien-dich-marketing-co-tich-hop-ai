@@ -26,6 +26,7 @@ import { CampaignTableSkeleton } from '../components/Skeleton';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { GlobalCsvImportModal } from '../components/GlobalCsvImportModal';
 import { AdAccountsHub } from '../components/AdAccountsHub';
+import { useWorkspace } from '../context/WorkspaceContext';
 
 interface DashboardProps {
   onSelectCampaign: (campaign: Campaign) => void;
@@ -43,6 +44,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   userRole
 }) => {
   const toast = useToast();
+  const { currentWorkspace } = useWorkspace();
   const csvFileInputRef = useRef<HTMLInputElement | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [contents, setContents] = useState<MarketingContent[]>([]);
@@ -103,8 +105,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           return null;
         }),
         commandCenterApi.getMorningBriefing().catch(() => null),
-        campaignApi.getPortfolioTriage().catch(() => ({ anomalies: [], summary: { critical_count: 0, warning_count: 0, healthy_count: 0, total_waste_risk_vnd: 0 } })),
-        campaignApi.getWinningPatterns().catch(() => ({ patterns: [], analyzed_campaigns_count: 0 })),
+        campaignApi.getPortfolioTriage(currentWorkspace?.id).catch(() => ({ anomalies: [], summary: { critical_count: 0, warning_count: 0, healthy_count: 0, total_waste_risk_vnd: 0 } })),
+        campaignApi.getWinningPatterns(currentWorkspace?.id).catch(() => ({ patterns: [], analyzed_campaigns_count: 0 })),
       ]);
       if (signal?.aborted) return;
       setCampaigns(cList);
@@ -124,86 +126,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       setCommandCenter(ccData);
       setMorningBriefing(mbData);
 
-      if (triageData?.anomalies && triageData.anomalies.length > 0) {
-        setPortfolioAnomalies(triageData.anomalies);
-      } else if (cList.length > 0) {
-        const firstCamp = cList[0];
-        const secondCamp = cList[1] || cList[0];
-        const thirdCamp = cList[2] || cList[0];
-        setPortfolioAnomalies([
-          {
-            id: `triage-pacing-${firstCamp.id}`,
-            campaign_id: firstCamp.id,
-            campaign_name: firstCamp.name,
-            anomaly_type: 'OVER_PACING',
-            severity: 'CRITICAL',
-            title: 'Tiêu tiền nhanh hơn tiến độ ngày (+32% vượt mức)',
-            detail: `Chiến dịch "${firstCamp.name}" đang cắn ngân sách nhanh hơn dự kiến trong khi chi phí để có 1 đơn hàng tăng 28%.`,
-            metric_highlight: 'Chi 132% tiến độ · Giá đơn +28%',
-            recommended_action: 'Giảm 15% ngân sách ngày để hãm tốc độ tiêu tiền.',
-            action_type: 'ADJUST_BUDGET',
-          },
-          {
-            id: `triage-fatigue-${secondCamp.id}`,
-            campaign_id: secondCamp.id,
-            campaign_name: secondCamp.name,
-            anomaly_type: 'CREATIVE_FATIGUE',
-            severity: 'HIGH',
-            title: 'Khách hàng đã nhàm quảng cáo (Lặp lại 3.6 lần/người)',
-            detail: `Cùng một tệp khách đã xem đi xem lại bài quảng cáo này quá nhiều lần khiến tỷ lệ bấm giảm từ 2.4% xuống 1.15%.`,
-            metric_highlight: 'Tỷ lệ bấm giảm 52%',
-            recommended_action: 'Thay bài viết hoặc câu mở đầu mới để thu hút người xem lại.',
-            action_type: 'REFRESH_CREATIVE',
-          },
-          {
-            id: `triage-bleed-${thirdCamp.id}`,
-            campaign_id: thirdCamp.id,
-            campaign_name: thirdCamp.name,
-            anomaly_type: 'ZERO_CONVERSION_BLEED',
-            severity: 'HIGH',
-            title: 'Chi nhiều tiền nhưng doanh thu thấp (ROAS 1.15x)',
-            detail: `Chi 1 đồng quảng cáo mới thu về 1.15 đồng doanh thu, chưa đủ bù tiền vốn hàng hóa và vận hành.`,
-            metric_highlight: 'Hệ số ROAS 1.15x (Dưới chuẩn 1.5x)',
-            recommended_action: 'Dồn bớt 20% ngân sách từ kênh yếu sang kênh đang ra đơn tốt nhất.',
-            action_type: 'REBALANCE_CHANNELS',
-          },
-        ]);
-      } else {
-        setPortfolioAnomalies([]);
-      }
-
-      if (patternsData?.patterns && patternsData.patterns.length > 0) {
-        setWinningPatterns(patternsData.patterns);
-      } else if (cList.length > 0) {
-        setWinningPatterns([
-          {
-            id: 'win-pattern-1',
-            pattern_name: 'Nêu thẳng vấn đề tốn kém + Đưa con số thực tế ngay câu thứ 2',
-            hook_type: 'Mở đầu bằng câu hỏi chạm vấn đề',
-            channel: 'Facebook & TikTok',
-            avg_ctr: 2.85,
-            avg_cvr: 4.2,
-            avg_roas: 4.15,
-            sample_count: Math.max(4, ctList.length),
-            insight: 'Các bài viết đi thẳng vào số tiền khách hàng đang bị lãng phí có tỷ lệ chốt đơn cao hơn các bài mở đầu chào hỏi chung chung.',
-            example_hook: '“Tại sao 73% tiền chạy quảng cáo bị mất ngay ở 3 giây đầu tiên mà không ra đơn?”',
-          },
-          {
-            id: 'win-pattern-2',
-            pattern_name: 'So sánh kết quả Trước & Sau + Nêu rõ chính sách đổi trả',
-            hook_type: 'So sánh trực diện Trước - Sau',
-            channel: 'TikTok & Video ngắn',
-            avg_ctr: 3.12,
-            avg_cvr: 3.75,
-            avg_roas: 3.82,
-            sample_count: 6,
-            insight: 'Cho khách hàng thấy sự thay đổi cụ thể trước và sau khi dùng sản phẩm trong 3 giây đầu giúp giữ người xem ở lại lâu hơn.',
-            example_hook: '“Trước khi đổi cách chia ngân sách: 420.000đ/khách. Sau 2 ngày áp dụng: còn 165.000đ/khách.”',
-          },
-        ]);
-      } else {
-        setWinningPatterns([]);
-      }
+      setPortfolioAnomalies(Array.isArray(triageData?.anomalies) ? triageData.anomalies : []);
+      setWinningPatterns(Array.isArray(patternsData?.patterns) ? patternsData.patterns : []);
     } catch (e: any) {
       if (e?.code === 'ERR_CANCELED' || signal?.aborted) return;
       setLoadError(getApiErrorMessage(e));
@@ -217,7 +141,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     void loadData(controller.signal);
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentWorkspace?.id]);
 
   const handleOneClickRebalance = async () => {
     const targetId = morningBriefing?.rebalance_action?.campaign_id || campaigns[0]?.id;
@@ -592,10 +516,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-[#121316]">
-                    Cách viết đang ra nhiều đơn nhất
+                    Thống kê hiệu quả theo Kênh &amp; Góc nội dung
                   </h3>
                   <p className="text-xs text-[#5A5E66]">
-                    Rút ra từ các bài quảng cáo có doanh thu cao nhất hiện tại
+                    Tổng hợp chỉ số hiệu quả (ROAS, CTR) và cấu trúc nội dung từ các kênh truyền thông
                   </p>
                 </div>
               </div>
@@ -603,33 +527,41 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             <div className="space-y-3">
-              {winningPatterns.slice(0, 3).map((pat, idx) => (
-                <div
-                  key={pat.id || pat.pattern_id || `pat-${idx}`}
-                  className="p-3.5 rounded-xl bg-[#F6F5F0]/70 border border-[#E4E2DD] space-y-1.5"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-white text-[#121316] border border-[#E4E2DD]">
-                      Hạng #{idx + 1} · {pat.channel || pat.category || 'Đa kênh'}
-                    </span>
-                    <div className="flex items-center gap-1.5 text-[11px] font-mono font-bold">
-                      <span className="px-2 py-0.5 rounded bg-[#F0FDF4] text-[#15803D] border border-[#BBF7D0]">
-                        ROAS {pat.avg_roas}x
-                      </span>
-                      <span className="px-2 py-0.5 rounded bg-white text-[#5A5E66] border border-[#E4E2DD]">
-                        CTR {pat.avg_ctr ?? pat.avg_ctr_pct ?? 2.4}%
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-xs font-extrabold text-[#121316]">{pat.pattern_name || pat.title}</p>
-                  <p className="text-xs text-[#5A5E66] leading-relaxed">{pat.insight}</p>
-                  {(pat.example_hook || pat.recommended_template) && (
-                    <p className="text-xs italic text-[#121316] bg-white px-3 py-2 rounded-lg border border-[#E4E2DD]">
-                      Câu mẫu: {pat.example_hook || pat.recommended_template}
-                    </p>
-                  )}
+              {winningPatterns.length === 0 ? (
+                <div className="p-4 rounded-xl bg-[#F6F5F0]/70 border border-[#E4E2DD] text-center">
+                  <p className="text-xs font-medium text-[#5A5E66]">
+                    Chưa có mẫu bài thắng cuộc. Hãy ghi nhận số liệu chuyển đổi thực tế từ các bài đăng để hệ thống phân tích.
+                  </p>
                 </div>
-              ))}
+              ) : (
+                winningPatterns.slice(0, 3).map((pat, idx) => (
+                  <div
+                    key={pat.id || pat.pattern_id || `pat-${idx}`}
+                    className="p-3.5 rounded-xl bg-[#F6F5F0]/70 border border-[#E4E2DD] space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-white text-[#121316] border border-[#E4E2DD]">
+                        Hạng #{idx + 1} · {pat.channel || pat.category || 'Đa kênh'}
+                      </span>
+                      <div className="flex items-center gap-1.5 text-[11px] font-mono font-bold">
+                        <span className="px-2 py-0.5 rounded bg-[#F0FDF4] text-[#15803D] border border-[#BBF7D0]">
+                          ROAS {pat.avg_roas}x
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-white text-[#5A5E66] border border-[#E4E2DD]">
+                          CTR {pat.avg_ctr ?? pat.avg_ctr_pct ?? 2.4}%
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs font-extrabold text-[#121316]">{pat.pattern_name || pat.title}</p>
+                    <p className="text-xs text-[#5A5E66] leading-relaxed">{pat.insight}</p>
+                    {(pat.example_hook || pat.recommended_template) && (
+                      <p className="text-xs italic text-[#121316] bg-white px-3 py-2 rounded-lg border border-[#E4E2DD]">
+                        Câu mẫu: {pat.example_hook || pat.recommended_template}
+                      </p>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
 
             <button

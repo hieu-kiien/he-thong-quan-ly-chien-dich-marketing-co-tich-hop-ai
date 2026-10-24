@@ -10,7 +10,7 @@ from app.core.security import RoleChecker, get_current_user
 from app.services import quota
 from app.models.entities import (
     MarketingContent, Campaign, MarketingChannel, ContentReview,
-    User, CampaignMember, Workspace, WorkspaceMember, BrandKit
+    User, CampaignMember, Workspace, WorkspaceMember, BrandKit, Product, ProductCategory
 )
 from app.schemas.schemas import (
     ContentCreate, ContentUpdate, ContentResponse, ReviewCreate,
@@ -292,6 +292,91 @@ def get_contents(
         serializer=lambda c: ContentResponse.model_validate(c),
     )
 
+def _resolve_or_create_scratchpad_campaign(
+    db: Session,
+    user: User,
+    explicit_ws_id: Optional[int] = None,
+) -> Campaign:
+    """Tự động phân giải hoặc khởi tạo 'Kho Nháp Tự Do (Scratchpad)' cho Workspace
+    khi người dùng lưu bài viết / Creative Pack tự do mà chưa cần chọn Chiến dịch trước
+    (Guided Malleable Architecture — Bottom-up Workflow).
+    """
+    ws_id = explicit_ws_id
+    if ws_id is not None:
+        assert_workspace_access(ws_id, user, db)
+    else:
+        membership = db.query(WorkspaceMember).filter(WorkspaceMember.user_id == user.id).first()
+        if membership:
+            ws_id = membership.workspace_id
+        else:
+            owned_ws = db.query(Workspace).filter(Workspace.owner_id == user.id).first()
+            if owned_ws:
+                ws_id = owned_ws.id
+            elif user.role == "ADMIN":
+                first_ws = db.query(Workspace).order_by(Workspace.id.asc()).first()
+                ws_id = first_ws.id if first_ws else 1
+
+    if ws_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Không tìm thấy không gian làm việc hợp lệ để lưu bản nháp tự do.",
+        )
+
+    scratch_code = f"SCRATCHPAD_WS_{ws_id}"
+    campaign = (
+        db.query(Campaign)
+        .filter(
+            Campaign.workspace_id == ws_id,
+            (Campaign.campaign_code == scratch_code) | (Campaign.name == "Kho Nháp Tự Do (Scratchpad)"),
+        )
+        .first()
+    )
+    if not campaign:
+        product = db.query(Product).order_by(Product.id.asc()).first()
+        if not product:
+            cat = db.query(ProductCategory).order_by(ProductCategory.id.asc()).first()
+            if not cat:
+                cat = ProductCategory(name="Danh mục Chung", description="Danh mục mặc định")
+                db.add(cat)
+                db.flush()
+            product = Product(
+                category_id=cat.id,
+                name="Sản phẩm / Dịch vụ Chung",
+                usp="Tối ưu hiệu quả thực tế cho khách hàng Việt Nam",
+                status="ACTIVE",
+            )
+            db.add(product)
+            db.flush()
+
+        campaign = Campaign(
+            workspace_id=ws_id,
+            product_id=product.id,
+            owner_id=user.id,
+            name="Kho Nháp Tự Do (Scratchpad)",
+            campaign_code=scratch_code,
+            objective="Lưu trữ nhanh bài viết nháp và gói nội dung (Creative Pack) chưa gắn chiến dịch cố định",
+            audience="Khách hàng mục tiêu của Shop / Doanh nghiệp",
+            start_date="2026-01-01",
+            end_date="2027-12-31",
+            budget=0.0,
+            status="ACTIVE",
+            funnel_stage="BoFU",
+        )
+        db.add(campaign)
+        db.flush()
+
+    if user.role not in ("ADMIN", "MANAGER", "AGENCY_MANAGER") and campaign.owner_id != user.id:
+        is_member = db.query(CampaignMember).filter(
+            CampaignMember.campaign_id == campaign.id,
+            CampaignMember.user_id == user.id,
+        ).first()
+        if not is_member:
+            db.add(CampaignMember(campaign_id=campaign.id, user_id=user.id, member_role="CONTRIBUTOR"))
+            db.flush()
+
+    return campaign
+
+
 @router.post("", response_model=ContentResponse, status_code=status.HTTP_201_CREATED)
 def create_content(
     req: ContentCreate,
@@ -307,8 +392,11 @@ def create_content(
             detail="Không thể tạo bài viết trực tiếp ở trạng thái APPROVED hoặc PUBLISHED. Cannot create content directly in APPROVED or PUBLISHED status. New content must start as DRAFT."
         )
 
-    # Record-level authorization: Kiểm tra quyền với Campaign
-    campaign = check_campaign_access_for_content(req.campaign_id, current_user, db)
+    # Record-level authorization: Kiểm tra quyền với Campaign hoặc tự gán vào Kho Nháp Tự Do (Scratchpad)
+    if req.campaign_id is not None:
+        campaign = check_campaign_access_for_content(req.campaign_id, current_user, db)
+    else:
+        campaign = _resolve_or_create_scratchpad_campaign(db, current_user, req.workspace_id)
 
     channel = db.query(MarketingChannel).filter(MarketingChannel.id == req.channel_id).first()
     if not channel:
@@ -339,12 +427,12 @@ def create_content(
         ch_code = (channel.code or "social").lower()
         angle_slug = (req.creative_angle or "general").lower().replace(" ", "_")
         hook_slug = (req.hook_variant or "v1").lower().replace(" ", "_")
-        camp_code = getattr(campaign, "campaign_code", None) or f"camp_{req.campaign_id}"
+        camp_code = getattr(campaign, "campaign_code", None) or f"camp_{campaign.id}"
         utm_params = f"?utm_source={ch_code}&utm_medium=paid_social&utm_campaign={camp_code.lower()}&utm_content={angle_slug}_{hook_slug}"
 
     content = MarketingContent(
         workspace_id=ws_id,
-        campaign_id=req.campaign_id,
+        campaign_id=campaign.id,
         channel_id=req.channel_id,
         created_by=user_id,
         title=req.title,
@@ -356,6 +444,7 @@ def create_content(
         hook_variant=req.hook_variant,
         utm_params=utm_params,
         ai_metadata_json=req.ai_metadata_json,
+        blocks_json=req.blocks_json or "[]",
     )
     db.add(content)
     try:
@@ -722,6 +811,9 @@ def update_content(
         content.utm_params = req.utm_params
     if req.ai_metadata_json is not None:
         content.ai_metadata_json = req.ai_metadata_json
+    if req.blocks_json is not None and req.blocks_json != content.blocks_json:
+        content.blocks_json = req.blocks_json
+        is_content_edited = True
 
     was_approved = content.status in ["APPROVED", "PUBLISHED"]
     if was_approved and is_content_edited:
@@ -1088,45 +1180,18 @@ def publish_content(
             meta_dict = {}
 
     meta_dict.update({
-        "external_post_id": external_delivery_id,
-        "ad_account_code": matched_ad_acc.account_code if matched_ad_acc else "act_108492019482",
-        "pixel_id": matched_ad_acc.pixel_id if (matched_ad_acc and matched_ad_acc.pixel_id) else "px_88392019283",
+        "external_post_id": external_delivery_id if outbound_dispatched else None,
+        "ad_account_code": matched_ad_acc.account_code if (outbound_dispatched and matched_ad_acc) else None,
+        "pixel_id": matched_ad_acc.pixel_id if (outbound_dispatched and matched_ad_acc and matched_ad_acc.pixel_id) else None,
         "published_at": now_utc.isoformat(),
         "published_by_id": current_user.id,
-        "publish_engine": publish_engine,
+        "publish_engine": publish_engine if outbound_dispatched else "INTERNAL_STATUS_ONLY",
         "outbound_dispatched": outbound_dispatched,
-        "delivery_status": "ACTIVE_DELIVERY",
+        "delivery_mode": "LIVE" if outbound_dispatched else "INTERNAL_STATUS_ONLY",
+        "delivery_status": "ACTIVE_DELIVERY" if outbound_dispatched else "INTERNAL_STATUS_ONLY",
     })
     content.ai_metadata_json = json.dumps(meta_dict, ensure_ascii=False)
     content.status = "PUBLISHED"
-
-    # Đảm bảo khởi tạo dòng theo dõi chỉ số (CampaignMetric) ngày hôm nay khi bài quảng cáo bắt đầu phân phối
-    try:
-        existing_metric = (
-            db.query(CampaignMetric)
-            .filter(
-                CampaignMetric.campaign_id == content.campaign_id,
-                CampaignMetric.channel_id == content.channel_id,
-                CampaignMetric.metric_date == today_str,
-            )
-            .first()
-        )
-        if not existing_metric:
-            db.add(
-                CampaignMetric(
-                    campaign_id=content.campaign_id,
-                    channel_id=content.channel_id,
-                    metric_date=today_str,
-                    views=150,
-                    clicks=12,
-                    conversions=0,
-                    cost=0.0,
-                    revenue=0.0,
-                    source="live_sync",
-                )
-            )
-    except Exception:
-        logger.warning("Khong the khoi tao CampaignMetric khi publish content %s", content_id)
 
     db.commit()
     db.refresh(content)
@@ -1136,13 +1201,13 @@ def publish_content(
         if ws_id is None:
             logger.warning("Bo qua thong bao: noi dung %s khong co workspace_id", content_id)
         else:
-            acc_label = matched_ad_acc.account_code if matched_ad_acc else "act_108492019482"
+            acc_label = matched_ad_acc.account_code if (outbound_dispatched and matched_ad_acc) else "INTERNAL_STATUS_ONLY"
             create_notification(
                 db=db,
                 user_id=None,
                 workspace_id=ws_id,
-                title="Bài viết đã được xuất bản & gắn mã theo dõi",
-                message=f"Bài viết '{content.title}' đã phân phối trên TK '{acc_label}' (Mã phân phối: {external_delivery_id}).",
+                title="Bài viết đã được xuất bản",
+                message=f"Bài viết '{content.title}' đã chuyển sang trạng thái PUBLISHED ({acc_label}).",
                 notif_type="campaign",
                 target_tab="campaigns"
             )
