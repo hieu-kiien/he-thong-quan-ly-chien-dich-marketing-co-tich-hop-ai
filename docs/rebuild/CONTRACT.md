@@ -226,3 +226,13 @@ Trang `/assistant` (giống Claude): cột trái danh sách phiên (tìm kiếm,
   - SSE `text` gửi toàn văn tích luỹ mỗi khi có part mới. Frontend có thể làm hiệu ứng "gõ chữ" phía client cho phần văn bản mới (thuần hiển thị).
 - Runner NDJSON bổ sung: dòng đầu `{"type":"run","run_id"}` (header `X-Run-Id`; client có thể truyền `run_id`), `{"type":"queued","position":n}` khi đang chờ, `tool` = `{name (bỏ tiền tố marketflow_), status:"done"|"error", input, output}`.
 - Số đo: lượt đơn giản 5–10s, lượt có 2 tool ~10s, RSS ~490 MB/tiến trình ⇒ **concurrency = 1**, timeout cứng bắt buộc (đã gặp treo >120s). Không cần `auth.json`.
+
+## 12. Phụ lục C — Chi tiết đề xuất AI (đã chốt giữa UI và backend)
+
+- `propose_content_drafts` args: `{"items":[{"campaign_id","channel_code","content_type","title","body","cta","status"}]}`; `status` theo từng item = `"PENDING_REVIEW"` (mặc định, "Gửi duyệt") hoặc `"DRAFT"` ("Lưu nháp"). Confirm body: `{"args": <args đã sửa>}`.
+- `result_json` sau khi thực thi:
+  - content drafts → `{"contents":[{"id","link":"/contents/<id>","status"}]}`
+  - `propose_campaign` / `propose_campaign_update` → `{"campaign_id","link":"/campaigns/<id>"}`
+  - `propose_schedule` → `{"schedule_id","link":"/calendar"}`
+  - `propose_metrics` → `{"inserted","updated","metric_ids":[...],"link":"/campaigns/<campaign_id>"}`
+- SSE `status`: `{"phase":"queued"|"thinking"|"tool"|"writing","queue_position"?}`. SSE `error`: `{"code","message"}` rồi đóng stream (backend vẫn gửi `message_end` trước `error` nếu đã lưu message ERROR — UI chấp nhận cả hai thứ tự).
