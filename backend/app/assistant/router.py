@@ -209,13 +209,23 @@ async def get_assistant_status(
 ) -> AssistantStatusOut:
     runner_health = await chat_service.default_runner.health()
     is_ok = bool(runner_health.get("ok", False))
+    rate_limited_for_s = int(runner_health.get("rate_limited_for_s") or 0)
+    if not is_ok:
+        last_error = runner_health.get("last_error")
+    elif rate_limited_for_s > 0:
+        # Không đưa log thô của nhà cung cấp ra giao diện — chỉ thông báo trung thực, dễ hiểu.
+        minutes = max(1, round(rate_limited_for_s / 60))
+        last_error = f"Dịch vụ AI đang hết hạn mức sử dụng, thử lại sau khoảng {minutes} phút."
+    else:
+        last_error = None
     return AssistantStatusOut(
-        available=is_ok,
+        available=is_ok and rate_limited_for_s == 0,
         runner={
             "ok": is_ok,
             "version": runner_health.get("opencode_version"),
             "model": runner_health.get("model"),
         },
-        last_error=runner_health.get("last_error") if not is_ok else None,
+        last_error=last_error,
         queue_length=int(runner_health.get("queue_length", 0)),
+        rate_limited_for_s=rate_limited_for_s,
     )

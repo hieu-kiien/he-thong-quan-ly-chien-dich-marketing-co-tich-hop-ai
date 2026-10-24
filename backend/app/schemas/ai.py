@@ -35,6 +35,7 @@ class AssistantStatusOut(BaseModel):
     runner: dict[str, Any]
     last_error: str | None = None
     queue_length: int = 0
+    rate_limited_for_s: int = 0
 
 
 class AiThreadOut(ORMModel):

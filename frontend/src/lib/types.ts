@@ -511,6 +511,8 @@ export interface AssistantStatus {
   runner: { ok: boolean; version: string | null; model: string | null };
   last_error?: string | null;
   queue_length: number;
+  /** Số giây còn lại trước khi thử gọi AI lại (nhà cung cấp báo hết hạn mức) */
+  rate_limited_for_s?: number;
 }
 
 export interface AiThread extends Timestamps {

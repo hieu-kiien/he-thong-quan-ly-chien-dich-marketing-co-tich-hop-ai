@@ -276,3 +276,20 @@ def test_status_endpoint(
     assert "runner" in data
     assert data["available"] is True
     assert "AI_RUNNER_TOKEN" not in resp.text
+
+
+def test_status_endpoint_reports_usage_limit_honestly(
+    client: TestClient,
+    marketer1_headers: dict[str, str],
+    fake_runner_fixture: FakeRunner,
+):
+    # Runner đang trong thời gian chờ sau khi nhà cung cấp báo hết hạn mức
+    fake_runner_fixture.health_response.update(
+        rate_limited_for_s=540,
+        last_error='AI_RATE_LIMITED: level=ERROR error.error="AI_APICallError: Free usage limit reached"',
+    )
+    data = client.get("/api/v1/assistant/status", headers=marketer1_headers).json()
+    assert data["available"] is False
+    assert data["rate_limited_for_s"] == 540
+    assert "9 phút" in data["last_error"]
+    assert "level=ERROR" not in data["last_error"]  # không lộ log thô của nhà cung cấp
