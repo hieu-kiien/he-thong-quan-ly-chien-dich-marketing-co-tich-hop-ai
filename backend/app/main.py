@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.api.v1 import api_v1_router
+from app.assistant.mcp_server import mcp_server, run_mcp_session_manager
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.errors import register_exception_handlers
@@ -22,7 +23,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # Validate production settings fail-fast
     settings.validate_for_runtime()
-    yield
+    async with run_mcp_session_manager():
+        yield
 
 
 app = FastAPI(
@@ -41,14 +43,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# MCP path normalizer (so both /mcp and /mcp/ hit the mounted FastMCP streamable-http app)
+@app.middleware("http")
+async def rewrite_mcp_path(request, call_next):
+    if request.url.path == "/mcp":
+        request.scope["path"] = "/mcp/"
+    return await call_next(request)
+
 # Exception handlers (CONTRACT §4)
 register_exception_handlers(app)
 
 # Include API v1 routes
 app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
 
+# Mount MCP streamable HTTP server (CONTRACT §5, §11)
+app.mount("/mcp", mcp_server.streamable_http_app())
+
 
 @app.get("/health", tags=["Hệ thống"])
+@app.get(f"{settings.API_V1_PREFIX}/health", tags=["Hệ thống"])
 async def health_check():
     # 1. Check Database
     db_status = "error"

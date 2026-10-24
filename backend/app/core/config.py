@@ -37,6 +37,8 @@ class Settings(BaseSettings):
 
     AI_RUNNER_URL: str = ""
     AI_RUNNER_TOKEN: str = ""
+    ASSISTANT_RUN_TOKEN_TTL_S: int = 10 * 60
+    ASSISTANT_TURN_TIMEOUT_S: int = 150
 
     LOGIN_MAX_FAILURES: int = 5
     LOGIN_WINDOW_SECONDS: int = 5 * 60

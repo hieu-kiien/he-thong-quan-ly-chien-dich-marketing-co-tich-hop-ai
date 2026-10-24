@@ -1,4 +1,8 @@
-"""Trợ lý AI runtime & MCP server (CONTRACT §5, §6, §11).
+"""Trợ lý AI runtime & MCP server (CONTRACT §5, §6, §11, §12)."""
 
-Module này do AI Assistant Runtime Agent triển khai độc lập trên nền service layer của Backend Core.
-"""
+from __future__ import annotations
+
+from app.assistant.mcp_server import mcp_server
+from app.assistant.router import router
+
+__all__ = ["mcp_server", "router"]

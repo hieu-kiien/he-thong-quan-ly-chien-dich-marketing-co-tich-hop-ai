@@ -5,8 +5,36 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from pydantic import BaseModel, Field
+
 from app.models.enums import AiActionStatus, AiMessageRole, AiMessageStatus
 from app.schemas.common import CampaignRef, ORMModel
+
+
+class AiThreadCreate(BaseModel):
+    title: str | None = None
+    campaign_id: int | None = None
+
+
+class AiThreadUpdate(BaseModel):
+    title: str | None = None
+    campaign_id: int | None = None
+    pinned: bool | None = None
+
+
+class MessageSendIn(BaseModel):
+    content: str = Field(..., min_length=1, max_length=8000)
+
+
+class ActionConfirmIn(BaseModel):
+    args: dict[str, Any] | None = None
+
+
+class AssistantStatusOut(BaseModel):
+    available: bool
+    runner: dict[str, Any]
+    last_error: str | None = None
+    queue_length: int = 0
 
 
 class AiThreadOut(ORMModel):

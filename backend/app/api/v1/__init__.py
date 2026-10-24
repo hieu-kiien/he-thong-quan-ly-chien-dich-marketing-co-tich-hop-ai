@@ -14,6 +14,7 @@ from app.api.v1.notifications import router as notifications_router
 from app.api.v1.schedules import router as schedules_router
 from app.api.v1.stats import router as stats_router
 from app.api.v1.users import router as users_router
+from app.assistant.router import router as assistant_router
 
 api_v1_router = APIRouter()
 
@@ -27,3 +28,4 @@ api_v1_router.include_router(metrics_router)
 api_v1_router.include_router(stats_router)
 api_v1_router.include_router(brand_router)
 api_v1_router.include_router(notifications_router)
+api_v1_router.include_router(assistant_router)
