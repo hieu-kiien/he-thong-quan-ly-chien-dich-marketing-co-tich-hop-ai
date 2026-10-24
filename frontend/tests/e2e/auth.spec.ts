@@ -72,4 +72,20 @@ test.describe('Phân hệ Xác thực & Phân quyền (Auth & Access Control)', 
     const text = await errorAlert.textContent();
     expect(text?.toLowerCase()).toContain('thử lại');
   });
+
+  test('Đăng ký tài khoản mới từ tab Đăng ký mới và tự động đăng nhập', async ({ page }) => {
+    await page.goto('/login');
+    await page.getByRole('tab', { name: 'Đăng ký mới' }).click();
+    await expect(page.locator('h1')).toContainText('Đăng ký tài khoản mới');
+
+    const uniqueEmail = `test_${Date.now()}@marketflow.vn`;
+    await page.fill('#register-fullname', 'Trần Thị Thử Nghiệm');
+    await page.fill('#auth-email', uniqueEmail);
+    await page.fill('#auth-password', 'TestUser@123');
+    await page.fill('#auth-confirm-password', 'TestUser@123');
+    await page.click('button[type="submit"]');
+
+    await expect(page).toHaveURL(/\/(dashboard)?$/, { timeout: 10000 });
+    await expect(page.locator('h1')).toContainText('Tổng quan');
+  });
 });

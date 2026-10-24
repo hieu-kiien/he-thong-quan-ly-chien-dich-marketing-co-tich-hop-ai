@@ -98,6 +98,12 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface RegisterRequest {
+  email: string;
+  full_name: string;
+  password: string;
+}
+
 export interface LoginResponse {
   access_token: string;
   token_type: 'bearer';

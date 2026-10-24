@@ -29,6 +29,7 @@ import type {
   Health,
   LoginRequest,
   LoginResponse,
+  RegisterRequest,
   MarkPublishedInput,
   Metric,
   MetricFilters,
@@ -57,6 +58,7 @@ export const healthApi = {
 
 export const authApi = {
   login: (body: LoginRequest) => post<LoginResponse>('/auth/login', body),
+  register: (body: RegisterRequest) => post<LoginResponse>('/auth/register', body),
   me: () => get<User>('/auth/me'),
   logout: () => post<void>('/auth/logout'),
   changePassword: (body: ChangePasswordRequest) => post<void>('/auth/change-password', body),

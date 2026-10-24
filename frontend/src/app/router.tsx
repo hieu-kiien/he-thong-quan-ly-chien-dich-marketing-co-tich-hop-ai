@@ -75,6 +75,17 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: '/register',
+    errorElement: <RouteErrorPage />,
+    element: (
+      <GuestOnly>
+        <Suspense fallback={<FullScreenLoader />}>
+          <LoginPage />
+        </Suspense>
+      </GuestOnly>
+    ),
+  },
+  {
     path: '/',
     element: <RequireAuth />,
     errorElement: <RouteErrorPage />,

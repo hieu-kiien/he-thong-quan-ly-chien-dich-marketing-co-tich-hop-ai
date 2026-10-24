@@ -2,13 +2,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useQueryClient } from '@tanstack/react-query';
 import { authApi } from './api/endpoints';
 import { getToken, onUnauthorized, setToken } from './api/client';
-import type { LoginRequest, User } from './types';
+import type { LoginRequest, RegisterRequest, User } from './types';
 
 interface AuthState {
   user: User | null;
   /** true khi đang xác minh token đã lưu lúc mở ứng dụng. */
   loading: boolean;
   login: (body: LoginRequest) => Promise<User>;
+  register: (body: RegisterRequest) => Promise<User>;
   logout: () => Promise<void>;
   /** Cập nhật user hiện tại sau khi sửa hồ sơ. */
   setUser: (user: User) => void;
@@ -68,6 +69,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [queryClient],
   );
 
+  const register = useCallback(
+    async (body: RegisterRequest) => {
+      const res = await authApi.register(body);
+      setToken(res.access_token);
+      queryClient.clear();
+      setSessionExpired(false);
+      setUser(res.user);
+      return res.user;
+    },
+    [queryClient],
+  );
+
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
@@ -81,8 +94,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const value = useMemo<AuthState>(
-    () => ({ user, loading, login, logout, setUser, sessionExpired }),
-    [user, loading, login, logout, sessionExpired],
+    () => ({ user, loading, login, register, logout, setUser, sessionExpired }),
+    [user, loading, login, register, logout, sessionExpired],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
