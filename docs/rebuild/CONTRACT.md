@@ -215,3 +215,14 @@ Trang `/assistant` (giống Claude): cột trái danh sách phiên (tìm kiếm,
 11. `AiThread = {id,user_id,campaign_id,campaign:CampaignRef|null,title,pinned,last_message_at,created_at,updated_at}`. `AiMessage = {id,thread_id,role,content,parts_json,status,error_code,model,latency_ms,created_at}`. `AiAction = {id,thread_id,message_id,user_id,tool,args_json,summary,status,result_json,error,executed_at,created_at}`.
 12. Datetime trả về luôn có offset timezone (UTC `+00:00` hoặc `Z`); client gửi `scheduled_at` dạng `2026-10-24T19:30:00+07:00`, backend chuẩn hoá về UTC khi lưu.
 13. Đơn vị số: `ctr`, `cvr` là **phân số** (0.0234 → UI "2,34%"). Mọi trường có hậu tố `_pct` (`budget_used_pct`, `budget.used_pct`, `used_pct`) là **phần trăm** (45.2 → "45,2%"). `cpc`, `cpa`, `cpm` là số VND (có thể lẻ, backend làm tròn 2 chữ số; UI làm tròn khi hiển thị). Mẫu số bằng 0 → `null`.
+
+## 11. Phụ lục B — Kết quả spike P0 (đã kiểm chứng trên VPS, bắt buộc)
+
+- **MCP chạy được dưới Zen free tier** → dùng đường MCP (§5), KHÔNG cần giao thức văn bản dự phòng. Tên tool model thấy: `marketflow_<tool>`.
+- Python SDK: pin `mcp>=1.2,<2` (bản 2.x đã bỏ `mcp.server.fastmcp`). Dùng `FastMCP(..., stateless_http=True)` streamable-http mount tại `/mcp`; đọc header qua `ctx.request_context.request.headers["authorization"]`.
+- Khoá tool built-in: KHÔNG được `deny` trơn read/glob/grep/list (sẽ 403). Dùng mẫu: `"*": deny` + `read/glob/grep/list: {"*": deny, "/__mf_never__/x": allow}` + `external_directory: deny` + `"marketflow_*": allow`.
+- OpenCode chỉ báo tool **sau khi xong** và text theo **từng part hoàn chỉnh** (không stream từng token). Vì vậy:
+  - Backend phát SSE `tool_call` với `status:"running"` **từ phía MCP handler** (khi OpenCode gọi vào `/mcp`, backend biết `message_id` qua run-token → đẩy sự kiện vào hàng đợi in-process của lượt đó), và `status:"done"|"error"` khi tool trả về.
+  - SSE `text` gửi toàn văn tích luỹ mỗi khi có part mới. Frontend có thể làm hiệu ứng "gõ chữ" phía client cho phần văn bản mới (thuần hiển thị).
+- Runner NDJSON bổ sung: dòng đầu `{"type":"run","run_id"}` (header `X-Run-Id`; client có thể truyền `run_id`), `{"type":"queued","position":n}` khi đang chờ, `tool` = `{name (bỏ tiền tố marketflow_), status:"done"|"error", input, output}`.
+- Số đo: lượt đơn giản 5–10s, lượt có 2 tool ~10s, RSS ~490 MB/tiến trình ⇒ **concurrency = 1**, timeout cứng bắt buộc (đã gặp treo >120s). Không cần `auth.json`.
