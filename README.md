@@ -1,200 +1,180 @@
-# MarketFlow AI
+# MarketFlow v2 — Hệ Thống Quản Lý Chiến Dịch Marketing Có Tích Hợp AI
 
-Ứng dụng mẫu quản lý chiến dịch marketing có tích hợp AI. Phạm vi hiện tại tập trung vào workspace, campaign, tác vụ, ngân sách/KPI mục tiêu, tạo nội dung và quy trình phê duyệt.
+> **Dự án môn học**: Ứng dụng trí tuệ nhân tạo (AIA331) — Mã số đề tài: 80300  
+> **Trường**: Trường Đại học Công nghệ Thông tin & Truyền thông — Đại học Thái Nguyên  
+> **Phiên bản**: v2 (Clean Rebuild) | **Nhánh Git**: `rebuild/v2` (Mã nguồn cũ lưu trữ tại tag `legacy-v1`)  
+> **Hạ tầng Production**: [https://marketing.kienhieu.id.vn/](https://marketing.kienhieu.id.vn/) (Cloudflare Tunnel → VPS Ubuntu 24.04 LTS)  
 
-> **Trạng thái:** prototype đang được phát triển. Lịch có thể đổi trạng thái nội bộ sang PUBLISHED; hiện chưa gửi bài thật lên mạng xã hội hoặc gửi email qua provider. Xem [lộ trình](docs/ROADMAP.md) và [kiến trúc hiện tại](docs/ARCHITECTURE.md).
+---
 
-## Triển khai ở đâu
+## 1. Giới thiệu Hệ thống (Scope v2)
 
-| Tầng | Chạy ở đâu | Vai trò |
-|---|---|---|
-| Tên miền & TLS | Cloudflare — `marketing.kienhieu.id.vn` | DNS, HTTPS, đẩy traffic qua Tunnel |
-| Frontend (static) + nginx | VPS `/var/www/marketflow` | Phục vụ file tĩnh, proxy `/api/*` |
-| Backend FastAPI | VPS systemd (`marketflow-api`) | Toàn bộ nghiệp vụ, 1 Uvicorn worker (~80–114 MB RAM) |
-| Database | PostgreSQL 16 trên cùng VPS | Mọi trạng thái nghiệp vụ, nghe loopback |
+MarketFlow v2 là giải pháp quản lý chiến dịch tiếp thị số tinh gọn, trung thực và an toàn dành riêng cho các doanh nghiệp vừa và nhỏ (SME) tại Việt Nam. Hệ thống kết hợp chặt chẽ giữa các nghiệp vụ quản trị tiếp thị cốt lõi và Trợ lý AI hội thoại hiện đại:
 
-Toàn bộ ứng dụng nằm trên **một** máy. Cloudflare không còn chạy mã ứng dụng —
-Worker và Pages đã bị gỡ ngày 2026-10-09, cùng Render và Neon. Không còn đường gọi AI
-riêng: mọi request đi cùng một origin, nên không còn giới hạn ~100 giây của Cloudflare
-lẫn việc lộ URL backend trong JavaScript. Lời gọi AI dài đã chuyển sang hàng đợi
-PostgreSQL trả job ID ngay. Chi tiết ở [docs/DEPLOYMENT-VPS.md](docs/DEPLOYMENT-VPS.md).
+- **Quản lý Chiến dịch & Đa kênh**: Quản lý mục tiêu, tiến độ, ngân sách tổng và phân bổ ngân sách cho 7 kênh tiếp thị chuẩn: Facebook, TikTok, Instagram, Zalo OA, Email, Google Ads, Website.
+- **Quy trình Kiểm duyệt Nội dung Chặt chẽ**: Áp dụng máy trạng thái (`DRAFT` → `PENDING_REVIEW` → `APPROVED` / `REJECTED` → `PUBLISHED`). Tách bạch quyền hạn giữa người tạo và người duyệt; người quản lý không được tự duyệt bài viết của chính mình (`CANNOT_REVIEW_OWN`).
+- **Ghi nhận & Phân tích Chỉ số Thực tế**: Nhập số liệu hàng ngày bằng tay hoặc import file CSV (hỗ trợ xem trước và kiểm tra tính logic). Tính toán tự động các chỉ số hiệu suất: CTR, CVR, CPC, CPA, CPM.
+- **Trợ lý AI Hội thoại (OpenCode Zen)**: Không gian làm việc riêng (`/assistant`) giúp lên ý tưởng nội dung, viết nháp bài viết theo quy chuẩn từng kênh và tóm tắt hiệu quả chiến dịch.
+- **Nguyên tắc Chống Tính năng Ảo (Rule 0)**: Toàn bộ số liệu hiển thị dựa trên dữ liệu người dùng thật hoặc dữ liệu mẫu có nhãn `SEED`. AI chỉ tạo đề xuất (`ai_action = PROPOSED`); người dùng phải xác nhận trên giao diện thì hành động mới được thực thi.
 
-SQLite chỉ dùng ở local và CI. Production dùng PostgreSQL; sao lưu chạy 03:00 hằng
-ngày và đã được thử khôi phục thật.
+---
 
-## Dự án giúp ai làm việc gì?
+## 2. Kiến trúc Hệ thống
 
-- **Chủ shop SME & Solo Marketer Việt Nam:** tạo nhanh **Gói Nội Dung Bán Hàng (Creative Pack)** gồm Bài chính + Comment đầu tiên (chứa link/SĐT lách bóp tương tác) + Ghi chú ảnh/video + Tin nhắn mẫu chốt đơn (`blocks_json`), viết nháp tự do không cần tạo chiến dịch trước (`campaign_id`/`product_id` tùy chọn), dùng **👤 Chế độ Chủ Shop (Đơn giản)** kèm nút **⚡ OpenCode 0đ (Sẵn trên VPS)** và 1-Click Xuất bản ngay không qua bước duyệt rườm rà.
-- **Trợ lý AI Copilot lâu dài & Bảng Nhớ Không Gian (kiểu Muse AI):** lưu trữ mạch hội thoại dài hạn theo dự án (`ai_chat_threads`), ghim thẻ ghi chú/ngữ cảnh không gian 2D (`muse_board_cards`) vào bộ nhớ AI, và cho phép LLM đề xuất thao tác dự án qua cơ chế **Staging Diff + 1-Click Hoàn tác (`agent_staged_proposals`)**.
-- **Quản lý agency & đội nhóm:** xem chiến dịch cần chú ý, công việc bị chặn, deadline, ngân sách, KPI mục tiêu và quy trình duyệt bài nhiều bước khi làm việc nhóm.
+```mermaid
+flowchart TD
+    Browser["Trình duyệt (React 18 + Vite SPA)"]
+    
+    subgraph VPS["Máy chủ VPS Ubuntu 24.04 LTS (2 vCPU / 2GB RAM)"]
+        Nginx["Nginx Reverse Proxy (:8080)"]
+        
+        subgraph Backend["FastAPI Backend (marketflow-api :8000)"]
+            REST["RESTful Routers (/api/v1/*)"]
+            Service["Service Layer (Nghiệp vụ & Phân quyền)"]
+            MCP["MCP Streamable-HTTP Server (/mcp)"]
+        end
 
-AI hỗ trợ tạo nháp, hội thoại chiến lược và đề xuất thay đổi trong khu vực chờ duyệt (Staging). Người dùng luôn nắm quyền kiểm soát tuyệt đối (Human-in-the-loop).
+        DB[(PostgreSQL 16 / SQLite)]
 
-## Bắt đầu nhanh
+        subgraph Runner["ai-runner Service (:8100, user: mfai)"]
+            RunnerAPI["FastAPI Runner (/run, /health)"]
+            Queue["Hàng đợi tuần tự (Concurrency = 1)"]
+            OpenCode["OpenCode CLI Subprocess"]
+        end
+    end
 
-### Chạy backend
+    ZenCloud["OpenCode Zen Cloud (Model miễn phí)"]
 
-Yêu cầu Python 3.12 hoặc phiên bản tương thích với CI. Từ thư mục gốc repo:
+    Browser -->|HTTPS / SSE| Nginx
+    Nginx --> REST
+    REST --> Service --> DB
+    Service --> MCP
 
-    cd backend
-    pip install -r requirements.txt
-    python seed/seed_data.py
-    python -m uvicorn app.main:app --reload --port 8000
+    REST -->|POST /run (NDJSON Stream)| RunnerAPI
+    RunnerAPI --> Queue --> OpenCode
+    OpenCode -->|Gọi model| ZenCloud
+    OpenCode -->|Gọi MCP Tools (/mcp + Bearer Run-Token)| MCP
+```
 
-API docs: http://localhost:8000/docs
+---
 
-### Chạy frontend
+## 3. Tài khoản Mẫu Demo (Seed Accounts)
 
-Mở terminal thứ hai tại thư mục gốc:
+Dữ liệu mẫu chuẩn tiếp thị cho chuỗi cà phê đặc sản Việt Nam (**Cà phê Rang xay An Nam**) được tạo sẵn trong hệ thống:
 
-    cd frontend
-    npm ci
-    npm run dev
+| Vai trò | Email đăng nhập | Mật khẩu | Quyền hạn chính |
+|---|---|---|---|
+| **Người quản lý (`MANAGER`)** | `manager@marketflow.vn` | `Manager@123` | Quản trị người dùng, kênh, hồ sơ thương hiệu; phê duyệt hoặc từ chối bài viết của nhân viên. |
+| **Nhân viên marketing (`MARKETER`)** | `marketer@marketflow.vn` | `Marketer@123` | Tạo và quản lý chiến dịch của mình; soạn thảo bài viết; gửi duyệt; lập lịch đăng; nhập số liệu. |
+| **Nhân viên marketing 2 (`MARKETER`)** | `marketer2@marketflow.vn` | `Marketer@123` | Phụ trách chiến dịch "Mùa Thu Cầu Đất"; phối hợp làm việc theo nhóm. |
 
-Giao diện: http://localhost:5173
+---
 
-### Chạy bằng Docker Compose
+## 4. Hướng dẫn Cài đặt & Chạy Cục bộ (Local Quick Start)
 
-Tại thư mục gốc:
+### Yêu cầu môi trường
+- Python 3.12 hoặc 3.13
+- Node.js 20+ và npm
+- Git
 
-    docker compose up -d --build
+### 4.1. Khởi chạy Backend (FastAPI)
+Mở cửa sổ dòng lệnh (PowerShell):
+```powershell
+# 1. Di chuyển vào thư mục backend
+cd backend
 
-Giao diện local: http://localhost:3000
+# 2. Tạo và kích hoạt môi trường ảo Python
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 
-### Triển khai native trên VPS
+# 3. Cài đặt các thư viện phụ thuộc
+pip install --upgrade pip
+pip install -r requirements.txt
 
-VPS production chạy PostgreSQL, FastAPI, Nginx và Cloudflare Tunnel dưới các
-dịch vụ hệ thống. Kế hoạch cấu hình, giới hạn tài nguyên và quy trình chuyển dữ
-liệu nằm trong [docs/DEPLOYMENT-VPS.md](docs/DEPLOYMENT-VPS.md).
+# 4. Chạy migration tạo cấu trúc cơ sở dữ liệu (SQLite mặc định)
+python -m alembic upgrade head
 
-Seed data dành cho local/demo. Không dùng database, mật khẩu mặc định hoặc secret của môi trường thật cho demo công khai hay production. Không ghi credential vào tài liệu hoặc commit.
+# 5. Nạp dữ liệu mẫu demo
+python seed/seed_demo.py --reset
 
-Trên production, scheduler chạy trong tiến trình API với `SCHEDULER_ENABLED=true`.
-Không còn cron của Worker: Worker đã bị gỡ.
+# 6. Khởi động máy chủ backend tại cổng 8000
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+API Docs Swagger UI có sẵn tại: `http://127.0.0.1:8000/docs`.
 
-## Kiểm tra chất lượng
+### 4.2. Khởi chạy AI Runner (Tuỳ chọn — nếu sử dụng Trợ lý AI thật)
+```powershell
+# Mở một cửa sổ terminal mới
+cd ai-runner
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 
-Workflow canonical nằm tại [.github/workflows/ci.yml](.github/workflows/ci.yml) với 8 gate: lint, typecheck, unit test, E2E, Docker build, dependency audit, secret scan và rubric check. Xem tab Actions trên `main` để lấy run gần nhất — số CI được ghi ở link sẽ lỗi thời sau vài tuần. Gate dependency vẫn ghi advisory thành warning; cần đọc log trước khi kết luận tình trạng bảo mật.
+# Khởi chạy dịch vụ runner tại cổng 8100
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8100
+```
+*(Ghi chú: Nếu không bật runner, các chức năng quản lý chiến dịch, nội dung, lịch và số liệu vẫn hoạt động bình thường. Bạn cũng có thể bật chế độ giả lập UI offline bằng cách đặt `VITE_ASSISTANT_SIMULATOR=true` trong `frontend/.env`).*
 
-Xem [docs/TESTING.md](docs/TESTING.md) để chạy test và hiểu giới hạn các số liệu. Không xem benchmark trên tập test hữu hạn là bằng chứng về giá trị kinh doanh hoặc cam kết AI không thể sai.
+### 4.3. Khởi chạy Frontend (React + Vite)
+```powershell
+# Mở một cửa sổ terminal mới
+cd frontend
 
-## Cấu trúc chính
+# 1. Cài đặt thư viện phụ thuộc
+npm ci
 
-- frontend/: React + Vite client.
-- backend/: FastAPI, SQLAlchemy và API nghiệp vụ.
-- scripts/: công cụ benchmark; một số script sinh báo cáo vào docs/.
-- docs/: kiến trúc, roadmap, kiểm thử, đánh giá AI và tài liệu thiết kế.
-- deploy/vps/: cấu hình systemd (`marketflow-api.service`), nginx và tinh chỉnh PostgreSQL trên VPS.
-- cloudflare/: di sản tham khảo cấu hình proxy cũ; xem [cloudflare/README.md](cloudflare/README.md).
+# 2. Khởi động giao diện dev server tại cổng 5173
+npm run dev
+```
+Truy cập giao diện ứng dụng tại: `http://localhost:5173`.
 
-## Cổng chất lượng (quality gate) của frontend
+---
 
-Chạy trước khi commit — cùng bộ lệnh mà CI chạy:
+## 5. Chạy bằng Docker Compose
+
+Hệ thống đã được đóng gói đầy đủ gồm PostgreSQL 16, Backend FastAPI tự động chạy migration, và Frontend phục vụ bởi Nginx:
 
 ```bash
-cd frontend
-npm run typecheck   # tsc --noEmit, strict + noUnusedLocals
-npm run lint        # ESLint, chặn cả warning (react-hooks + jsx-a11y)
-npm run build
+# Khởi động toàn bộ cụm dịch vụ (Postgres + Backend + Frontend)
+docker compose up -d
+
+# Xem log khởi động
+docker compose logs -f backend
 ```
+Truy cập ứng dụng qua cổng `http://localhost:8080`.
 
-`npm run lint` dùng `--max-warnings=0`: mọi cảnh báo đều phải được xử lý,
-không bỏ qua. Có một ngoại lệ có chủ đích (`WorkflowCanvas` chỉ nạp brief khi
-đổi chiến dịch) được ghi rõ lý do ngay tại dòng `eslint-disable`.
+---
 
-## Biến môi trường đáng chú ý
+## 6. Cách thức Hoạt động của Trợ lý AI (OpenCode Zen Integration)
 
-Ngoài `.env.example`, ba biến sau ảnh hưởng trực tiếp tới an toàn dữ liệu:
+1. **Không sử dụng API Key**: Hệ thống kết nối với các mô hình miễn phí thông qua **OpenCode CLI** và hạ tầng **OpenCode Zen**. Không lưu trữ bất kỳ API key nào trong CSDL và không gửi key về trình duyệt.
+2. **Giao tiếp hai chiều an toàn qua MCP (Model Context Protocol)**:
+   - Backend sinh một mã **Run-Token** JWT ngắn hạn (10 phút) cấp cho tiến trình OpenCode.
+   - OpenCode gọi ngược lại Backend qua endpoint `/mcp` (Stateless-HTTP) để đọc số liệu chiến dịch hoặc tạo đề xuất.
+3. **Cơ chế Chỉ Đề Xuất (Proposal-Only)**:
+   - Khi AI gọi các công cụ ghi dữ liệu (ví dụ: `propose_content_drafts`, `propose_schedule`), hệ thống chỉ tạo bản ghi `ai_action` ở trạng thái `PROPOSED`.
+   - Một thẻ đề xuất trực quan xuất hiện tại panel bên phải của giao diện.
+   - Người dùng có thể chỉnh sửa lại tiêu đề, nội dung và bấm **Xác nhận**; khi đó hành động mới thực sự được tạo trong CSDL dưới danh tính của người dùng đó.
+4. **Phòng thủ Tấn công Prompt Injection**:
+   - Cấu hình agent khóa hoàn toàn lệnh shell (`bash: deny`), ngăn chặn đọc file hệ thống (`read: deny` chuyển hướng tới `/__mf_never__/x`), bảo vệ an toàn cho máy chủ VPS.
 
-| Biến | Mặc định | Vì sao quan trọng |
-| --- | --- | --- |
-| `SCHEDULER_ENABLED` | `true` | Scheduler chạy nền trong tiến trình FastAPI (với `--workers 1` trên VPS để tránh chạy trùng job và tiết kiệm RAM). |
-| `SCHEDULER_SECRET` | *(rỗng)* | Khóa bảo mật tùy chọn cho `POST /api/v1/schedules/trigger-worker`. Rỗng thì endpoint chỉ nhận Bearer token của người dùng hợp lệ. |
-| `BYOK_PBKDF2_SALT` | *(tự sinh)* | Salt của khoá vault. Để trống thì ứng dụng tự sinh salt ngẫu nhiên và lưu ở `backend/.vault_salt` (không commit). Chỉ đặt khi hạ tầng cấp secret riêng. |
-| `AI_PROVIDER` | `opencode` | Phải thuộc danh sách provider trong `backend/app/services/ai/providers.py`: `gemini \| openrouter \| openai \| anthropic \| groq \| xai \| huggingface \| ollama \| opencode`. `opencode` kết nối tới OpenCode Zen (`https://opencode.ai/zen/v1`, mặc định `mimo-v2.6-flash-free`) kèm cầu nối OpenCode CLI cục bộ trên VPS, **không cần mua credits**. Danh sách model hợp lệ: `GET {AI_BASE_URL}/models`. |
-| `AI_TIMEOUT_SECONDS` | `60` | Timeout gọi provider HTTP. Đối với tác vụ dài, hệ thống hỗ trợ hàng đợi PostgreSQL bất đồng bộ (`/api/v1/ai/jobs`) và cầu nối OpenCode CLI tự động ngắt nhanh (fast-fail ~1.5s–3s) khi hết hạn mức miễn phí. |
+---
 
-## AI thật hay nội dung dự phòng?
+## 7. Các Hạn chế Thực tế (Honest Limitations)
 
-Mỗi phản hồi AI đều mang `is_fallback`. Khi `true`, nội dung do bộ template
-sinh ra chứ không phải mô hình ngôn ngữ, và giao diện hiển thị bảng cảnh báo
-màu hổ phách kèm lý do (`warnings`). Đó là chủ ý: trước đây UI hiện nhãn
-"Gemini 2.5 Flash" và toast báo thành công bất kể backend có gọi được provider
-hay không, nên người dùng tưởng xem nội dung AI trong khi thực ra là khuôn mẫu.
+1. **Hạn mức Tần suất Gọi AI (Free Tier Rate Limits)**: Do sử dụng tài nguyên mô hình miễn phí từ OpenCode Zen, hệ thống có thể gặp giới hạn tốc độ (HTTP 429) vào các khung giờ cao điểm. Hệ thống đã có cơ chế tự động chuyển đổi sang mô hình dự phòng (`glm-5.3-flash-free`) và báo lỗi trung thực cho người dùng.
+2. **Không Tự Động Đăng Bài Lên Mạng Xã Hội**: Hệ thống không tích hợp API tự động xuất bản (để tránh rủi ro khoá tài khoản mạng xã hội của doanh nghiệp). Lịch đăng bài đóng vai trò lập kế hoạch; nhân viên tự đăng bài ra kênh ngoài và cập nhật liên kết xác nhận.
+3. **Giới hạn Đồng thời trên Máy chủ Đơn (Concurrency = 1)**: Do mỗi tiến trình OpenCode tiêu thụ ~490 MB RAM RSS, máy chủ VPS giới hạn xử lý tuần tự từng yêu cầu một để đảm bảo không bị cạn kiệt RAM. Các yêu cầu gửi đồng thời sẽ được xếp vào hàng đợi chờ ngắn (tối đa 8 vị trí).
 
-Kiểm tra nhanh sau khi cấu hình:
+---
 
-```
-curl -s http://127.0.0.1:8000/api/v1/auth/login -H "Content-Type: application/json" \
-  -d '{"email":"manager@gmail.com","password":"Manager@123"}'
-# lấy token, rồi:
-curl -s http://127.0.0.1:8000/api/v1/ai/omnichannel -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" -H "X-Workspace-Id: 1" \
-  -d '{"campaign_id":1,"brief":"Ra mắt khóa học AI 2026"}'
-```
+## 8. Mục lục Tài liệu Kỹ thuật Chi tiết
 
-`"is_fallback": false` nghĩa là AI thật đã viết nội dung.
+Toàn bộ tài liệu chi tiết của dự án được lưu trữ trong thư mục `docs/`:
 
-### Ba tầng khoá AI (BYOK)
-
-`ai_service.resolve_api_key` tra theo thứ tự, tầng đầu thắng:
-
-| Tầng | Nguồn | Phạm vi |
-| --- | --- | --- |
-| 1 | Khóa lưu trong workspace | Mọi thành viên dùng chung |
-| 2 | Khóa cá nhân của user | Chỉ người đó |
-| 3 | `AI_API_KEY` trong `.env` | Toàn hệ thống |
-| 4 | *(không có)* | Smart Fallback — template, `is_fallback=true` |
-
-Xem/sửa khóa ở **Cài Đặt & Brand Kit → BYOK Vault**. Gán `provider` và `model`
-riêng cho từng tầng; danh sách model hợp lệ lấy từ `GET {AI_BASE_URL}/models`.
-Phản hồi sau mỗi lần sinh nội dung báo `model_provider` dạng
-`opencode-workspace` / `opencode-user` / `opencode` để biết đang dùng tầng nào.
-
-Lưu khóa cho workspace chỉ `MANAGER`, `AGENCY_MANAGER` hoặc `ADMIN` được —
-`MARKETER` nhận 403. `CLIENT_APPROVER` không được quản lý khoá.
-
-### Hai file `.env` phải khớp nhau
-
-Có hai file: `.env` ở thư mục gốc (đọc bởi `docker-compose.yml`) và
-`backend/.env` (đọc bởi `app/core/config.py`). Trước đây chúng lệch nhau nên
-`docker compose up` chạy một backend im lặng rơi về template trong khi chạy trực
-tiếp thì dùng provider khác. Khi đổi cấu hình AI, sửa **cả hai**.
-
-## Tài khoản kiểm thử
-
-| Email | Mật khẩu | Vai trò / giới hạn |
-| --- | --- | --- |
-| `manager@gmail.com` | `Manager@123` | Xem/toàn quyền chiến dịch, duyệt & xuất bản |
-| `marketer@gmail.com` | `Marketer@123` | Soạn nội dung AI, lập lịch, KHÔNG tự duyệt |
-| `approver@gmail.com` | `Approver@123` | Chỉ duyệt/từ chối, không được publish |
-| `admin@gmail.com` | `Admin@123` | Quyền rộng nhất, quản lý khoá mọi workspace |
-
-Các mật khẩu này chỉ phục vụ seed dữ liệu local/demo. Backend từ chối đăng ký
-tự do với vai trò đặc quyền (`MANAGER`, `AGENCY_MANAGER`, `CLIENT_APPROVER`,
-`ADMIN`) — xem `POST /api/v1/auth/register`.
-
-## Giới hạn cần biết
-
-1. PUBLISHED hiện là trạng thái của hệ thống. Chưa có bằng chứng rằng content đã được gửi và xác nhận từ một nền tảng bên ngoài.
-2. Chỉ số AI/backend trong CI là kết quả của môi trường và workload đã ghi; chúng không chứng minh campaign tạo thêm doanh thu hoặc người dùng tiết kiệm thời gian.
-3. Toàn bộ dữ liệu nằm trong PostgreSQL trên một VPS. Sao lưu chạy 03:00 hằng ngày và đã được thử khôi phục vào database tạm (20 bảng, 1 user, khớp bản gốc) — nhưng **bản sao vẫn nằm trên cùng đĩa với ứng dụng**, nên cứu được lỗi phần mềm chứ không cứu được hỏng phần cứng. Ứng dụng dùng `create_all()` chứ không có migration — thêm cột mới ở production cần `ALTER TABLE` thủ công. VPS là một điểm lỗi duy nhất.
-4. Mọi chỉ số trên giao diện đều đọc từ `CampaignMetric` trong database. Nếu chưa nhập chỉ số thì giao diện hiển thị "chưa có dữ liệu" chứ không tự sinh số ước tính — đây là chủ ý, không phải thiếu sót. Chạy `python backend/seed/seed_data.py` để nạp dữ liệu mẫu. Dữ liệu mẫu được đánh dấu bằng `CampaignMetric.source = 'seed'` và giao diện hiện cảnh báo.
-5. Điểm `compliance_score` của nội dung đa kênh đến từ bộ quét quy tắc từ khoá, không phải chấm điểm của AI; không có Brand Kit thì hiển thị "chưa chấm". Xem [đạo đức AI & giám sát](docs/AI_ETHICS_AND_HUMAN_OVERSIGHT.md).
-6. Bảng so sánh prompt v1/v2/v3 chạy trên stub tất định — đo mức đáp ứng đặc tả, không đo chất lượng văn phong của mô hình thật. Xem [so sánh prompt](docs/PROMPT_VARIANT_COMPARISON.md).
-
-## Tài liệu
-
-- [Mục lục tài liệu](docs/README.md)
-- [Phân tích yêu cầu & thiết kế](docs/REQUIREMENTS_AND_DESIGN.md)
-- [Phân tích khoảng cách](docs/REQUIREMENTS_GAP_ANALYSIS.md)
-- [Lộ trình dài hạn](docs/ROADMAP.md)
-- [Kiến trúc](docs/ARCHITECTURE.md)
-- [Kiểm thử và CI](docs/TESTING.md)
-- [AI evaluation](docs/AI_EVALUATION_REPORT.md)
-- [So sánh phiên bản prompt](docs/PROMPT_VARIANT_COMPARISON.md)
-- [Đạo đức AI & giám sát của con người](docs/AI_ETHICS_AND_HUMAN_OVERSIGHT.md)
-- [Cloudflare deployment](cloudflare/README.md)
-- [Đối chiếu rubric 40 tiêu chí](docs/UNIVERSITY_DEFENSE_RUBRIC_ALIGNMENT.md)
-
-V8/V9 và các biên bản/test readiness trước đây được giữ như hồ sơ snapshot. Mục lục tài liệu phân biệt rõ tài liệu hiện hành với hồ sơ lịch sử.
+- [Tài liệu Phân tích Yêu cầu & Thiết kế Hệ thống (KT1)](docs/REQUIREMENTS_AND_DESIGN.md): Bối cảnh SME, 2 vai trò người dùng, bảng Input/Process/Output, yêu cầu phi chức năng, sơ đồ Use Case, ERD 14 bảng CSDL và luồng dữ liệu.
+- [Đặc tả Phân hệ Trợ lý AI (KT3)](docs/AI_ASSISTANT.md): Kiến trúc AI Runner, danh mục công cụ MCP, giao thức sự kiện SSE, tối ưu prompt qua 3 phiên bản (v1 → v2 → v3), xử lý lỗi và quy trình con người duyệt đề xuất.
+- [Đạo đức AI & Quyền Riêng tư Dữ liệu](docs/AI_ETHICS_AND_PRIVACY.md): Bảo vệ khoá xác thực, phạm vi dữ liệu gửi cho mô hình, điều khoản huấn luyện của mô hình miễn phí, các biện pháp chống ảo giác và minh chứng phòng thủ Prompt Injection.
+- [Kế hoạch & Danh mục Ca Kiểm thử (Testing)](docs/TESTING.md): Hướng dẫn chạy từng bộ test, số liệu đo lường thực tế, danh mục 54 ca kiểm thử backend và 16 ca runner theo trường hợp bình thường, lỗi và biên.
+- [Minh chứng Ứng dụng AI Trong SDLC](docs/AI_IN_SDLC.md): Nhật ký sử dụng AI xuyên suốt các giai đoạn KT1 (rà soát hiện trạng v1), KT2 (lập trình đa tác nhân), KT3 (thực nghiệm P0 Spike trên VPS) và đánh giá chất lượng tự động.
+- [Hướng dẫn Triển khai Máy chủ VPS](docs/DEPLOYMENT-VPS.md): Hướng dẫn cấu hình systemd, Nginx, PostgreSQL và Cloudflare Tunnel trên máy chủ sản xuất thực tế.

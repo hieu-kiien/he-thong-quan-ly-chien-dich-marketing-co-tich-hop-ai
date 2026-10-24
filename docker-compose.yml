@@ -1,160 +1,112 @@
 # =============================================================================
-# Marketing Campaign Management System with AI - Docker Compose (he thong anh)
+# MarketFlow v2 — Docker Compose (Môi trường hoàn chỉnh)
 #
-# YEU cau ve khi chay `docker compose up` (uu tien cao):
+# Bao gồm:
+#   1. postgres: PostgreSQL 16 Alpine
+#   2. backend: FastAPI Backend (chạy Alembic migration tự động khi khởi động)
+#   3. frontend: React SPA phục vụ bởi Nginx non-root (cổng 80/8080)
+#   4. ai-runner (tuỳ chọn): Dịch vụ runner OpenCode CLI (chạy qua profile `runner`)
 #
-#  1) FILE .env PHIA HOST LA BAT BUOC.
-#     - SECRET_KEY, JWT_SECRET_KEY, BYOK_ENCRYPTION_KEY co `${...?}` nen Compose
-#       se FAIL ngay (exit != 0) neu thieu 3 bien nay. Moi cai >= 48 ky tu.
-#     - AI_API_KEY: neu bo trong, tinh nang AI tu dong rot ve Smart Fallback
-#       (khong co loi, nhung ket qua AI co chat luong thap). Dat key that de bat
-#       AI that su chay. KHONG bao gio hardcode key vao file nay.
-#     - MARKETFLOW_MANAGER_PASSWORD / MARKETFLOW_MARKETER_PASSWORD /
-      #       MARKETFLOW_APPROVER_PASSWORD: mac dinh rong (nhu hien tai) de KHONG co
-#       ai vo tinh chay production bang mat khau demo. Trong moi truong that,
-#       BAT BUOC dat 3 bien nay qua .env.
+# Cách chạy cơ bản (Postgres + Backend + Frontend):
+#   docker compose up -d
 #
-#  2) THU MUC backend/data/ LÀ DUNG LUONG DU LIEU (bao gom file SQLite).
-#     - Mount NGUYEN THU MUC `./backend/data` vao `/app/data` (khong phai file
-#       `.db` le). Ly do: backend/app/core/database.py bat `PRAGMA
-#       journal_mode=WAL`, nen SQLite sinh them 2 file can ke: `*.db-wal` va
-#       `*.db-shm`. Neu chi mount file `.db`, 2 file do KHONG nam trong volume
-#       -> container recreate se mat WAL -> du lieu chua flush co the bien mat.
-#     - Thu muc nay duoc Docker tao tu dong neu chua co. KHONG COMMIT data
-#       production vao git: `.gitignore` da co san `**/*.db`, `**/*.db-wal`,
-#       `**/*.db-shm` nen da che ho data, nhung van nen them `.gitkeep` rong neu
-#       muon mang cau truc thu muc.
-#     - MIGRATION 1 LAN: neu DB cu dang nam o `backend/marketing_campaigns.db`,
-#       hay chuyen file do (ca `-wal`/`-shm` neu co) vao `backend/data/` truoc
-#       lan `docker compose up` dau tien, neu khong se bat dau bang DB rong.
-#
-#  3) `version:` da duoc go bo - Compose Specification v2 khong con can
-#     dong nay va warning "version is obsolete".
+# Cách chạy kèm AI Runner (yêu cầu cấu hình OpenCode CLI):
+#   docker compose --profile runner up -d
 # =============================================================================
 
 services:
+  # ---------------------------------------------------------------------------
+  # 1. Cơ sở dữ liệu PostgreSQL
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: marketflow_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-marketflow}
+      POSTGRES_USER: ${POSTGRES_USER:-marketflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-marketflow_secret_123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-marketflow} -d ${POSTGRES_DB:-marketflow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # 2. FastAPI Backend
+  # ---------------------------------------------------------------------------
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: aia331_backend
+    container_name: marketflow_backend
     restart: unless-stopped
-    # Cho scheduler (APScheduler) co thoi gian dung trong: cancel job dang chay
-    # va flush SQLite/WAL truoc khi container bi SIGKILL.
-    stop_grace_period: 20s
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "127.0.0.1:8000:8000"
     environment:
-      - APP_NAME=Marketing Campaign Management System with AI
-      - APP_ENV=${APP_ENV:-production}
+      - APP_NAME=MarketFlow
+      - APP_ENV=production
       - API_V1_PREFIX=/api/v1
-      # File DB nam trong thu muc da mount o duoi -> moi thay doi path DB thi
-      # doi ca `volumes` ben duoi, khong tach hai cai ra.
-      - DATABASE_URL=sqlite:////app/data/marketing_campaigns.db
-      - "SECRET_KEY=${SECRET_KEY:?Error: SECRET_KEY required}"
-      - "JWT_SECRET_KEY=${JWT_SECRET_KEY:?Error: JWT_SECRET_KEY required}"
-      - "BYOK_ENCRYPTION_KEY=${BYOK_ENCRYPTION_KEY:?Error: BYOK_ENCRYPTION_KEY required}"
-      # --- AI (P0) ---
-      # Truoc day AI_API_KEY khong duoc truyen vao container nen moi cau hoi
-      # AI trong Docker deu im lang rot ve Smart Fallback. Mac dinh rong de
-      # `docker compose up` van chay duoc, nhung de AI that su hoat dong thi
-      # phai dat AI_API_KEY trong .env.
-      - AI_API_KEY=${AI_API_KEY:-}
-      - AI_PROVIDER=${AI_PROVIDER:-gemini}
-      - AI_BASE_URL=${AI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai}
-      - AI_MODEL=${AI_MODEL:-gemini-3.8-flash}
-      # KHÔNG hardcode 10: /api/v1/ai/omnichannel đo thực tế 83–214 giây
-      # (sinh đồng thời Facebook + TikTok 4 cảnh + Email A/B). Timeout 10–20 giây
-      # kích hoạt Smart Fallback dù provider hoàn toàn ổn, tức Docker chạy AI
-      # "thành công" nhưng ra nội dung template — đúng lỗi im lặng mà bài này
-      # đang cố tránh. Mặc định 420 khớp backend/.env.
-      - AI_TIMEOUT_SECONDS=${AI_TIMEOUT_SECONDS:-420}
-      - AI_ENABLE_FALLBACK=true
-      # Trần token đầu ra cho Anthropic. Anthropic bắt buộc có `max_tokens`
-      # trong payload; quá thấp sẽ cắt mất JSON đa kênh và rơi về Smart Fallback.
-      - ANTHROPIC_MAX_TOKENS=${ANTHROPIC_MAX_TOKENS:-8192}
-      # --- Provider AI chạy cục bộ / không cần API key ---
-      # Ollama nói đúng giao thức OpenAI ở http://host.docker.internal:11434/v1.
-      # Để dùng Ollama trên máy Windows: chạy `ollama serve` rồi đặt
-      # MARKETFLOW_OLLAMA_BASE_URL=http://host.docker.internal:11434/v1 trong .env
-      # (biến CỐ Ý có tiền tố MARKETFLOW_ để không đụng biến đã có sẵn trong
-      # môi trường hệ thống — xem .env.example).
-      - MARKETFLOW_OLLAMA_BASE_URL=${MARKETFLOW_OLLAMA_BASE_URL:-}
-      - MARKETFLOW_HF_BASE_URL=${MARKETFLOW_HF_BASE_URL:-}
-      - MARKETFLOW_ANTHROPIC_BASE_URL=${MARKETFLOW_ANTHROPIC_BASE_URL:-}
-      # --- Khoá riêng theo provider (tầng SYSTEM) ---
-      # Mỗi provider tự tra biến riêng trước AI_API_KEY chung, nên cấu hình một
-      # provider không bị lẫn sang provider khác.
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY:-}
-      # --- Role passwords (P0) ---
-      # Mac dinh RONG. Root user trong backend co fallback ve mat khau demo neu
-      # bien nay rong - xem backend/app/core/config.py. Dat rong o day de khong
-      # bao gio deploy production ma van chay bang mat khau demo.
-      - MARKETFLOW_MANAGER_PASSWORD=${MARKETFLOW_MANAGER_PASSWORD:-}
-      - MARKETFLOW_MARKETER_PASSWORD=${MARKETFLOW_MARKETER_PASSWORD:-}
-      - MARKETFLOW_APPROVER_PASSWORD=${MARKETFLOW_APPROVER_PASSWORD:-}
-    volumes:
-      # MOUNT THU MUC, khong phai file `.db`: giu duoc ca `-wal` va `-shm`.
-      # Xem README-style comment o dau file nay.
-      - ./backend/data:/app/data
-    # Can ghi DB nen read_only phai false (noi ro de khong nguoi sua thanh
-    # `true` roi lam container khong khoi dong).
-    read_only: false
-    security_opt:
-      - no-new-privileges:true
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    healthcheck:
-      # 127.0.0.1 thay vì `localhost` để tránh rơi vào ::1 (IPv6) - xem ghi chú
-      # ở healthcheck của frontend.
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\" || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    networks:
-      - marketing_net
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-marketflow}:${POSTGRES_PASSWORD:-marketflow_secret_123}@postgres:5432/${POSTGRES_DB:-marketflow}
+      - JWT_SECRET=${JWT_SECRET:-insecure_docker_compose_jwt_secret_32chars_min}
+      - JWT_ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=480
+      - CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173
+      - AI_RUNNER_URL=${AI_RUNNER_URL:-http://ai-runner:8100}
+      - AI_RUNNER_TOKEN=${AI_RUNNER_TOKEN:-}
+    # Tự động chạy migration Alembic và nạp dữ liệu mẫu khi khởi động
+    command: >
+      sh -c "alembic upgrade head &&
+            python seed/seed_demo.py --force &&
+            uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
+  # ---------------------------------------------------------------------------
+  # 3. Frontend Web (Nginx)
+  # ---------------------------------------------------------------------------
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: aia331_frontend
+      args:
+        - VITE_API_URL=/api/v1
+        - VITE_ENABLE_OFFLINE_DEMO=false
+    container_name: marketflow_frontend
     restart: unless-stopped
-    # Dockerfile stage 2 chay `nginxinc/nginx-unprivileged:alpine` (non-root),
-    # nen container nghe port 8080 thay vi 80.
-    ports:
-      - "3000:8080"
     depends_on:
-      backend:
-        condition: service_healthy
-    read_only: false
-    security_opt:
-      - no-new-privileges:true
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    healthcheck:
-      # PHẢI dùng 127.0.0.1 chứ không phải `localhost`: trong container, `localhost`
-      # resolve ra ::1 (IPv6) trước, còn nginx chỉ LẮNG NGHE IPv4 0.0.0.0:8080
-      # -> "Connection refused" -> container bị đánh dấu unhealthy dù app vẫn chạy.
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-    networks:
-      - marketing_net
+      - backend
+    ports:
+      - "8080:8080"
 
-networks:
-  marketing_net:
-    driver: bridge
+  # ---------------------------------------------------------------------------
+  # 4. AI Runner Service (Profile tuỳ chọn: `runner`)
+  # Ghi chú: Chạy OpenCode CLI yêu cầu cài đặt binary opencode và đăng nhập Zen.
+  # Khuyến nghị thực tế: chạy dịch vụ systemd trực tiếp trên host/VPS (CONTRACT §11).
+  # ---------------------------------------------------------------------------
+  ai-runner:
+    profiles:
+      - runner
+    build:
+      context: ./ai-runner
+      dockerfile: Dockerfile
+    container_name: marketflow_ai_runner
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8100:8100"
+    environment:
+      - RUNNER_HOST=0.0.0.0
+      - RUNNER_PORT=8100
+      - RUNNER_TOKEN=${AI_RUNNER_TOKEN:-}
+      - OPENCODE_AGENT=marketflow
+      - OPENCODE_MODEL=${OPENCODE_MODEL:-opencode/big-pickle}
+      - RUNNER_CONCURRENCY=1
+      - RUNNER_MAX_QUEUE=8
+
+volumes:
+  postgres_data:

@@ -16,7 +16,7 @@ Tài liệu này là **nguồn sự thật duy nhất** về kiến trúc vận 
            ▼
 [ Nginx Reverse Proxy ] (127.0.0.1:8080)
    ├── Phục vụ Frontend SPA tĩnh: /var/www/marketflow
-   ├── Chặn tuyệt đối truy cập ngoài vào /mcp -> HTTP 404
+   ├── Chặn truy cập từ ngoài vào /mcp -> HTTP 404
    ├── Proxy /api/v1/assistant/ (SSE streaming: no-buffering, timeout 300s)
    └── Proxy /api/ -> FastAPI Backend (127.0.0.1:8000)
            │
@@ -86,7 +86,7 @@ RUNNER_PORT=8100
 
 ## 3. Quy Trình Cài Đặt & Triển Khai (Deployment Procedure)
 
-Script triển khai tự động `deploy/vps/deploy_v2.sh` có tính chất **idempotent**, an toàn tuyệt đối và không làm mất dữ liệu cũ.
+Script triển khai tự động `deploy/vps/deploy_v2.sh` có tính chất **idempotent**: sao lưu trước khi thay đổi và không ghi đè CSDL v1 (v2 dùng CSDL riêng `marketflow_v2`).
 
 ### Các bước thực hiện:
 
