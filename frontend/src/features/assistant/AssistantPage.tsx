@@ -25,7 +25,7 @@ export default function AssistantPage() {
 
   // Trạng thái giao diện
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isActionsPanelOpen, setIsActionsPanelOpen] = useState(true);
+  const [isActionsPanelOpen, setIsActionsPanelOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
   const [composerText, setComposerText] = useState('');
@@ -212,10 +212,7 @@ export default function AssistantPage() {
         queryClient.invalidateQueries({ queryKey: ['assistant', 'threads'] });
         setComposerText('');
         navigate(`/assistant/${newThread.id}`);
-        // Chờ route chuyển và gửi tin nhắn trong effect hoặc gọi trực tiếp
-        setTimeout(() => {
-          sendMessage(text);
-        }, 100);
+        await sendMessage(text, newThread.id);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Không thể khởi tạo phiên mới.');
       }
@@ -250,6 +247,12 @@ export default function AssistantPage() {
   };
 
   const proposedCount = actions.filter((a) => a.status === 'PROPOSED').length;
+
+  // Panel "Đề xuất & bản nháp" mặc định đóng để khung chat đủ rộng;
+  // tự mở khi phiên có đề xuất đang chờ xác nhận (khi mở phiên hoặc khi AI vừa tạo đề xuất mới).
+  useEffect(() => {
+    if (proposedCount > 0) setIsActionsPanelOpen(true);
+  }, [proposedCount, currentThreadId]);
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-canvas">

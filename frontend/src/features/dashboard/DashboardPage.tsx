@@ -122,7 +122,7 @@ export default function DashboardPage() {
             {overview?.has_seed_data && <SeedDataBadge />}
           </div>
         }
-        description="Báo cáo số liệu hiệu quả chiến dịch, ngân sách và trạng thái vận hành theo thời gian thực."
+        description="Hiệu quả và chi phí chiến dịch tổng hợp từ số liệu đã nhập hoặc import."
       />
 
       {/* Filter bar */}

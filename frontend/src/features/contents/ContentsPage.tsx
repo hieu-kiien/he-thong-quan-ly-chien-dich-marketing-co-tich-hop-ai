@@ -270,22 +270,7 @@ export default function ContentsPage() {
       {/* Main Table */}
       {isLoading ? (
         <div className="rounded-lg border border-border bg-surface p-4">
-          <Table>
-            <THead>
-              <TR>
-                <TH>Tiêu đề</TH>
-                <TH>Chiến dịch</TH>
-                <TH>Kênh</TH>
-                <TH>Định dạng</TH>
-                <TH>Nguồn gốc</TH>
-                <TH>Trạng thái</TH>
-                <TH>Người tạo</TH>
-                <TH>Ngày tạo</TH>
-                <TH className="text-right">Thao tác</TH>
-              </TR>
-            </THead>
-            <SkeletonRows rows={6} />
-          </Table>
+          <SkeletonRows rows={6} />
         </div>
       ) : isError ? (
         <ErrorState error={error} onRetry={() => refetch()} />

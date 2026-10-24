@@ -28,8 +28,9 @@ export function useAssistantStream(threadId?: number) {
   const queryClient = useQueryClient();
   const [streamingState, setStreamingState] = useState<StreamingState>(INITIAL_STREAMING_STATE);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const activeStreamThreadIdRef = useRef<number | null>(null);
 
-  // Dọn dẹp khi unmount (huỷ luồng fetch ngầm để tránh lỗi)
+  // Dọn dẹp khi unmount (huỷ luồng fetch ngầm để tránh rò rỉ)
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -37,6 +38,17 @@ export function useAssistantStream(threadId?: number) {
         abortControllerRef.current = null;
       }
     };
+  }, []);
+
+  // Huỷ luồng khi người dùng chuyển sang xem một phiên khác (tránh huỷ khi chuyển từ undefined sang newThread.id)
+  useEffect(() => {
+    if (threadId && activeStreamThreadIdRef.current && threadId !== activeStreamThreadIdRef.current) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      activeStreamThreadIdRef.current = null;
+    }
   }, [threadId]);
 
   /**
@@ -102,6 +114,7 @@ export function useAssistantStream(threadId?: number) {
 
       const controller = new AbortController();
       abortControllerRef.current = controller;
+      activeStreamThreadIdRef.current = activeThreadId;
 
       setStreamingState({
         isStreaming: true,
@@ -286,15 +299,16 @@ export function useAssistantStream(threadId?: number) {
    * Gửi tin nhắn người dùng và mở luồng SSE.
    */
   const sendMessage = useCallback(
-    async (content: string) => {
-      if (!threadId || !content.trim()) return;
+    async (content: string, overrideThreadId?: number) => {
+      const activeId = overrideThreadId ?? threadId;
+      if (!activeId || !content.trim()) return;
 
       const trimmed = content.trim();
 
       // Thêm ngay tin nhắn người dùng tạm thời vào giao diện
       const optimisticUserMsg: AiMessage = {
         id: Date.now(),
-        thread_id: threadId,
+        thread_id: activeId,
         role: 'USER',
         content: trimmed,
         parts_json: [],
@@ -306,16 +320,16 @@ export function useAssistantStream(threadId?: number) {
         updated_at: new Date().toISOString(),
       };
 
-      queryClient.setQueryData<AiMessage[]>(['assistant', 'messages', threadId], (old = []) => [
+      queryClient.setQueryData<AiMessage[]>(['assistant', 'messages', activeId], (old = []) => [
         ...old,
         optimisticUserMsg,
       ]);
 
-      await executeStream(threadId, (controller, callbacks) => {
+      await executeStream(activeId, (controller, callbacks) => {
         if (import.meta.env.DEV && isSimulatorActive) {
-          return simulateAssistantStream(threadId, trimmed, callbacks, controller.signal);
+          return simulateAssistantStream(activeId, trimmed, callbacks, controller.signal);
         }
-        return streamSendMessage(threadId, trimmed, callbacks, controller.signal);
+        return streamSendMessage(activeId, trimmed, callbacks, controller.signal);
       });
     },
     [threadId, executeStream, queryClient],

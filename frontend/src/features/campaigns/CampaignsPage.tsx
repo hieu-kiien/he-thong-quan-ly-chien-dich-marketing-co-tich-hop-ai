@@ -270,21 +270,7 @@ export default function CampaignsPage() {
       {/* Main Table Content */}
       {isLoading ? (
         <div className="rounded-lg border border-border bg-surface p-4">
-          <Table>
-            <THead>
-              <TR>
-                <TH>Chiến dịch</TH>
-                <TH>Mục tiêu</TH>
-                <TH>Kênh</TH>
-                <TH>Thời gian</TH>
-                <TH>Ngân sách / Đã chi</TH>
-                <TH>Trạng thái</TH>
-                <TH>Nội dung</TH>
-                <TH className="text-right">Thao tác</TH>
-              </TR>
-            </THead>
-            <SkeletonRows rows={6} />
-          </Table>
+          <SkeletonRows rows={6} />
         </div>
       ) : isError ? (
         <ErrorState
