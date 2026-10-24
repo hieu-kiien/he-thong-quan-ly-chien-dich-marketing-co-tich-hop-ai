@@ -199,3 +199,18 @@ Trang `/assistant` (giống Claude): cột trái danh sách phiên (tìm kiếm,
 - Backend: pytest (SQLite), mỗi router có test đúng/sai/biên + phân quyền; assistant test bằng **FakeRunner** (thành công, gọi tool, đề xuất, timeout, rate limit, rỗng, stop). ruff sạch.
 - Frontend: `npm run typecheck`, `npm run lint` (max-warnings 0), `npm run build` sạch; Playwright e2e cho luồng chính.
 - Tuân thủ `AGENTS.md` (GitNexus impact trước khi sửa/xoá symbol cũ; orchestrator chạy detect-changes trước commit).
+
+## 10. Phụ lục A — Hình dạng response (đã chốt, bắt buộc cả backend & frontend)
+
+1. Ref object nhúng: `UserRef={id,full_name}`, `ChannelRef={id,code,name}`, `CampaignRef={id,name}`.
+2. `Content = {id,campaign_id,campaign:CampaignRef,channel_id,channel:ChannelRef,content_type,title,body,cta,status,origin,ai_message_id,created_by:UserRef,published_url,published_at,published_by:UserRef|null,created_at,updated_at}`. Lọc list `created_by=<user_id>`.
+3. `POST /contents/{id}/submit` → Content đã cập nhật + `banned_matches:[{keyword,count}]` ở cấp cao nhất.
+4. `ContentReview = {id,content_id,reviewer:UserRef,decision,comment,created_at}`; `GET /contents/{id}/reviews` → mảng.
+5. `Schedule = {id,content_id,scheduled_at,assignee:UserRef|null,status,note,done_at,content:{id,title,status,content_type,created_by:UserRef},campaign:CampaignRef,channel:ChannelRef,created_at,updated_at}`; `GET /schedules` → mảng thường (lọc theo khoảng ngày, không phân trang).
+6. `Metric = {id,campaign_id,campaign:CampaignRef,channel_id,channel:ChannelRef,metric_date,views,clicks,conversions,cost,source,entered_by:UserRef|null,import_batch,created_at,updated_at}`; `GET /metrics` phân trang.
+7. CSV preview row: `{row,metric_date,campaign_id,campaign_name,channel_id,channel_code,views,clicks,conversions,cost,exists}` (exists=true nghĩa là sẽ cập nhật); `summary` = object phẳng số: `{total,valid,invalid,inserts,updates}`; commit body = `{rows: <các preview row hợp lệ như đã trả về>}` — backend **phải validate lại** khi commit.
+8. Phân trang: /campaigns, /contents, /metrics, /users, /notifications (notifications thêm `unread_count`). Mảng thường: /channels, /schedules, /stats/timeseries, /stats/by-channel, /stats/by-campaign, /assistant/threads, /assistant/threads/{id}/messages, /assistant/actions, /contents/{id}/reviews.
+9. `GET /brand-profile`: `banned_keywords:[{id,keyword,note}]`; `PUT /brand-profile` nhận `banned_keywords:[{keyword,note?}]` (thay thế toàn bộ).
+10. `User = {id,email,full_name,role,is_active,created_at,updated_at}`. Rate-limit đăng nhập → 429 `detail.code=LOGIN_RATE_LIMITED`.
+11. `AiThread = {id,user_id,campaign_id,campaign:CampaignRef|null,title,pinned,last_message_at,created_at,updated_at}`. `AiMessage = {id,thread_id,role,content,parts_json,status,error_code,model,latency_ms,created_at}`. `AiAction = {id,thread_id,message_id,user_id,tool,args_json,summary,status,result_json,error,executed_at,created_at}`.
+12. Datetime trả về luôn có offset timezone (UTC `+00:00` hoặc `Z`); client gửi `scheduled_at` dạng `2026-10-24T19:30:00+07:00`, backend chuẩn hoá về UTC khi lưu.
