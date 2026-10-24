@@ -1,607 +1,95 @@
-import logging
-from sqlalchemy import create_engine, event, text
-from sqlalchemy.orm import declarative_base, sessionmaker
+"""Kết nối CSDL, Base khai báo và kiểu thời gian UTC dùng chung."""
+
+from __future__ import annotations
+
+from collections.abc import Iterator
+from datetime import UTC, datetime
+
+from sqlalchemy import DateTime, Integer, MetaData, create_engine, event
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
+from sqlalchemy.types import TypeDecorator
+
 from app.core.config import settings
 
-logger = logging.getLogger("marketflow.database")
+NAMING_CONVENTION = {
+    "ix": "ix_%(column_0_label)s",
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s",
+}
 
-class DatabaseMigrationError(RuntimeError):
-    """Ngoại lệ tùy chỉnh khi quá trình migration hoặc kiểm tra tương thích schema CSDL thất bại."""
-    pass
 
-from pathlib import Path
+def utcnow() -> datetime:
+    return datetime.now(UTC)
 
-db_url = settings.DATABASE_URL
-if db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
-elif db_url.startswith("sqlite:///") and not db_url.startswith("sqlite:////") and db_url != "sqlite:///:memory:":
-    raw_path = db_url[len("sqlite:///"):]
-    p = Path(raw_path)
-    if not p.is_absolute():
-        base_target = (settings.BASE_DIR / raw_path.lstrip("./")).resolve()
-        if base_target.exists():
-            db_url = f"sqlite:///{base_target.as_posix()}"
 
-engine_kwargs = {"echo": False}
-if db_url.startswith("sqlite"):
-    engine_kwargs["connect_args"] = {"check_same_thread": False}
-else:
-    engine_kwargs["pool_pre_ping"] = True
-    engine_kwargs["pool_recycle"] = 180
-    engine_kwargs["pool_size"] = 2
-    engine_kwargs["max_overflow"] = 3
+class UTCDateTime(TypeDecorator):
+    """Lưu thời điểm dưới dạng UTC và luôn trả về datetime có tzinfo=UTC.
 
-engine = create_engine(db_url, **engine_kwargs)
+    SQLite không lưu múi giờ nên giá trị đọc ra là naive; PostgreSQL trả về
+    theo múi giờ phiên. Cả hai đều được chuẩn hoá về UTC tại đây.
+    """
 
-# Kích hoạt bắt buộc kiểm tra ràng buộc khóa ngoại và tối ưu hóa đồng thời WAL trên SQLite
-if db_url.startswith("sqlite"):
-    @event.listens_for(engine, "connect")
-    def set_sqlite_pragma(dbapi_connection, connection_record):
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=UTC)
+        value = value.astimezone(UTC)
+        if dialect.name == "sqlite":
+            return value.replace(tzinfo=None)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+
+
+class Base(DeclarativeBase):
+    metadata = MetaData(naming_convention=NAMING_CONVENTION)
+
+
+class TimestampMixin:
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+def make_engine(url: str) -> Engine:
+    kwargs: dict = {"pool_pre_ping": True}
+    if url.startswith("sqlite"):
+        kwargs["connect_args"] = {"check_same_thread": False}
+    eng = create_engine(url, **kwargs)
+    if url.startswith("sqlite"):
+        enable_sqlite_fk(eng)
+    return eng
+
+
+def enable_sqlite_fk(eng: Engine) -> None:
+    @event.listens_for(eng, "connect")
+    def _set_pragma(dbapi_connection, _record):  # pragma: no cover - trivial
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.execute("PRAGMA busy_timeout=15000")
-        cursor.execute("PRAGMA cache_size=-4000")
-        cursor.execute("PRAGMA temp_store=DEFAULT")
         cursor.close()
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-Base = declarative_base()
+engine = make_engine(settings.DATABASE_URL)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
-def get_db():
+
+def get_db() -> Iterator[Session]:
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-
-
-def _backfill_tenant_workspace_ids(db_engine=engine, conn=None):
-    """Gán workspace_id cho các bản ghi còn NULL dựa trên campaign cha.
-
-    - Content : lấy workspace_id từ campaign cha (nếu campaign đã có workspace).
-    - Campaign: ưu tiên workspace mà ``workspaces.owner_id = campaigns.owner_id``;
-                nếu không có, lấy workspace đầu tiên mà owner là thành viên
-                (``workspace_members``); nếu vẫn không có thì giữ NULL
-                (không đoán bừa) và chỉ log cảnh báo.
-
-    Idempotent: chỉ UPDATE dòng có ``workspace_id IS NULL``.
-
-    Thứ tự: content (theo campaign đã có workspace) -> campaign -> content lần 2
-    (theo campaign vừa được gán ở bước trên) để không sót nội dung.
-    """
-    own_conn = conn is None
-    try:
-        if own_conn:
-            conn = db_engine.connect()
-
-        required = {"marketing_contents", "campaigns", "workspaces", "workspace_members"}
-        existing = {
-            row[0]
-            for row in conn.exec_driver_sql(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
-        }
-        if not required.issubset(existing):
-            logger.info("Tenant backfill skipped: thiếu bảng %s", sorted(required - existing))
-            return
-
-        # SAVEPOINT để lỗi ở backfill không làm hỏng phần schema ALTER đã chạy trước đó.
-        savepoint_ok = False
-        try:
-            conn.exec_driver_sql("SAVEPOINT tenant_ws_backfill")
-            savepoint_ok = True
-        except Exception:
-            logger.debug("Khong tao duoc SAVEPOINT cho tenant backfill", exc_info=True)
-
-        stats = {}
-        try:
-            # 1) Content -> workspace của campaign cha (campaign đã có workspace)
-            res = conn.exec_driver_sql(
-                "UPDATE marketing_contents "
-                "SET workspace_id = (SELECT c.workspace_id FROM campaigns c WHERE c.id = marketing_contents.campaign_id) "
-                "WHERE workspace_id IS NULL "
-                "AND campaign_id IN (SELECT id FROM campaigns WHERE workspace_id IS NOT NULL)"
-            )
-            stats["content_from_campaign"] = max(int(getattr(res, "rowcount", 0) or 0), 0)
-
-            # 2) Campaign -> workspace mà owner sở hữu
-            res = conn.exec_driver_sql(
-                "UPDATE campaigns "
-                "SET workspace_id = (SELECT w.id FROM workspaces w WHERE w.owner_id = campaigns.owner_id ORDER BY w.id LIMIT 1) "
-                "WHERE workspace_id IS NULL "
-                "AND owner_id IN (SELECT owner_id FROM workspaces WHERE owner_id IS NOT NULL)"
-            )
-            stats["campaign_from_owner"] = max(int(getattr(res, "rowcount", 0) or 0), 0)
-
-            # 3) Campaign -> workspace đầu tiên mà owner là thành viên
-            res = conn.exec_driver_sql(
-                "UPDATE campaigns "
-                "SET workspace_id = (SELECT MIN(wm.workspace_id) FROM workspace_members wm WHERE wm.user_id = campaigns.owner_id) "
-                "WHERE workspace_id IS NULL "
-                "AND owner_id IN (SELECT user_id FROM workspace_members)"
-            )
-            stats["campaign_from_membership"] = max(int(getattr(res, "rowcount", 0) or 0), 0)
-
-            # 4) Content lần 2: nội dung của campaign vừa được gán workspace ở bước 2-3
-            res = conn.exec_driver_sql(
-                "UPDATE marketing_contents "
-                "SET workspace_id = (SELECT c.workspace_id FROM campaigns c WHERE c.id = marketing_contents.campaign_id) "
-                "WHERE workspace_id IS NULL "
-                "AND campaign_id IN (SELECT id FROM campaigns WHERE workspace_id IS NOT NULL)"
-            )
-            stats["content_after_campaign"] = max(int(getattr(res, "rowcount", 0) or 0), 0)
-        except Exception:
-            logger.warning(
-                "Tenant workspace backfill khong hoan tat, giu nguyen du lieu cu: %s",
-                exc_info=True,
-            )
-            if savepoint_ok:
-                try:
-                    conn.exec_driver_sql("ROLLBACK TO SAVEPOINT tenant_ws_backfill")
-                    conn.exec_driver_sql("RELEASE SAVEPOINT tenant_ws_backfill")
-                except Exception:
-                    logger.debug("Khong rollback duoc SAVEPOINT tenant backfill", exc_info=True)
-            return
-        finally:
-            if savepoint_ok:
-                try:
-                    conn.exec_driver_sql("RELEASE SAVEPOINT tenant_ws_backfill")
-                except Exception:
-                    logger.debug("Khong release duoc SAVEPOINT tenant backfill", exc_info=True)
-
-        assigned = sum(stats.values())
-        if assigned:
-            logger.info(
-                "Tenant backfill: da gan workspace_id cho %s dong (content_from_campaign=%s, "
-                "campaign_from_owner=%s, campaign_from_membership=%s, content_after_campaign=%s)",
-                assigned,
-                stats["content_from_campaign"],
-                stats["campaign_from_owner"],
-                stats["campaign_from_membership"],
-                stats["content_after_campaign"],
-            )
-    except Exception:
-        # Không được phép làm hỏng startup vì migration dữ liệu.
-        logger.warning("Tenant workspace backfill that bai, bo qua.", exc_info=True)
-    finally:
-        if own_conn and conn is not None:
-            try:
-                conn.commit()
-            except Exception:
-                logger.debug("Khong commit duoc tenant backfill", exc_info=True)
-            finally:
-                conn.close()
-
-
-def _migrate_custom_api_key_provider_constraint(db_engine, conn) -> None:
-    """Dựng lại bảng `custom_api_keys` nếu CHECK constraint provider chưa chứa đủ SUPPORTED_PROVIDER_SLUGS."""
-    import re
-    from app.services.ai.providers import SUPPORTED_PROVIDER_SLUGS
-
-    row = conn.exec_driver_sql(
-        "SELECT sql FROM sqlite_master WHERE type='table' AND name='custom_api_keys'"
-    ).fetchone()
-    if not row or not row[0]:
-        return
-    table_sql = row[0]
-    if all(f"'{slug}'" in table_sql for slug in SUPPORTED_PROVIDER_SLUGS):
-        return
-
-    allowed_sql = ", ".join(f"'{slug}'" for slug in SUPPORTED_PROVIDER_SLUGS)
-    new_sql = re.sub(
-        r"provider\s+IN\s*\([^)]+\)",
-        f"provider IN ({allowed_sql})",
-        table_sql,
-        count=1,
-        flags=re.IGNORECASE,
-    )
-    if new_sql == table_sql:
-        logger.warning(
-            "Khong nhan dang CHECK constraint cua custom_api_keys trong DDL; bo qua migration."
-        )
-        return
-
-    logger.info("Migrating custom_api_keys provider constraint to include all SUPPORTED_PROVIDER_SLUGS")
-    conn.exec_driver_sql("ALTER TABLE custom_api_keys RENAME TO custom_api_keys_legacy")
-    conn.exec_driver_sql(new_sql)
-    conn.exec_driver_sql(
-        "INSERT INTO custom_api_keys "
-        "(id, user_id, workspace_id, provider, encrypted_key, model, is_active, created_at, updated_at) "
-        "SELECT id, user_id, workspace_id, provider, encrypted_key, model, is_active, created_at, updated_at "
-        "FROM custom_api_keys_legacy"
-    )
-    conn.exec_driver_sql("DROP TABLE custom_api_keys_legacy")
-
-
-def _migrate_ai_job_kind_constraint(db_engine, conn) -> None:
-    """Dựng lại bảng `ai_jobs` nếu CHECK constraint kind chưa chứa đủ các loại job mới."""
-    import re
-    required_kinds = (
-        "ideas", "draft", "summary", "omnichannel", "plan",
-        "angle_matrix", "prelaunch_critic", "deep_doctor", "batch_compliance_fix",
-    )
-    row = conn.exec_driver_sql(
-        "SELECT sql FROM sqlite_master WHERE type='table' AND name='ai_jobs'"
-    ).fetchone()
-    if not row or not row[0]:
-        return
-    table_sql = row[0]
-    if all(f"'{k}'" in table_sql for k in required_kinds):
-        return
-
-    logger.info("Migrating ai_jobs kind constraint to include extended AI job kinds")
-    allowed_sql = ", ".join(f"'{k}'" for k in required_kinds)
-    new_sql = re.sub(
-        r"kind\s+IN\s*\([^)]+\)",
-        f"kind IN ({allowed_sql})",
-        table_sql,
-        count=1,
-        flags=re.IGNORECASE,
-    )
-    if new_sql == table_sql:
-        logger.warning(
-            "Khong nhan dang CHECK constraint cua ai_jobs trong DDL; bo qua migration."
-        )
-        return
-
-    index_rows = conn.exec_driver_sql(
-        "SELECT sql FROM sqlite_master WHERE type='index' "
-        "AND tbl_name='ai_jobs' AND sql IS NOT NULL"
-    ).fetchall()
-    index_sqls = [r[0] for r in index_rows if r and r[0]]
-
-    columns = [
-        r[1]
-        for r in conn.exec_driver_sql("PRAGMA table_info(ai_jobs)").fetchall()
-    ]
-    col_list = ", ".join(columns)
-
-    conn.exec_driver_sql("ALTER TABLE ai_jobs RENAME TO ai_jobs_legacy")
-    conn.exec_driver_sql(new_sql)
-    conn.exec_driver_sql(
-        f"INSERT INTO ai_jobs ({col_list}) SELECT {col_list} FROM ai_jobs_legacy"
-    )
-    conn.exec_driver_sql("DROP TABLE ai_jobs_legacy")
-    for sql in index_sqls:
-        try:
-            conn.exec_driver_sql(sql)
-        except Exception:
-            # Index đã tồn tại (tên không đổi) -> bỏ qua, không làm hỏng migration.
-            logger.debug("Index recreation skipped: %s", sql, exc_info=True)
-
-
-def ensure_sqlite_schema_compatibility(db_engine=engine):
-    """Tự động kiểm tra và bổ sung các cột mới vào CSDL SQLite hiện hữu nếu thiếu (Idempotent Zero Migration Failure)."""
-    if not str(db_engine.url).startswith("sqlite"):
-        return
-    try:
-        with db_engine.connect() as conn:
-            res = conn.exec_driver_sql("PRAGMA table_info(marketing_contents)")
-            existing_cols = [row[1] for row in res.fetchall()]
-            if existing_cols:
-                if "image_url" not in existing_cols:
-                    conn.exec_driver_sql("ALTER TABLE marketing_contents ADD COLUMN image_url VARCHAR(1024)")
-                if "workspace_id" not in existing_cols:
-                    # KHÔNG gán DEFAULT 1: workspace 1 có thể thuộc tenant khác, nên
-                    # gán hàng loạt vào đó là gán dữ liệu của agency này sang agency
-                    # khác. `_backfill_tenant_workspace_ids` sẽ suy ra đúng workspace
-                    # từ campaign cha; bước này chỉ thêm cột, chưa gán giá trị.
-                    conn.exec_driver_sql("ALTER TABLE marketing_contents ADD COLUMN workspace_id INTEGER")
-                if "warnings_json" not in existing_cols:
-                    conn.exec_driver_sql("ALTER TABLE marketing_contents ADD COLUMN warnings_json TEXT DEFAULT '[]'")
-                if "creative_angle" not in existing_cols:
-                    conn.exec_driver_sql("ALTER TABLE marketing_contents ADD COLUMN creative_angle VARCHAR(50)")
-                if "hook_variant" not in existing_cols:
-                    conn.exec_driver_sql("ALTER TABLE marketing_contents ADD COLUMN hook_variant VARCHAR(50)")
-                if "utm_params" not in existing_cols:
-                    conn.exec_driver_sql("ALTER TABLE marketing_contents ADD COLUMN utm_params VARCHAR(500)")
-                if "ai_metadata_json" not in existing_cols:
-                    conn.exec_driver_sql("ALTER TABLE marketing_contents ADD COLUMN ai_metadata_json TEXT")
-                if "blocks_json" not in existing_cols:
-                    conn.exec_driver_sql("ALTER TABLE marketing_contents ADD COLUMN blocks_json TEXT DEFAULT '[]'")
-
-            # 2. Bảng custom_api_keys (Zero Migration Failure)
-            table_check = conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='custom_api_keys'")
-            if not table_check.fetchone():
-                from app.models.entities import CustomApiKey
-                CustomApiKey.__table__.create(bind=conn)
-            else:
-                key_cols_res = conn.exec_driver_sql("PRAGMA table_info(custom_api_keys)")
-                key_cols = [row[1] for row in key_cols_res.fetchall()]
-                if "workspace_id" not in key_cols:
-                    conn.exec_driver_sql("ALTER TABLE custom_api_keys ADD COLUMN workspace_id INTEGER")
-                if "user_id" not in key_cols:
-                    conn.exec_driver_sql("ALTER TABLE custom_api_keys ADD COLUMN user_id INTEGER")
-                if "is_active" not in key_cols:
-                    conn.exec_driver_sql("ALTER TABLE custom_api_keys ADD COLUMN is_active BOOLEAN DEFAULT 1")
-
-            # 2b. Thu hồi phiên đăng nhập: cột users.token_version.
-            res_users = conn.exec_driver_sql("PRAGMA table_info(users)")
-            user_cols = [row[1] for row in res_users.fetchall()]
-            if user_cols and "token_version" not in user_cols:
-                conn.exec_driver_sql("ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0")
-
-            # 3. Bổ sung các cột Brief & Target & Enterprise Grid cho campaigns (Idempotent Migration)
-            res_camp = conn.exec_driver_sql("PRAGMA table_info(campaigns)")
-            camp_cols = [row[1] for row in res_camp.fetchall()]
-            if camp_cols:
-                if "key_message" not in camp_cols:
-                    conn.exec_driver_sql("ALTER TABLE campaigns ADD COLUMN key_message TEXT")
-                if "primary_cta" not in camp_cols:
-                    conn.exec_driver_sql("ALTER TABLE campaigns ADD COLUMN primary_cta VARCHAR(255)")
-                if "target_kpi_name" not in camp_cols:
-                    conn.exec_driver_sql("ALTER TABLE campaigns ADD COLUMN target_kpi_name VARCHAR(50)")
-                if "target_kpi_value" not in camp_cols:
-                    conn.exec_driver_sql("ALTER TABLE campaigns ADD COLUMN target_kpi_value NUMERIC(12, 2)")
-                if "campaign_code" not in camp_cols:
-                    conn.exec_driver_sql("ALTER TABLE campaigns ADD COLUMN campaign_code VARCHAR(100)")
-                if "funnel_stage" not in camp_cols:
-                    conn.exec_driver_sql("ALTER TABLE campaigns ADD COLUMN funnel_stage VARCHAR(20) NOT NULL DEFAULT 'BoFU'")
-                if "daily_budget_cap" not in camp_cols:
-                    conn.exec_driver_sql("ALTER TABLE campaigns ADD COLUMN daily_budget_cap NUMERIC(12, 2)")
-                if "tags_json" not in camp_cols:
-                    conn.exec_driver_sql("ALTER TABLE campaigns ADD COLUMN tags_json TEXT DEFAULT '[]'")
-
-            # 4. Tạo bảng mới cho Tasks, Budget Allocations, KPI Targets (Zero Migration Failure)
-            from app.models.entities import Task, CampaignBudgetAllocation, CampaignKPITarget
-            table_task_check = conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='campaign_tasks'")
-            if not table_task_check.fetchone():
-                Task.__table__.create(bind=conn)
-
-            table_budget_check = conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='campaign_budget_allocations'")
-            if not table_budget_check.fetchone():
-                CampaignBudgetAllocation.__table__.create(bind=conn)
-
-            table_kpi_check = conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='campaign_kpi_targets'")
-            if not table_kpi_check.fetchone():
-                CampaignKPITarget.__table__.create(bind=conn)
-
-            # 4a. Cột đánh dấu "số AI ước tính" (AI Campaign Planner). Dòng do
-            # người dùng phân bổ tay giữ DEFAULT false; chỉ POST
-            # /campaigns/{id}/plan/apply gán true. `create_all` không ALTER bảng
-            # đã có nên CSDL cũ phải thêm cột tại đây.
-            budget_cols = {
-                row[1] for row in conn.exec_driver_sql("PRAGMA table_info(campaign_budget_allocations)")
-            }
-            if budget_cols and "is_ai_estimate" not in budget_cols:
-                conn.exec_driver_sql(
-                    "ALTER TABLE campaign_budget_allocations "
-                    "ADD COLUMN is_ai_estimate BOOLEAN NOT NULL DEFAULT false"
-                )
-                logger.info("Migration: added campaign_budget_allocations.is_ai_estimate")
-            kpi_cols = {
-                row[1] for row in conn.exec_driver_sql("PRAGMA table_info(campaign_kpi_targets)")
-            }
-            if kpi_cols and "is_ai_estimate" not in kpi_cols:
-                conn.exec_driver_sql(
-                    "ALTER TABLE campaign_kpi_targets "
-                    "ADD COLUMN is_ai_estimate BOOLEAN NOT NULL DEFAULT false"
-                )
-                logger.info("Migration: added campaign_kpi_targets.is_ai_estimate")
-
-            # 5a. Thêm cột `campaign_metrics.source` và `campaign_metrics.content_id` nếu thiếu.
-            metric_cols = {
-                row[1] for row in conn.exec_driver_sql("PRAGMA table_info(campaign_metrics)")
-            }
-            if metric_cols and "source" not in metric_cols:
-                try:
-                    conn.exec_driver_sql(
-                        "ALTER TABLE campaign_metrics ADD COLUMN source VARCHAR(20)"
-                    )
-                    logger.info("Migration: added campaign_metrics.source")
-                except Exception:
-                    logger.debug("campaign_metrics.source add skipped", exc_info=True)
-            if metric_cols and "content_id" not in metric_cols:
-                try:
-                    conn.exec_driver_sql(
-                        "ALTER TABLE campaign_metrics ADD COLUMN content_id INTEGER REFERENCES marketing_contents(id) ON DELETE SET NULL"
-                    )
-                    logger.info("Migration: added campaign_metrics.content_id")
-                except Exception:
-                    logger.debug("campaign_metrics.content_id add skipped", exc_info=True)
-
-            # 5. Bổ sung index cho các cột lọc nóng.
-            # `Base.metadata.create_all` chỉ tạo index cho bảng MỚI; với CSDL SQLite
-            # đã tồn tại, index khai báo trong `__table_args__` sẽ không bao giờ
-            # được tạo. Danh sách dưới đây phải được giữ đồng bộ với entities.py.
-            # Đều idempotent (CREATE INDEX IF NOT EXISTS) nên chạy lại vô hại.
-            for index_sql in (
-                "CREATE INDEX IF NOT EXISTS idx_campaigns_workspace ON campaigns (workspace_id)",
-                "CREATE INDEX IF NOT EXISTS idx_campaigns_product ON campaigns (product_id)",
-                "CREATE INDEX IF NOT EXISTS ix_campaigns_campaign_code ON campaigns (campaign_code)",
-                "CREATE INDEX IF NOT EXISTS idx_contents_workspace ON marketing_contents (workspace_id)",
-                "CREATE INDEX IF NOT EXISTS idx_contents_channel ON marketing_contents (channel_id)",
-                "CREATE INDEX IF NOT EXISTS idx_contents_status ON marketing_contents (status)",
-                "CREATE INDEX IF NOT EXISTS idx_metrics_channel ON campaign_metrics (channel_id)",
-                "CREATE INDEX IF NOT EXISTS ix_campaign_metrics_content_id ON campaign_metrics (content_id)",
-                "CREATE INDEX IF NOT EXISTS idx_workspace_members_workspace ON workspace_members (workspace_id)",
-                # Index hot cho màn hình "Việc của tôi" (due_date quét theo assignee)
-                # và lọc task theo tenant.
-                "CREATE INDEX IF NOT EXISTS idx_tasks_assignee_due ON campaign_tasks (assignee_id, due_date)",
-                "CREATE INDEX IF NOT EXISTS idx_tasks_workspace_status ON campaign_tasks (workspace_id, status)",
-            ):
-                try:
-                    conn.exec_driver_sql(index_sql)
-                except Exception:
-                    # Bảng chưa tồn tại (DB rỗng, sẽ được create_all tạo sau) ->
-                    # bỏ qua, không làm hỏng toàn bộ bước migration.
-                    logger.debug("Index creation skipped: %s", index_sql, exc_info=True)
-
-            # 5b. Nới CHECK constraint `provider` của custom_api_keys.
-            # SQLite không có ALTER Constraint nên phải dựng lại bảng. CSDL cũ
-            # chặn 'opencode' ở tầng DB, khiến lưu khóa BYOK chết bằng
-            # IntegrityError (HTTP 500) thay vì lỗi validation có thể đọc được.
-            _migrate_custom_api_key_provider_constraint(db_engine=db_engine, conn=conn)
-
-            # 5c. Nới CHECK constraint `kind` của ai_jobs.
-            _migrate_ai_job_kind_constraint(db_engine=db_engine, conn=conn)
-
-            # Backfill tenant: gán workspace_id cho dữ liệu legacy còn NULL để không
-            # rơi vào vùng fail-closed của tầng phân quyền (idempotent, bọc try/except).
-            _backfill_tenant_workspace_ids(db_engine=db_engine, conn=conn)
-
-            # Cảnh báo toàn vẹn tenant: các bản ghi còn thiếu workspace_id sẽ bị từ chối
-            # truy cập ở tầng phân quyền (fail-closed). Cần migration để gán workspace.
-            try:
-                orphan_campaigns = conn.exec_driver_sql(
-                    "SELECT COUNT(*) FROM campaigns WHERE workspace_id IS NULL"
-                ).scalar()
-                orphan_contents = conn.exec_driver_sql(
-                    "SELECT COUNT(*) FROM marketing_contents WHERE workspace_id IS NULL"
-                ).scalar()
-                if orphan_campaigns or orphan_contents:
-                    logger.warning(
-                        "Tenant integrity: %s campaign(s) and %s content row(s) still have NULL workspace_id "
-                        "and will be rejected by record-level authorization. Run a data migration.",
-                        orphan_campaigns, orphan_contents,
-                    )
-            except Exception:
-                logger.debug("Tenant integrity probe skipped", exc_info=True)
-
-            conn.commit()
-    except Exception as e:
-        logger.error("Database schema migration failed: %s", e, exc_info=True)
-        raise DatabaseMigrationError(f"Database schema migration failed: {e}") from e
-
-
-def init_db(db_engine=engine):
-    """Khởi tạo toàn bộ các bảng trong CSDL và đảm bảo tính tương thích schema SQLite."""
-    Base.metadata.create_all(bind=db_engine)
-    ensure_sqlite_schema_compatibility(db_engine)
-    ensure_postgres_schema_compatibility(db_engine)
-
-
-def ensure_postgres_schema_compatibility(db_engine=engine) -> None:
-    """Thêm cột còn thiếu trên Postgres (và mọi backend không phải SQLite).
-
-    `Base.metadata.create_all` chỉ tạo BẢNG mới; nó không bao giờ ALTER bảng đã
-    tồn tại. Deployment Postgres đã có sẵn bảng `campaign_metrics` từ lần chạy
-    trước nên cột `source` (phân biệt dữ liệu mẫu với dữ liệu thật) sẽ không
-    được tạo và mọi truy vấn `source` sẽ ném ProgrammingError.
-
-    Hàm chỉ làm ADD COLUMN với giá trị mặc định NULL — không phá dữ liệu đang có.
-    """
-    if str(db_engine.url).startswith("sqlite"):
-        return
-    checks = (
-        ("campaign_metrics", "source", "VARCHAR(20)"),
-        ("campaign_metrics", "content_id", "INTEGER"),
-        ("campaigns", "campaign_code", "VARCHAR(100)"),
-        ("campaigns", "funnel_stage", "VARCHAR(20) NOT NULL DEFAULT 'BoFU'"),
-        ("campaigns", "daily_budget_cap", "NUMERIC(12, 2)"),
-        ("campaigns", "tags_json", "TEXT DEFAULT '[]'"),
-        ("marketing_contents", "creative_angle", "VARCHAR(50)"),
-        ("marketing_contents", "hook_variant", "VARCHAR(50)"),
-        ("marketing_contents", "utm_params", "VARCHAR(500)"),
-        ("marketing_contents", "ai_metadata_json", "TEXT"),
-        ("marketing_contents", "blocks_json", "TEXT DEFAULT '[]'"),
-        # Revocation phiên đăng nhập: token cũ phải bị từ chối ngay khi cột này
-        # được thêm (mọi token phát hành trước đây coi như phiên 0 đã hết hiệu lực
-        # sau lần logout/đổi mật khẩu đầu tiên).
-        ("users", "token_version", "INTEGER NOT NULL DEFAULT 0"),
-        # Đánh dấu "số AI ước tính" (AI Campaign Planner). Dòng phân bổ/KPI tay
-        # giữ DEFAULT false; dòng do plan apply tạo nhận true.
-        ("campaign_budget_allocations", "is_ai_estimate", "BOOLEAN NOT NULL DEFAULT false"),
-        ("campaign_kpi_targets", "is_ai_estimate", "BOOLEAN NOT NULL DEFAULT false"),
-    )
-    # `exec_driver_sql` NHẬN SQL THÔ, không bind tham số. Dùng `:t`/`:c` ở đây
-    # sẽ được gửi thẳng xuống Postgres như chữ thường -> SyntaxError -> bị nuốt
-    # trong except -> cột KHÔNG BAO GIỜ được tạo -> mọi truy vấn `source` sau đó
-    # ném ProgrammingError và API trả 500. Đã xảy ra thật trên production.
-    # Vì tên bảng/cột nằm trong hằng số của chính file này (không phải input
-    # người dùng) nên nội suy trực tiếp là an toàn; `text()` được dùng cho
-    # phần so sánh để không phụ thuộc cú pháp bind của driver.
-    with db_engine.begin() as conn:
-        for table, column, coltype in checks:
-            exists = conn.execute(
-                text(
-                    "SELECT 1 FROM information_schema.columns "
-                    "WHERE table_name = :t AND column_name = :c"
-                ),
-                {"t": table, "c": column},
-            ).fetchone()
-            if exists:
-                continue
-            try:
-                conn.exec_driver_sql(
-                    f"ALTER TABLE {table} ADD COLUMN {column} {coltype}"
-                )
-                logger.info("Migration: added %s.%s", table, column)
-            except Exception:
-                # KHÔNG nuốt im lặng: đây là loại lỗi từng làm production trả 500
-                # mà không có dấu vết. Ghi cảnh báo để thấy được ngay.
-                logger.warning(
-                    "Migration FAILED to add %s.%s — các truy vấn cột này sẽ lỗi",
-                    table, column, exc_info=True,
-                )
-
-    # Index hot (idempotent): bảng campaign_tasks đã tồn tại từ trước nên
-    # create_all không bao giờ tạo thêm index mới cho chúng.
-    with db_engine.begin() as conn:
-        for index_sql in (
-            "CREATE INDEX IF NOT EXISTS idx_tasks_assignee_due ON campaign_tasks (assignee_id, due_date)",
-            "CREATE INDEX IF NOT EXISTS idx_tasks_workspace_status ON campaign_tasks (workspace_id, status)",
-            "CREATE INDEX IF NOT EXISTS ix_campaigns_campaign_code ON campaigns (campaign_code)",
-            "CREATE INDEX IF NOT EXISTS ix_campaign_metrics_content_id ON campaign_metrics (content_id)",
-        ):
-            try:
-                conn.exec_driver_sql(index_sql)
-            except Exception:
-                logger.warning("Migration FAILED: %s", index_sql, exc_info=True)
-
-    # Nới CHECK constraint `kind` của ai_jobs để nhận các loại job mới (Postgres có
-    # ALTER CONSTRAINT nên không cần dựng lại bảng như SQLite).
-    with db_engine.begin() as conn:
-        try:
-            required_kinds = (
-                "ideas", "draft", "summary", "omnichannel", "plan",
-                "angle_matrix", "prelaunch_critic", "deep_doctor", "batch_compliance_fix",
-            )
-            row = conn.execute(
-                text(
-                    "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
-                    "WHERE conname = 'chk_ai_job_kind' "
-                    "AND conrelid = 'ai_jobs'::regclass"
-                )
-            ).fetchone()
-            if row is None or not all(f"'{k}'" in row[0] for k in required_kinds):
-                allowed_sql = ", ".join(f"'{k}'" for k in required_kinds)
-                conn.exec_driver_sql("ALTER TABLE ai_jobs DROP CONSTRAINT IF EXISTS chk_ai_job_kind")
-                conn.exec_driver_sql(
-                    f"ALTER TABLE ai_jobs ADD CONSTRAINT chk_ai_job_kind "
-                    f"CHECK (kind IN ({allowed_sql}))"
-                )
-                logger.info("Migration: chk_ai_job_kind extended with new job kinds")
-        except Exception:
-            logger.warning(
-                "Migration FAILED to extend ai_jobs kind CHECK constraint",
-                exc_info=True,
-            )
-
-    with db_engine.begin() as conn:
-        try:
-            from app.services.ai.providers import SUPPORTED_PROVIDER_SLUGS
-            row = conn.execute(
-                text(
-                    "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
-                    "WHERE conname = 'chk_api_key_provider' "
-                    "AND conrelid = 'custom_api_keys'::regclass"
-                )
-            ).fetchone()
-            if row is None or not all(f"'{slug}'" in row[0] for slug in SUPPORTED_PROVIDER_SLUGS):
-                allowed_sql = ", ".join(f"'{slug}'" for slug in SUPPORTED_PROVIDER_SLUGS)
-                conn.exec_driver_sql("ALTER TABLE custom_api_keys DROP CONSTRAINT IF EXISTS chk_api_key_provider")
-                conn.exec_driver_sql(
-                    f"ALTER TABLE custom_api_keys ADD CONSTRAINT chk_api_key_provider "
-                    f"CHECK (provider IN ({allowed_sql}))"
-                )
-                logger.info("Migration: chk_api_key_provider synced with SUPPORTED_PROVIDER_SLUGS")
-        except Exception:
-            logger.warning(
-                "Migration FAILED to sync custom_api_keys provider CHECK constraint",
-                exc_info=True,
-            )
-

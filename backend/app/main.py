@@ -1,250 +1,88 @@
-import re
-import sys
-import time
+"""FastAPI application entrypoint for MarketFlow v2."""
+
+from __future__ import annotations
+
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+
+import httpx
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
-logger = logging.getLogger("marketflow.main")
-
+from app.api.v1 import api_v1_router
 from app.core.config import settings
-from app.api.v1.auth import router as auth_router
-from app.api.v1.campaigns import router as campaigns_router
-from app.api.v1.contents import router as contents_router
-from app.api.v1.metrics import router as metrics_router
-from app.api.v1.ai import router as ai_router
-from app.api.v1.ai_jobs import router as ai_jobs_router
-from app.api.v1.channels import router as channels_router
-from app.api.v1.schedules import router as schedules_router
-from app.api.v1.workspaces import router as workspaces_router
-from app.api.v1.brand_kit import router as brand_kit_router
-from app.api.v1.settings import router as settings_router
-from app.api.v1.notifications import router as notifications_router
-from app.api.v1.tasks import router as tasks_router
-from app.api.v1.export import router as export_router
-from app.api.v1.mcp import router as mcp_router
+from app.core.database import SessionLocal
+from app.core.errors import register_exception_handlers
 
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(application: FastAPI):
-    # Lifespan chạy trong event loop thật của ASGI server, nên start_scheduler_task()
-    # luôn tìm được running loop (khác với on_event startup của FastAPI bản cũ).
-    on_startup()
-    try:
-        yield
-    finally:
-        on_shutdown()
+async def lifespan(app: FastAPI):
+    # Validate production settings fail-fast
+    settings.validate_for_runtime()
+    yield
 
-
-API_DESCRIPTION = """
-Hệ thống quản lý chiến dịch marketing có tích hợp AI.
-
-## Phân trang (áp dụng cho MỌI endpoint trả về danh sách)
-
-Hợp đồng DUY NHẤT, mô tả bằng `Page[T]` (xem `app/core/pagination.py`).
-
-**Query**
-
-| Tham số | Mặc định | Ràng buộc |
-| --- | --- | --- |
-| `page` | `1` | `>= 1` |
-| `page_size` | `20` | `1 .. 100` |
-
-**Response**
-
-```json
-{
-  "items": [ ... ],
-  "total": 132,
-  "page": 1,
-  "page_size": 20,
-  "total_pages": 7,
-  "has_next": true,
-  "has_prev": false
-}
-```
-
-- `total` là tổng số bản ghi **sau khi lọc**, không phải số bản ghi của trang hiện tại.
-- `total_pages = ceil(total / page_size)`; bằng `0` khi không có bản ghi nào.
-- Lọc và sắp xếp (`search`, `status`, `sort`, ...) được áp **trước**, phân trang **sau**:
-  trang N luôn là N lát cắt của tập đã lọc và sắp xếp.
-- `page_size` vượt 100 trả `422` — tham số không trần là đường DoS, và instance
-  triển khai thật chỉ có 512 MB RAM.
-- Client cũ bỏ qua tham số phân trang vẫn nhận trang đầu tiên hợp lệ.
-
-## Hạn mức gói miễn phí (per-workspace)
-
-Khi vượt hạn mứng, API trả `429` với `detail` là object có `error: "quota_exceeded"`,
-`limit_code`, `limit`, `used`, `remaining`, `resets_at` để client hiển thị thông báo
-hành động được. Xem `app/services/quota.py` và `GET /workspaces/{id}/quota`.
-"""
 
 app = FastAPI(
     title=settings.APP_NAME,
-    description=API_DESCRIPTION,
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
     lifespan=lifespan,
+    docs_url="/docs" if not settings.is_production else None,
+    redoc_url="/redoc" if not settings.is_production else None,
 )
 
-# Timing Middleware ghi nhận độ trễ xử lý API và chèn header X-Process-Time
-class TimingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        start_time = time.perf_counter()
-        response = await call_next(request)
-        process_time = time.perf_counter() - start_time
-        response.headers["X-Process-Time"] = f"{process_time:.6f}"
-        return response
-
-app.add_middleware(TimingMiddleware)
-app.add_middleware(GZipMiddleware, minimum_size=500)
-
-# CORS Middleware hỗ trợ kết nối từ Frontend React
-#
-# `allow_origin_regex` là BẮT BUỘC: CORSMiddleware của Starlette so khớp
-# `allow_origins` theo chuỗi chính xác, nên một mục dạng "https://*.kienhieu.id.vn"
-# trong danh sách sẽ không bao giờ khớp. Regex mới là thứ thực sự cho phép subdomain.
-# Lưu ý: chỉ dùng `allow_origin_regex` (không dùng "*") vì cần `allow_credentials=True`.
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_origin_regex="|".join(settings.ALLOWED_ORIGIN_REGEXES) if settings.ALLOWED_ORIGIN_REGEXES else None,
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Process-Time"],
 )
 
-from fastapi.exception_handlers import request_validation_exception_handler
+# Exception handlers (CONTRACT §4)
+register_exception_handlers(app)
 
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    # So khớp theo đường dẫn, KHÔNG dùng `"/reject" in path`: bất kỳ đường dẫn nào
-    # chứa chuỗi "reject" (ví dụ /campaigns/1/contents/2/rejected-archive) cũng nhận
-    # cùng thông báo sai, và tra cứu chuỗi con trên URL là cách so khớp mong manh.
-    path = str(request.url.path)
-    if re.search(r"/contents/[^/]+/reject$", path):
-        return JSONResponse(
-            status_code=400,
-            content={"detail": "Vui lòng cung cấp lý do từ chối cụ thể (tối thiểu 3 ký tự)"}
-        )
-    return await request_validation_exception_handler(request, exc)
-
-# Đăng ký các Router nghiệp vụ
-app.include_router(auth_router, prefix=settings.API_V1_PREFIX)
-app.include_router(campaigns_router, prefix=settings.API_V1_PREFIX)
-app.include_router(contents_router, prefix=settings.API_V1_PREFIX)
-app.include_router(metrics_router, prefix=settings.API_V1_PREFIX)
-app.include_router(ai_router, prefix=settings.API_V1_PREFIX)
-app.include_router(ai_jobs_router, prefix=settings.API_V1_PREFIX)
-app.include_router(channels_router, prefix=settings.API_V1_PREFIX)
-app.include_router(schedules_router, prefix=settings.API_V1_PREFIX)
-app.include_router(workspaces_router, prefix=settings.API_V1_PREFIX)
-app.include_router(brand_kit_router, prefix=settings.API_V1_PREFIX)
-app.include_router(settings_router, prefix=settings.API_V1_PREFIX)
-app.include_router(notifications_router, prefix=settings.API_V1_PREFIX)
-app.include_router(tasks_router, prefix=settings.API_V1_PREFIX)
-app.include_router(export_router, prefix=settings.API_V1_PREFIX)
-app.include_router(mcp_router, prefix=settings.API_V1_PREFIX)
+# Include API v1 routes
+app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
 
 
-
-from app.core.database import init_db, DatabaseMigrationError
-from seed.seed_data import seed_data
-from app.services.scheduler.worker import start_scheduler_task, stop_scheduler_task
-from app.services.ai.job_worker import start_ai_job_worker, stop_ai_job_worker
-
-
-def on_startup():
+@app.get("/health", tags=["Hệ thống"])
+async def health_check():
+    # 1. Check Database
+    db_status = "error"
     try:
-        from app.core.database import engine as current_engine
-        init_db(current_engine)
-        is_production = str(settings.APP_ENV).strip().lower() == "production"
-        if is_production:
-            logger.info("APP_ENV=production: skipping demo seed data.")
-        else:
-            logger.info("Initializing automatic zero-cold-start seed data...")
-            seed_data()
-            logger.info("Database initialized and auto-seeded successfully.")
-        # Chay o ca dev va production: self-host khong co duong nao tao ADMIN
-        # qua API, nen moi deployment deu can bien moi truong nay.
-        from app.core.bootstrap_admin import run_bootstrap_admin
-        run_bootstrap_admin()
-    except DatabaseMigrationError as e:
-        logger.critical(f"Critical database migration error during startup: {e}", exc_info=True)
-        sys.exit(1)
-    except Exception as e:
-        logger.error(f"Error during database startup seed: {e}", exc_info=True)
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
+            db_status = "ok"
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Health check DB error: %s", exc)
+        db_status = "error"
 
-    # Worker hàng đợi AI bất đồng bộ (POST /ai/jobs -> GET /ai/jobs/{id}).
-    #
-    # Đây là đường thay thế cho các endpoint AI đồng bộ, vốn giữ thread suốt thời
-    # gian chờ LLM: `/ai/omnichannel` đo mất 237 giây trên Render free (512 MB) và
-    # bị Cloudflare cắt ở ~100 giây (error 524). Hàng đợi nằm trong chính CSDL và
-    # worker chỉ chạy tối đa `AI_JOB_CONCURRENCY` job đồng thời.
-    #
-    # KHỞI ĐỘNG TRƯỚC khối scheduler vì khối scheduler có `return` sớm khi
-    # `SCHEDULER_ENABLED=false` — mà đó đúng là cấu hình của bản deploy Cloudflare.
-    # Đặt sau đây thì trên bản deploy đó worker AI sẽ không bao giờ chạy.
-    #
-    # `start_ai_job_worker` tự bắt mọi lỗi và trả None. Cố ý không để lỗi ở đây
-    # làm hỏng startup: nếu không bật được worker thì API vẫn phải phục vụ được mọi
-    # route không liên quan tới AI, và job đã enqueue vẫn nằm an toàn trong hàng đợi.
-    start_ai_job_worker(app)
+    # 2. Check AI Runner
+    ai_status = "unknown"
+    if settings.AI_RUNNER_URL:
+        try:
+            url = f"{settings.AI_RUNNER_URL.rstrip('/')}/health"
+            headers = {}
+            if settings.AI_RUNNER_TOKEN:
+                headers["X-Runner-Token"] = settings.AI_RUNNER_TOKEN
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                resp = await client.get(url, headers=headers)
+                if resp.status_code == 200:
+                    ai_status = "ok"
+                else:
+                    ai_status = "error"
+        except Exception:  # noqa: BLE001
+            ai_status = "error"
 
-    # Scheduler nền.
-    #
-    # Vì sao cần công tắc tắt: trên Cloudflare, container được evict sau
-    # `sleepAfter` (10m) và dữ liệu chỉ được đẩy lên R2 qua `persistSnapshot()`
-    # sau MỖI HTTP write. Nếu scheduler chạy trong container, nó ghi
-    # APPROVED -> PUBLISHED thẳng vào SQLite mà không đi qua HTTP, nên thay đổi đó
-    # KHÔNG được snapshot. Khi container bị evict, bài đã "đăng" biến mất âm
-    # thầm — mà không có lỗi nào được ghi ra. Đặt SCHEDULER_ENABLED=false để
-    # tắt scheduler trong container và để lớp Durable Object điều phối thay.
-    if not settings.SCHEDULER_ENABLED:
-        logger.info(
-            "SCHEDULER_ENABLED=false: bo qua scheduler nen trong tien trinh. "
-            "Voi Cloudflare, lich dang nen duoc Durable Object xu ly de dam bao duoc snapshot."
-        )
-        return
-    try:
-        start_scheduler_task(app)
-        logger.info("Background scheduler task initiated on startup.")
-    except Exception as e:
-        logger.error(f"Error starting scheduler task: {e}", exc_info=True)
+    overall_status = "ok" if db_status == "ok" else "error"
+    if db_status == "ok" and ai_status == "error":
+        overall_status = "degraded"
 
-
-def on_shutdown():
-    try:
-        stop_ai_job_worker(app)
-    except Exception as e:
-        logger.error(f"Error stopping AI job worker: {e}", exc_info=True)
-
-    try:
-        stop_scheduler_task(app)
-        logger.info("Background scheduler task stopped cleanly on shutdown.")
-    except Exception as e:
-        logger.error(f"Error stopping scheduler task: {e}", exc_info=True)
-
-
-@app.get("/")
-def root():
     return {
-        "status": "online",
-        "app_name": settings.APP_NAME,
-        "docs_url": "/docs",
-        "api_v1": settings.API_V1_PREFIX
+        "status": overall_status,
+        "db": db_status,
+        "ai_runner": ai_status,
     }
-
-@app.get("/health")
-@app.get(f"{settings.API_V1_PREFIX}/health")
-def health_check():
-    return {"status": "healthy"}
-

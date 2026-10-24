@@ -1,0 +1,92 @@
+"""Test xác thực /auth/* (CONTRACT §4, §10)."""
+
+from __future__ import annotations
+
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+from app.core.security import login_rate_limiter
+from app.models import User
+
+
+def test_login_success(client: TestClient, manager_user: User):
+    resp = client.post("/api/v1/auth/login", json={"email": manager_user.email, "password": "Manager@123"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
+    assert data["user"]["email"] == manager_user.email
+    assert data["user"]["role"] == "MANAGER"
+
+
+def test_login_wrong_password(client: TestClient, manager_user: User):
+    resp = client.post("/api/v1/auth/login", json={"email": manager_user.email, "password": "WrongPassword@123"})
+    assert resp.status_code == 401
+    err = resp.json()["detail"]
+    assert err["code"] == "INVALID_CREDENTIALS"
+
+
+def test_login_rate_limit(client: TestClient, manager_user: User):
+    login_rate_limiter.reset()
+    # 5 failed attempts
+    for _ in range(5):
+        resp = client.post("/api/v1/auth/login", json={"email": manager_user.email, "password": "BadPassword1"})
+        assert resp.status_code == 401
+
+    # 6th attempt should be rate limited (429)
+    resp = client.post("/api/v1/auth/login", json={"email": manager_user.email, "password": "BadPassword1"})
+    assert resp.status_code == 429
+    err = resp.json()["detail"]
+    assert err["code"] == "LOGIN_RATE_LIMITED"
+    assert "Retry-After" in resp.headers
+
+    login_rate_limiter.reset()
+
+
+def test_login_disabled_account(client: TestClient, db: Session, manager_user: User):
+    manager_user.is_active = False
+    db.commit()
+
+    resp = client.post("/api/v1/auth/login", json={"email": manager_user.email, "password": "Manager@123"})
+    assert resp.status_code == 403
+    assert resp.json()["detail"]["code"] == "ACCOUNT_DISABLED"
+
+
+def test_me_endpoint(client: TestClient, manager_headers: dict[str, str], manager_user: User):
+    resp = client.get("/api/v1/auth/me", headers=manager_headers)
+    assert resp.status_code == 200
+    assert resp.json()["id"] == manager_user.id
+    assert resp.json()["email"] == manager_user.email
+
+
+def test_logout_revokes_token(client: TestClient, manager_headers: dict[str, str]):
+    # Check me works
+    resp = client.get("/api/v1/auth/me", headers=manager_headers)
+    assert resp.status_code == 200
+
+    # Logout
+    resp = client.post("/api/v1/auth/logout", headers=manager_headers)
+    assert resp.status_code == 200
+
+    # Check old token is now revoked
+    resp = client.get("/api/v1/auth/me", headers=manager_headers)
+    assert resp.status_code == 401
+    assert resp.json()["detail"]["code"] == "TOKEN_REVOKED"
+
+
+def test_change_password(client: TestClient, marketer1_headers: dict[str, str], marketer1_user: User):
+    resp = client.post(
+        "/api/v1/auth/change-password",
+        headers=marketer1_headers,
+        json={"current_password": "Marketer@123", "new_password": "NewSecretPass456"},
+    )
+    assert resp.status_code == 200
+    new_token = resp.json()["access_token"]
+
+    # Old token is revoked
+    old_resp = client.get("/api/v1/auth/me", headers=marketer1_headers)
+    assert old_resp.status_code == 401
+
+    # New token works
+    new_resp = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {new_token}"})
+    assert new_resp.status_code == 200
