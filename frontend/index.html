@@ -4,32 +4,17 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hệ thống Quản lý Chiến dịch Marketing tích hợp AI | AIA331</title>
-
-    <!-- SEO cơ bản cho trang công khai duy nhất (trang đăng nhập).
-         Lighthouse từng báo "Document does not have a meta description". -->
+    <title>MarketFlow — Quản lý chiến dịch marketing</title>
     <meta
       name="description"
-      content="MarketFlow AI là nền tảng điều phối chiến dịch marketing tích hợp AI: lập kế hoạch, phê duyệt nội dung, lịch xuất bản và đo hiệu quả đa kênh trong một nơi duy nhất."
+      content="MarketFlow: lập kế hoạch chiến dịch, soạn và duyệt nội dung, lập lịch đăng và theo dõi số liệu marketing đa kênh, có trợ lý AI hỗ trợ soạn thảo."
     />
-    <meta property="og:type" content="website" />
-    <meta property="og:title" content="MarketFlow AI — Điều phối chiến dịch marketing tích hợp AI" />
-    <meta
-      property="og:description"
-      content="Lập kế hoạch, phê duyệt, xuất bản và đo hiệu quả chiến dịch marketing đa kênh — có AI hỗ trợ sáng tạo nội dung và chẩn đoán hiệu suất."
-    />
-    <meta property="og:locale" content="vi_VN" />
-
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@500;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="preload" href="/fonts/plus-jakarta-sans-vietnamese.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/plus-jakarta-sans-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <meta name="color-scheme" content="light dark" />
+    <!-- Áp dụng giao diện sáng/tối trước khi React render để tránh nháy màn hình.
+         Đặt ở file riêng vì CSP chặn inline script. -->
+    <script src="/theme-init.js"></script>
   </head>
-  <body class="bg-[#F6F5F0] text-[#121316] font-sans antialiased">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
