@@ -1,20 +1,20 @@
 # /etc/systemd/system/marketflow-api.service
 #
-# Tiến trình FastAPI cho MarketFlow AI (Production VPS — 2 vCPU / 2 GiB RAM).
-# Đồng bộ 100% với cấu hình thực tế trên VPS:
-# - Đọc biến môi trường từ /opt/marketflow/backend/.env
-# - Chạy 2 Uvicorn workers với --timeout-keep-alive 75 (khớp keepalive của Nginx/Cloudflare)
-# - Giới hạn bộ nhớ MemoryHigh/MemoryMax bảo vệ VPS 2 GiB RAM khỏi OOM killer.
+# Tien trinh FastAPI cho MarketFlow v2 (Production VPS — 2 vCPU / 2 GiB RAM).
+# - Doc bien moi truong tu /opt/marketflow/backend/.env
+# - Chay 1 Uvicorn worker toi uu RAM cho VPS 2 GiB
+# - Gioi han bo nho MemoryHigh/MemoryMax bao ve VPS khoi OOM killer
+# - Khong phu thuoc vao $HOME, ProtectHome=true bao ve he thong
 #
-# Cài đặt / Cập nhật:
+# Cai dat / Cap nhat:
 #   sudo cp deploy/vps/marketflow-api.service /etc/systemd/system/
 #   sudo systemctl daemon-reload
-#   sudo systemctl enable --now marketflow-api
+#   sudo systemctl restart marketflow-api
 #   sudo systemctl status marketflow-api
 
 [Unit]
-Description=MarketFlow AI — FastAPI backend (Production VPS)
-After=network-online.target
+Description=MarketFlow AI — FastAPI backend v2 (Production VPS)
+After=network-online.target postgresql.service
 Wants=network-online.target
 
 [Service]
@@ -23,13 +23,12 @@ User=marketflow
 Group=marketflow
 WorkingDirectory=/opt/marketflow/backend
 
-# Tệp .env chứa SECRET_KEY, BYOK_ENCRYPTION_KEY, AI_API_KEY (chmod 600).
+# Tep .env chua DATABASE_URL, JWT_SECRET, AI_RUNNER_TOKEN... (chmod 600)
 EnvironmentFile=/opt/marketflow/backend/.env
 Environment="PYTHONUNBUFFERED=1"
 Environment="PYTHONDONTWRITEBYTECODE=1"
 Environment="HOME=/opt/marketflow"
 
-# 1 worker async Uvicorn tối ưu bộ nhớ RAM cho VPS 2 GiB (tiết kiệm ~140 MB RAM so với 2 workers).
 ExecStart=/opt/marketflow/.venv/bin/uvicorn app.main:app \
     --host 127.0.0.1 \
     --port 8000 \
@@ -44,18 +43,18 @@ Restart=always
 RestartSec=3
 TimeoutStopSec=30
 
-# Giới hạn tài nguyên cho VPS 2 vCPU / 2 GiB RAM (tránh OOM toàn máy)
+# Gioi han tai nguyen cho VPS 2 vCPU / 2 GiB RAM (tranh OOM toan may)
 MemoryHigh=512M
 MemoryMax=768M
 CPUQuota=180%
 LimitNOFILE=65535
 
-# Hardening cơ bản của systemd
+# Hardening systemd
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/marketflow /opt/marketflow/backend/data /opt/marketflow/backend
+ReadWritePaths=/opt/marketflow /opt/marketflow/backend
 
 StandardOutput=journal
 StandardError=journal

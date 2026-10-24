@@ -1,569 +1,235 @@
-# Triển khai native trên CloudCode VPS
+# Hướng Dẫn Triển Khai Production — MarketFlow v2 (Ubuntu VPS)
 
-## Đánh giá hiện tại
+Tài liệu này là **nguồn sự thật duy nhất** về kiến trúc vận hành, cấu hình dịch vụ, quy trình triển khai, sao lưu và xử lý sự cố cho hệ thống **MarketFlow v2** trên máy chủ CloudCode VPS (Ubuntu 24.04 LTS, 2 vCPU, 2 GiB RAM, 40 GiB NVMe).
 
-VPS có 2 vCPU, 2 GiB RAM và 30 GB đĩa. Số liệu lần kiểm tra gần nhất là khoảng
-393 MiB RAM khi máy gần rảnh. Cơ sở dữ liệu production khoảng 34 MB. Cấu hình này
-đủ cho ứng dụng hiện tại ở mức tải thấp đến vừa, miễn là giới hạn tác vụ AI đồng
-thời và không chạy mô hình AI tại VPS.
+---
 
-Ứng dụng có frontend React/Vite, API FastAPI, PostgreSQL và hàng đợi AI được lưu
-trong PostgreSQL. Worker AI cùng scheduler được khởi động trong vòng đời FastAPI;
-không cần Redis hay Celery. Tác vụ AI gọi nhà cung cấp bên ngoài, vì vậy thời
-gian chờ mô hình chiếm ưu thế hơn CPU của VPS.
+## 1. Sơ Đồ Kiến Trúc & Cổng Dịch Vụ
 
-## Bố trí runtime
-
-- PostgreSQL 16.15 chỉ nghe trên loopback; không mở cổng 5432 ra Internet.
-- FastAPI chạy dưới tài khoản hệ thống `marketflow`, nghe tại `127.0.0.1:8000`
-  (1 Uvicorn worker tối ưu RAM ~80–114 MB, xem mục trạng thái bên dưới).
-- Nginx phục vụ frontend tĩnh và proxy `/api/` tới FastAPI; Nginx chỉ nghe trên
-  `127.0.0.1:8080`.
-- Cloudflare Tunnel được quản lý trong Cloudflare Dashboard và trỏ
-  `marketing.kienhieu.id.vn` tới Nginx tại `http://127.0.0.1:8080`. Frontend và
-  API dùng chung hostname, nên không cần cấu hình CORS cho API hostname riêng.
-- Frontend được build thành file tĩnh. Node không cần chạy sau khi build.
-
-File trong `deploy/vps/` là **bản chép nguyên từ máy chủ thật**, không phải bản
-mẫu giả định đường dẫn. Nó dùng source `/opt/marketflow`, giao diện đã build ở
-`/var/www/marketflow`, env production `/opt/marketflow/backend/.env` (quyền 600,
-chỉ user `marketflow` đọc) và nginx nghe `127.0.0.1:8080`. Dựng lại VPS từ repo
-sao chép trực tiếp các file này là có đúng cấu hình đang chạy.
-
-## Giới hạn tài nguyên
-
-Đặt các biến sau trong env production:
-
-```dotenv
-APP_ENV=production
-DATABASE_URL=postgresql://marketflow:<mat-khau-hex>@127.0.0.1:5432/marketflow
-SCHEDULER_ENABLED=true
-AI_JOB_WORKER_ENABLED=true
-AI_JOB_CONCURRENCY=1
-AI_JOB_TIMEOUT_SECONDS=300
-AI_JOB_POLL_INTERVAL_SECONDS=2
-AI_JOB_RETENTION_DAYS=7
+```
+[ Internet / Người dùng ]
+           │
+           ▼
+[ Cloudflare Edge ] (Tên miền: https://marketing.kienhieu.id.vn/)
+           │
+           │ (Cloudflare Tunnel: cloudflared-tunnel.service)
+           ▼
+[ Nginx Reverse Proxy ] (127.0.0.1:8080)
+   ├── Phục vụ Frontend SPA tĩnh: /var/www/marketflow
+   ├── Chặn tuyệt đối truy cập ngoài vào /mcp -> HTTP 404
+   ├── Proxy /api/v1/assistant/ (SSE streaming: no-buffering, timeout 300s)
+   └── Proxy /api/ -> FastAPI Backend (127.0.0.1:8000)
+           │
+           ▼
+[ FastAPI Backend ] (marketflow-api.service — User: marketflow, 127.0.0.1:8000)
+   ├── CSDL: PostgreSQL 16 (127.0.0.1:5432, Database: marketflow_v2)
+   ├── Streamable-HTTP FastMCP server mount tại /mcp
+   └── Gọi AI Runner qua HTTP nội bộ: 127.0.0.1:8100 (Header: X-Runner-Token)
+           │
+           ▼
+[ AI Runner Service ] (marketflow-ai-runner.service — User: mfai, 127.0.0.1:8100)
+   ├── Hàng đợi tuần tự (Concurrency = 1, MemoryMax = 896M)
+   ├── Khởi tạo tiến trình con: opencode run --agent marketflow
+   │     └── Gọi ngược lại MCP Backend (127.0.0.1:8000/mcp/) bằng Bearer run-token
+   └── Kết nối ra ngoài tới OpenCode Zen (Model: big-pickle / glm-5.3-flash)
 ```
 
-Tạo mật khẩu PostgreSQL chỉ gồm ký tự hex để tránh phải URL-encode trong
-`DATABASE_URL`. `SECRET_KEY`, `JWT_SECRET_KEY` và `BYOK_ENCRYPTION_KEY` phải là
-secret production mạnh. Cần giữ nguyên `BYOK_ENCRYPTION_KEY` hiện dùng để đọc
-các API key đã mã hóa trong DB. Không đưa secret vào repo hoặc log.
-
-PostgreSQL nên giữ `shared_buffers` khoảng 128 MB, `work_mem` 4 MB và
-`max_connections` khoảng 30. Chỉ tăng `AI_JOB_CONCURRENCY` khi đã theo dõi RAM
-thực tế và có nhu cầu xử lý song song. Không chạy nhiều Uvicorn worker vì mỗi
-tiến trình sẽ khởi động worker AI và scheduler riêng.
-
-## Kế hoạch chuyển đổi an toàn
-
-1. Cài PostgreSQL, Nginx, Python virtualenv và `cloudflared`; tạo user hệ thống
-   không có quyền đăng nhập tương tác. PostgreSQL hướng dẫn cài bản 16 trên
-   Ubuntu 24.04 qua PGDG apt repository trong
-   [tài liệu chính thức](https://www.postgresql.org/download/linux/ubuntu/).
-2. Chuyển source từ repo hiện tại, cài dependency vào virtualenv và build
-   frontend với `VITE_API_URL=/api/v1`, `VITE_AI_API_URL` để trống.
-3. Tạo PostgreSQL local, restore bản dump thử và đối chiếu bảng, tài khoản cùng
-   số bản ghi trước khi đổi traffic.
-4. Tạo Tunnel trong Cloudflare Dashboard, cài `cloudflared` service bằng tunnel
-   token và đặt hostname route vào Nginx. Tunnel mở kết nối đi ra Cloudflare,
-   không cần mở cổng ứng dụng vào Internet; xem
-   [tài liệu Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/).
-   Khởi động API, scheduler, Nginx và Tunnel; kiểm tra health/API/login qua
-   hostname thử nghiệm.
-5. Sao lưu lần cuối, tạm dừng ghi trong lúc chuyển dữ liệu cuối, rồi mới chuyển
-   route của domain. Giữ Render và Neon sẵn sàng rollback cho tới khi xác nhận
-   app và dữ liệu hoạt động ổn định.
-6. Thiết lập backup PostgreSQL hằng ngày, kiểm tra khôi phục và theo dõi RAM,
-   swap, dung lượng đĩa, log lỗi API và `pg_stat_activity`.
-
-## Kế hoạch chỉnh code
-
-- Giữ queue AI hiện có làm đường gọi chính trên UI; nó trả job ID nhanh và lưu
-  trạng thái trong PostgreSQL.
-- Dùng một API origin cùng domain. Sau khi rà soát các luồng còn gọi endpoint AI
-  đồng bộ, có thể bỏ cơ chế `VITE_AI_API_URL` riêng cho Render và cập nhật các
-  chú thích cũ nói request AI phải bypass Worker.
-- Giữ endpoint đồng bộ để tương thích trong giai đoạn đầu; không xóa API công khai
-  trong cùng lần chuyển hạ tầng.
-- Không đổi thuật toán nghiệp vụ hoặc schema chỉ để phục vụ VPS. Mọi thay đổi
-  nguồn cần phân tích GitNexus và giữ cấu hình production tách khỏi mặc định dev.
-
-## Rủi ro vận hành
-
-VPS đơn là một điểm lỗi duy nhất. Backup trên cùng đĩa không bảo vệ khi hỏng VPS;
-cần có bản sao ngoài VPS và phải thử restore. Chuyển domain chỉ thực hiện sau khi
-đã kiểm tra bản chạy mới và có thể quay lại Render/Neon.
-Khi chuyển hostname đang gắn với Cloudflare Worker, chỉ đổi route của
-`marketing.kienhieu.id.vn`; giữ nguyên các DNS record email.
-
-## Trạng thái đã triển khai (2026-10-09)
-
-Phần trên là kế hoạch. Dưới đây là những gì đã thực sự chạy và đã kiểm chứng.
-
-| Hạng mục | Giá trị thực tế |
-| --- | --- |
-| Máy chủ | CloudCode NAT, Ubuntu 24.04, 2 vCPU, 2 GiB RAM, 30 GiB đĩa |
-| SSH | `vn-hn.cloudcode.io.vn` cổng `30513`, key `marketflow_vps_ed25519` |
-| Python | 3.12.3 hệ thống; venv ứng dụng Python 3.11.17 |
-| PostgreSQL | 16.15, `shared_buffers` 384 MB, `max_connections` 40 |
-| Nginx | 1.24.0, nghe `127.0.0.1:8080` |
-| Cloudflared | 2026.10.0, tunnel `marketflow-prod` |
-| Source | `/opt/marketflow`, venv `/opt/marketflow/.venv` |
-| Cấu hình | `/opt/marketflow/backend/.env` (quyền 600) |
-| Giao diện tĩnh | `/var/www/marketflow` |
-| Domain | `https://marketing.kienhieu.id.vn` |
-
-Dịch vụ systemd: `marketflow-api` (1 Uvicorn worker, `MemoryHigh=512M`, `MemoryMax=768M`, AI
-concurrency 1) và `cloudflared-tunnel`.
-
-### Ba sai lệch phát hiện khi dựng thật
-
-Tài liệu và hướng dẫn ban đầu đều dự đoán, phần này ghi lại điều thực tế:
-
-1. **QUIC bị chặn.** Mạng VPS không mở UDP/443 nên tunnel thử QUIC rồi timeout.
-   Buộc dùng `protocol: http2` trong `/etc/cloudflared/config.yml`.
-2. **`.env` phải nằm trong `backend/`.** `config.py` tính đường dẫn tương đối
-   tới chính nó; đặt ở thư mục gốc khiến app từ chối `SECRET_KEY`.
-3. **Lệch phiên bản PostgreSQL.** Kế hoạch ghi bản 18; máy chủ đã có 16.15 từ
-   khoá Ubuntu nên dùng bản 16 cho khớp.
-
-### Đã kiểm chứng bằng thực thi, không phải giả định
-
-- Health, trang chủ, đăng nhập ADMIN, các endpoint có phân trang: HTTP 200.
-- Dashboard báo `real_rows: 0` — cơ sở dữ liệu sạch, không còn dữ liệu mẫu.
-- **AI thật**: job chạy 100 giây, `is_fallback=false`, model `space-bunny-free`,
-  không phải fallback mô phỏng.
-- **Sao lưu đã thử khôi phục**: phục hồi vào cơ sở dữ liệu tạm được 20 bảng và
-  1 user, khớp với bản gốc. Lịch 03:00 hằng ngày, giữ 7 bản mới nhất.
-
-### Hạ tầng cũ đã gỡ
-
-Render (`marketflow-api`, `marketflow-db`), Neon (`marketflow-prod`), Cloudflare
-Worker (`marketflow-kienhieu`) và Pages (`marketflow`) đều đã xoá. `render.yaml`
-và `cloudflare/wrangler.jsonc` đã xoá khỏi repo để không bị tái tạo ngoài ý muốn.
-
-### Việc còn lại
-
-- Xoá `/opt/marketflow/.env` trùng thừa (app đọc bản trong `backend/`) — **đã xoá**.
-- App chạy bằng `User=root` — **đã chuyển** sang user `marketflow`, không đặc quyền.
-- Bản sao lưu cùng đĩa — **đã thêm** lớp offsite, xem mục cuối.
-- Rate limit gộp mọi người vào một IP — **đã sửa** dùng `CF-Connecting-IP`.
-
-## Sao lưu và cảnh báo (2026-10-09, đã chạy thật)
-
-Phần trên là kế hoạch. Toàn bộ mục việc còn lại đã được xử lý.
-
-### Trên VPS
-
-- Sao lưu PostgreSQL 03:00 hằng ngày qua `/etc/cron.d/marketflow-backup`,
-  script `/usr/local/bin/marketflow-backup`, giữ 7 bản mới nhất.
-- App chạy bằng user hệ thống `marketflow`; file `settings.env` đặt ở
-  `/opt/marketflow/backend/` và chỉ user `marketflow` đọc được.
-- Mỗi lần kéo bản mới, người dùng kiểm tra `pull.log` ở
-  `%USERPROFILE%\marketflow-backups\`; monitor ghi ra `monitor.log` cùng chỗ.
-- Bộ giới hạn đăng nhập dùng `CF-Connecting-IP` (IP thật) do nginx chuyển tiếp,
-  thay vì phần đầu `X-Forwarded-For` chứa IP điểm vào của Cloudflare.
-
-### Ngoài VPS — bản sao lưu thật sự an toàn
-
-Trước đây bản sao lưu chỉ nằm trên cùng đĩa VPS nên **không cứu được lỗi phần
-cứng**. Nay có thêm lớp thứ hai: **máy tính của người vận hành kéo bản về** qua
-`marketflow-pull-backup.ps1` (lịch Windows `MarketFlow-Offsite-Backup`, 04:00 và
-09:00 hằng ngày, giữ 7 phiên bản). Vì VPS không biết địa chỉ máy cá nhân (NAT,
-Windows không có sshd), nên chiều khả thi là **máy cá nhân chủ động kéo**.
-
-Các script (đặt ở `%USERPROFILE%`):
-
-| Script | Vai trò |
-|---|---|
-| `marketflow-pull-backup.ps1` | Yêu cầu VPS tạo bản mới, kéo về, giữ 7 bản |
-| `marketflow-monitor.ps1` | Kiểm tra domain + nội bộ VPS, ghi log, báo hỏng |
-| `marketflow-verify-offsite.ps1` | Phục hồi bản local vào DB tạm trên VPS, so sánh |
-| `marketflow-offsite-verify.sh` | Script tập trung chạy trên VPS |
-| `marketflow-register-backup.ps1` | Đăng ký Task Scheduler |
-
-### Đã kiểm chứng bằng thực thi, không phải giả định
-
-- **Sao lưu trong VPS**: phục hồi vào DB tạm, 20 bảng và 1 user khớp bản gốc.
-- **Sao lưu offsite**: kéo từ VPS về máy cá nhân, giải nén (2332 dòng, 20
-  `CREATE TABLE`), đẩy lên VPS và phục hồi vào DB tạm — kết quả
-  `goc=20 · khoi-phuc=20 · users goc=1 · khoi-phuc=1`. Đã chạy lại hai lần cho
-  chắc, không chỉ một lần may mắn.
-- **Cảnh báo**: `health OK: healthy`, trang chủ 200, VPS nội bộ 200 — kiểm tra
-  cả tầng Cloudflare lẫn tầng VPS để biết lỗi nằm ở đâu.
-
-### Rủi ro còn lại
-
-- Máy cá nhân phải **bật** vào lúc 04:00 hoặc 09:00 mới kéo được; Task có
-  `StartWhenAvailable` nên nếu tắt máy sẽ tự bù trong vòng 2 ngày.
-- Bản local lưu dạng `.sql.gz` trên ổ `C:`. Hỏng ổ `C:` thì mất cả hai lớp.
-  Nếu muốn an toàn tuyệt đối, cần đẩy lên Cloudflare R2 hoặc ổ di động.
-
-## Đồng bộ nginx và nén (2026-10-10)
-
-### Lỗi 404 ở `/assets/` — nguyên nhân thật
-
-Mọi file dưới `/assets/` trả 404 khiến trang mở không ra giao diện. Nghi vấn đầu
-tiên là `try_files`, nhưng nginx không phải thủ phạm: thư mục assets đang chế độ
-không cho user `www-data` đọc. Sửa bằng `chmod 755` cho cả `/var/www/marketflow`
-và `/var/www/marketflow/assets`.
-
-Bài học được ghi vào repo: file nginx trong git trước đó chỉ là bản mẫu chưa
-từng chạy — giả định `/srv/marketflow/frontend`, timeout 120s, thiếu cả
-`CF-Connecting-IP`. Dựng lại VPS từ bản đó sẽ tái xuất hiện lỗi vừa sửa. File
-trong `deploy/vps/` nay là bản chép nguyên từ máy chủ, các điểm khác biệt so với
-bản mẫu cũ đều có lý do:
-
-| Khác biệt | Vì sao |
-| --- | --- |
-| `upstream` + `keepalive 8` | Tái dùng kết nối tới FastAPI, đỡ TCP handshake mỗi request |
-| `proxy_read_timeout 600s` | Tác vụ AI chạy 80–240 giây; bản mẫu 120s sẽ cắt ngang job |
-| `CF-Connecting-IP` / `CF-IPCountry` | App và giới hạn đăng nhập cần IP thật, không phải IP Cloudflare |
-| `expires 30d` + `try_files` trong `/assets/` | Cache file có hash trong tên; 404 đúng khi file thật sự không có |
-| `gzip` cho `text/*`, JSON, SVG | JS ~138 KB + CSS ~95 KB nén còn ~70 KB tổng |
-| `location /health` | Health độc lập, không lẫn với route `/api/` |
-
-Thêm `deploy/vps/nginx-mf-probe.conf` — vhost `127.0.0.1:8099` in ra header
-Cloudflare gửi tới, dùng để kiểm chứng IP thật khi nghi ngờ rate limit.
-
-### Việc còn dở
-
-- **TLS 1.3 đã có sẵn**, không phải việc còn dở. TLS kết thúc tại Cloudflare
-  edge chứ không tại VPS (nginx chỉ nghe loopback). Kiểm chứng bằng
-  `openssl s_client -tls1_3`: bắt tay ra `TLSv1.3, TLS_AES_256_GCM_SHA384`.
-  Dashboard đặt mức tối thiểu là 1.2 — nên giữ nguyên, nâng lên 1.3 chỉ chặn
-  client cũ mà không được lợi ích gì thêm vì bản 1.3 đã được chọn thật.
-- **`marketflow-api.service` trong repo vẫn là bản mẫu đã lệch**: thực tế chạy
-  `--workers 2 --timeout-keep-alive 75`, env ở `/opt/marketflow/backend/.env`,
-  không dùng `--proxy-headers`. Chưa đồng bộ vì chưa cần dựng lại máy chủ; nếu
-  giữ repo làm nguồn dựng lại thì phải sửa cùng đợt.
-- **Resend**: code xong (`EMAIL_PROVIDER=resend`, `RESEND_API_KEY`,
-  `EMAIL_FROM_ADDRESS`), đang đặt `none`. Cần người vận hành tạo key ở
-  resend.com và xác thực domain gửi, rồi dán biến vào `/opt/marketflow/backend/.env`
-  trên VPS và khởi động lại `marketflow-api`.
-
-## Đo Lighthouse / Core Web Vitals (2026-10-10)
-
-Đo bằng Chrome DevTools MCP trên trang chủ, desktop, không bóp CPU/mạng. Hệ
-thống chưa có dữ liệu CrUX thật nên con số dưới đây là **lab**, đo từ máy vận
-hành ở Việt Nam.
-
-### Điểm
-
-| Chỉ số | Giá trị | Ngưỡng | Kết luận |
-| --- | --- | --- | --- |
-| LCP | 1.769 ms | < 2.5 s | Tốt |
-| CLS | 0,00 | < 0,1 | Tốt |
-| TTFB | 210 ms | < 800 ms | Tốt |
-| Lighthouse a11y | 96 | — | Tốt |
-| Lighthouse best-practices | 77 | — | Cần xem |
-| Lighthouse SEO | 82 | — | Cần xem |
-
-LCP gồm TTFB 210 ms + độ trễ render 1.559 ms. Độ trễ render chiếm 88 % và là
-chi phí tất yếu của SPA: phải tải và chạy xong React mới vẽ được chữ đầu tiên.
-Cách giảm là bớt JS phải chạy trước khi vẽ, không phải sửa nginx.
-
-### Phát hiện, xếp theo mức đáng sửa
-
-1. **`/robots.txt`, `/sitemap.xml`, `/favicon.ico` trả về trang HTML.** Nginx
-   `location /` đẩy mọi đường dẫn thiếu về `index.html`, nên bot xin
-   `robots.txt` nhận nguyên trang HTML (trạng thái 200,
-   `content-type: text/html`) — Lighthouse báo *robots.txt is not valid, 21
-   errors*. Mọi URL vô nghĩa cũng trả 200 HTML thay vì 404, làm bẩn dữ liệu
-   crawl. Cách sửa: đặt `robots.txt` thật vào `frontend/public/` và cho nginx
-   trả 404 cho `.txt`/`.xml`/`.ico` thay vì fallback về SPA.
-2. **Không có `meta description`.** Trang chủ chỉ có `<title>`. Thêm một thẻ
-   mô tả khoảng 150 ký tự là xong việc này.
-3. **Nhiều API bị gọi trùng trên một lần tải trang**: `/campaigns` 4 lần,
-   `/analytics/dashboard` 5 lần, `/contents` 5 lần. Các component tự fetch
-   không dùng cache chung nên cứ vào trang là dội lại hết. Trên VPS 2 vCPU việc
-   này cộng thêm tải thật; phía UI cũng phải hiện skeleton lâu hơn. Cách sửa:
-   một query cache dùng chung (React Query với `staleTime`, hoặc context giữ
-   kết quả) để các component đọc lại thay vì tự gọi.
-4. **Google Fonts chặn render và là bên thứ ba.** `<link>` tới
-   `fonts.googleapis.com` nằm trong `<head>` nên chặn vẽ đầu tiên; sau đó còn
-   3 file woff2 từ `fonts.gstatic.com`. Trang chỉ cần tiếng Việt và latin — tự
-   host hai subset đó rồi `preload` sẽ bỏ được cả lối tắt DNS/TLS sang bên thứ
-   ba, và cache 30 ngày qua `assets/` luôn. Tách subset xong còn bỏ được
-   cyrillic-ext chưa ai dùng.
-5. ~~**Cloudflare đang trả gzip chứ không phải brotli.**~~ **Đã làm** (phiên
-   2026-10-12 chiều): cài `libnginx-mod-http-brotli-filter` trên VPS và bật
-   `brotli on` trong nginx. Request `accept-encoding: br` giờ trả
-   `content-encoding: br` (xác minh qua CF: HTML 2237 B identity → 904 B
-   brotli). Gzip giữ nguyên làm fallback cho client không ho tro br. Xem
-   bảng audit ở cuối tài liệu.
-6. **Dữ liệu mẫu nằm trong bundle production.** Các hằng `MOCK_CAMPAIGNS`,
-   `MOCK_CHANNEL_ATTRIBUTION` trong `frontend/src/services/mockData.ts` nằm
-   trong `index-*.js` phục vụ mọi lượt vào trang. Nếu chỉ là dự phòng khi API
-   lỗi/offline, nên tách sang import động để first-load khỏi tải.
-7. Nặng nhỏ còn lại: `LegacyJavaScript` 10,6 kB code hỗ trợ trình duyệt cũ;
-   favicon vẫn là `/vite.svg` mặc định của Vite.
-
-Lỗi `errors-in-console` mà Lighthouse bắt được là `chrome-extension://invalid/`
-— lỗi của extension trong máy vận hành, không phải của trang.
-
-## Phiên 2026-10-10 (buổi chiều)
-
-### Sự cố cần biết: VPS ngỏng lúc ~12:35
-
-Domain trả Cloudflare **error 1033** (mất kết nối tới cloudflared), SSH cổng
-30513 timeout dù ping còn trả lời. Monitor cuối cùng thấy healthy lúc
-12:02:49. **Chưa xử lý được vì không vào được máy chủ từ xa** — cần người
-vận hành kiểm tra trực tiếp: VPS còn sống không, `systemctl status
-cloudflared-tunnel`, mạng ra ngoài của VPS có bị chặn/rớt không. Các sửa đổi
-trong ba commit dưới chưa được đẩy lên server.
-
-### Đã sửa trong các commit này
-
-1. **Trang đăng nhập mới** (bản Halloween của người vận hành, port sang React):
-   cảnh ngày/đêm, dây leo SVG, đèn pin chiếu từng ký tự mật khẩu, sói 60 khung,
-   nhện canvas. Ảnh sói PNG 1,42 MB → WebP 0,47 MB. Toàn bộ hiệu ứng tách thành
-   module `frontend/src/features/halloween-login/` có cleanup: rời trang là gỡ
-   sạch listener và class trên `<body>`.
-2. **Sửa lỗi login mất chữ đã gõ** (lỗi có sẵn, không do port): `login()` và
-   `register()` trong AuthContext bật cùng cờ `isLoading` mà App.tsx dùng để
-   tháo LoginPage khỏi cây React. Giữa lúc đăng nhập trang bị unmount: chữ đã
-   gõ biến mất, lỗi không kịp hiện, cảnh phải dựng lại. Cờ chung đã bỏ, trang
-   đăng nhập tự theo dõi trạng thái chờ.
-3. **Nhà cung cấp AI lỗi thời — đã nâng cấp theo mô hình của 9Router** (khảo
-   sát `github.com/decolua/9router`): bài học cốt lõi là *không hardcode tên
-   model*. Ta làm theo bằng endpoint `GET /api/v1/settings/ai-models` gọi
-   `{base_url}/models` của nhà cung cấp; nếu không liệt kê được (Anthropic,
-   lỗi mạng, thiếu khoá) thì dùng danh sách dự phòng đã kiểm chứng trong
-   `providers.py`. Thử thật: OpenCode Zen trả `source=live` với model
-   `space-bunny-free, big-pickle, mimo-v2.6-flash-free…`. Model mặc định cập
-   nhật theo trang chính thức: `gemini-2.5-flash`, `gpt-4o-mini`,
-   `claude-sonnet-4-6`, `anthropic/claude-sonnet-4-6` cho OpenRouter. Registry
-   có thêm `free_tier`/`free_note` để UI gợi ý tầng miễn phí.
-4. **SEO (Lighthouse phàn nàn từ phiên trước)**: thêm meta description + og
-   tags, favicon thật thay `/vite.svg`, `robots.txt` và `sitemap.xml` thật.
-   nginx đổi `.txt/.xml/.ico` thiếu sang **404** thay vì rơi vào fallback SPA
-   (trước đó bot xin `robots.txt` nhận trang HTML — Lighthouse báo 21 lỗi).
-   `/api/` và `/assets/` chuyển sang `^~` để location regex không ăn nhầm.
-
-### Còn dở
-
-- **Resend trên VPS đã hoàn tất** (2026-10-11, xem mục cuối tài liệu).
-- **Gộp chuỗi fallback (combos kiểu 9Router)**: hiện mới có Smart Fallback
-  trong app, chưa có chuỗi do người dùng đặt tên. Việc tiếp theo hợp lý.
-- Ba việc "đáng làm" trong mục dự án (API gọi trùng, Google Fonts tự host,
-  dữ liệu mẫu trong bundle) vẫn chưa ai làm.
-- File lạ `D:\Temp\hieuk\opencode\inspect.py` (đọc `/root/.cloudflared/cert.pem`)
-  được phát hiện khi chạy test; **không phải do phiên này tạo**, đã không chạy
-  nó. Người vận hành nên xoá hoặc kiểm tra nguồn gốc.
-
-## Email Resend — đã chạy thật (2026-10-10, tối)
-
-Làm bằng browser skill (bsk) trên phiên đăng nhập sẵn của người vận hành:
-
-- **API key đã tạo**: `re_5VDLniyM…` ("MarketFlow production mail", quyền
-  Sending access), lưu vào `backend/.env` máy này (file .env có gitignore).
-- **Domain riêng**: `marketing.kienhieu.id.vn` đã thêm và **Verified** trong
-  Resend. Bản ghi DNS do tôi tự thêm trong Cloudflare Dashboard: TXT DKIM,
-  CNAME `rsend.marketing` + `send.marketing` → `*.forge.rmta.net`.
-- **Gửi thử đã thành công ba lần**, kèm id trả về từ Resend:
-  1. về `qtu1053@gmail.com` (chế độ thử `onboarding@resend.dev`);
-  2. về người nhận **ngoài** chủ tài khoản (`dtc245200244@ictu.edu.vn`) từ địa
-     chỉ đã xác thực `no-reply@auth.kienhieu.id.vn`;
-  3. về `dtc245200244@ictu.edu.vn` từ địa chỉ mới
-     `no-reply@marketing.kienhieu.id.vn`.
-- `GET /api/v1/settings/email-status` trả
-  `{enabled: true, provider: resend, from_address: no-reply@marketing.kienhieu.id.vn}`.
-- Lưu ý đúng thiết kế: `send()` không ném lỗi ra ngoài; gửi sai địa chỉ ở chế độ
-  thử trả `{sent: false, reason: …}` chứ không làm hỏng request nghiệp vụ.
-
-### Hai cái bẫy đã mắc, ghi lại để lần sau khỏi lặp
-
-1. **Bản ghi DNS trong Cloudflare phải để "DNS only", tuyệt đối không Proxied.**
-   Lần đầu tôi thêm 2 CNAME `rsend/send` bị mặc định **Proxied** (mây cam) →
-   DNS không phân giải được kiểu CNAME → Resend báo Failed mãi. Mở panel Edit →
-   tắt công tắc "Proxy status" → Save. Cách nhận biết đúng: `Resolve-DnsName`
-   phải trả về NameHost, và cả 1.1.1.1 lẫn 8.8.8.8 đều phải thấy.
-2. **Sau khi Resend đã đánh dấu Failed, bấm Verify lại có thể không chạy thật.**
-   Cách chắc ăn: xoá domain, thêm lại, rồi Verify — lần làm lại này qua luôn.
-3. Tiện thể: `D:\Temp\hieuk\opencode`đã có sẵn 2 domain `auth.*` của cùng chủ —
-   thêm domain mới trên gói free bị chặn ở mốc 3 domain; phải xoá domain hỏng
-   (`gtoil.vn`, Failed) mới có chỗ trống.
-4. Key Resend quyền **Sending access không đọc được** bản ghi DNS qua API. Muốn
-   lấy đầy đủ giá trị CNAME phải tạo key **Full access** tạm, đọc xong **xoá
-   ngay** (đã làm đúng vậy).
-
-### Còn lại trên VPS — đã hoàn tất (2026-10-11)
-
-Bốn dòng env đã ghi vào `/opt/marketflow/backend/.env` (lưu ý: bản cũ trên VPS
-đang có `EMAIL_PROVIDER="none"` — giá trị placeholder, không phải thiếu key) rồi
-`systemctl restart marketflow-api`. Từ chối `none` sang `resend` + thêm
-`RESEND_API_KEY` và `EMAIL_FROM_NAME`.
-
-## Sự cố VPS chết và khôi phục (2026-10-11)
-
-### Diễn biến
-
-1. ~12:02 UTC VPS tắt đột ngột (panel CloudCode ghi `STOPPED`). Domain timeout,
-   SSH reset, tunnel báo error 1033.
-2. Panel `my.cloudcode.io.vn` lỗi HTTP 500; panel mới **`vps.cloud.codes`**
-   (`cloudcode.io.vn/my` cũng trỏ tới hệ thống này) vẫn chạy. Người vận hành
-   bấm **Start** trên trang `vps.cloud.codes/servers/639a6009`.
-3. VPS lên (uptime 4 phút) nhưng **domain vẫn chết**.
-
-### Hai nguyên nhân và cách sửa
-
-1. **Bản ghi DNS tunnel phải Proxied (mây cam).** Sau khi VPS chạy lại,
-   `marketing.kienhieu.id.vn` (CNAME → `<tunnel-uuid>.cfargotunnel.com`) đang ở
-   chế độ **DNS only**. Resolver đuổi theo CNAME và chỉ nhận được
-   `fd10:aec2:5dae::` — IPv6 unique-local, không giao thông được → timeout cả
-   từ trong VPS lẫn ngoài. Bật **Proxy status** trong DNS dashboard là xong
-   ngay (trả IP edge `104.21.x/172.67.x`, front 200).
-   - **Khác với record Resend** ở trên: record mail (TXT/CNAME rsend, send)
-     phải **DNS only**; record **tunnel hostname** phải **Proxied**. Hai kiểu
-     record, hai quy tắc ngược nhau — đừng lẫn.
-2. **Quyền thư mục `/var/www/marketflow`.** scp từ Windows tạo thư mục con
-   `drwx------` (umask 077) → nginx (www-data) không đọc được → asset trả
-   fallback SPA (HTML 2023 byte) hoặc 404 dù file có trên đĩa. Fix:
-   `find /var/www/marketflow -type d -exec chmod 755 {} +` và
-   `find /var/www/marketflow -type f -exec chmod 644 {} +`.
-   Cloudflare còn cache briefly cái 404 cũ — request có query `?v=2` xác nhận
-   file phục vụ đúng, cache tự hết sau vài phút.
-
-### Việc deploy dở dang trong lúc VPS chết đã hoàn tất
-
-- Kéo 7 commit mới nhất (`ca713fd`) vào `/opt/marketflow`.
-- nginx đổi sang `deploy/vps/nginx-marketflow.conf` (gzip, CF-Connecting-IP,
-  timeout 600s, `/api/`+`/assets/` `^~`, `.txt/.xml/.ico` thiếu → 404).
-- Frontend build lại local với `VITE_AI_API_URL=` **trống** (bỏ URL Render đã
-  chết trong `frontend/.env`) và `VITE_API_URL=/api/v1`; upload `dist/` lên
-  `/var/www/marketflow`.
-- Host key SSH của `vn-hn.cloudcode.io.vn:30513` thay đổi sau khi máy được
-  Start lại (có thể provider chuyển VM sang node khác) — đã ghi nhận key mới.
-
-### Panel VPS
-
-| Link | Ghi chú |
-| --- | --- |
-| `https://cloudcode.io.vn/my` | Danh sách server |
-| `https://vps.cloud.codes/servers/639a6009` | Server NAT-GO-300PAG (Start/Restart/Kill) |
-
-Lưu ý: browser bsk (automation) gặp `ERR_SSL_UNRECOGNIZED_NAME_ALERT` khi mở
-`vps.cloud.codes` — thao tác Start phải làm tay trên browser người vận hành.
-
-## Phiên 2026-10-12 — chuỗi AI kiểu 9Router + 3 việc tối ưu tải trang
-
-### Chuỗi fallback model (AIModelChain) — backend + frontend
-
-- Bảng `ai_model_chains` (owner hoặc workspace, `hops_json` 1–10 bước,
-  `is_active`/`is_default`), CRUD đầy đủ tại
-  `GET/POST/PUT/PATCH/DELETE /api/v1/settings/ai-chains`. Quyền: ADMIN hoặc
-  creator, workspace chain cần MANAGER-owner/member. Tên trùng trong cùng
-  scope → 409; provider/model sai → 422; `model` để trống → backend tự điền
-  model mặc định của provider.
-- `execute_task` (AI service): resolve chuỗi theo `chain_id` của request →
-  default workspace → default cá nhân; thiếu key một hop thì skip (ghi
-  warning), lỗi schema/runtime thì sang hop kế tiếp, timeout chia đều theo
-  số hop. Hết chuỗi → template fallback có warning tên chuỗi. Fixture mode
-  (key test) không đụng chuỗi.
-- `chain_id` nhận ở 4 endpoint (`/ai/ideas`, `/ai/draft`, `/ai/summary`,
-  `/ai/omnichannel`) và trong payload job (`AIJobCreateRequest`).
-- Frontend: tab **Chuỗi AI (Fallback)** trong Settings — tạo/sửa/toggle/
-  đặt mặc định/xóa, hop = provider + model (model optional).
-- Test: `backend/tests/test_ai_model_chains.py` — 19 test, đều pass;
-  toàn suite 1627 passed.
-
-### Ba việc tối ưu (theo mục "Còn dở" trước đó)
-
-1. **API gọi trùng**: interceptor gộp GET in-flight trong `apiClient`
-   (key = baseURL+url+params+Authorization+X-Workspace-Id). Vào Dashboard
-   trước đây `/campaigns` gọi 4 lần, `/analytics/dashboard` và `/contents`
-   5 lần vì các component cùng mount tự fetch. Không cache sau khi xong —
-   nút tải lại vẫn là network thật. POST/PUT/DELETE không gộp.
-2. **Google Fonts tự host**: Plus Jakarta Sans (vietnamese + latin, 2 file
-   woff2 variable ~36 KB) chuyển vào `frontend/public/fonts/` + `@font-face`
-   trong `index.css`; bỏ `<link>` sang fonts.googleapis.com (render-blocking,
-   bên thứ ba) và preconnect. Preload 2 file trong `index.html`.
-3. **Dữ liệu mẫu ra khỏi bundle**: `mockData.ts` (~11 KB chunk) chỉ tải qua
-   `import()` khi vào nhánh Offline Demo — `api.ts` (35 điểm) và
-   `AIDoctorWidget`. Bundle chính không còn fixture (đã xác minh bằng
-   grep trên `dist/assets/index-*.js`).
-
-## Phiên 2026-10-12 (chiều) — sửa CI xanh + tối ưu tài nguyên VPS
-
-### CI xanh sau ≥10 commit đỏ liên tiếp
-
-Lý do 4 job gate fail, đã sửa ở commit `706ae5f`:
-
-1. **Gate 7 Cloudflare Worker** — `wrangler.jsonc` bị xóa chủ đích
-   (`500cacf`) → job luôn "No config file detected". Gỡ job + bỏ khỏi
-   `needs` của `docker-verify`.
-2. **Gate 1 chain AI** — timeout hop dùng `min(timeout, per_hop)` với
-   default 10s → hop nhận 7s < 15s (cần cho test). Sửa công thức thành
-   `max(15, min(timeout, per_hop))` và nâng default `AI_TIMEOUT_SECONDS`
-   10 → 60 khớp `.env.example`.
-3. **Gate 3 smoke E2E** — selector `text=MarketFlow AI` không còn trên
-   login (brand chỉ trong Sidebar sau đăng nhập). Đổi sang `#login-title`.
-4. **Gate 4 WCAG** — selector "Đăng ký tài khoản mới" đổi thành
-   `button.text-action:has-text("Đăng ký")`.
-
-Kết quả: run `38231477928` **success** (toàn bộ pipeline, gồm Docker).
-
-### Tối ưu tài nguyên VPS (audit thật + sửa)
-
-Audit trước khi sửa (2 GB RAM, 2 vCPU, DB 32 MB):
-
-| Hạng mục | Trước | Sau | Ghi chú |
-| --- | --- | --- | --- |
-| nginx brotli | chưa cài | `libnginx-mod-http-brotli-filter` + `brotli on` | HTML 2237 B → 904 B (−60%); CF trả `Content-Encoding: br` |
-| Font `/fonts/` | `no-cache` (bị location `/` nuốt) | `max-age=2592000` (30 ngày) | thêm `location ^~ /fonts/` |
-| Postgres `shared_buffers` | 384 MB | 128 MB | DB chỉ 32 MB; giải phóng RAM cho page cache |
-| Postgres `work_mem` | 8 MB | 4 MB | truy vấn nhỏ, 4 MB đủ |
-| Postgres `max_connections` | 40 | 30 | 2 uvicorn worker + pool nội bộ |
-| fwupd | active (~46 MB) | inactive | không cần trên VPS |
-
-- Script tune: `deploy/vps/tune-postgres.sh` (backup conf, sed, reload/
-  restart postgres). Lưu ý: `shared_buffers`/`max_connections` cần
-  **restart** postgres, `reload` không đủ.
-- nginx conf thật trên VPS đã đồng bộ từ `deploy/vps/nginx-marketflow.conf`.
-- Verify production `https://marketing.kienhieu.id.vn`:
-  - HTML: `Content-Encoding: br` (CF) + gzip fallback OK.
-  - Font: `Cache-Control: public, max-age=2592000`, `cf-cache-status: MISS`.
-  - API `/api/v1/health`: `{"status":"healthy"}`.
-  - RAM sau tune: 620 Mi used / 1.3 Gi available (trước: 637 Mi / 1.3 Gi).
-- Scheduler/AI job worker **an toàn với 2 uvicorn worker** (đã audit):
-  schedule dùng conditional UPDATE `PLANNED→EXECUTED`, job queue dùng
-  `SELECT … FOR UPDATE SKIP LOCKED`.
-
-### Nợ kỹ thuật còn lại (chưa làm ở phiên này)
-
-- `metrics.py`: mỗi handler đăng ký 2–4 path (alias cũ + mới). Frontend
-  chỉ dùng path mới; path cũ chỉ test dùng. Giữ lại để không break test,
-  cần migration nếu gỡ.
-- Biến config placeholder (`OLLAMA_BASE_URL` / `ANTHROPIC_BASE_URL` /
-  `HF_BASE_URL`): cố ý giữ để chặn env hệ thống lọt vào settings (xem
-  comment trong `config.py`), không phải biến chết.
-- Chưa có công cụ migration (dùng `create_all()`); chưa bật mutation
-  testing; email Resend đã Verified nhưng chưa nối luồng publish tự động.
-
-## Phiên 2026-10-23 — Tối ưu RAM 1-Worker, Cầu nối OpenCode CLI, Creative Pack & Muse AI Board
-
-### 1. Tối ưu RAM (`marketflow-api.service`)
-
-- Hợp nhất và đồng bộ `deploy/vps/marketflow-api.service` với máy chủ thật: giảm từ `--workers 2` xuống `--workers 1`, đặt giới hạn `MemoryHigh=512M` và `MemoryMax=768M`.
-- Kết quả đo thực tế trên VPS (2 GiB RAM): tiến trình `marketflow-api` chỉ tiêu thụ **~80,3 MB – 114 MB RAM** (thấp hơn 4 lần so với ngưỡng cảnh báo), giúp VPS luôn duy trì **~1,25 – 1,45 GiB RAM khả dụng**.
-
-### 2. Cầu nối OpenCode CLI cục bộ trên VPS (`v1.19.4`)
-
-- Tích hợp binary `/root/.opencode/bin/opencode` (symlink `/usr/local/bin/opencode`) vào `AIService._try_opencode_cli_bridge` (`backend/app/services/ai/ai_service.py`).
-- Khắc phục triệt để 2 nút thắt của OpenCode CLI:
-  1. Chạy trong thư mục rỗng có `.git` cô lập (`/tmp/marketflow_oc_empty/.git`) + `stdin=subprocess.DEVNULL` để OpenCode không quét toàn bộ filesystem từ `/`.
-  2. Đọc luồng `--print-logs --format json` theo thời gian thực để ngắt nhanh (**fast-fail ~1,5s–3s** thay vì treo retry ngầm) ngay khi gặp `AI_APICallError` hoặc `Free usage limit reached`.
-- Cập nhật model mặc định của provider `opencode` từ `space-bunny-free` (đã ngừng phục vụ) sang `mimo-v2.6-flash-free` (`AI_TIMEOUT_SECONDS=60`).
-
-### 3. Kiến trúc 2 Chế độ UX, Creative Pack, Muse AI Board & Staging Diff
-
-- **2 Chế độ hiển thị trên AI Studio (`frontend/src/pages/AIStudio.tsx`)**:
-  - **👤 Chế độ Chủ Shop (Đơn giản)** (Mặc định): ẩn toàn bộ thông số kỹ thuật phức tạp, tích hợp nút **⚡ OpenCode 0đ (Sẵn trên VPS)** và 1-Click Xuất bản ngay.
-  - **⚙️ Chế độ Chuyên Gia**: mở khóa Ma trận 12 Góc tiếp cận, Hội đồng 4 Persona chấm điểm và tuỳ chỉnh Provider/Model nâng cao.
-- **Dọn dẹp mã giả lập & file rác**:
-  - Xoá endpoint giả lập OAuth (`POST /ad-accounts/oauth-connect`) và nhánh cộng số liệu giả trong `backend/app/api/v1/metrics.py`.
-  - Dọn sạch hơn 50 script/file debug tạm thời trong `/root` trên VPS (bao gồm `/root/inspect.py` từng che khuất module chuẩn `inspect` của Python).
-
-
+### Bảng Danh Mục Dịch Vụ & Cổng
+
+| Dịch vụ | Tên Systemd Service | Cổng / Socket | Tài khoản | Thư mục làm việc | Giới hạn bộ nhớ |
+|---|---|---|---|---|---|
+| **Nginx** | `nginx.service` | `127.0.0.1:8080` | `www-data` | `/var/www/marketflow` | Hệ thống |
+| **Cloudflare Tunnel** | `cloudflared-tunnel.service` | Outbound | `root` | `/etc/cloudflared` | Hệ thống |
+| **FastAPI Backend** | `marketflow-api.service` | `127.0.0.1:8000` | `marketflow` | `/opt/marketflow/backend` | `MemoryMax=768M` |
+| **AI Runner** | `marketflow-ai-runner.service` | `127.0.0.1:8100` | `mfai` | `/opt/marketflow/ai-runner/sandbox` | `MemoryMax=896M` |
+| **PostgreSQL 16** | `postgresql@16-main.service` | `127.0.0.1:5432` | `postgres` | `/var/lib/postgresql/16/main` | ~256M |
+
+---
+
+## 2. Tệp Biến Môi Trường (Environment Files)
+
+### 2.1. Backend FastAPI: `/opt/marketflow/backend/.env`
+- Phân quyền bắt buộc: `chmod 600`, sở hữu bởi `marketflow:marketflow`.
+- Cấu hình:
+```dotenv
+APP_NAME=MarketFlow
+APP_ENV=production
+API_V1_PREFIX=/api/v1
+DATABASE_URL=postgresql://marketflow:<MAT_KHAU_HEX>@127.0.0.1:5432/marketflow_v2
+JWT_SECRET=<CHUOI_RANDOM_HEX_64_KY_TU>
+ACCESS_TOKEN_EXPIRE_MINUTES=480
+CORS_ORIGINS=https://marketing.kienhieu.id.vn,http://127.0.0.1:8080
+AI_RUNNER_URL=http://127.0.0.1:8100
+AI_RUNNER_TOKEN=<RUNNER_TOKEN_TU_RUNNER_ENV>
+```
+
+> **Lưu ý**: `settings.validate_for_runtime()` tự động kiểm tra khi khởi động ở `APP_ENV=production`. Nếu `JWT_SECRET` dưới 32 ký tự, dùng SQLite hoặc thiếu `AI_RUNNER_TOKEN`, tiến trình sẽ dừng ngay lập tức.
+
+### 2.2. AI Runner: `/etc/marketflow/ai-runner.env`
+- Phân quyền bắt buộc: `chmod 600`, sở hữu bởi `root:root`.
+- Cấu hình:
+```dotenv
+RUNNER_TOKEN=<CHUOI_SECRET_X_RUNNER_TOKEN>
+OPENCODE_BIN=/usr/local/bin/opencode
+RUNNER_SANDBOX_DIR=/opt/marketflow/ai-runner/sandbox
+OPENCODE_AGENT=marketflow
+OPENCODE_MODEL=opencode/big-pickle
+OPENCODE_FALLBACK_MODELS=opencode/glm-5.3-flash-free,opencode/deepseek-v4.1-flash-free
+RUNNER_TIMEOUT_S=120
+RUNNER_CONCURRENCY=1
+RUNNER_MAX_QUEUE=8
+RUNNER_HOST=127.0.0.1
+RUNNER_PORT=8100
+```
+
+---
+
+## 3. Quy Trình Cài Đặt & Triển Khai (Deployment Procedure)
+
+Script triển khai tự động `deploy/vps/deploy_v2.sh` có tính chất **idempotent**, an toàn tuyệt đối và không làm mất dữ liệu cũ.
+
+### Các bước thực hiện:
+
+1. **Chuẩn bị bản phát hành (Release Artifacts)**:
+   - Build frontend trên máy phát triển hoặc CI:
+     ```powershell
+     npm --prefix frontend ci
+     npm --prefix frontend run build
+     ```
+   - Đảm bảo mã nguồn `backend/` và thư mục `frontend/dist/` đã sẵn sàng.
+
+2. **Tải lên máy chủ & Chạy script chuyển đổi**:
+   ```bash
+   # Chạy trực tiếp trên VPS với quyền root (từ thư mục release hoặc git repo):
+   sudo bash deploy/vps/deploy_v2.sh
+   ```
+
+### Cơ chế hoạt động của `deploy_v2.sh`:
+- **Bước 1**: Tạo bản sao lưu đầy đủ `pg_dump` của CSDL cũ sang `/var/backups/marketflow/pre_v2_<ts>.sql.gz`.
+- **Bước 2**: Sao lưu toàn bộ thư mục `/opt/marketflow/backend`, `/var/www/marketflow` và `.venv` cũ để sẵn sàng rollback.
+- **Bước 3**: Khởi tạo CSDL mới `marketflow_v2` (CSDL cũ `marketflow` được giữ nguyên vẹn 100%).
+- **Bước 4**: Khởi tạo Virtualenv Python 3.12 tại `/opt/marketflow/.venv`, cài đặt `requirements.txt`, thiết lập `/opt/marketflow/backend/.env` với JWT Secret ngẫu nhiên an toàn, chạy `alembic upgrade head` và nạp dữ liệu mẫu ban đầu (seed demo chỉ chạy 1 lần duy nhất nhờ cờ `.seed_v2_done`).
+- **Bước 5**: Cập nhật systemd unit `marketflow-api.service` và nạp lại daemon.
+- **Bước 6**: Triển khai frontend `dist/` vào `/var/www/marketflow` theo cơ chế hoán đổi nguyên tử (atomic directory swap) kèm chuẩn phân quyền `755` cho thư mục và `644` cho tệp.
+- **Bước 7**: Cập nhật cấu hình Nginx (hỗ trợ SSE streaming, gzip, brotli và chặn `/mcp`), kiểm tra `nginx -t` trước khi reload.
+- **Bước 8**: Khởi động lại service `marketflow-api` và thực hiện 4 bước kiểm thử tự động (smoke checks: `/api/v1/health`, đăng nhập Manager, chặn `/mcp`, tải giao diện SPA).
+
+---
+
+## 4. Quy Trình Sao Lưu & Khôi Phục (Backup & Restore)
+
+### 4.1. Sao lưu tự động hằng ngày
+Hệ thống tự động sao lưu CSDL vào **03:00 sáng hằng ngày** thông qua cron job tại `/etc/cron.d/marketflow-backup`:
+```cron
+0 3 * * * root /usr/local/bin/marketflow-backup >> /var/log/backup.log 2>&1
+```
+Tệp sao lưu được nén `gzip -6` và lưu trữ tại `/var/backups/marketflow/marketflow-YYYYMMDD-HHMMSS.sql.gz`. Script tự động dọn dẹp và duy trì 7 bản sao lưu gần nhất.
+
+### 4.2. Sao lưu thủ công trước khi bảo trì
+```bash
+sudo -u postgres pg_dump -d marketflow_v2 --clean --if-exists --no-owner --no-privileges | gzip -6 > /var/backups/marketflow/marketflow_v2_manual_$(date +%Y%m%d_%H%M%S).sql.gz
+```
+
+### 4.3. Lệnh khôi phục CSDL đã qua kiểm nghiệm thực tế (Tested Restore Command)
+Khi cần khôi phục CSDL từ bản sao lưu:
+```bash
+# 1. Tạm dừng dịch vụ API để tránh ghi dữ liệu trong lúc khôi phục
+sudo systemctl stop marketflow-api
+
+# 2. Khôi phục dữ liệu từ tệp nén vào CSDL marketflow_v2
+zcat /var/backups/marketflow/<ten_file_sao_luu>.sql.gz | sudo -u postgres psql -d marketflow_v2
+
+# 3. Khởi động lại dịch vụ API
+sudo systemctl start marketflow-api
+
+# 4. Kiểm tra sức khỏe dịch vụ
+curl -s http://127.0.0.1:8080/api/v1/health
+```
+
+---
+
+## 5. Quy Trình Rollback Về v1 (Emergency Rollback)
+
+Nếu quá trình chuyển đổi gặp sự cố nghiêm trọng, toàn bộ hệ thống có thể quay về phiên bản v1 trong vòng **10 giây** nhờ script rollback tự động:
+
+```bash
+sudo bash deploy/vps/rollback_v1.sh
+```
+
+### Nguyên lý an toàn:
+- CSDL `marketflow` cũ **không bị chỉnh sửa hay xóa bỏ** trong suốt quá trình cài đặt v2.
+- Script tự động khôi phục thư mục backend v1, môi trường virtualenv Python 3.11, giao diện frontend v1 và cấu hình systemd/nginx cũ.
+- Khởi động lại dịch vụ và xác nhận endpoint `/health` hoạt động bình thường.
+
+---
+
+## 6. Vận Hành, Giám Sát & Nhật Ký Lỗi (Troubleshooting)
+
+### 6.1. Xem log thời gian thực qua `journalctl`
+- **Backend FastAPI**:
+  ```bash
+  journalctl -u marketflow-api -f
+  ```
+- **AI Runner Service**:
+  ```bash
+  journalctl -u marketflow-ai-runner -f
+  ```
+- **Nginx Web Server**:
+  ```bash
+  journalctl -u nginx -f
+  tail -f /var/log/nginx/error.log
+  ```
+- **Cloudflare Tunnel**:
+  ```bash
+  journalctl -u cloudflared-tunnel -f
+  ```
+
+### 6.2. Kiểm tra nhanh trạng thái toàn bộ dịch vụ
+```bash
+systemctl status nginx postgresql marketflow-api marketflow-ai-runner cloudflared-tunnel --no-pager
+```
+
+### 6.3. Kiểm tra kết nối & Sức khỏe hệ thống
+- Kiểm tra endpoint tổng thể (DB + AI Runner):
+  ```bash
+  curl -s http://127.0.0.1:8080/api/v1/health
+  # Kết quả mong đợi: {"status":"ok","db":"ok","ai_runner":"ok"}
+  ```
+- Kiểm tra AI Runner độc lập:
+  ```bash
+  curl -s http://127.0.0.1:8100/health
+  # Kết quả mong đợi: {"ok":true,"opencode_version":"1.19.4","model":"opencode/big-pickle",...}
+  ```
+
+---
+
+## 7. Ghi Chú Đặc Thù Về AI Runner & OpenCode
+
+1. **Bộ nhớ & Mức tiêu thụ RAM**:
+   - Tiến trình AI Runner (Uvicorn): ~50 MB RAM RSS.
+   - Tiến trình OpenCode CLI khi sinh nội dung và gọi MCP tool: ~490 MB RAM RSS.
+   - Giới hạn systemd: `MemoryHigh=768M`, `MemoryMax=896M` bảo vệ VPS 2 GiB khỏi nguy cơ OOM killer.
+2. **Giới hạn đồng thời (Concurrency = 1)**:
+   - Hệ thống áp dụng hàng đợi tuần tự FIFO với `concurrency = 1`. Tuyệt đối **không tăng concurrency** trên VPS 2 GiB vì 2 tiến trình OpenCode chạy song song sẽ tiêu thụ gần 1 GB RAM, dẫn đến tràn bộ nhớ.
+3. **Mô hình miễn phí (OpenCode Zen Free Tier) & Rate Limits**:
+   - Mô hình chính được chọn qua thực nghiệm P0 Spike: `opencode/big-pickle` (tuân thủ nguyên tắc đề xuất, tiếng Việt tự nhiên, tỷ lệ gọi MCP tool chính xác 100%).
+   - Danh sách dự phòng: `glm-5.3-flash-free`, `deepseek-v4.1-flash-free`.
+   - Khi Zen đạt giới hạn tần suất (FreeTierError / 429), AI Runner tự động chuẩn hóa thành mã lỗi `AI_RATE_LIMITED` để hiển thị thông báo thân thiện tới người dùng.
+4. **Timeout cứng**:
+   - `RUNNER_TIMEOUT_S=120`. Nếu một lượt tương tác kéo dài quá 120 giây (do mạng hoặc chờ model), tiến trình con sẽ bị chấm dứt (`SIGKILL` toàn bộ process group) để giải phóng RAM cho yêu cầu tiếp theo.
+
+---
+
+## 8. Nguyên Tắc Bảo Mật Cốt Lõi (Security Guidelines)
+
+1. **Chặn cổng `/mcp` từ Internet**:
+   - Giao thức MCP Streamable-HTTP (`/mcp`) chỉ được dùng nội bộ giữa OpenCode CLI và FastAPI Backend qua `127.0.0.1:8000/mcp`.
+   - Nginx cấu hình khối `location ^~ /mcp { return 404; }` đảm bảo người dùng bên ngoài không thể thăm dò hoặc tấn công giao diện công cụ.
+2. **Xác thực Run-Token JWT ngắn hạn**:
+   - Mọi lượt gọi MCP bắt buộc phải mang Bearer JWT có thời hạn 10 phút, chứa đúng các claim `uid`, `thread_id`, `message_id`. OpenCode không thể giả mạo phiên của người dùng khác.
+3. **Tách biệt tài khoản hệ thống (Privilege Separation)**:
+   - Backend chạy bằng user `marketflow` (`ProtectHome=true`, không có login shell).
+   - AI Runner chạy bằng user riêng biệt `mfai` (`HOME=/var/lib/mfai`).
+   - Sandbox của OpenCode bị khóa chặt bằng phân quyền nghiêm ngặt trong `deploy/opencode/agent/marketflow.md`: chặn toàn bộ quyền đọc/ghi file hệ thống (`read`, `glob`, `grep`, `list`, `bash`, `external_directory`), chỉ cho phép các tool nghiệp vụ mang tiền tố `marketflow_*`.
+4. **Bảo mật bí mật (Secret Zero-Leakage)**:
+   - Không commit bất kỳ secret, mật khẩu PostgreSQL, JWT Secret hay token nào vào Git repository.
