@@ -1,0 +1,62 @@
+# /etc/systemd/system/marketflow-ai-runner.service
+#
+# MarketFlow AI Runner — OpenCode CLI Execution Service
+# Bounded concurrency (1 process), strict systemd hardening, memory ceiling to protect 2GB VPS.
+#
+# Install / Update:
+#   sudo cp deploy/vps/marketflow-ai-runner.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now marketflow-ai-runner
+#   sudo systemctl status marketflow-ai-runner
+
+[Unit]
+Description=MarketFlow AI — OpenCode Runner Service (Production VPS)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mfai
+Group=mfai
+WorkingDirectory=/opt/marketflow/ai-runner/sandbox
+
+# Environment file containing RUNNER_TOKEN, OPENCODE_MODEL, OPENCODE_FALLBACK_MODELS (chmod 600)
+EnvironmentFile=/etc/marketflow/ai-runner.env
+Environment="PYTHONUNBUFFERED=1"
+Environment="PYTHONDONTWRITEBYTECODE=1"
+Environment="HOME=/var/lib/mfai"
+Environment="PYTHONPATH=/opt/marketflow/ai-runner"
+
+# Single async worker bound to 127.0.0.1:8100
+ExecStart=/opt/marketflow/ai-runner/.venv/bin/uvicorn app.main:app \
+    --host 127.0.0.1 \
+    --port 8100 \
+    --workers 1 \
+    --timeout-keep-alive 30 \
+    --limit-concurrency 100 \
+    --backlog 128
+
+Restart=always
+RestartSec=3
+TimeoutStopSec=15
+
+# Memory protection tuned for VPS 2GB RAM:
+# Single opencode process RSS ~490 MB + uvicorn RSS ~60 MB => ~550 MB total active RSS.
+MemoryHigh=768M
+MemoryMax=896M
+CPUQuota=180%
+LimitNOFILE=65535
+
+# Systemd security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/mfai /tmp
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=marketflow-ai-runner
+
+[Install]
+WantedBy=multi-user.target

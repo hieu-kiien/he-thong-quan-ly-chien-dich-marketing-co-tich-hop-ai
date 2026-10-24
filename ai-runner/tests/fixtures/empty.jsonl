@@ -1,0 +1,2 @@
+{"type":"step_start","timestamp":1792835848376,"sessionID":"ses_empty_123","part":{"id":"prt_1","messageID":"msg_1","sessionID":"ses_empty_123","type":"step-start"}}
+{"type":"step_finish","timestamp":1792835851052,"sessionID":"ses_empty_123","part":{"id":"prt_2","reason":"stop","messageID":"msg_1","sessionID":"ses_empty_123","type":"step-finish","tokens":{"total":20,"input":20,"output":0,"reasoning":0},"cost":0}}
