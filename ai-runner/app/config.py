@@ -47,6 +47,9 @@ class Settings:
     port: int = 8100
     # Extra env passed through to opencode (besides PATH/HOME/LANG/XDG_*/MF_RUN_TOKEN).
     passthrough_env: list[str] = field(default_factory=list)
+    # After the provider reports a usage/rate limit, fail fast (without spawning opencode)
+    # for this many seconds. OpenCode itself retries silently instead of exiting.
+    rate_limit_cooldown_s: float = 600.0
 
     @property
     def opencode_cmd(self) -> list[str]:
@@ -74,4 +77,5 @@ class Settings:
             host=os.environ.get("RUNNER_HOST", "127.0.0.1"),
             port=_int("RUNNER_PORT", 8100),
             passthrough_env=_split_csv(os.environ.get("RUNNER_PASSTHROUGH_ENV")),
+            rate_limit_cooldown_s=_float("RUNNER_RATE_LIMIT_COOLDOWN_S", 600.0, minimum=0.0),
         )

@@ -13,16 +13,14 @@ import contextlib
 import json
 import logging
 from contextlib import asynccontextmanager
-from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from . import __version__
 from .config import Settings
-from .events import error_event
-from .runner import RunHandle, Runner, RunRequestData
+from .runner import Runner, RunRequestData
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 log = logging.getLogger("ai_runner.main")
@@ -85,6 +83,7 @@ async def health():
         "queue_length": runner.queue_length,
         "active": runner.active,
         "last_error": runner.last_error,
+        "rate_limited_for_s": runner.cooldown_remaining_s,
     }
 
 

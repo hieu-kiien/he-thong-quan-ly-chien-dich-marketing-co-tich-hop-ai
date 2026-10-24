@@ -1,7 +1,5 @@
 """FastMCP streamable-HTTP server mount tại `/mcp` cho OpenCode gọi ngược (CONTRACT §5, §11)."""
 
-from __future__ import annotations
-
 import logging
 import uuid
 from collections.abc import AsyncIterator

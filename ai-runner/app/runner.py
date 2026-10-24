@@ -82,6 +82,9 @@ class _Attempt:
     rc: int | None = None
     timed_out: bool = False
     stderr_tail: str = ""
+    # Set when opencode's log stream (stderr, --print-logs) reports a usage/rate limit.
+    # OpenCode keeps retrying silently in that case, so the runner kills it immediately.
+    limit_hit: bool = False
 
 
 class QueueFullError(Exception):
@@ -97,6 +100,12 @@ class Runner:
         self.runs: dict[str, RunHandle] = {}
         self.opencode_version: str | None = None
         self.last_error: str | None = None
+        # monotonic deadline until which runs fail fast with AI_RATE_LIMITED (no opencode spawn)
+        self.rate_limited_until: float = 0.0
+
+    @property
+    def cooldown_remaining_s(self) -> int:
+        return max(0, int(self.rate_limited_until - time.monotonic()))
 
     # ------------------------------------------------------------------ info
     @property
@@ -166,6 +175,14 @@ class Runner:
         """Full lifecycle of one /run request as NDJSON-able dicts."""
         yield {"type": "run", "run_id": handle.run_id}
         try:
+            if self.cooldown_remaining_s > 0:
+                # Provider usage limit reached recently: answer honestly right away instead of
+                # spawning a ~500 MB opencode process that would only hang until the timeout.
+                yield error_event(
+                    AI_RATE_LIMITED,
+                    detail=f"usage limit cooldown, retry in ~{self.cooldown_remaining_s}s",
+                )
+                return
             try:
                 async for event in self._acquire(handle):
                     yield event
@@ -256,7 +273,11 @@ class Runner:
         return env
 
     def build_cmd(self, model: str | None, session_id: str | None, run_id: str, prompt: str = "") -> list[str]:
-        cmd = [*self.s.opencode_cmd, "run", "--agent", self.s.agent, "--format", "json"]
+        # --print-logs streams opencode's own log lines to stderr so provider errors
+        # (e.g. "Free usage limit reached") are visible immediately; opencode would
+        # otherwise retry silently and never emit an error event on stdout.
+        cmd = [*self.s.opencode_cmd, "run", "--print-logs", "--log-level", "WARN",
+               "--agent", self.s.agent, "--format", "json"]
         if self.s.pure:
             cmd.append("--pure")
         if model:
@@ -296,7 +317,10 @@ class Runner:
                 return
 
             failure_text = f"{state.error_raw or ''}\n{attempt.stderr_tail}"
-            failed = state.error_raw is not None or (attempt.rc not in (0, None))
+            failed = attempt.limit_hit or state.error_raw is not None or (attempt.rc not in (0, None))
+            # The free tier limit ("Free usage limit reached") is account-wide: every free model
+            # fails the same way, so falling back would only waste time and memory.
+            account_limit = attempt.limit_hit or "free usage limit" in failure_text.lower()
 
             if failed and not state.emitted_output:
                 if session_id and not session_retry_done and is_session_error(failure_text):
@@ -304,14 +328,21 @@ class Runner:
                     session_id = None
                     session_retry_done = True
                     continue
-                if (is_rate_limited(failure_text) or is_model_error(failure_text)) and index + 1 < len(models):
+                if (
+                    not account_limit
+                    and (is_rate_limited(failure_text) or is_model_error(failure_text))
+                    and index + 1 < len(models)
+                ):
                     log.info("run %s: model %s failed (%s); falling back to %s",
                              handle.run_id, model, state.error_short, models[index + 1])
                     index += 1
                     continue
 
             if failed:
-                code = AI_RATE_LIMITED if is_rate_limited(failure_text) else AI_UNAVAILABLE
+                rate_limited = account_limit or is_rate_limited(failure_text)
+                if rate_limited and self.s.rate_limit_cooldown_s > 0:
+                    self.rate_limited_until = time.monotonic() + self.s.rate_limit_cooldown_s
+                code = AI_RATE_LIMITED if rate_limited else AI_UNAVAILABLE
                 detail = state.error_short or attempt.stderr_tail.strip()[-400:] or f"exit code {attempt.rc}"
                 yield error_event(code, detail=detail)
                 return
@@ -355,7 +386,14 @@ class Runner:
         )
         handle.proc = proc
         stderr_buf: collections.deque[bytes] = collections.deque(maxlen=64)
-        stderr_task = asyncio.get_running_loop().create_task(self._drain(proc.stderr, stderr_buf))
+
+        def on_stderr(tail: str) -> None:
+            if not attempt.limit_hit and is_rate_limited(tail):
+                attempt.limit_hit = True
+                log.warning("run %s: provider usage/rate limit reported, killing opencode", handle.run_id)
+                self._kill_group(proc, signal.SIGKILL if os.name == "posix" else None)
+
+        stderr_task = asyncio.get_running_loop().create_task(self._drain(proc.stderr, stderr_buf, on_stderr))
         try:
             assert proc.stdout is not None
             while True:
@@ -397,7 +435,11 @@ class Runner:
             handle.proc = None
 
     @staticmethod
-    async def _drain(stream: asyncio.StreamReader | None, buf: collections.deque[bytes]) -> None:
+    async def _drain(
+        stream: asyncio.StreamReader | None,
+        buf: collections.deque[bytes],
+        on_chunk: Any = None,
+    ) -> None:
         if stream is None:
             return
         while True:
@@ -405,6 +447,9 @@ class Runner:
             if not chunk:
                 return
             buf.append(chunk)
+            if on_chunk is not None:
+                # inspect the recent tail (a marker may straddle two chunks)
+                on_chunk(b"".join(list(buf)[-2:]).decode("utf-8", "replace"))
 
     @staticmethod
     def _kill_group(proc: asyncio.subprocess.Process, sig: Any) -> None:

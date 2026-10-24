@@ -120,11 +120,10 @@ SRC_B_REAL="$(cd "$SRC_BACKEND" && pwd)"
 DST_B_REAL="$(cd "/opt/marketflow/backend" && pwd)"
 if [ "$SRC_B_REAL" != "$DST_B_REAL" ]; then
     echo "    Dong bo ma nguon backend tu $SRC_BACKEND vao /opt/marketflow/backend..."
+    find /opt/marketflow/backend -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
     rsync -a --delete \
         --exclude '.env' \
         --exclude '.seed_v2_done' \
-        --exclude '__pycache__' \
-        --exclude '*.pyc' \
         "$SRC_BACKEND/" /opt/marketflow/backend/
 fi
 
@@ -167,7 +166,7 @@ fi
 # Tao JWT_SECRET duy nhat va bao toan neu da tao truoc do
 EXISTING_JWT=""
 if [ -f "/opt/marketflow/backend/.env" ]; then
-    EXISTING_JWT=$(grep '^JWT_SECRET=' /opt/marketflow/backend/.env | cut -d= -f2- | tr -d '"'\'' \r')
+    EXISTING_JWT=$(grep '^JWT_SECRET=' /opt/marketflow/backend/.env 2>/dev/null | cut -d= -f2- | tr -d '"'\'' \r' || true)
 fi
 
 if [ -n "$EXISTING_JWT" ] && [ "${#EXISTING_JWT}" -ge 32 ] && [ "$EXISTING_JWT" != "dev-only-insecure-secret-change-me" ]; then
@@ -193,13 +192,13 @@ chown -R marketflow:marketflow /opt/marketflow/backend /opt/marketflow/.venv
 
 # Migration Alembic
 echo "    Chay Alembic migration tren marketflow_v2..."
-sudo -u marketflow /opt/marketflow/.venv/bin/alembic -c /opt/marketflow/backend/alembic.ini upgrade head
+sudo -u marketflow bash -c "cd /opt/marketflow/backend && /opt/marketflow/.venv/bin/alembic upgrade head"
 
 # Seed demo chi chay lan dau
 SEED_FLAG="/opt/marketflow/backend/.seed_v2_done"
 if [ ! -f "$SEED_FLAG" ]; then
     echo "    Lan dau cai dat v2: nap du lieu mau (seed demo)..."
-    sudo -u marketflow /opt/marketflow/.venv/bin/python /opt/marketflow/backend/seed/seed_demo.py --force
+    sudo -u marketflow bash -c "cd /opt/marketflow/backend && /opt/marketflow/.venv/bin/python seed/seed_demo.py --force"
     touch "$SEED_FLAG"
     chown marketflow:marketflow "$SEED_FLAG"
     echo "    Da nap du lieu mau thanh cong!"
@@ -243,9 +242,29 @@ nginx -t
 systemctl reload nginx
 
 # ------------------------------------------------------------------------------
-# 7. Khoi dong lai Services & Smoke Tests
+# 7. Cap nhat Runner Sandbox & Khoi dong lai Services
 # ------------------------------------------------------------------------------
-echo "==> [8/8] Khoi dong lai marketflow-api va kiem tra smoke checks..."
+echo "==> [8/8] Cap nhat Runner Sandbox, khoi dong lai services va smoke checks..."
+
+# Cap nhat runner sandbox neu co file opencode trong release
+if [ -f "$SOURCE_ROOT/deploy/opencode/agent/marketflow.md" ]; then
+    echo "    Cap nhat runner sandbox agent va opencode.json..."
+    mkdir -p /opt/marketflow/ai-runner/sandbox/.opencode/agent
+    cp "$SOURCE_ROOT/deploy/opencode/agent/marketflow.md" /opt/marketflow/ai-runner/sandbox/.opencode/agent/marketflow.md
+    cp "$SOURCE_ROOT/deploy/opencode/opencode.json" /opt/marketflow/ai-runner/sandbox/opencode.json
+    chmod -R a+rX /opt/marketflow/ai-runner/sandbox
+    chown -R root:root /opt/marketflow/ai-runner/sandbox/opencode.json
+    chown -R root:root /opt/marketflow/ai-runner/sandbox/.opencode/agent/marketflow.md
+    systemctl restart marketflow-ai-runner
+    sleep 2
+    if ! systemctl is-active --quiet marketflow-ai-runner; then
+        echo "ERROR: marketflow-ai-runner khong khoi dong duoc!" >&2
+        journalctl -u marketflow-ai-runner -n 30 --no-pager
+        exit 1
+    fi
+    echo "    marketflow-ai-runner da duoc khoi dong lai voi sandbox moi."
+fi
+
 systemctl restart marketflow-api
 sleep 3
 

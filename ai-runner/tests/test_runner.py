@@ -6,7 +6,6 @@ import asyncio
 from pathlib import Path
 
 import pytest
-
 from app.config import Settings
 from app.events import AI_EMPTY_RESPONSE, AI_RATE_LIMITED, AI_TIMEOUT
 from app.runner import Runner, RunRequestData
@@ -85,6 +84,32 @@ async def test_freetier_rate_limited():
     assert err_ev is not None
     assert err_ev["code"] == AI_RATE_LIMITED
     assert "giới hạn" in err_ev["message"].lower() or "free" in err_ev.get("detail", "").lower()
+
+
+@pytest.mark.asyncio
+async def test_usage_limit_in_logs_fails_fast_and_cools_down():
+    # opencode only logs "Free usage limit reached" on stderr and then retries forever.
+    runner = make_runner(timeout_s=20.0, fallback_models=["opencode/glm-5.3-flash-free"])
+    loop = asyncio.get_running_loop()
+
+    started = loop.time()
+    handle = runner.new_handle("test_usage_limit_1")
+    events = [e async for e in runner.stream(RunRequestData(prompt="usagelimit"), handle)]
+    elapsed = loop.time() - started
+
+    err_ev = next(e for e in events if e["type"] == "error")
+    assert err_ev["code"] == AI_RATE_LIMITED
+    assert elapsed < 10, f"should fail fast, took {elapsed:.1f}s"  # no fallback, no timeout wait
+    assert runner.cooldown_remaining_s > 0
+
+    # During cooldown the runner answers immediately without spawning opencode.
+    started = loop.time()
+    handle2 = runner.new_handle("test_usage_limit_2")
+    events2 = [e async for e in runner.stream(RunRequestData(prompt="Xin chào"), handle2)]
+    assert [e["type"] for e in events2] == ["run", "error"]
+    assert events2[1]["code"] == AI_RATE_LIMITED
+    assert "cooldown" in events2[1].get("detail", "")
+    assert loop.time() - started < 1
 
 
 @pytest.mark.asyncio

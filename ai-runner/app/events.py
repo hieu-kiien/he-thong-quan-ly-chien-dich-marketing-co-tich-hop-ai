@@ -144,8 +144,7 @@ def parse_line(line: str, state: TurnState) -> list[dict[str, Any]]:
         tool_state = part.get("state") if isinstance(part.get("state"), dict) else {}
         status = tool_state.get("status")
         name = str(part.get("tool") or "")
-        if name.startswith(TOOL_PREFIX):
-            name = name[len(TOOL_PREFIX):]
+        name = name.removeprefix(TOOL_PREFIX)
         ok = status == "completed"
         if status in ("completed", "error"):
             state.tools += 1

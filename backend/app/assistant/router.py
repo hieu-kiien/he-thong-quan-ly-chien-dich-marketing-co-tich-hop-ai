@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 
@@ -72,13 +72,19 @@ def update_thread(
     return chat_service.update_thread(db, user, thread_id, data)
 
 
-@router.delete("/threads/{thread_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Xoá phiên hội thoại")
+@router.delete(
+    "/threads/{thread_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    summary="Xoá phiên hội thoại",
+)
 def delete_thread(
     thread_id: int,
     user: CurrentUser,
     db: DbSession,
-) -> None:
+) -> Response:
     chat_service.delete_thread(db, user, thread_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/threads/{thread_id}/messages", response_model=list[AiMessageOut], summary="Danh sách tin nhắn của phiên")

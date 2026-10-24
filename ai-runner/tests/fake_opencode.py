@@ -40,7 +40,7 @@ def main() -> int:
     elif not sys.stdin.isatty():
         try:
             prompt = sys.stdin.read()
-        except Exception:
+        except Exception:  # noqa: BLE001
             prompt = ""
 
     mode = os.environ.get("FAKE_OPENCODE_MODE", "").lower()
@@ -72,6 +72,18 @@ def main() -> int:
 
     # Hang / timeout simulation
     if mode == "hang" or "hang" in prompt_low:
+        time.sleep(60.0)
+        return 0
+
+    # Real-world free tier exhaustion (observed on the VPS with opencode 1.19.4): the error only
+    # appears in the log stream (stderr with --print-logs) and opencode keeps retrying forever.
+    if mode == "usagelimit" or "usagelimit" in prompt_low:
+        sys.stderr.write(
+            'timestamp=2026-10-24T16:00:51.647Z level=ERROR message="stream error" providerID=opencode '
+            'modelID=big-pickle error.error="AI_APICallError: Free usage limit reached. '
+            'Subscribe to OpenCode Go to keep going: https://opencode.ai/go"\n'
+        )
+        sys.stderr.flush()
         time.sleep(60.0)
         return 0
 

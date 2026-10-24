@@ -7,8 +7,8 @@ from pathlib import Path
 
 import httpx
 import pytest
-
 from app.config import Settings
+
 from app.main import app, runner
 
 FAKE_BIN = str(Path(__file__).parent / "fake_opencode.py")
