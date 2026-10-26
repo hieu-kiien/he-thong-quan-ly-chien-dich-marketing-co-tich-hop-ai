@@ -47,11 +47,14 @@ npm run build
 
 ### 1.4. Đánh giá Tự động Prompt Trợ lý AI (Evaluate Assistant)
 ```powershell
-# Chạy đánh giá định lượng 8 ca kiểm thử qua 3 phiên bản prompt (Offline Dry-Run)
+# Chạy chấm điểm nhanh từ bộ transcripts đã lưu trên VPS (không tốn token mô hình)
+python scripts/evaluate_assistant.py --all-versions --transcripts docs/eval/transcripts.json
+
+# Chạy tự kiểm tra bộ chấm điểm Offline (Harness Self-Test qua fixtures)
 python scripts/evaluate_assistant.py --dry-run --all-versions
 
-# Chạy đánh giá trực tiếp với AI Runner đang hoạt động
-python scripts/evaluate_assistant.py --prompt-version deploy/opencode/prompts/v3.md
+# Chạy đánh giá trực tiếp trên VPS với OpenCode CLI
+python3 scripts/evaluate_assistant.py --engine opencode --opencode-bin /opt/opencode/bin/opencode --prompt-version v4 --transcripts docs/eval/transcripts.json --output docs/eval/REAL_EVAL_REPORT.md
 ```
 
 ### 1.5. Kiểm thử Tích hợp Đầu-Cuối (Playwright E2E Test Suite)
@@ -90,7 +93,7 @@ Các số liệu ghi nhận trực tiếp từ các lệnh thực thi trong hệ
 | **Frontend Lint** | ESLint 9 | 100+ component & hooks | **0 cảnh báo (0 warnings)** | 7.35 giây |
 | **Frontend Production Build** | Vite 5.4.21 | 2.788 modules | **Thành công (`dist/index.html`)** | 11.63 giây |
 | **Frontend Playwright E2E** | Playwright 1.63.0 | 28 test cases | **28 / 28 PASSED (100%)** | 1.4 phút (84 giây) |
-| **AI Prompt Evaluation** | `evaluate_assistant.py` | 8 ca kiểm thử định lượng | **Dry-Run (Harness Self-Test): Đạt**<br>*(Tự kiểm tra bộ chấm điểm bằng phản hồi mẫu viết tay; KHÔNG phản ánh kết quả mô hình thật)*<br>Chạy thật trên VPS: **Chưa chạy — sẽ cập nhật sau khi triển khai** | 0.85 giây |
+| **AI Prompt Evaluation** | `evaluate_assistant.py` | 8 ca kiểm thử định lượng | **Thực nghiệm VPS (26/10/2026): V4 đạt 7 / 8 ca (87.5%)**<br>(V1: 6/8, V2: 5/8, V3: 6/8, V4: 7/8 trên `opencode/big-pickle`)<br>Live turn: **109s**, 2 tool calls (`list_campaigns` + `propose_content_drafts`), khớp 100% CSDL<br>Minh chứng: [`transcripts.json`](file:///c:/Users/hieuk/Desktop/Ứng%20Dụng%20AI/docs/eval/transcripts.json), [`REAL_EVAL_REPORT.md`](file:///c:/Users/hieuk/Desktop/Ứng%20Dụng%20AI/docs/eval/REAL_EVAL_REPORT.md), [`live_turn_20261026.md`](file:///c:/Users/hieuk/Desktop/Ứng%20Dụng%20AI/docs/eval/live_turn_20261026.md)<br>Dry-run (Harness Self-Test): **8 / 8 PASSED (100%)** | Chạy thật VPS: ~120s<br>Chấm lại: 0.12s |
 | **Backend Full Test Suite** | Pytest 9.1.0 | 76 test cases | **76 / 76 PASSED (100%)** | 39.09 giây |
 
 ---

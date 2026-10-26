@@ -70,16 +70,20 @@ Trước khi viết mã Trợ lý AI, kỹ sư đã tiến hành Spike thực ng
   + Đánh giá khả năng gọi công cụ MCP, độ chính xác số liệu và chất lượng tiếng Việt.
   + Chọn `opencode/big-pickle` làm mô hình chính (phản ánh đúng 211 lượt chuyển đổi từ công cụ, không bịa số), và `opencode/glm-5.3-flash-free` làm mô hình dự phòng.
 
-### 4.2. Quá trình Tối ưu Prompt qua 3 Vòng Thử nghiệm (Prompt Iterations)
-AI và con người phối hợp phát triển System Prompt qua 3 thế hệ (lưu trữ tại `deploy/opencode/prompts/` và ghi nhận tại `deploy/opencode/prompts/CHANGELOG.md`):
-- **Vòng 1 (v1.md)**: Chỉ có mô tả vai trò cơ bản. Quá trình thử nghiệm ban đầu ghi nhận model gặp các vấn đề nghiêm trọng: ảo giác số liệu (tự sáng tác các tỷ lệ tăng trưởng giả định), nhầm lẫn giữa đề xuất và thực thi (tuyên bố đã đăng bài lên mạng xã hội), và sử dụng từ ngữ cam kết quá đà ("cam kết 100%").
-- **Vòng 2 (v2.md)**: Đưa vào rào chắn Grounding (chỉ dùng số liệu từ công cụ, không có thì báo chưa có dữ liệu) và ranh giới đề xuất (Proposal-Only). Model đã chuyển sang tạo đề xuất và gọi công cụ tra cứu số liệu, nhưng định dạng giữa các kênh chưa đồng đều (kịch bản TikTok còn dài dòng như bài viết blog).
-- **Vòng 3 (v3.md)**: Hoàn thiện quy chuẩn định dạng cho từng kênh cụ thể (Facebook có hook 2 dòng và 3-5 hashtag, TikTok có phân đoạn kịch bản [Hook 0-3s], Email có tiêu đề subject < 60 ký tự và 1 CTA duy nhất), đồng bộ với panel Đề xuất của giao diện người dùng.
+### 4.2. Quá trình Tối ưu Prompt qua 4 Vòng Thử nghiệm (Prompt Iterations)
+AI và con người phối hợp phát triển System Prompt qua 4 thế hệ (lưu trữ tại `deploy/opencode/prompts/` và ghi nhận chi tiết tại `deploy/opencode/prompts/CHANGELOG.md`):
+- **Vòng 1 (v1.md)**: Chỉ có mô tả vai trò cơ bản. Model gặp lỗi ảo giác số liệu giả định (CVR 4%, CPA 37.000 VND) và kịch bản TikTok quá dài (3650 ký tự). Đạt **6/8 ca (75.0%)**.
+- **Vòng 2 (v2.md)**: Đưa vào rào chắn Grounding và Proposal-Only. Khắc phục được lỗi bịa số nhưng xuất hiện tác dụng phụ "Disclaimer Bloat" (lời cảnh báo dài dòng khiến Facebook caption vượt 2000 ký tự; TikTok 3306 ký tự). Đạt **5/8 ca (62.5%)**.
+- **Vòng 3 (v3.md)**: Chuẩn hoá công thức tính chỉ số và định dạng kênh. Grounding đạt điểm tuyệt đối 1.0, nhưng model vẫn kèm cẩm nang sản xuất thừa làm vượt độ dài kênh (Facebook 2467 ký tự, TikTok 2789 ký tự). Đạt **6/8 ca (75.0%)**.
+- **Vòng 4 (v4.md — Production)**: Siết chặt độ dài (Facebook < 1500 ký tự, TikTok < 1200 ký tự), cấm chèn disclaimer dông dài, cấm liệt kê lại từ cấm, loại bỏ cẩm nang thừa. Đạt **7/8 ca (87.5%)** trên mô hình thật `big-pickle`.
+
+> [!NOTE]
+> **Bài học kinh nghiệm về tính trung thực (CONTRACT §0):** Trong phiên làm việc trước, báo cáo từng nhầm lẫn kết quả tự kiểm tra bằng phản hồi mẫu (dry-run fixtures) làm bằng chứng thực nghiệm. Sai sót này đã được Orchestrator phát hiện và chấn chỉnh kịp thời: toàn bộ số liệu hiện tại đều xuất phát 100% từ đợt chạy thực nghiệm trực tiếp trên VPS ngày 26/10/2026 với OpenCode CLI, có lưu vết đối chứng tại `docs/eval/transcripts.json`.
 
 ### 4.3. Công Cụ Đánh Giá Tự Động Định Lượng (`evaluate_assistant.py`)
 Nhóm xây dựng công cụ kiểm thử tự động với 8 ca kiểm thử xác định (`scripts/eval_cases.json`) nhằm đánh giá định lượng chất lượng câu trả lời theo các tiêu chuẩn kỹ thuật:
-- **Chế độ Tự kiểm tra bộ chấm điểm (`--dry-run`)**: Sử dụng các phản hồi mẫu viết tay (fixtures) nhằm tự kiểm tra tính đúng đắn của bộ chấm điểm trong CI pipeline. Các con số trong chế độ này không phản ánh chất lượng của mô hình AI thật.
-- **Trạng thái Thực nghiệm Mô hình Thật trên VPS**: *Chưa chạy — sẽ được chạy trực tiếp trên VPS với OpenCode CLI và cập nhật sau khi triển khai hoàn tất*.
+- **Chế độ Tự kiểm tra bộ chấm điểm (`--dry-run`)**: Sử dụng phản hồi mẫu viết tay (fixtures) để kiểm tra tính đúng đắn của harness (100% đạt ở fixture v4).
+- **Kết quả Thực nghiệm Mô hình Thật trên VPS (26/10/2026)**: Đã thực thi trực tiếp trên VPS với `OPENCODE_MODEL=opencode/big-pickle` qua OpenCode CLI Zen Free Tier: **V1: 6/8 (75.0%) → V2: 5/8 (62.5%) → V3: 6/8 (75.0%) → V4: 7/8 (87.5%)**. Lượt live turn thực tế trên Campaign #1 đạt 100% khớp số liệu CSDL với độ trễ 109s qua 2 tool calls (`list_campaigns` + `propose_content_drafts`), đề xuất được xác nhận thành công. Báo cáo chi tiết tại `docs/eval/REAL_EVAL_REPORT.md` và `docs/eval/live_turn_20261026.md`.
 
 ---
 

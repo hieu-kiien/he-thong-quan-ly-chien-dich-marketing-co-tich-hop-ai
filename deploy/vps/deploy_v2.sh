@@ -266,7 +266,7 @@ if [ -f "$SOURCE_ROOT/deploy/opencode/agent/marketflow.md" ]; then
 fi
 
 systemctl restart marketflow-api
-sleep 3
+sleep 6
 
 if ! systemctl is-active --quiet marketflow-api; then
     echo "ERROR: marketflow-api service khong chay duoc sau khi restart!" >&2
