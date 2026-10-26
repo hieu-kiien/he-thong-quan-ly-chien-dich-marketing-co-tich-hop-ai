@@ -32,7 +32,8 @@ from app.schemas.ai import (
     AiThreadUpdate,
 )
 from app.schemas.common import CampaignRef
-from app.services import channel_service
+from app.schemas.stats import StatsFilters
+from app.services import brand_service, campaign_service, channel_service, stats_service
 from app.services.common import like_pattern
 
 logger = logging.getLogger(__name__)
@@ -113,13 +114,19 @@ def update_thread(db: Session, user: User, thread_id: int, data: AiThreadUpdate)
         raise PermissionDenied("Chỉ chủ phiên mới được sửa thông tin phiên")
 
     if data.campaign_id is not None:
+        new_campaign_id: int | None
         if data.campaign_id == 0:
-            thread.campaign_id = None
+            new_campaign_id = None
         else:
             camp = db.get(Campaign, data.campaign_id)
             if camp is None:
                 raise ValidationFailed(fields={"campaign_id": "Chiến dịch không tồn tại"})
-            thread.campaign_id = camp.id
+            new_campaign_id = camp.id
+        if new_campaign_id != thread.campaign_id:
+            thread.campaign_id = new_campaign_id
+            # Đổi ngữ cảnh chiến dịch: bắt đầu phiên OpenCode mới để lượt kế tiếp nhận ảnh chụp
+            # dữ liệu của chiến dịch mới (kèm tóm tắt hội thoại trước đó).
+            thread.opencode_session_id = None
 
     if data.title is not None:
         new_title = data.title.strip()
@@ -151,22 +158,79 @@ def list_messages(db: Session, user: User, thread_id: int) -> list[AiMessageOut]
 
 # --- Prompt Builder -----------------------------------------------------------
 
+def _fmt_rate(value: float | None) -> str:
+    return "—" if value is None else f"{value * 100:.2f}%"
+
+
+def _fmt_money(value: Any) -> str:
+    return "—" if value is None else f"{int(value):,} VND".replace(",", ".")
+
+
+def _snapshot_lines(db: Session, user: User, thread: AiThread) -> list[str]:
+    """Ảnh chụp dữ liệu (đọc qua service layer, đúng quyền người dùng) gửi kèm lượt đầu của phiên.
+
+    Mỗi lần AI gọi công cụ là thêm một lượt gọi mô hình. Với hạn mức miễn phí, đưa sẵn dữ liệu
+    hay dùng giúp trả lời nhanh hơn và tốn ít lượt hơn; AI vẫn gọi công cụ khi cần dữ liệu khác.
+    """
+    lines: list[str] = []
+    brand = brand_service.get_brand_profile(db, user)
+    if brand.brand_name:
+        lines.append(f"- Thương hiệu: {brand.brand_name}. Giọng văn: {brand.tone_of_voice[:200] or '—'}")
+    if brand.banned_keywords:
+        words = ", ".join(f'"{k.keyword}"' for k in brand.banned_keywords[:20])
+        lines.append(f"- Từ cấm của thương hiệu: {words}")
+
+    if thread.campaign_id:
+        try:
+            camp = campaign_service.get_campaign(db, user, thread.campaign_id)
+        except NotFound:
+            return lines
+        lines.append(
+            f"- Chiến dịch #{camp.id} '{camp.name}': mục tiêu {camp.goal}, trạng thái {camp.status}, "
+            f"{camp.start_date:%d/%m/%Y} - {camp.end_date:%d/%m/%Y}, ngân sách {_fmt_money(camp.budget)}"
+        )
+        lines.append(f"  - Mục tiêu chi tiết: {camp.objective[:300]}")
+        lines.append(f"  - Đối tượng: {camp.target_audience[:300]}")
+        lines.append(f"  - Sản phẩm: {camp.product[:300]}")
+        if camp.key_message:
+            lines.append(f"  - Thông điệp chính: {camp.key_message[:300]}")
+        channels = ", ".join(
+            f"{c.code} (dự kiến {_fmt_money(c.planned_budget)})" for c in camp.channels
+        )
+        lines.append(f"  - Kênh của chiến dịch: {channels}")
+        s = camp.stats
+        if s.views or s.clicks or s.conversions or s.cost:
+            lines.append(
+                f"  - Số liệu tổng (từ CSDL): views {s.views}, clicks {s.clicks}, chuyển đổi {s.conversions}, "
+                f"chi phí {_fmt_money(s.cost)}, CTR {_fmt_rate(s.ctr)}, CVR {_fmt_rate(s.cvr)}, "
+                f"đã dùng {s.budget_used_pct if s.budget_used_pct is not None else '—'}% ngân sách"
+            )
+            for row in stats_service.get_by_channel(db, user, StatsFilters(campaign_id=camp.id)):
+                lines.append(
+                    f"    - {row.channel.code}: views {row.views}, clicks {row.clicks}, chuyển đổi {row.conversions}, "
+                    f"chi phí {_fmt_money(row.cost)}, CTR {_fmt_rate(row.ctr)}, CPA {_fmt_money(row.cpa)}"
+                )
+        else:
+            lines.append("  - Số liệu: CHƯA CÓ dữ liệu hiệu quả nào được nhập cho chiến dịch này.")
+    return lines
+
+
 def build_prompt(db: Session, user: User, thread: AiThread, user_content: str) -> str:
     lines = ["[NGỮ CẢNH]"]
     lines.append(f"- Người dùng: {user.full_name} (Vai trò: {user.role.value})")
     today = today_vn()
     lines.append(f"- Hôm nay: {today:%d/%m/%Y} (Múi giờ Asia/Ho_Chi_Minh)")
 
-    # Chiến dịch gắn kèm (nếu có)
-    if thread.campaign_id:
-        camp = db.get(Campaign, thread.campaign_id)
-        if camp:
-            lines.append(
-                f"- Chiến dịch gắn với phiên: #{camp.id} '{camp.name}' | "
-                f"Mục tiêu: {camp.goal.value} | Trạng thái: {camp.status.value} | "
-                f"Ngân sách: {int(camp.budget):,} VND | "
-                f"Thời gian: {camp.start_date:%d/%m/%Y} - {camp.end_date:%d/%m/%Y}"
-            )
+    first_turn_of_session = not thread.opencode_session_id
+    if first_turn_of_session:
+        # Lượt đầu của phiên OpenCode: gửi ảnh chụp dữ liệu; các lượt sau phiên đã nhớ ngữ cảnh.
+        lines.extend(_snapshot_lines(db, user, thread))
+        lines.append(
+            f"- Ảnh chụp dữ liệu trên lấy lúc {now_utc():%H:%M} UTC; dùng ngay nếu đủ, "
+            "chỉ gọi công cụ khi cần dữ liệu khác hoặc mới hơn."
+        )
+    elif thread.campaign_id:
+        lines.append(f"- Chiến dịch gắn với phiên: #{thread.campaign_id}")
 
     # Kênh tiếp thị đang kích hoạt
     active_channels = channel_service.list_channels(db, user, include_inactive=False)
