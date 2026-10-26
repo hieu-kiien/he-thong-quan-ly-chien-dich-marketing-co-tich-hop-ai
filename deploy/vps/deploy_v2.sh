@@ -212,6 +212,8 @@ fi
 echo "==> [5/8] Cap nhat cau hinh marketflow-api.service..."
 cp "${SOURCE_ROOT}/deploy/vps/marketflow-api.service" /etc/systemd/system/marketflow-api.service
 systemctl daemon-reload
+# Sao luu hang ngay phai tro vao CSDL v2 (cron /etc/cron.d/marketflow-backup goi script nay)
+install -m 755 "${SOURCE_ROOT}/deploy/vps/marketflow-backup.sh" /usr/local/bin/marketflow-backup
 
 # ------------------------------------------------------------------------------
 # 5. Trien khai Frontend Atomic
