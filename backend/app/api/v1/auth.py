@@ -1,12 +1,12 @@
-"""Router xác thực: đăng nhập, đăng xuất, thông tin cá nhân, đổi mật khẩu."""
+"""Router xác thực: đăng nhập, đăng ký, đăng xuất, thông tin cá nhân, đổi mật khẩu."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, status
 
 from app.core.security import CurrentUser, DbSession
 from app.schemas.common import Message
-from app.schemas.user import ChangePasswordIn, LoginIn, TokenOut, UserOut
+from app.schemas.user import ChangePasswordIn, LoginIn, RegisterIn, TokenOut, UserOut
 from app.services import auth_service
 
 router = APIRouter(prefix="/auth", tags=["Xác thực"])
@@ -22,6 +22,11 @@ def _client_ip(request: Request) -> str | None:
 @router.post("/login", response_model=TokenOut)
 def login(data: LoginIn, request: Request, db: DbSession) -> TokenOut:
     return auth_service.login(db, data, _client_ip(request))
+
+
+@router.post("/register", response_model=TokenOut, status_code=status.HTTP_201_CREATED)
+def register(data: RegisterIn, db: DbSession) -> TokenOut:
+    return auth_service.register(db, data)
 
 
 @router.get("/me", response_model=UserOut)

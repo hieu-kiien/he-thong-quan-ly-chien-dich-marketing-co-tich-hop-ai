@@ -1,11 +1,11 @@
-"""Đăng nhập, đăng xuất (thu hồi token), đổi mật khẩu."""
+"""Đăng nhập, đăng ký, đăng xuất (thu hồi token), đổi mật khẩu."""
 
 from __future__ import annotations
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.errors import PermissionDenied, Unauthorized, ValidationFailed
+from app.core.errors import Conflict, PermissionDenied, Unauthorized, ValidationFailed
 from app.core.security import (
     create_access_token,
     hash_password,
@@ -14,7 +14,8 @@ from app.core.security import (
     verify_password,
 )
 from app.models import User
-from app.schemas.user import ChangePasswordIn, LoginIn, TokenOut, UserOut
+from app.models.enums import UserRole
+from app.schemas.user import ChangePasswordIn, LoginIn, RegisterIn, TokenOut, UserOut
 
 
 def _token_out(user: User) -> TokenOut:
@@ -32,6 +33,27 @@ def login(db: Session, data: LoginIn, client_ip: str | None) -> TokenOut:
         raise PermissionDenied("Tài khoản đã bị khoá, vui lòng liên hệ quản lý", code="ACCOUNT_DISABLED")
     login_rate_limiter.reset(key)
     return _token_out(user)
+
+
+def register(db: Session, data: RegisterIn) -> TokenOut:
+    problem = validate_password_strength(data.password)
+    if problem:
+        raise ValidationFailed(problem, fields={"password": problem})
+    exists = db.execute(select(User.id).where(func.lower(User.email) == data.email)).first()
+    if exists:
+        raise Conflict("Email đã được sử dụng", code="EMAIL_EXISTS", fields={"email": "Email đã được sử dụng"})
+    new_user = User(
+        email=data.email,
+        full_name=data.full_name,
+        role=UserRole.MARKETER,
+        password_hash=hash_password(data.password),
+        is_active=True,
+        token_version=0,
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return _token_out(new_user)
 
 
 def logout(db: Session, user: User) -> None:
