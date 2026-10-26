@@ -24,14 +24,19 @@ import argparse
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
-import tempfile
+import threading
+import time
 import urllib.error
 import urllib.request
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+
+class RateLimitedError(RuntimeError):
+    """Nhà cung cấp mô hình báo hết hạn mức — dừng đánh giá, lưu phần đã chạy để chạy tiếp sau."""
 
 # Ensure UTF-8 stdout on Windows
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
@@ -292,13 +297,42 @@ def call_opencode_direct(
 
     try:
         temp_agent_file.write_text(agent_content, encoding="utf-8")
-        cmd = [opencode_bin, "run", "--agent", temp_agent_file.stem, "--format", "json", "--", prompt]
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=150, check=False)
-        if proc.returncode != 0:
-            raise RuntimeError(f"Lỗi OpenCode CLI (code {proc.returncode}): {proc.stderr}")
+        # --print-logs: lỗi nhà cung cấp (vd "Free usage limit reached") chỉ xuất hiện trong log,
+        # OpenCode sẽ tự retry mãi — nên đọc stderr để dừng ngay thay vì chờ timeout.
+        cmd = [opencode_bin, "run", "--print-logs", "--log-level", "WARN",
+               "--agent", temp_agent_file.stem, "--format", "json", "--title", "eval", "--", prompt]
+        proc = subprocess.Popen(
+            cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, encoding="utf-8", errors="replace",
+        )
+        stderr_lines: list[str] = []
+        limit_hit = threading.Event()
 
-        accumulated_text = ""
-        for line in proc.stdout.splitlines():
+        def _watch_stderr() -> None:
+            assert proc.stderr is not None
+            for line in proc.stderr:
+                stderr_lines.append(line)
+                if "free usage limit" in line.lower() or "freetiererror" in line.lower():
+                    limit_hit.set()
+                    proc.kill()
+                    return
+
+        watcher = threading.Thread(target=_watch_stderr, daemon=True)
+        watcher.start()
+        try:
+            stdout, _ = proc.communicate(timeout=150)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.communicate()
+            raise RuntimeError("OpenCode CLI quá thời gian 150s") from None
+        watcher.join(timeout=2)
+        if limit_hit.is_set():
+            raise RateLimitedError("Nhà cung cấp báo hết hạn mức miễn phí (Free usage limit reached)")
+        if proc.returncode != 0:
+            raise RuntimeError(f"Lỗi OpenCode CLI (code {proc.returncode}): {''.join(stderr_lines)[-500:]}")
+
+        parts: list[str] = []
+        for line in stdout.splitlines():
             line = line.strip()
             if not line:
                 continue
@@ -306,11 +340,11 @@ def call_opencode_direct(
                 ev = json.loads(line)
                 if ev.get("type") == "text":
                     part = ev.get("part", {})
-                    if isinstance(part, dict) and "text" in part:
-                        accumulated_text += part.get("text", "")
+                    if isinstance(part, dict) and part.get("text"):
+                        parts.append(part["text"].strip())
             except json.JSONDecodeError:
                 continue
-        return accumulated_text
+        return "\n\n".join(parts)
     finally:
         if temp_agent_file.exists():
             temp_agent_file.unlink()
@@ -327,6 +361,8 @@ def run_evaluation_for_version(
     runner_token: str,
     opencode_bin: str,
     no_tools: bool,
+    cache: dict[str, dict[str, Any]] | None = None,
+    on_record: Any = None,
 ) -> list[dict[str, Any]]:
     system_prompt = ""
     if prompt_file and prompt_file.exists():
@@ -338,8 +374,13 @@ def run_evaluation_for_version(
             continue
 
         cid = case["id"]
+        started = time.monotonic()
+        cached = (cache or {}).get(version_label, {}).get(cid) if not dry_run else None
         if dry_run:
             response = fixtures.get(version_label, {}).get(cid, "")
+        elif cached is not None:
+            # Đã chạy thật trước đó (bản ghi lưu trong transcripts) — không gọi lại mô hình
+            response = cached["response"]
         else:
             if not prompt_file or not prompt_file.exists():
                 raise ValueError(f"Thiếu file prompt cho phiên bản {version_label}: {prompt_file}")
@@ -349,7 +390,19 @@ def run_evaluation_for_version(
                 response = call_ai_runner(case["prompt"], system_prompt, runner_url, runner_token)
 
         eval_res = evaluate_response(case, response)
+        eval_res["response"] = response
+        eval_res["latency_s"] = cached["latency_s"] if cached else round(time.monotonic() - started, 1)
         results.append(eval_res)
+        if not dry_run and cached is None and cache is not None:
+            cache.setdefault(version_label, {})[cid] = {
+                "response": response,
+                "latency_s": eval_res["latency_s"],
+                "recorded_at": datetime.now(UTC).isoformat(timespec="seconds"),
+            }
+            if on_record:
+                on_record()
+        print(f"[{version_label}] {cid}: {'ĐẠT' if eval_res['passed'] else 'KHÔNG ĐẠT'} ({eval_res['latency_s']}s)",
+              file=sys.stderr, flush=True)
 
     return results
 
@@ -451,6 +504,11 @@ def main() -> int:
     parser.add_argument("--runner-url", default=os.getenv("RUNNER_URL", "http://127.0.0.1:8100"), help="Địa chỉ AI Runner")
     parser.add_argument("--runner-token", default=os.getenv("RUNNER_TOKEN", ""), help="Mã bí mật AI Runner")
     parser.add_argument("--output", help="Đường dẫn lưu báo cáo markdown kết quả")
+    parser.add_argument(
+        "--transcripts",
+        default="docs/eval/transcripts.json",
+        help="(chạy thật) Tệp JSON lưu toàn văn phản hồi của mô hình; ca đã có sẽ không gọi lại (chạy tiếp được)",
+    )
     args = parser.parse_args()
 
     root_dir = Path(__file__).resolve().parents[1]
@@ -472,20 +530,37 @@ def main() -> int:
         else:
             target_versions = ["v3"]
 
+    cache: dict[str, dict[str, Any]] | None = None
+    transcripts_path = root_dir / args.transcripts
+    if not args.dry_run:
+        cache = json.loads(transcripts_path.read_text(encoding="utf-8")) if transcripts_path.exists() else {}
+
+    def save_cache() -> None:
+        transcripts_path.parent.mkdir(parents=True, exist_ok=True)
+        transcripts_path.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
+
     for v in target_versions:
         prompt_file = prompts_dir / f"{v}.md"
-        res = run_evaluation_for_version(
-            version_label=v,
-            prompt_file=prompt_file,
-            test_cases=test_cases,
-            fixtures=fixtures,
-            dry_run=args.dry_run,
-            engine=args.engine,
-            runner_url=args.runner_url,
-            runner_token=args.runner_token,
-            opencode_bin=args.opencode_bin,
-            no_tools=args.no_tools,
-        )
+        try:
+            res = run_evaluation_for_version(
+                version_label=v,
+                prompt_file=prompt_file,
+                test_cases=test_cases,
+                fixtures=fixtures,
+                dry_run=args.dry_run,
+                engine=args.engine,
+                runner_url=args.runner_url,
+                runner_token=args.runner_token,
+                opencode_bin=args.opencode_bin,
+                no_tools=args.no_tools,
+                cache=cache,
+                on_record=save_cache,
+            )
+        except RateLimitedError as exc:
+            done = sum(len(c) for c in (cache or {}).values())
+            print(f"\n[DỪNG] {exc}. Đã lưu {done} phản hồi thật vào {transcripts_path}. "
+                  "Chạy lại lệnh khi có hạn mức để tiếp tục các ca còn lại.", file=sys.stderr)
+            return 3
         version_results[v] = res
 
     report_md = format_markdown_report(version_results, dry_run=args.dry_run, engine=args.engine)
