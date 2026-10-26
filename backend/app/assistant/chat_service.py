@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.assistant.bus import event_bus
 from app.assistant.context import get_db_context
 from app.assistant.runner_client import RunnerClient, default_runner
+from app.assistant.tools import registry
 from app.core.config import settings
 from app.core.errors import Conflict, NotFound, PermissionDenied, ValidationFailed
 from app.core.security import encode_token
@@ -258,6 +259,11 @@ def _format_sse(event_type: str, data: Any) -> str:
     return f"event: {event_type}\ndata: {payload}\n\n"
 
 
+def _join_parts(parts: list[str]) -> str:
+    """Ghép các part văn bản của OpenCode thành một markdown (mỗi part là một khối riêng)."""
+    return "\n\n".join(p.strip() for p in parts if p and p.strip())
+
+
 # --- Luồng thực thi Turn Stream (SSE) -----------------------------------------
 
 async def run_turn_stream(
@@ -390,12 +396,17 @@ async def run_turn_stream(
                     part = ev.get("text", "")
                     if part:
                         accumulated_parts.append(part)
-                        full_content = "".join(accumulated_parts)
+                        # OpenCode gửi từng "part" văn bản hoàn chỉnh (trước/sau khi gọi công cụ)
+                        full_content = _join_parts(accumulated_parts)
                         await out_queue.put(_format_sse("text", {"content": full_content}))
 
                 elif etype == "tool":
-                    call_id = str(ev.get("id") or ev.get("name"))
-                    # Bỏ qua nếu đã được MCP event bus phát
+                    name = str(ev.get("name") or "")
+                    # Công cụ MarketFlow chạy qua MCP của chính backend nên event bus đã phát
+                    # running/done kèm tóm tắt tiếng Việt — bỏ bản sao từ runner để tránh trùng.
+                    if registry.get(name) is not None:
+                        continue
+                    call_id = str(ev.get("id") or name)
                     if call_id not in emitted_tools:
                         emitted_tools.add(call_id)
                         await out_queue.put(
@@ -432,7 +443,7 @@ async def run_turn_stream(
             )
 
         finally:
-            full_content = "".join(accumulated_parts)
+            full_content = _join_parts(accumulated_parts)
             # Cập nhật DB trạng thái kết thúc
             with get_db_context() as db_final:
                 msg = db_final.get(AiMessage, assistant_msg_id)

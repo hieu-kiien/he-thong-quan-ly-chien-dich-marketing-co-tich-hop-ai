@@ -28,17 +28,6 @@ class LoginIn(InputModel):
         return v.lower()
 
 
-class RegisterIn(InputModel):
-    email: EmailStr
-    full_name: str = Field(min_length=2, max_length=120)
-    password: str = Field(min_length=1, max_length=128)
-
-    @field_validator("email")
-    @classmethod
-    def _lower(cls, v: str) -> str:
-        return v.lower()
-
-
 class TokenOut(ORMModel):
     access_token: str
     token_type: str = "bearer"

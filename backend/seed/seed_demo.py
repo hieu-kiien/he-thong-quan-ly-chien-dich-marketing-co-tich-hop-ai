@@ -349,7 +349,6 @@ def seed_demo_data(reset: bool = False) -> None:
                 "body": "3 chai — 3 cá tính:\n- Đen nguyên bản cho ngày cần tập trung tối đa.\n- Cam vàng tươi mát cho buổi chiều sảng khoái.\n- Hạnh nhân béo nhẹ cho buổi sáng thư thả.\n\nBạn chọn hương vị nào cho thứ Hai năng suất?",
                 "cta": "Xem thêm tại link trên bio",
                 "status": ContentStatus.APPROVED,
-                "origin": ContentOrigin.AI,
                 "created_by": marketer1,
                 "review_decision": ReviewDecision.APPROVED,
                 "review_comment": "Nội dung chuẩn brand guideline, hình ảnh phối màu rất tốt. Đã duyệt.",
@@ -391,7 +390,6 @@ def seed_demo_data(reset: bool = False) -> None:
                 "body": "Chào bạn,\n\nBạn đã bao giờ tự tay ngửi hạt cà phê vừa rang xong và phân biệt được nốt hương hoa quả với hương chocolate chưa?\n\nCuối tuần này, Trưởng xưởng rang An Nam thân mời bạn tham gia buổi Cupping thân mật tại số 12 Võ Thị Sáu...",
                 "cta": "Đăng ký giữ chỗ Workshop",
                 "status": ContentStatus.DRAFT,
-                "origin": ContentOrigin.AI,
                 "created_by": manager,
             },
         ]

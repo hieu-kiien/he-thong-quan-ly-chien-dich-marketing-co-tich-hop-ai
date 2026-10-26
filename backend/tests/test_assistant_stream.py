@@ -106,7 +106,12 @@ def test_sse_happy_path(
         {"type": "run", "run_id": "run_test_123"},
         {"type": "queued", "position": 1},
         {"type": "session", "id": "ses_opencode_456"},
-        {"type": "text", "text": "Chào bạn! "},
+        # Giống OpenCode thật: một part văn bản trước khi gọi công cụ, một part sau đó
+        {"type": "text", "text": "Tôi sẽ xem số liệu trước."},
+        # Công cụ MarketFlow (đi qua MCP, event bus đã phát) → runner không được phát trùng
+        {"type": "tool", "name": "get_stats", "status": "done", "input": {}, "output": "{}"},
+        # Công cụ ngoài MarketFlow (built-in bị chặn) → vẫn hiển thị để minh bạch
+        {"type": "tool", "id": "call_read_1", "name": "read", "status": "error", "input": {}},
         {"type": "text", "text": "Dưới đây là ý tưởng marketing."},
         {"type": "done", "model": "test-zen-model", "latency_ms": 1250},
     ])
@@ -132,9 +137,14 @@ def test_sse_happy_path(
     assert "text" in event_names
     assert "message_end" in event_names
 
-    # Kiểm tra nội dung text tích luỹ
+    # Kiểm tra nội dung text tích luỹ: các part được ghép thành khối riêng, không dính chữ
+    expected = "Tôi sẽ xem số liệu trước.\n\nDưới đây là ý tưởng marketing."
     text_events = [e[1]["content"] for e in events if e[0] == "text"]
-    assert "Chào bạn! Dưới đây là ý tưởng marketing." in text_events[-1]
+    assert text_events[-1] == expected
+
+    # Không phát trùng tool_call cho công cụ MarketFlow; công cụ khác vẫn hiển thị
+    tool_events = [e[1] for e in events if e[0] == "tool_call"]
+    assert [t["name"] for t in tool_events] == ["read"]
 
     # Kiểm tra DB
     db_thread = db.get(AiThread, thread_id)
@@ -148,7 +158,7 @@ def test_sse_happy_path(
     assert db_messages[0].role == AiMessageRole.USER
     assert db_messages[1].role == AiMessageRole.ASSISTANT
     assert db_messages[1].status == AiMessageStatus.COMPLETE
-    assert db_messages[1].content == "Chào bạn! Dưới đây là ý tưởng marketing."
+    assert db_messages[1].content == expected
     assert db_messages[1].model == "test-zen-model"
     assert db_messages[1].latency_ms == 1250
 

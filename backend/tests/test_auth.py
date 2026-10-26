@@ -90,33 +90,3 @@ def test_change_password(client: TestClient, marketer1_headers: dict[str, str], 
     # New token works
     new_resp = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {new_token}"})
     assert new_resp.status_code == 200
-
-
-def test_register_success_and_validation(client: TestClient, manager_user: User):
-    # Weak password rejected
-    weak = client.post(
-        "/api/v1/auth/register",
-        json={"email": "newuser@marketflow.vn", "full_name": "Nguyễn Văn Mới", "password": "short"},
-    )
-    assert weak.status_code == 422
-    assert weak.json()["detail"]["code"] == "VALIDATION_ERROR"
-
-    # Successful registration defaults to MARKETER and issues JWT
-    resp = client.post(
-        "/api/v1/auth/register",
-        json={"email": "NewUser@MarketFlow.vn", "full_name": "Nguyễn Văn Mới", "password": "NewUser@123"},
-    )
-    assert resp.status_code == 201
-    data = resp.json()
-    assert "access_token" in data
-    assert data["user"]["email"] == "newuser@marketflow.vn"
-    assert data["user"]["full_name"] == "Nguyễn Văn Mới"
-    assert data["user"]["role"] == "MARKETER"
-
-    # Duplicate email rejected (409)
-    dup = client.post(
-        "/api/v1/auth/register",
-        json={"email": "newuser@marketflow.vn", "full_name": "Người Khác", "password": "NewUser@123"},
-    )
-    assert dup.status_code == 409
-    assert dup.json()["detail"]["code"] == "EMAIL_EXISTS"
