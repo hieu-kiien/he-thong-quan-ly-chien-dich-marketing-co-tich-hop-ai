@@ -2,7 +2,7 @@
 
 > Học phần: Ứng dụng trí tuệ nhân tạo (AIA331)  
 > Hệ thống: MarketFlow v2  
-> Ngày cập nhật số liệu: 24/10/2026  
+> Ngày cập nhật số liệu: 27/10/2026  
 > Căn cứ kỹ thuật: `backend/tests/`, `ai-runner/tests/`, `frontend/`, `scripts/evaluate_assistant.py`  
 
 ---
@@ -88,13 +88,13 @@ Các số liệu ghi nhận trực tiếp từ các lệnh thực thi trong hệ
 
 | Phân hệ / Bộ kiểm thử | Công cụ | Số lượng kiểm thử | Kết quả thực tế | Thời gian thực thi |
 |---|---|---|---|---|
-| **ai-runner** | Pytest 9.1.0 | 16 test cases | **16 / 16 PASSED (100%)** | 3.90 giây |
+| **ai-runner** | Pytest 9.1.0 | 17 test cases | **17 / 17 PASSED** | 3.94 giây |
 | **Frontend Typecheck** | `tsc --noEmit` | Toàn bộ `src/**/*.ts(x)` | **0 lỗi (Exit Code 0)** | 8.87 giây |
 | **Frontend Lint** | ESLint 9 | 100+ component & hooks | **0 cảnh báo (0 warnings)** | 7.35 giây |
 | **Frontend Production Build** | Vite 5.4.21 | 2.788 modules | **Thành công (`dist/index.html`)** | 11.63 giây |
-| **Frontend Playwright E2E** | Playwright 1.63.0 | 28 test cases | **28 / 28 PASSED (100%)** | 1.4 phút (84 giây) |
+| **Frontend Playwright E2E** | Playwright 1.63.0 | 29 test cases | **29 / 29 PASSED** | 1.4 phút |
 | **AI Prompt Evaluation** | `evaluate_assistant.py` | 8 ca kiểm thử định lượng | **Thực nghiệm VPS (26/10/2026): V4 đạt 7 / 8 ca (87.5%)**<br>(V1: 6/8, V2: 5/8, V3: 6/8, V4: 7/8 trên `opencode/big-pickle`)<br>Live turn: **109s**, 2 tool calls (`list_campaigns` + `propose_content_drafts`), khớp 100% CSDL<br>Minh chứng: [`transcripts.json`](file:///c:/Users/hieuk/Desktop/Ứng%20Dụng%20AI/docs/eval/transcripts.json), [`REAL_EVAL_REPORT.md`](file:///c:/Users/hieuk/Desktop/Ứng%20Dụng%20AI/docs/eval/REAL_EVAL_REPORT.md), [`live_turn_20261026.md`](file:///c:/Users/hieuk/Desktop/Ứng%20Dụng%20AI/docs/eval/live_turn_20261026.md)<br>Dry-run (Harness Self-Test): **8 / 8 PASSED (100%)** | Chạy thật VPS: ~120s<br>Chấm lại: 0.12s |
-| **Backend Full Test Suite** | Pytest 9.1.0 | 76 test cases | **76 / 76 PASSED (100%)** | 39.09 giây |
+| **Backend Full Test Suite** | Pytest 9.1.0 | 101 test cases | **101 / 101 PASSED** | 51 giây |
 
 ---
 
@@ -243,7 +243,7 @@ Bao gồm 21 ca kiểm thử chuyên sâu cho tầng Trợ lý AI của Backend:
 
 Bộ kiểm thử tích hợp đầu-cuối tự động gồm **28 ca kiểm thử E2E** thực thi trên trình duyệt Chromium Headless qua Playwright (`playwright.config.ts`, `npm run test:e2e`):
 
-| Tệp kiểm thử | Số ca | Luồng nghiệp vụ kiểm thử | Kết quả thực tế (24/10/2026) |
+| Tệp kiểm thử | Số ca | Luồng nghiệp vụ kiểm thử | Kết quả thực tế (27/10/2026) |
 |---|---|---|---|
 | `auth.spec.ts` | 4 | Đăng nhập sai mật khẩu (báo lỗi tiếng Việt), Đăng nhập Quản lý (MANAGER) & Đăng xuất, Đăng nhập Nhân viên (MARKETER - ẩn menu duyệt), Cơ chế Rate Limit đăng nhập sai 5 lần chặn HTTP 429 | **4 / 4 PASSED** (8.0s) |
 | `dashboard.spec.ts` | 4 | Kiểm tra đối soát số liệu tổng quan với API, nhãn Dữ liệu mẫu SEED (CONTRACT §0), Giao diện Responsive 768px, Đổi giao diện Sáng / Tối (Dark Mode), Chuông thông báo & Đánh dấu đã đọc | **4 / 4 PASSED** (8.7s) |
@@ -259,13 +259,13 @@ Bộ kiểm thử tích hợp đầu-cuối tự động gồm **28 ca kiểm th
 
 ## 4. Ghi Chú Kỹ Thuật & Báo Cáo Chất Lượng Mã Nguồn
 
-1. **Kết quả kiểm thử Backend**: 100% kiểm thử tự động đã vượt qua (**76 / 76 tests PASSED** trong 39.09 giây).
+1. **Kết quả kiểm thử Backend**: Toàn bộ kiểm thử tự động đã vượt qua (**101 / 101 tests PASSED** trong 51 giây, lệnh python -m pytest -q).
 2. **Linter Ruff Backend**: Tầng ứng dụng và kiểm thử (`backend/app/`, `backend/tests/`) đạt chuẩn 100% không có lỗi (`All checks passed!`).
 3. **Frontend Quality Gates**:
    - `npm run typecheck`: **0 lỗi** TypeScript Strict Mode.
    - `npm run lint`: **0 cảnh báo** ESLint 9 Zero Warnings (`--max-warnings=0`).
    - `npm run build`: Biên dịch Production Bundle sạch trong 11.63 giây.
-   - `npm run test:e2e`: **28 / 28 tests PASSED (100%)** trong 1.4 phút (84 giây).
+   - `npm run test:e2e`: **29 / 29 tests PASSED** trong 1.4 phút.
 4. **Các lỗi tích hợp đã phát hiện và xử lý triệt để**:
    - **Xung đột hủy luồng SSE khi chuyển đổi route Trợ lý AI**: Trong `useAssistantStream.ts`, `useEffect([threadId])` dọn dẹp nhầm luồng fetch khi route chuyển từ `undefined` sang `newThread.id`. Đã thêm `activeStreamThreadIdRef` để bảo vệ luồng SSE không bị ngắt quãng ngoài ý muốn.
    - **Cảnh báo React `validateDOMNesting`**: Khắc phục thẻ `<div>` lồng trong thẻ `<p>` tại `PageHeader` và thẻ `<div>` nằm trực tiếp trong thẻ `<table>` khi hiển thị `SkeletonRows` tại `CampaignsPage` và `ContentsPage`.
