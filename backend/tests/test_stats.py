@@ -152,3 +152,58 @@ def test_stats_by_channel_and_by_campaign(
     assert len(data_camp) >= 1
     assert data_camp[0]["campaign"]["name"] == sample_campaign.name
     assert data_camp[0]["views"] == 1000
+
+
+def test_seed_flag_respects_filters(
+    client: TestClient,
+    marketer1_headers: dict[str, str],
+    db: Session,
+    sample_campaign: Campaign,
+    test_channels: dict[str, Channel],
+):
+    """Nhãn 'Dữ liệu mẫu' chỉ hiện khi tập số liệu đang xem có dòng SEED (không phải toàn CSDL)."""
+    today = today_vn()
+    db.add_all([
+        Metric(
+            campaign_id=sample_campaign.id, channel_id=test_channels["INSTAGRAM"].id, metric_date=today,
+            views=100, clicks=5, conversions=1, cost=Decimal(10_000), source=MetricSource.SEED,
+        ),
+        Metric(
+            campaign_id=sample_campaign.id, channel_id=test_channels["FACEBOOK"].id, metric_date=today,
+            views=100, clicks=5, conversions=1, cost=Decimal(10_000), source=MetricSource.MANUAL,
+        ),
+    ])
+    db.commit()
+
+    def seed_flag(query: str) -> bool:
+        return client.get(f"/api/v1/stats/overview{query}", headers=marketer1_headers).json()["has_seed_data"]
+
+    assert seed_flag("") is True
+    assert seed_flag("?channel_code=INSTAGRAM") is True
+    assert seed_flag("?channel_code=FACEBOOK") is False
+
+
+def test_channel_filter_compares_cost_with_channel_planned_budget(
+    client: TestClient,
+    marketer1_headers: dict[str, str],
+    db: Session,
+    sample_campaign: Campaign,
+    test_channels: dict[str, Channel],
+):
+    """Lọc theo kênh: chi phí của kênh so với ngân sách DỰ KIẾN CỦA KÊNH (Facebook 12tr), không phải 20tr cả chiến dịch."""
+    db.add(Metric(
+        campaign_id=sample_campaign.id, channel_id=test_channels["FACEBOOK"].id, metric_date=today_vn(),
+        views=1000, clicks=50, conversions=5, cost=Decimal(6_000_000), source=MetricSource.MANUAL,
+    ))
+    db.commit()
+
+    fb = client.get("/api/v1/stats/overview?channel_code=FACEBOOK", headers=marketer1_headers).json()
+    assert fb["budget"]["total_budget"] == 12_000_000
+    assert fb["budget"]["used_pct"] == 50.0
+
+    rows = client.get("/api/v1/stats/by-campaign?channel_code=FACEBOOK", headers=marketer1_headers).json()
+    assert [r["campaign"]["id"] for r in rows] == [sample_campaign.id]
+    assert rows[0]["budget"] == 12_000_000 and rows[0]["used_pct"] == 50.0
+
+    # Chiến dịch không dùng kênh TikTok thì không xuất hiện khi lọc theo TikTok
+    assert client.get("/api/v1/stats/by-campaign?channel_code=TIKTOK", headers=marketer1_headers).json() == []

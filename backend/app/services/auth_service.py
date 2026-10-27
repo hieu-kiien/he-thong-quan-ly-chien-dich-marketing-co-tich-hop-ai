@@ -5,11 +5,13 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.errors import Conflict, PermissionDenied, Unauthorized, ValidationFailed
 from app.core.security import (
     create_access_token,
     hash_password,
     login_rate_limiter,
+    register_rate_limiter,
     validate_password_strength,
     verify_password,
 )
@@ -35,7 +37,16 @@ def login(db: Session, data: LoginIn, client_ip: str | None) -> TokenOut:
     return _token_out(user)
 
 
-def register(db: Session, data: RegisterIn) -> TokenOut:
+def register(db: Session, data: RegisterIn, client_ip: str | None = None) -> TokenOut:
+    if not settings.ALLOW_SELF_REGISTER:
+        raise PermissionDenied(
+            "Hệ thống không mở đăng ký tự do. Vui lòng liên hệ Quản lý để được cấp tài khoản.",
+            code="REGISTER_DISABLED",
+        )
+    # Mỗi lượt đăng ký (thành công hay không) đều tính vào hạn mức theo IP, chống tạo hàng loạt tài khoản rác
+    reg_key = f"register|{client_ip or '-'}"
+    register_rate_limiter.check(reg_key)
+    register_rate_limiter.record_failure(reg_key)
     problem = validate_password_strength(data.password)
     if problem:
         raise ValidationFailed(problem, fields={"password": problem})

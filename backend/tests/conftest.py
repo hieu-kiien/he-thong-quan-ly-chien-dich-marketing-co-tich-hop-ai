@@ -8,12 +8,17 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
-from app.core.security import create_access_token, hash_password
+from app.core.security import (
+    create_access_token,
+    hash_password,
+    login_rate_limiter,
+    register_rate_limiter,
+)
 from app.core.timeutil import today_vn
 from app.main import app
 from app.models import (
@@ -43,16 +48,41 @@ def test_engine():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+    # pysqlite mặc định không phát BEGIN/SAVEPOINT đúng cách → cần cấu hình thì rollback tới savepoint mới hoạt động
+    # (https://docs.sqlalchemy.org/en/20/dialects/sqlite.html#serializable-isolation-savepoints-transactional-ddl)
+    @event.listens_for(engine, "connect")
+    def _disable_pysqlite_autobegin(dbapi_connection, _record):
+        dbapi_connection.isolation_level = None
+
+    @event.listens_for(engine, "begin")
+    def _emit_begin(conn):
+        conn.exec_driver_sql("BEGIN")
+
     Base.metadata.create_all(bind=engine)
     yield engine
     Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiters() -> Iterator[None]:
+    """Giới hạn đăng nhập/đăng ký là bộ đếm toàn cục trong RAM — đặt lại để các test không ảnh hưởng nhau."""
+    login_rate_limiter.reset()
+    register_rate_limiter.reset()
+    yield
 
 
 @pytest.fixture
 def db(test_engine) -> Iterator[Session]:
     connection = test_engine.connect()
     transaction = connection.begin()
-    SessionTest = sessionmaker(bind=connection, autoflush=False, expire_on_commit=False)
+    # create_savepoint: session.rollback() (dùng trong service khi lỗi) chỉ lui tới savepoint,
+    # không xoá dữ liệu fixture nằm trong transaction ngoài của test.
+    SessionTest = sessionmaker(
+        bind=connection,
+        autoflush=False,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
     session = SessionTest()
 
     yield session

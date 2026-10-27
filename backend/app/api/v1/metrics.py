@@ -56,7 +56,7 @@ def upsert_metric(data: MetricIn, user: CurrentUser, db: DbSession) -> MetricOut
 
 
 @router.get("/import/template")
-def get_import_template() -> Response:
+def get_import_template(_: CurrentUser) -> Response:
     content = metric_service.get_csv_template()
     return Response(
         content=content,
@@ -71,7 +71,8 @@ async def preview_csv_import(
     db: DbSession,
     file: Annotated[UploadFile, File(...)],
 ) -> ImportPreviewOut:
-    content = await file.read()
+    # Đọc tối đa MAX_CSV_BYTES + 1 byte: file quá lớn bị từ chối mà không nạp hết vào RAM
+    content = await file.read(metric_service.MAX_CSV_BYTES + 1)
     return metric_service.preview_csv_import(db, user, content, file.filename)
 
 

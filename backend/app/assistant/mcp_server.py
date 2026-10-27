@@ -17,6 +17,7 @@ from app.assistant.tools import registry
 from app.core.config import settings
 from app.core.errors import PermissionDenied
 from app.models.ai import AiAction, AiMessage, AiThread
+from app.models.enums import AiMessageStatus
 from app.models.user import User
 from app.schemas.ai import AiActionOut
 
@@ -73,6 +74,9 @@ def verify_run_token(ctx: Context, db: Session) -> tuple[User, AiThread, AiMessa
     user = db.get(User, uid)
     if not user or not user.is_active:
         raise PermissionDenied("Tài khoản người dùng không tồn tại hoặc đã bị khoá")
+    # Đăng xuất / đổi mật khẩu (tăng token_version) phải vô hiệu hoá luôn run-token đang chạy
+    if "tv" in payload and int(payload["tv"]) != (user.token_version or 0):
+        raise PermissionDenied("Phiên đăng nhập đã bị thu hồi")
 
     thread = db.get(AiThread, thread_id)
     if not thread or thread.user_id != user.id:
@@ -81,6 +85,9 @@ def verify_run_token(ctx: Context, db: Session) -> tuple[User, AiThread, AiMessa
     message = db.get(AiMessage, message_id)
     if not message or message.thread_id != thread.id:
         raise PermissionDenied("Tin nhắn trợ lý không hợp lệ")
+    # Run-token chỉ có hiệu lực khi lượt trả lời đang chạy (không dùng lại sau khi đã xong / bị dừng)
+    if message.status != AiMessageStatus.STREAMING:
+        raise PermissionDenied("Lượt trả lời đã kết thúc, run-token không còn hiệu lực")
 
     return user, thread, message
 

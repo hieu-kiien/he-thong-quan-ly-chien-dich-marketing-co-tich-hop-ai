@@ -120,3 +120,56 @@ def test_register_success_and_validation(client: TestClient, manager_user: User)
     )
     assert dup.status_code == 409
     assert dup.json()["detail"]["code"] == "EMAIL_EXISTS"
+
+
+def test_login_rate_limit_not_bypassed_by_spoofed_forwarded_header(client: TestClient, manager_user: User):
+    """X-Forwarded-For do client gửi không được dùng để né giới hạn (peer không phải proxy nội bộ)."""
+    for i in range(5):
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={"email": manager_user.email, "password": "BadPassword1"},
+            headers={"X-Forwarded-For": f"10.0.0.{i}", "CF-Connecting-IP": f"9.9.9.{i}"},
+        )
+        assert resp.status_code == 401
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={"email": manager_user.email, "password": "BadPassword1"},
+        headers={"X-Forwarded-For": "10.0.0.99", "CF-Connecting-IP": "9.9.9.99"},
+    )
+    assert resp.status_code == 429
+
+
+def test_register_rate_limited_per_ip(client: TestClient):
+    for i in range(5):
+        resp = client.post(
+            "/api/v1/auth/register",
+            json={"email": f"nguoi{i}@example.com", "full_name": f"Người dùng {i}", "password": "MatKhau123"},
+        )
+        assert resp.status_code == 201, resp.text
+    resp = client.post(
+        "/api/v1/auth/register",
+        json={"email": "nguoi6@example.com", "full_name": "Người dùng 6", "password": "MatKhau123"},
+    )
+    assert resp.status_code == 429
+    assert resp.json()["detail"]["code"] == "REGISTER_RATE_LIMITED"
+
+
+def test_register_can_be_disabled(client: TestClient, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "ALLOW_SELF_REGISTER", False)
+    resp = client.post(
+        "/api/v1/auth/register",
+        json={"email": "khach@example.com", "full_name": "Khách", "password": "MatKhau123"},
+    )
+    assert resp.status_code == 403
+    assert resp.json()["detail"]["code"] == "REGISTER_DISABLED"
+
+
+def test_login_limiter_memory_is_bounded():
+    from app.core.security import LoginRateLimiter
+
+    limiter = LoginRateLimiter(5, 300)
+    for i in range(LoginRateLimiter.MAX_KEYS + 500):
+        limiter.record_failure(f"user{i}@example.com|1.2.3.4")
+    assert len(limiter._failures) <= LoginRateLimiter.MAX_KEYS

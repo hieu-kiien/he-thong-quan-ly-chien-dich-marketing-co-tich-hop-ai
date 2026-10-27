@@ -550,6 +550,11 @@ def seed_demo_data(reset: bool = False) -> None:
             ),
         ]
         for uid, ntype, msg, link, read in notif_specs:
+            # Idempotent: chạy seed nhiều lần không nhân bản thông báo
+            if db.execute(
+                select(Notification.id).where(Notification.user_id == uid, Notification.type == ntype, Notification.link == link)
+            ).first():
+                continue
             db.add(Notification(user_id=uid, type=ntype, message=msg, link=link, is_read=read))
 
         db.commit()

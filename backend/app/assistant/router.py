@@ -6,13 +6,12 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Query, Response, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
 
 from app.assistant import actions_service, chat_service
-from app.core.errors import Conflict, NotFound, PermissionDenied
+from app.core.errors import NotFound, PermissionDenied
 from app.core.security import CurrentUser, DbSession
 from app.models.ai import AiMessage, AiThread
-from app.models.enums import AiActionStatus, AiMessageRole
+from app.models.enums import AiActionStatus
 from app.schemas.ai import (
     ActionConfirmIn,
     AiActionOut,
@@ -105,17 +104,9 @@ async def send_message(
     user: CurrentUser,
     db: DbSession,
 ) -> StreamingResponse:
-    # Xác thực quyền truy cập phiên trước khi stream
-    chat_service.get_thread_orm(db, user, thread_id)
-    if await chat_service.is_thread_busy(thread_id):
-        raise Conflict("Phiên hội thoại đang có lượt xử lý chưa hoàn tất", code="THREAD_BUSY")
-
-    stream = chat_service.run_turn_stream(
-        user_id=user.id,
-        thread_id=thread_id,
-        content=data.content,
-    )
-    return StreamingResponse(stream, media_type="text/event-stream", headers=SSE_HEADERS)
+    # Kiểm tra quyền, giành khoá phiên và ghi DB TRƯỚC khi mở stream: lỗi 403/404/409 trả JSON chuẩn
+    ctx = await chat_service.start_turn(user_id=user.id, thread_id=thread_id, content=data.content)
+    return StreamingResponse(chat_service.stream_turn(ctx), media_type="text/event-stream", headers=SSE_HEADERS)
 
 
 @router.post("/threads/{thread_id}/stop", summary="Dừng lượt trả lời đang chạy")
@@ -138,32 +129,17 @@ async def regenerate_message(
         raise NotFound("Không tìm thấy tin nhắn cần tạo lại")
 
     thread = db.get(AiThread, msg.thread_id)
-    if not thread or (thread.user_id != user.id and not user.is_manager):
+    if not thread or thread.user_id != user.id:
         raise PermissionDenied("Không có quyền truy cập phiên này")
 
-    # Tìm tin nhắn user trước đó trong cùng thread
-    prev_user_msg = db.execute(
-        select(AiMessage)
-        .where(
-            AiMessage.thread_id == thread.id,
-            AiMessage.role == AiMessageRole.USER,
-            AiMessage.id <= msg.id,
-        )
-        .order_by(AiMessage.id.desc())
-    ).scalars().first()
-
-    if not prev_user_msg:
-        raise NotFound("Không tìm thấy tin nhắn người dùng tương ứng để tạo lại")
-
-    if await chat_service.is_thread_busy(thread.id):
-        raise Conflict("Phiên hội thoại đang có lượt xử lý chưa hoàn tất", code="THREAD_BUSY")
-
-    stream = chat_service.run_turn_stream(
+    # Dùng lại câu hỏi gốc (không nhân đôi tin nhắn người dùng) và thay câu trả lời cuối cùng
+    ctx = await chat_service.start_turn(
         user_id=user.id,
         thread_id=thread.id,
-        content=prev_user_msg.content,
+        content="",
+        regenerate_message_id=message_id,
     )
-    return StreamingResponse(stream, media_type="text/event-stream", headers=SSE_HEADERS)
+    return StreamingResponse(chat_service.stream_turn(ctx), media_type="text/event-stream", headers=SSE_HEADERS)
 
 
 # --- Actions (Proposals) ------------------------------------------------------

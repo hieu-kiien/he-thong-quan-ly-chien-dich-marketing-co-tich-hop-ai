@@ -128,6 +128,10 @@ def create_schedule(db: Session, user: User, data: ScheduleCreate) -> ScheduleOu
     content = db.get(Content, data.content_id)
     if content is None:
         raise ValidationFailed(fields={"content_id": "Nội dung không tồn tại"})
+    # Người lập lịch trở thành người được phép đánh dấu "đã đăng" → chỉ Quản lý, tác giả bài hoặc
+    # chủ chiến dịch mới được lập lịch (tránh tự gán lịch rồi xuất bản bài của người khác).
+    if not user.is_manager and content.created_by != user.id and content.campaign.owner_id != user.id:
+        raise PermissionDenied("Bạn chỉ được lập lịch cho nội dung do mình tạo hoặc thuộc chiến dịch của mình")
     if content.status in NOT_SCHEDULABLE:
         raise Conflict(
             f"Không thể lập lịch cho nội dung '{content_service.STATUS_LABELS[ContentStatus(content.status)]}'",

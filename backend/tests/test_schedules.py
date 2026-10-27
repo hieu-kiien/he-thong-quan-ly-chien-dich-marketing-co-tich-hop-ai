@@ -107,3 +107,26 @@ def test_cancel_schedule(
     cancel_resp = client.post(f"/api/v1/schedules/{sched_id}/cancel", headers=marketer1_headers)
     assert cancel_resp.status_code == 200
     assert cancel_resp.json()["status"] == "CANCELLED"
+
+
+def test_marketer_cannot_schedule_someone_elses_content(
+    client: TestClient, marketer2_headers: dict[str, str], sample_content: Content
+):
+    """Người lập lịch được phép đánh dấu 'đã đăng' nên chỉ tác giả/chủ chiến dịch/Quản lý được lập lịch."""
+    resp = client.post(
+        "/api/v1/schedules",
+        headers=marketer2_headers,
+        json={"content_id": sample_content.id, "scheduled_at": (now_utc() + timedelta(days=2)).isoformat()},
+    )
+    assert resp.status_code == 403
+
+
+def test_manager_can_schedule_any_content(
+    client: TestClient, manager_headers: dict[str, str], sample_content: Content
+):
+    resp = client.post(
+        "/api/v1/schedules",
+        headers=manager_headers,
+        json={"content_id": sample_content.id, "scheduled_at": (now_utc() + timedelta(days=2)).isoformat()},
+    )
+    assert resp.status_code == 201

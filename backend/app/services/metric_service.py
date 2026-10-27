@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
+import math
 import uuid
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -293,10 +294,14 @@ def preview_csv_import(
         c.code.upper(): c for c in db.execute(select(Channel)).scalars()
     }
 
-    # Query all existing metric keys to mark `exists`
-    existing_keys: set[tuple[int, int, date]] = set(
-        db.execute(select(Metric.campaign_id, Metric.channel_id, Metric.metric_date)).all()
-    )
+    # Query all existing metric keys to mark `exists` (và biết ai đã nhập để kiểm tra quyền sửa)
+    existing_owner: dict[tuple[int, int, date], int | None] = {
+        (cid, chid, mdate): entered_by
+        for cid, chid, mdate, entered_by in db.execute(
+            select(Metric.campaign_id, Metric.channel_id, Metric.metric_date, Metric.entered_by)
+        ).all()
+    }
+    existing_keys = set(existing_owner)
 
     rows: list[ImportRow] = []
     errors: list[ImportRowError] = []
@@ -382,8 +387,11 @@ def preview_csv_import(
             views = int(views_str) if views_str else 0
             clicks = int(clicks_str) if clicks_str else 0
             conversions = int(conv_str) if conv_str else 0
-            cost = int(float(cost_str)) if cost_str else 0
-        except ValueError:
+            cost_value = float(cost_str) if cost_str else 0.0
+            if not math.isfinite(cost_value):
+                raise ValueError("cost không hữu hạn")
+            cost = int(cost_value)
+        except (ValueError, OverflowError):
             errors.append(ImportRowError(row=row_idx, message="Các trường số liệu (views, clicks, conversions, cost) phải là số"))
             continue
 
@@ -401,6 +409,15 @@ def preview_csv_import(
                 ImportRowError(
                     row=row_idx,
                     message=f"Bị trùng lặp chiến dịch, kênh và ngày với một dòng trước đó trong file ({metric_date})",
+                )
+            )
+            continue
+        # Dòng ghi đè số liệu do người khác nhập: báo ngay ở bước xem trước (commit sẽ bị từ chối 403)
+        if dedup_key in existing_owner and not user.is_manager and existing_owner[dedup_key] != user.id:
+            errors.append(
+                ImportRowError(
+                    row=row_idx,
+                    message="Trùng với số liệu do người khác nhập — bạn chỉ được cập nhật số liệu của chính mình",
                 )
             )
             continue

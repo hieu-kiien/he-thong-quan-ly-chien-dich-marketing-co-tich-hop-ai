@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     LOGIN_MAX_FAILURES: int = 5
     LOGIN_WINDOW_SECONDS: int = 5 * 60
 
+    # Tự đăng ký tài khoản (luôn tạo vai trò MARKETER). Tắt khi chỉ muốn Quản lý cấp tài khoản.
+    ALLOW_SELF_REGISTER: bool = True
+    REGISTER_MAX_PER_HOUR: int = 5  # số lần đăng ký tối đa mỗi giờ cho mỗi địa chỉ IP
+
     @field_validator("APP_ENV")
     @classmethod
     def _normalize_env(cls, value: str) -> str:

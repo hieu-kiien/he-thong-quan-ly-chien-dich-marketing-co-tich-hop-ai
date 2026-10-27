@@ -166,3 +166,69 @@ def test_csv_preview_and_commit(
     commit_data = commit_resp.json()
     assert commit_data["inserted"] == 2
     assert commit_data["import_batch"].startswith("csv_")
+
+
+def test_csv_template_requires_login(client: TestClient):
+    assert client.get("/api/v1/metrics/import/template").status_code == 401
+
+
+def test_csv_preview_rejects_non_finite_numbers_without_500(
+    client: TestClient,
+    marketer1_headers: dict[str, str],
+    sample_campaign: Campaign,
+    test_channels: dict[str, Channel],
+):
+    today = today_vn()
+    csv_content = (
+        "date,campaign_id,channel_code,views,clicks,conversions,cost\n"
+        f"{today},{sample_campaign.id},FACEBOOK,1000,50,5,inf\n"
+        f"{today - timedelta(days=1)},{sample_campaign.id},FACEBOOK,1000,50,5,nan\n"
+        f"{today - timedelta(days=2)},{sample_campaign.id},FACEBOOK,1000,50,5,-inf\n"
+    )
+    files = {"file": ("bad.csv", csv_content.encode("utf-8"), "text/csv")}
+    resp = client.post("/api/v1/metrics/import/preview", headers=marketer1_headers, files=files)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["summary"]["valid"] == 0
+    assert data["summary"]["invalid"] == 3
+
+
+def test_csv_preview_flags_rows_that_would_overwrite_other_users_metrics(
+    client: TestClient,
+    marketer1_headers: dict[str, str],
+    marketer2_headers: dict[str, str],
+    manager_headers: dict[str, str],
+    sample_campaign: Campaign,
+    test_channels: dict[str, Channel],
+):
+    today = today_vn()
+    created = client.post(
+        "/api/v1/metrics",
+        headers=marketer1_headers,
+        json={
+            "campaign_id": sample_campaign.id,
+            "channel_code": "FACEBOOK",
+            "metric_date": str(today),
+            "views": 200,
+            "clicks": 10,
+            "conversions": 1,
+            "cost": 50_000,
+        },
+    )
+    assert created.status_code in (200, 201)
+    csv_content = (
+        "date,campaign_id,channel_code,views,clicks,conversions,cost\n"
+        f"{today},{sample_campaign.id},FACEBOOK,300,20,2,70000\n"
+    )
+    files = lambda: {"file": ("x.csv", csv_content.encode("utf-8"), "text/csv")}
+
+    # Marketer khác: báo lỗi ngay ở bước xem trước (thay vì để lệnh commit bị 403 giữa chừng)
+    other = client.post("/api/v1/metrics/import/preview", headers=marketer2_headers, files=files()).json()
+    assert other["summary"]["valid"] == 0 and other["summary"]["invalid"] == 1
+    assert "người khác" in other["errors"][0]["message"]
+
+    # Chính chủ và Quản lý được cập nhật
+    own = client.post("/api/v1/metrics/import/preview", headers=marketer1_headers, files=files()).json()
+    assert own["summary"]["updates"] == 1
+    mgr = client.post("/api/v1/metrics/import/preview", headers=manager_headers, files=files()).json()
+    assert mgr["summary"]["updates"] == 1

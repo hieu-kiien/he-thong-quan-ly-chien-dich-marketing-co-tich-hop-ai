@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -14,7 +15,14 @@ from app.assistant.tools import (
     ProposeMetricsArgs,
     ProposeScheduleArgs,
 )
-from app.core.errors import Conflict, NotFound, PermissionDenied, ValidationFailed
+from app.core.errors import (
+    BadRequest,
+    Conflict,
+    DomainError,
+    NotFound,
+    PermissionDenied,
+    ValidationFailed,
+)
 from app.core.timeutil import now_utc
 from app.models.ai import AiAction
 from app.models.enums import AiActionStatus, ContentOrigin, MetricSource
@@ -216,6 +224,12 @@ def confirm(
             updated_count = 0
             campaign_id = m_args.rows[0].campaign_id if m_args.rows else 0
 
+            # Kiểm tra TOÀN BỘ dòng trước khi ghi dòng nào (mỗi upsert tự commit nên không thể rollback)
+            for row in m_args.rows:
+                metric_service.validate_metric_counts(row.views, row.clicks, row.conversions, row.cost)
+                campaign_service.find_campaign_for_reference(db, row.campaign_id, field="campaign_id")
+                channel_service.resolve_channel(db, None, row.channel_code, field="channel_code")
+
             for row in m_args.rows:
                 metric_in = MetricIn(
                     campaign_id=row.campaign_id,
@@ -260,11 +274,32 @@ def confirm(
         db.refresh(action)
         return action
 
+    except (DomainError, PydanticValidationError) as exc:
+        db.rollback()
+        domain_exc: DomainError
+        if isinstance(exc, PydanticValidationError):
+            fields = {".".join(str(p) for p in e["loc"]) or "args": e["msg"] for e in exc.errors()[:5]}
+            domain_exc = ValidationFailed(fields=fields)
+        else:
+            domain_exc = exc
+        action = db.get(AiAction, action_id)
+        if action is not None:
+            action.error = domain_exc.message
+            # Lỗi do dữ liệu/nghiệp vụ có thể sửa được (ví dụ gõ sai ngày): giữ PROPOSED để người dùng
+            # chỉnh lại rồi xác nhận lần nữa. Lỗi quyền/không tồn tại thì không thể thành công → FAILED.
+            if not isinstance(domain_exc, ValidationFailed | Conflict | BadRequest):
+                action.status = AiActionStatus.FAILED
+            db.commit()
+        if domain_exc is exc:
+            raise
+        raise domain_exc from exc
     except Exception as exc:
-        action.status = AiActionStatus.FAILED
-        action.error = getattr(exc, "message", str(exc))
-        db.commit()
-        db.refresh(action)
+        db.rollback()
+        action = db.get(AiAction, action_id)
+        if action is not None:
+            action.status = AiActionStatus.FAILED
+            action.error = getattr(exc, "message", str(exc))
+            db.commit()
         raise
 
 

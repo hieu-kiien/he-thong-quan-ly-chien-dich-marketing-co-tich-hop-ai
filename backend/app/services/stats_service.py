@@ -12,7 +12,15 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import ValidationFailed
 from app.core.timeutil import today_vn, vn_day_end_utc, vn_day_start_utc
-from app.models import Campaign, Channel, Content, Metric, Schedule, User
+from app.models import (
+    Campaign,
+    CampaignChannel,
+    Channel,
+    Content,
+    Metric,
+    Schedule,
+    User,
+)
 from app.models.enums import CampaignStatus, ContentStatus, MetricSource, ScheduleStatus
 from app.schemas.common import ChannelRef
 from app.schemas.stats import (
@@ -53,6 +61,28 @@ def _apply_stats_filters(stmt, filters: StatsFilters, db: Session | None = None)
     return stmt
 
 
+def _resolve_channel_id(db: Session, filters: StatsFilters) -> int | None:
+    """id kênh đang lọc (-1 nếu mã kênh không tồn tại); None nếu không lọc theo kênh."""
+    if filters.channel_id is not None:
+        return filters.channel_id
+    if filters.channel_code:
+        ch = channel_service.find_by_code(db, filters.channel_code)
+        return ch.id if ch else -1
+    return None
+
+
+def _planned_budgets(db: Session, campaign_ids: list[int], channel_id: int) -> dict[int, Decimal]:
+    """Ngân sách dự kiến của riêng một kênh theo từng chiến dịch (chỉ các chiến dịch có đặt ngân sách kênh)."""
+    rows = db.execute(
+        select(CampaignChannel.campaign_id, CampaignChannel.planned_budget).where(
+            CampaignChannel.channel_id == channel_id,
+            CampaignChannel.campaign_id.in_(campaign_ids),
+            CampaignChannel.planned_budget.is_not(None),
+        )
+    ).all()
+    return {cid: Decimal(str(pb)) for cid, pb in rows}
+
+
 def get_overview(db: Session, user: User, filters: StatsFilters | None = None) -> StatsOverview:
     filters = filters or StatsFilters()
 
@@ -80,9 +110,19 @@ def get_overview(db: Session, user: User, filters: StatsFilters | None = None) -
         camp_stmt = camp_stmt.where(Campaign.id == filters.campaign_id)
     if filters.status:
         camp_stmt = camp_stmt.where(Campaign.status == filters.status)
+    channel_filter = _resolve_channel_id(db, filters)
+    if channel_filter is not None:
+        camp_stmt = camp_stmt.where(
+            exists().where(CampaignChannel.campaign_id == Campaign.id, CampaignChannel.channel_id == channel_filter)
+        )
     campaigns = list(db.execute(camp_stmt).scalars())
 
-    total_budget_dec = sum((c.budget for c in campaigns), Decimal(0)) if campaigns else None
+    if channel_filter is not None:
+        # Đang lọc theo kênh: so chi phí của kênh đó với NGÂN SÁCH DỰ KIẾN CỦA KÊNH (không phải cả chiến dịch)
+        planned = _planned_budgets(db, [c.id for c in campaigns], channel_filter)
+        total_budget_dec = sum(planned.values(), Decimal(0)) if planned else None
+    else:
+        total_budget_dec = sum((c.budget for c in campaigns), Decimal(0)) if campaigns else None
     used_pct = percent(cost_dec, total_budget_dec) if total_budget_dec is not None and total_budget_dec > 0 else None
 
     budget = BudgetSummary(
@@ -122,7 +162,9 @@ def get_overview(db: Session, user: User, filters: StatsFilters | None = None) -
     schedules_today = int(db.execute(sched_stmt).scalar_one())
 
     # 7. Has seed data
-    has_seed = bool(db.execute(select(exists().where(Metric.source == MetricSource.SEED))).scalar())
+    # Chỉ báo "Dữ liệu mẫu" khi CHÍNH tập số liệu đang xem có dòng SEED (áp dụng cùng bộ lọc)
+    seed_stmt = _apply_stats_filters(select(Metric.id).where(Metric.source == MetricSource.SEED), filters, db)
+    has_seed = db.execute(seed_stmt.limit(1)).first() is not None
 
     return StatsOverview(
         totals=totals,
@@ -233,10 +275,19 @@ def get_by_campaign(db: Session, user: User, filters: StatsFilters | None = None
         camp_stmt = camp_stmt.where(Campaign.id == filters.campaign_id)
     if filters.status:
         camp_stmt = camp_stmt.where(Campaign.status == filters.status)
+    channel_filter = _resolve_channel_id(db, filters)
+    if channel_filter is not None:
+        camp_stmt = camp_stmt.where(
+            exists().where(CampaignChannel.campaign_id == Campaign.id, CampaignChannel.channel_id == channel_filter)
+        )
     campaigns = list(db.execute(camp_stmt).scalars())
 
     if not campaigns:
         return []
+
+    planned_by_campaign = (
+        _planned_budgets(db, [c.id for c in campaigns], channel_filter) if channel_filter is not None else {}
+    )
 
     camp_ids = [c.id for c in campaigns]
 
@@ -261,14 +312,16 @@ def get_by_campaign(db: Session, user: User, filters: StatsFilters | None = None
     result: list[CampaignStatsRow] = []
     for camp in campaigns:
         m_views, m_clicks, m_convs, m_cost = metrics_map.get(camp.id, (0, 0, 0, Decimal(0)))
-        used_pct = percent(m_cost, camp.budget) if camp.budget > 0 else None
+        # Lọc theo kênh: dùng ngân sách dự kiến của kênh đó; không có thì không tính tỉ lệ (null)
+        budget_basis = planned_by_campaign.get(camp.id) if channel_filter is not None else camp.budget
+        used_pct = percent(m_cost, budget_basis) if budget_basis is not None and budget_basis > 0 else None
         ctr_val = ratio(m_clicks, m_views)
         cpa_val = money_ratio(m_cost, m_convs)
 
         result.append(
             CampaignStatsRow(
                 campaign=CampaignStatsRef(id=camp.id, name=camp.name, status=camp.status),
-                budget=camp.budget,
+                budget=budget_basis if budget_basis is not None else Decimal(0),
                 cost=m_cost,
                 used_pct=used_pct,
                 views=m_views,

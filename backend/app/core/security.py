@@ -129,9 +129,17 @@ DbSession = Annotated[Session, Depends(get_db)]
 class LoginRateLimiter:
     """Tối đa `max_failures` lần sai trong `window` giây cho mỗi khoá email+IP."""
 
-    def __init__(self, max_failures: int, window_seconds: int) -> None:
+    def __init__(
+        self,
+        max_failures: int,
+        window_seconds: int,
+        message: str | None = None,
+        code: str = "LOGIN_RATE_LIMITED",
+    ) -> None:
         self.max_failures = max_failures
         self.window = window_seconds
+        self.message = message
+        self.code = code
         self._failures: dict[str, deque[float]] = defaultdict(deque)
         self._lock = threading.Lock()
 
@@ -152,16 +160,28 @@ class LoginRateLimiter:
                 if not bucket:
                     self._failures.pop(key, None)
         if retry_after:
+            wait = f"{max(1, retry_after // 60)} phút"
             raise RateLimited(
-                "Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau "
-                f"{max(1, retry_after // 60)} phút.",
-                code="LOGIN_RATE_LIMITED",
+                f"{self.message} Vui lòng thử lại sau {wait}."
+                if self.message
+                else f"Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau {wait}.",
+                code=self.code,
                 headers={"Retry-After": str(retry_after)},
             )
 
+    MAX_KEYS = 10_000
+
     def record_failure(self, key: str) -> None:
         with self._lock:
-            self._prune(key, time.monotonic()).append(time.monotonic())
+            now = time.monotonic()
+            self._prune(key, now).append(now)
+            if len(self._failures) > self.MAX_KEYS:
+                # Chặn tăng bộ nhớ vô hạn (vd tấn công đổi email/IP liên tục): bỏ bucket đã hết hạn,
+                # nếu vẫn quá nhiều thì bỏ các bucket cũ nhất.
+                for k in [k for k, b in self._failures.items() if not b or b[-1] <= now - self.window]:
+                    del self._failures[k]
+                while len(self._failures) > self.MAX_KEYS:
+                    del self._failures[next(iter(self._failures))]
 
     def reset(self, key: str | None = None) -> None:
         with self._lock:
@@ -172,3 +192,9 @@ class LoginRateLimiter:
 
 
 login_rate_limiter = LoginRateLimiter(settings.LOGIN_MAX_FAILURES, settings.LOGIN_WINDOW_SECONDS)
+register_rate_limiter = LoginRateLimiter(
+    settings.REGISTER_MAX_PER_HOUR,
+    60 * 60,
+    message="Bạn đã đăng ký quá nhiều tài khoản từ địa chỉ này.",
+    code="REGISTER_RATE_LIMITED",
+)

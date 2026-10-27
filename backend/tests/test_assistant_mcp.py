@@ -302,3 +302,51 @@ async def test_mcp_mount_paths(mcp_setup: tuple[AiThread, AiMessage, str]):
             json={"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "list_channels", "arguments": {}}},
         )
         assert r2.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_mcp_run_token_rejected_after_turn_finished_or_revoked(
+    mcp_setup: tuple[AiThread, AiMessage, str],
+    marketer1_user: User,
+    db: Session,
+):
+    """Run-token chỉ dùng được khi lượt đang chạy, và mất hiệu lực khi người dùng đăng xuất/đổi mật khẩu."""
+    thread, message, _ = mcp_setup
+    now = datetime.now(UTC)
+
+    def mint(**extra) -> str:
+        return encode_token({
+            "typ": "assistant_run",
+            "uid": marketer1_user.id,
+            "thread_id": thread.id,
+            "message_id": message.id,
+            "iat": int(now.timestamp()),
+            "exp": int((now + timedelta(minutes=10)).timestamp()),
+            **extra,
+        })
+
+    async def call(client: httpx.AsyncClient, token: str) -> dict:
+        resp = await client.post(
+            "/mcp/",
+            headers={"Accept": "application/json, text/event-stream", "Authorization": f"Bearer {token}"},
+            json={"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "list_channels", "arguments": {}}},
+        )
+        line = next(line for line in resp.text.splitlines() if line.startswith("data: "))
+        return json.loads(line[6:])["result"]
+
+    async with (
+        run_mcp_session_manager(),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client,
+    ):
+        # Token hợp lệ khi lượt đang STREAMING
+        assert (await call(client, mint(tv=marketer1_user.token_version or 0)))["isError"] is False
+
+        # token_version đã đổi (đăng xuất / đổi mật khẩu) → bị từ chối
+        revoked = await call(client, mint(tv=(marketer1_user.token_version or 0) + 1))
+        assert revoked["isError"] is True and "thu hồi" in revoked["content"][0]["text"]
+
+        # Lượt đã kết thúc → run-token không còn hiệu lực
+        message.status = AiMessageStatus.COMPLETE
+        db.commit()
+        finished = await call(client, mint(tv=marketer1_user.token_version or 0))
+        assert finished["isError"] is True and "kết thúc" in finished["content"][0]["text"]

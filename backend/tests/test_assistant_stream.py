@@ -303,3 +303,86 @@ def test_status_endpoint_reports_usage_limit_honestly(
     assert data["rate_limited_for_s"] == 540
     assert "9 phút" in data["last_error"]
     assert "level=ERROR" not in data["last_error"]  # không lộ log thô của nhà cung cấp
+
+
+def test_manager_cannot_access_other_users_thread(
+    client: TestClient,
+    marketer1_headers: dict[str, str],
+    manager_headers: dict[str, str],
+    fake_runner_fixture: FakeRunner,
+):
+    """Phiên chat là riêng tư: Quản lý cũng không đọc/xoá/gửi tin vào phiên của nhân viên."""
+    fake_runner_fixture.set_events([{"type": "text", "text": "ok"}, {"type": "done", "model": "m", "latency_ms": 1}])
+    thread_id = client.post("/api/v1/assistant/threads", json={}, headers=marketer1_headers).json()["id"]
+
+    assert client.get(f"/api/v1/assistant/threads/{thread_id}", headers=manager_headers).status_code == 403
+    assert client.get(f"/api/v1/assistant/threads/{thread_id}/messages", headers=manager_headers).status_code == 403
+    assert client.delete(f"/api/v1/assistant/threads/{thread_id}", headers=manager_headers).status_code == 403
+    resp = client.post(
+        f"/api/v1/assistant/threads/{thread_id}/messages", json={"content": "xin chào"}, headers=manager_headers
+    )
+    assert resp.status_code == 403  # trả JSON lỗi chuẩn, không phải một stream bị lỗi giữa chừng
+    assert resp.json()["detail"]["code"]
+    assert client.get("/api/v1/assistant/threads", headers=manager_headers).json() == []
+
+
+def test_regenerate_reuses_user_message_and_replaces_last_answer(
+    client: TestClient,
+    marketer1_headers: dict[str, str],
+    fake_runner_fixture: FakeRunner,
+    db: Session,
+):
+    fake_runner_fixture.set_events([
+        {"type": "text", "text": "Câu trả lời lần đầu."},
+        {"type": "done", "model": "m", "latency_ms": 1},
+    ])
+    thread_id = client.post("/api/v1/assistant/threads", json={}, headers=marketer1_headers).json()["id"]
+    first = client.post(
+        f"/api/v1/assistant/threads/{thread_id}/messages", json={"content": "Viết slogan"}, headers=marketer1_headers
+    )
+    assert first.status_code == 200
+    first_asst_id = next(e[1]["message"]["id"] for e in parse_sse_events(first.text) if e[0] == "message_end")
+
+    fake_runner_fixture.set_events([
+        {"type": "text", "text": "Câu trả lời sau khi tạo lại."},
+        {"type": "done", "model": "m", "latency_ms": 1},
+    ])
+    again = client.post(f"/api/v1/assistant/messages/{first_asst_id}/regenerate", headers=marketer1_headers)
+    assert again.status_code == 200
+
+    db.expire_all()
+    msgs = db.query(AiMessage).filter(AiMessage.thread_id == thread_id).order_by(AiMessage.id).all()
+    assert [m.role for m in msgs] == [AiMessageRole.USER, AiMessageRole.ASSISTANT]  # không nhân đôi câu hỏi
+    assert msgs[0].content == "Viết slogan"
+    assert msgs[1].content == "Câu trả lời sau khi tạo lại."
+    assert msgs[1].id != first_asst_id  # câu trả lời cũ đã được thay thế
+
+    # Chỉ tạo lại được câu trả lời cuối cùng
+    old = client.post(f"/api/v1/assistant/messages/{first_asst_id}/regenerate", headers=marketer1_headers)
+    assert old.status_code == 404
+
+
+def test_create_thread_for_campaign_reuses_empty_thread(
+    client: TestClient,
+    marketer1_headers: dict[str, str],
+    sample_campaign,
+):
+    a = client.post("/api/v1/assistant/threads", json={"campaign_id": sample_campaign.id}, headers=marketer1_headers)
+    b = client.post("/api/v1/assistant/threads", json={"campaign_id": sample_campaign.id}, headers=marketer1_headers)
+    assert a.json()["id"] == b.json()["id"]  # không tạo phiên rác mỗi lần bấm "Hỏi Trợ lý AI"
+
+
+def test_client_disconnect_does_not_release_thread_lock_until_turn_ends(
+    client: TestClient,
+    marketer1_user,
+    marketer1_headers: dict[str, str],
+    fake_runner_fixture: FakeRunner,
+):
+    """Khoá phiên chỉ được nhả khi lượt chạy thực sự kết thúc (không phải khi client ngắt kết nối)."""
+    fake_runner_fixture.set_events([{"type": "text", "text": "xong"}, {"type": "done", "model": "m", "latency_ms": 1}])
+    thread_id = client.post("/api/v1/assistant/threads", json={}, headers=marketer1_headers).json()["id"]
+    resp = client.post(
+        f"/api/v1/assistant/threads/{thread_id}/messages", json={"content": "chào"}, headers=marketer1_headers
+    )
+    assert resp.status_code == 200
+    assert asyncio.run(chat_service.is_thread_busy(thread_id)) is False  # lượt đã xong → khoá đã nhả

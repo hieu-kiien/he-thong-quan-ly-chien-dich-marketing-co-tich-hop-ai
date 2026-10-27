@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 from collections.abc import AsyncIterator
@@ -10,7 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.assistant.bus import event_bus
@@ -21,8 +22,9 @@ from app.core.config import settings
 from app.core.errors import Conflict, NotFound, PermissionDenied, ValidationFailed
 from app.core.security import encode_token
 from app.core.timeutil import now_utc, today_vn
-from app.models.ai import AiMessage, AiThread
+from app.models.ai import AiAction, AiMessage, AiThread
 from app.models.campaign import Campaign
+from app.models.content import Content
 from app.models.enums import AiMessageRole, AiMessageStatus
 from app.models.user import User
 from app.schemas.ai import (
@@ -71,6 +73,18 @@ def create_thread(db: Session, user: User, data: AiThreadCreate) -> AiThreadOut:
         if camp is None:
             raise ValidationFailed(fields={"campaign_id": "Chiến dịch không tồn tại"})
         campaign_id = camp.id
+        # Mở lại phiên TRỐNG đã có của chiến dịch này thay vì tạo thêm phiên rác mỗi lần bấm "Hỏi Trợ lý AI"
+        empty_thread = db.execute(
+            select(AiThread)
+            .where(
+                AiThread.user_id == user.id,
+                AiThread.campaign_id == campaign_id,
+                ~select(AiMessage.id).where(AiMessage.thread_id == AiThread.id).exists(),
+            )
+            .order_by(AiThread.id.desc())
+        ).scalars().first()
+        if empty_thread is not None:
+            return thread_out(empty_thread)
 
     thread = AiThread(
         user_id=user.id,
@@ -99,7 +113,8 @@ def get_thread_orm(db: Session, user: User, thread_id: int) -> AiThread:
     thread = db.get(AiThread, thread_id)
     if thread is None:
         raise NotFound("Không tìm thấy phiên hội thoại")
-    if thread.user_id != user.id and not user.is_manager:
+    # Phiên chat là riêng tư của từng người dùng (kể cả Quản lý): chỉ chủ phiên được truy cập
+    if thread.user_id != user.id:
         raise PermissionDenied("Bạn không có quyền truy cập phiên hội thoại này")
     return thread
 
@@ -143,8 +158,6 @@ def update_thread(db: Session, user: User, thread_id: int, data: AiThreadUpdate)
 
 def delete_thread(db: Session, user: User, thread_id: int) -> None:
     thread = get_thread_orm(db, user, thread_id)
-    if thread.user_id != user.id and not user.is_manager:
-        raise PermissionDenied("Chỉ chủ phiên mới được xoá phiên hội thoại")
     db.delete(thread)
     db.commit()
 
@@ -267,9 +280,19 @@ class RunningTurn:
     abort_event: asyncio.Event | None = None
 
 
+@dataclass
+class TurnContext:
+    """Một lượt hội thoại đã khởi tạo. Công việc chạy nền độc lập với kết nối của client."""
+
+    thread_id: int
+    out_queue: asyncio.Queue[str | None]
+
+
 # Dict in-memory khoá các thread đang chạy
 _running_turns: dict[int, RunningTurn] = {}
 _turns_lock = asyncio.Lock()
+# Giữ tham chiếu tới các task nền (tránh bị thu gom khi client ngắt kết nối giữa chừng)
+_background_tasks: set[asyncio.Task[Any]] = set()
 
 
 async def is_thread_busy(thread_id: int) -> bool:
@@ -328,86 +351,134 @@ def _join_parts(parts: list[str]) -> str:
     return "\n\n".join(p.strip() for p in parts if p and p.strip())
 
 
+def _prepare_regenerate(db: Session, thread: AiThread, message_id: int) -> AiMessage:
+    """Chuẩn bị 'Tạo lại': dùng lại câu hỏi gốc (không nhân đôi) và bỏ câu trả lời cũ.
+
+    Chỉ tạo lại được câu trả lời cuối cùng của phiên. Câu trả lời cũ chỉ bị xoá khi không có
+    đề xuất hay nội dung nào gắn với nó (để không mất dấu vết nguồn gốc của nội dung AI).
+    """
+    msg = db.get(AiMessage, message_id)
+    if msg is None or msg.thread_id != thread.id:
+        raise NotFound("Không tìm thấy tin nhắn cần tạo lại")
+    if msg.role != AiMessageRole.ASSISTANT:
+        raise ValidationFailed(fields={"message_id": "Chỉ tạo lại được câu trả lời của trợ lý"})
+    last_id = db.execute(select(func.max(AiMessage.id)).where(AiMessage.thread_id == thread.id)).scalar_one()
+    if msg.id != last_id:
+        raise Conflict("Chỉ tạo lại được câu trả lời cuối cùng của phiên", code="NOT_LAST_MESSAGE")
+    prev_user = db.execute(
+        select(AiMessage)
+        .where(
+            AiMessage.thread_id == thread.id,
+            AiMessage.role == AiMessageRole.USER,
+            AiMessage.id < msg.id,
+        )
+        .order_by(AiMessage.id.desc())
+    ).scalars().first()
+    if prev_user is None:
+        raise NotFound("Không tìm thấy tin nhắn người dùng tương ứng để tạo lại")
+
+    has_actions = db.execute(select(AiAction.id).where(AiAction.message_id == msg.id).limit(1)).first()
+    has_contents = db.execute(select(Content.id).where(Content.ai_message_id == msg.id).limit(1)).first()
+    if not has_actions and not has_contents:
+        db.delete(msg)
+    return prev_user
+
+
 # --- Luồng thực thi Turn Stream (SSE) -----------------------------------------
 
-async def run_turn_stream(
+async def start_turn(
     user_id: int,
     thread_id: int,
     content: str,
     runner: RunnerClient | None = None,
-) -> AsyncIterator[str]:
-    """Khởi chạy một lượt hội thoại stream, kết hợp runner events và MCP event bus."""
+    regenerate_message_id: int | None = None,
+) -> TurnContext:
+    """Khởi tạo một lượt hội thoại: kiểm tra quyền, giành khoá phiên, ghi DB, chạy nền.
+
+    Mọi lỗi (403/404/409) được ném ra TRƯỚC khi bắt đầu stream nên trả về JSON lỗi chuẩn.
+    Sau khi trả về, lượt chạy hoàn tất và được lưu kể cả khi client ngắt kết nối (F5).
+    """
     r = runner or default_runner
     now = datetime.now(UTC)
 
-    # 1. Khởi tạo DB records cho turn
-    with get_db_context() as db:
-        user = db.get(User, user_id)
-        if not user or not user.is_active:
-            raise PermissionDenied("Tài khoản người dùng không hoạt động")
+    # 1. Giành khoá phiên một cách nguyên tử TRƯỚC khi ghi DB (tránh hai lượt chạy chồng nhau)
+    turn = await register_turn(thread_id, 0)
 
-        thread = db.get(AiThread, thread_id)
-        if not thread or (thread.user_id != user.id and not user.is_manager):
-            raise PermissionDenied("Không có quyền truy cập phiên này")
+    try:
+        with get_db_context() as db:
+            user = db.get(User, user_id)
+            if not user or not user.is_active:
+                raise PermissionDenied("Tài khoản người dùng không hoạt động")
 
-        # Lưu User message
-        user_msg = AiMessage(
-            thread_id=thread.id,
-            role=AiMessageRole.USER,
-            content=content,
-            parts_json=[],
-            status=AiMessageStatus.COMPLETE,
-        )
-        db.add(user_msg)
-        db.flush()
+            thread = db.get(AiThread, thread_id)
+            if thread is None:
+                raise NotFound("Không tìm thấy phiên hội thoại")
+            # Phiên chat là riêng tư của từng người dùng (kể cả Quản lý)
+            if thread.user_id != user.id:
+                raise PermissionDenied("Không có quyền truy cập phiên này")
 
-        # Tự động đặt tên phiên nếu là "Phiên mới"
-        if thread.title == "Phiên mới":
-            clean_title = content.strip().replace("\n", " ")
-            thread.title = clean_title[:60].strip() or "Phiên mới"
+            if regenerate_message_id is not None:
+                user_msg = _prepare_regenerate(db, thread, regenerate_message_id)
+            else:
+                user_msg = AiMessage(
+                    thread_id=thread.id,
+                    role=AiMessageRole.USER,
+                    content=content,
+                    parts_json=[],
+                    status=AiMessageStatus.COMPLETE,
+                )
+                db.add(user_msg)
+                db.flush()
 
-        # Tạo Assistant message ở trạng thái STREAMING
-        assistant_msg = AiMessage(
-            thread_id=thread.id,
-            role=AiMessageRole.ASSISTANT,
-            content="",
-            parts_json=[],
-            status=AiMessageStatus.STREAMING,
-        )
-        db.add(assistant_msg)
-        thread.last_message_at = now_utc()
-        db.commit()
-        db.refresh(user_msg)
-        db.refresh(assistant_msg)
-        db.refresh(thread)
+            # Tự động đặt tên phiên nếu là "Phiên mới"
+            if thread.title == "Phiên mới":
+                clean_title = user_msg.content.strip().replace("\n", " ")
+                thread.title = clean_title[:60].strip() or "Phiên mới"
 
-        user_msg_out = message_out(user_msg).model_dump(mode="json")
-        assistant_msg_id = assistant_msg.id
-        session_id = thread.opencode_session_id
-        prompt = build_prompt(db, user, thread, content)
+            # Tạo Assistant message ở trạng thái STREAMING
+            assistant_msg = AiMessage(
+                thread_id=thread.id,
+                role=AiMessageRole.ASSISTANT,
+                content="",
+                parts_json=[],
+                status=AiMessageStatus.STREAMING,
+            )
+            db.add(assistant_msg)
+            thread.last_message_at = now_utc()
+            db.commit()
+            db.refresh(user_msg)
+            db.refresh(assistant_msg)
+            db.refresh(thread)
 
-    # 2. Đăng ký turn lock
-    turn = await register_turn(thread_id, assistant_msg_id)
+            user_msg_out = message_out(user_msg).model_dump(mode="json")
+            assistant_msg_id = assistant_msg.id
+            token_version = user.token_version or 0
+            session_id = thread.opencode_session_id
+            prompt = build_prompt(db, user, thread, user_msg.content)
+    except BaseException:
+        await unregister_turn(thread_id)
+        raise
 
-    # 3. Tạo run-token cho MCP (10 phút)
+    turn.message_id = assistant_msg_id
+
+    # 2. Tạo run-token cho MCP (10 phút)
     run_token_payload = {
         "typ": "assistant_run",
         "uid": user_id,
         "thread_id": thread_id,
         "message_id": assistant_msg_id,
+        "tv": token_version,
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(seconds=settings.ASSISTANT_RUN_TOKEN_TTL_S)).timestamp()),
     }
     run_token = encode_token(run_token_payload)
 
-    # 4. Đăng ký nhận sự kiện từ MCP event bus
+    # 3. Đăng ký nhận sự kiện từ MCP event bus
     bus_queue = await event_bus.register(assistant_msg_id)
 
     # Hàng đợi xuất dữ liệu SSE ra ngoài
     out_queue: asyncio.Queue[str | None] = asyncio.Queue()
-
-    # Phát message_start ngay lập tức
-    await out_queue.put(
+    out_queue.put_nowait(
         _format_sse(
             "message_start",
             {
@@ -417,8 +488,25 @@ async def run_turn_stream(
         )
     )
 
+    async def _bus_worker() -> None:
+        """Worker lắng nghe các sự kiện từ MCP event bus (tool running/done, action)."""
+        while True:
+            ev = await bus_queue.get()
+            if ev is None:
+                break
+            etype = ev.get("event")
+            data = ev.get("data")
+            if etype == "tool_call":
+                if data.get("status") == "running":
+                    await out_queue.put(_format_sse("status", {"phase": "tool"}))
+                await out_queue.put(_format_sse("tool_call", data))
+            elif etype == "action":
+                await out_queue.put(_format_sse("action", data))
+
+    bus_task = asyncio.create_task(_bus_worker())
+
     async def _runner_worker() -> None:
-        """Worker chạy ai-runner và bơm sự kiện vào out_queue."""
+        """Chạy ai-runner và bơm sự kiện vào out_queue; lưu kết quả cuối vào DB."""
         accumulated_parts: list[str] = []
         emitted_tools: set[str] = set()
         model_name: str | None = None
@@ -507,6 +595,11 @@ async def run_turn_stream(
             )
 
         finally:
+            # Xả nốt sự kiện MCP (tool/action) trước khi kết thúc để không bị mất hay đảo thứ tự
+            await bus_queue.put(None)
+            with contextlib.suppress(asyncio.TimeoutError, asyncio.CancelledError):
+                await asyncio.wait_for(asyncio.shield(bus_task), timeout=2.0)
+
             full_content = _join_parts(accumulated_parts)
             # Cập nhật DB trạng thái kết thúc
             with get_db_context() as db_final:
@@ -526,48 +619,45 @@ async def run_turn_stream(
             if final_status != AiMessageStatus.ERROR:
                 await out_queue.put(_format_sse("message_end", {"message": final_msg_out}))
 
-    async def _bus_worker() -> None:
-        """Worker lắng nghe các sự kiện từ MCP event bus (tool running/done, action)."""
-        while True:
-            ev = await bus_queue.get()
-            if ev is None:
-                break
-            etype = ev.get("event")
-            data = ev.get("data")
-            if etype == "tool_call":
-                if data.get("status") == "running":
-                    await out_queue.put(_format_sse("status", {"phase": "tool"}))
-                await out_queue.put(_format_sse("tool_call", data))
-            elif etype == "action":
-                await out_queue.put(_format_sse("action", data))
+    async def _supervisor() -> None:
+        try:
+            await _runner_worker()
+        finally:
+            # Giải phóng khoá phiên CHỈ khi lượt chạy thực sự kết thúc (kể cả khi client đã ngắt)
+            bus_task.cancel()
+            await event_bus.unregister(assistant_msg_id, bus_queue)
+            await unregister_turn(thread_id)
+            out_queue.put_nowait(None)
 
-    # Chạy runner worker song song
-    runner_task = asyncio.create_task(_runner_worker())
-    bus_task = asyncio.create_task(_bus_worker())
+    supervisor = asyncio.create_task(_supervisor())
+    for task in (supervisor, bus_task):
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
 
-    def _done_callback(fut: Any) -> None:
-        # Ngừng bus worker khi runner xong
-        bus_task.cancel()
-        out_queue.put_nowait(None)
+    return TurnContext(thread_id=thread_id, out_queue=out_queue)
 
-    runner_task.add_done_callback(_done_callback)
 
-    try:
-        # 5. Yield SSE events ra response stream với heartbeat 15 giây
-        while True:
-            try:
-                item = await asyncio.wait_for(out_queue.get(), timeout=15.0)
-                if item is None:
-                    break
-                yield item
-            except TimeoutError:
-                # Heartbeat comment per CONTRACT §6 / §10
-                yield ": ping\n\n"
+async def stream_turn(ctx: TurnContext) -> AsyncIterator[str]:
+    """Đọc sự kiện SSE của một lượt đã khởi tạo, kèm heartbeat 15 giây (CONTRACT §6)."""
+    while True:
+        try:
+            item = await asyncio.wait_for(ctx.out_queue.get(), timeout=15.0)
+        except TimeoutError:
+            yield ": ping\n\n"
+            continue
+        if item is None:
+            break
+        yield item
 
-    finally:
-        # Dọn dẹp tài nguyên
-        await event_bus.unregister(assistant_msg_id, bus_queue)
-        await unregister_turn(thread_id)
-        if not runner_task.done():
-            # Client ngắt kết nối: runner vẫn tiếp tục chạy hoàn tất ở nền (hoặc abort nếu đã set)
-            pass
+
+async def run_turn_stream(
+    user_id: int,
+    thread_id: int,
+    content: str,
+    runner: RunnerClient | None = None,
+    regenerate_message_id: int | None = None,
+) -> AsyncIterator[str]:
+    """Tiện ích: khởi tạo rồi stream một lượt (dùng trong test)."""
+    ctx = await start_turn(user_id, thread_id, content, runner, regenerate_message_id)
+    async for item in stream_turn(ctx):
+        yield item

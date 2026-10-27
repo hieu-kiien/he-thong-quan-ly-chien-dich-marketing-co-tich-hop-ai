@@ -241,3 +241,69 @@ def test_actions_api_endpoints(
     data = resp.json()
     assert data["status"] == "EXECUTED"
     assert "contents" in data["result_json"]
+
+
+def test_confirm_validation_error_keeps_proposal_editable(
+    db: Session,
+    marketer1_user: User,
+    test_action_fixture: tuple[AiThread, AiMessage, AiAction],
+):
+    """Gõ sai dữ liệu khi sửa thẻ đề xuất không được khoá thẻ vĩnh viễn: sửa lại rồi xác nhận được."""
+    from app.core.errors import ValidationFailed
+
+    _, _, action = test_action_fixture
+    bad = {"items": [{**action.args_json["items"][0], "channel_code": "KENH_KHONG_TON_TAI"}]}
+
+    with pytest.raises(ValidationFailed):
+        actions_service.confirm(db, marketer1_user, action.id, args_override=bad)
+
+    db.refresh(action)
+    assert action.status == AiActionStatus.PROPOSED
+    assert action.error  # hiển thị lý do cho người dùng
+    assert db.query(Content).filter(Content.ai_message_id == action.message_id).count() == 0
+
+    fixed = actions_service.confirm(db, marketer1_user, action.id)
+    assert fixed.status == AiActionStatus.EXECUTED
+    assert fixed.error is None
+
+
+def test_confirm_metrics_validates_all_rows_before_writing(
+    db: Session,
+    marketer1_user: User,
+    sample_campaign: Campaign,
+    test_action_fixture: tuple[AiThread, AiMessage, AiAction],
+):
+    """Một dòng lỗi thì KHÔNG dòng nào được ghi (mỗi upsert tự commit nên phải kiểm tra trước)."""
+    from app.core.errors import ValidationFailed
+    from app.core.timeutil import today_vn
+    from app.models import Metric
+
+    thread, message, _ = test_action_fixture
+    good = {
+        "campaign_id": sample_campaign.id,
+        "channel_code": "FACEBOOK",
+        "metric_date": today_vn().isoformat(),
+        "views": 100,
+        "clicks": 10,
+        "conversions": 1,
+        "cost": 50000,
+    }
+    bad = {**good, "metric_date": "2026-01-02", "clicks": 999}  # clicks > views
+    action = AiAction(
+        thread_id=thread.id,
+        message_id=message.id,
+        user_id=marketer1_user.id,
+        tool="propose_metrics",
+        args_json={"rows": [good, bad]},
+        summary="Đề xuất ghi 2 dòng số liệu",
+        status=AiActionStatus.PROPOSED,
+    )
+    db.add(action)
+    db.commit()
+
+    with pytest.raises(ValidationFailed):
+        actions_service.confirm(db, marketer1_user, action.id)
+
+    assert db.query(Metric).filter(Metric.campaign_id == sample_campaign.id).count() == 0
+    db.refresh(action)
+    assert action.status == AiActionStatus.PROPOSED
