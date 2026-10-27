@@ -79,3 +79,10 @@ def test_changing_campaign_starts_new_session(db: Session, marketer1_user: User,
     db.refresh(thread)
     assert thread.campaign_id == sample_campaign.id
     assert thread.opencode_session_id is None
+
+
+def test_snapshot_time_is_labelled_in_vietnam_time(db: Session, marketer1_user: User, sample_campaign: Campaign):
+    thread = _thread(db, marketer1_user, sample_campaign)
+    prompt = chat_service.build_prompt(db, marketer1_user, thread, "Tóm tắt")
+    assert "(giờ Việt Nam)" in prompt
+    assert " UTC" not in prompt  # tránh để mô hình hiểu nhầm giờ UTC là giờ địa phương

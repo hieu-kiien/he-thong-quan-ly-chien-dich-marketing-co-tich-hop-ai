@@ -21,7 +21,7 @@ from app.assistant.tools import registry
 from app.core.config import settings
 from app.core.errors import Conflict, NotFound, PermissionDenied, ValidationFailed
 from app.core.security import encode_token
-from app.core.timeutil import now_utc, today_vn
+from app.core.timeutil import VN_TZ, now_utc, today_vn
 from app.models.ai import AiAction, AiMessage, AiThread
 from app.models.campaign import Campaign
 from app.models.content import Content
@@ -239,7 +239,7 @@ def build_prompt(db: Session, user: User, thread: AiThread, user_content: str) -
         # Lượt đầu của phiên OpenCode: gửi ảnh chụp dữ liệu; các lượt sau phiên đã nhớ ngữ cảnh.
         lines.extend(_snapshot_lines(db, user, thread))
         lines.append(
-            f"- Ảnh chụp dữ liệu trên lấy lúc {now_utc():%H:%M} UTC; dùng ngay nếu đủ, "
+            f"- Ảnh chụp dữ liệu trên lấy lúc {datetime.now(VN_TZ):%H:%M %d/%m/%Y} (giờ Việt Nam); dùng ngay nếu đủ, "
             "chỉ gọi công cụ khi cần dữ liệu khác hoặc mới hơn."
         )
     elif thread.campaign_id:
