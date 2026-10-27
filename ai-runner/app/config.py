@@ -50,8 +50,6 @@ class Settings:
     # After the provider reports a usage/rate limit, fail fast (without spawning opencode)
     # for this many seconds. OpenCode itself retries silently instead of exiting.
     rate_limit_cooldown_s: float = 600.0
-    # Optional file path watched by systemd (marketflow-warp-rotate.path) to auto-rotate WARP IP on rate limit.
-    warp_rotate_trigger: str = ""
 
     @property
     def opencode_cmd(self) -> list[str]:
@@ -80,5 +78,4 @@ class Settings:
             port=_int("RUNNER_PORT", 8100),
             passthrough_env=_split_csv(os.environ.get("RUNNER_PASSTHROUGH_ENV")),
             rate_limit_cooldown_s=_float("RUNNER_RATE_LIMIT_COOLDOWN_S", 600.0, minimum=0.0),
-            warp_rotate_trigger=(os.environ.get("RUNNER_WARP_ROTATE_TRIGGER") or "").strip(),
         )

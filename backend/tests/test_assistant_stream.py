@@ -386,3 +386,47 @@ def test_client_disconnect_does_not_release_thread_lock_until_turn_ends(
     )
     assert resp.status_code == 200
     assert asyncio.run(chat_service.is_thread_busy(thread_id)) is False  # lượt đã xong → khoá đã nhả
+
+
+def test_sse_realtime_text_delta_and_phase_progression(
+    client: TestClient,
+    marketer1_headers: dict[str, str],
+    fake_runner_fixture: FakeRunner,
+    db: Session,
+):
+    """Kiểm tra stream từng cụm từ (text_delta) và chuyển pha trạng thái thinking -> writing."""
+    fake_runner_fixture.set_events([
+        {"type": "run", "run_id": "run_delta_1"},
+        {"type": "session", "id": "ses_delta_1"},
+        {"type": "step"},
+        {"type": "text_delta", "part_id": "p1", "delta": "Xin chào "},
+        {"type": "text_delta", "part_id": "p1", "delta": "bạn!"},
+        {"type": "text", "text": "Xin chào bạn!"},
+        {"type": "step"},
+        {"type": "text_delta", "part_id": "p2", "delta": "Đây là bước 2."},
+        {"type": "text", "text": "Đây là bước 2."},
+        {"type": "done", "model": "test-zen", "latency_ms": 420},
+    ])
+
+    thread_id = client.post("/api/v1/assistant/threads", json={}, headers=marketer1_headers).json()["id"]
+    resp = client.post(
+        f"/api/v1/assistant/threads/{thread_id}/messages",
+        json={"content": "Kiểm tra stream"},
+        headers=marketer1_headers,
+    )
+    assert resp.status_code == 200
+    events = parse_sse_events(resp.text)
+
+    phases = [e[1]["phase"] for e in events if e[0] == "status"]
+    assert "thinking" in phases
+    assert "writing" in phases
+
+    text_Snapshots = [e[1]["content"] for e in events if e[0] == "text"]
+    assert text_Snapshots[0] == "Xin chào"
+    assert "Xin chào bạn!" in text_Snapshots
+    assert text_Snapshots[-1] == "Xin chào bạn!\n\nĐây là bước 2."
+
+    db.expire_all()
+    msgs = db.query(AiMessage).filter(AiMessage.thread_id == thread_id).order_by(AiMessage.id).all()
+    assert msgs[-1].content == "Xin chào bạn!\n\nĐây là bước 2."
+

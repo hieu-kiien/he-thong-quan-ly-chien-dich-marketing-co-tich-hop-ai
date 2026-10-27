@@ -19,7 +19,11 @@ fi
 echo "==> [3/7] Setting up directories..."
 mkdir -p /etc/marketflow
 mkdir -p /opt/marketflow/ai-runner/app
-mkdir -p /opt/marketflow/ai-runner/sandbox/.opencode/agent
+mkdir -p /var/lib/mfai/sandbox/.opencode/agent
+mkdir -p /var/lib/mfai/sandbox/.opencode/plugins
+if [ ! -d /var/lib/mfai/sandbox/.git ]; then
+    git init -q /var/lib/mfai/sandbox
+fi
 
 echo "==> [4/7] Ensuring environment file /etc/marketflow/ai-runner.env..."
 if [ ! -f /etc/marketflow/ai-runner.env ]; then
@@ -28,7 +32,8 @@ if [ ! -f /etc/marketflow/ai-runner.env ]; then
 # MarketFlow AI Runner environment configuration
 RUNNER_TOKEN=${RANDOM_TOKEN}
 OPENCODE_BIN=/opt/opencode/bin/opencode
-RUNNER_SANDBOX_DIR=/opt/marketflow/ai-runner/sandbox
+RUNNER_SANDBOX_DIR=/var/lib/mfai/sandbox
+OPENCODE_PURE=0
 OPENCODE_AGENT=marketflow
 OPENCODE_MODEL=opencode/big-pickle
 OPENCODE_FALLBACK_MODELS=opencode/glm-5.3-flash-free,opencode/deepseek-v4.1-flash-free
@@ -48,16 +53,18 @@ echo "==> [5/7] Deploying sandbox agent & config..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-# Copy agent and opencode config to sandbox
-cp "${REPO_DIR}/deploy/opencode/agent/marketflow.md" /opt/marketflow/ai-runner/sandbox/.opencode/agent/marketflow.md
-cp "${REPO_DIR}/deploy/opencode/opencode.json" /opt/marketflow/ai-runner/sandbox/opencode.json
+# Copy agent, stream-delta plugin, and opencode config to isolated sandbox
+cp "${REPO_DIR}/deploy/opencode/agent/marketflow.md" /var/lib/mfai/sandbox/.opencode/agent/marketflow.md
+cp "${REPO_DIR}/deploy/opencode/plugins/stream-delta.js" /var/lib/mfai/sandbox/.opencode/plugins/stream-delta.js
+cp "${REPO_DIR}/deploy/opencode/opencode.json" /var/lib/mfai/sandbox/opencode.json
 
 # Copy ai-runner application code if not already in destination
 if [ "${REPO_DIR}/ai-runner/app" != "/opt/marketflow/ai-runner/app" ]; then
     cp -r "${REPO_DIR}/ai-runner/app/"* /opt/marketflow/ai-runner/app/
 fi
 chown -R root:root /opt/marketflow/ai-runner
-chmod -R a+rX /opt/marketflow/ai-runner/sandbox
+chown -R mfai:mfai /var/lib/mfai/sandbox
+chmod -R a+rX /var/lib/mfai/sandbox
 chmod -R a+rX /opt/marketflow/ai-runner/app
 
 echo "==> [6/7] Setting up Python virtual environment..."

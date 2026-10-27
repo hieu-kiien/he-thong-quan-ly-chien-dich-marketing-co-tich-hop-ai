@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 from app.config import Settings
-from app.events import AI_EMPTY_RESPONSE, AI_RATE_LIMITED, AI_TIMEOUT
+from app.events import AI_EMPTY_RESPONSE, AI_RATE_LIMITED, AI_TIMEOUT, TurnState, parse_line
 from app.runner import Runner, RunRequestData
 
 FAKE_BIN = str(Path(__file__).parent / "fake_opencode.py")
@@ -216,3 +216,20 @@ async def test_stale_session_retry():
     assert "done" in types
     done_ev = next(e for e in events if e["type"] == "done")
     assert done_ev["session_id"] == "ses_test_simple_123"
+
+
+def test_parse_line_text_delta_and_step():
+    state = TurnState()
+    ev_step = parse_line('{"type":"step_start","sessionID":"ses_1"}', state)
+    assert ev_step == [{"type": "session", "id": "ses_1"}, {"type": "step"}]
+
+    ev_d1 = parse_line('{"type":"text_delta","sessionID":"ses_1","partID":"p1","delta":"Xin "}', state)
+    assert ev_d1 == [{"type": "text_delta", "part_id": "p1", "delta": "Xin "}]
+    assert state.has_text is True
+    assert state.emitted_output is True
+
+    ev_final = parse_line('{"type":"text","sessionID":"ses_1","part":{"id":"p1","text":"Xin chào"}}', state)
+    assert ev_final == [{"type": "text", "text": "Xin chào"}]
+    assert "p1" not in state.part_deltas
+    assert state.texts == ["Xin chào"]
+

@@ -96,6 +96,7 @@ def test_read_tools_execution(
     assert res["id"] == sample_campaign.id
     assert res["name"] == sample_campaign.name
     assert "stats" in res
+    assert "stats_by_channel" in res
     assert len(res["channels"]) == 2
 
     # 3. get_stats

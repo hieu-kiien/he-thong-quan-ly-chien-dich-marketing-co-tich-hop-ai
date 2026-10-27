@@ -96,6 +96,7 @@ class TurnState:
 
     session_id: str | None = None
     texts: list[str] = field(default_factory=list)
+    part_deltas: dict[str, str] = field(default_factory=dict)
     tools: int = 0
     error_raw: str | None = None
     error_short: str | None = None
@@ -103,11 +104,11 @@ class TurnState:
 
     @property
     def emitted_output(self) -> bool:
-        return bool(self.texts) or self.tools > 0
+        return bool(self.texts) or bool(self.part_deltas) or self.tools > 0
 
     @property
     def has_text(self) -> bool:
-        return any(t.strip() for t in self.texts)
+        return any(t.strip() for t in self.texts) or any(d.strip() for d in self.part_deltas.values())
 
 
 def parse_line(line: str, state: TurnState) -> list[dict[str, Any]]:
@@ -135,10 +136,21 @@ def parse_line(line: str, state: TurnState) -> list[dict[str, Any]]:
     etype = event.get("type")
     part = event.get("part") if isinstance(event.get("part"), dict) else {}
 
-    if etype == "text":
+    if etype == "step_start":
+        out.append({"type": "step"})
+    elif etype == "text_delta":
+        delta = event.get("delta")
+        part_id = str(event.get("partID") or "default")
+        if isinstance(delta, str) and delta:
+            state.part_deltas[part_id] = state.part_deltas.get(part_id, "") + delta
+            out.append({"type": "text_delta", "part_id": part_id, "delta": delta})
+    elif etype == "text":
         text = part.get("text")
+        part_id = str(part.get("id") or "")
         if isinstance(text, str) and text.strip():
             state.texts.append(text)
+            if part_id:
+                state.part_deltas.pop(part_id, None)
             out.append({"type": "text", "text": text})
     elif etype == "tool_use":
         tool_state = part.get("state") if isinstance(part.get("state"), dict) else {}

@@ -16,9 +16,10 @@ COPY ai-runner/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY ai-runner/app ./app
 
-# Sandbox: thư mục rỗng chỉ chứa agent đã khoá quyền + cấu hình MCP trỏ về dịch vụ backend trong compose
+# Sandbox: thư mục rỗng chỉ chứa agent đã khoá quyền + plugin stream-delta + cấu hình MCP
 ARG MCP_URL=http://backend:8000/mcp/
 COPY deploy/opencode/agent/marketflow.md /srv/sandbox/.opencode/agent/marketflow.md
+COPY deploy/opencode/plugins/stream-delta.js /srv/sandbox/.opencode/plugins/stream-delta.js
 COPY deploy/opencode/opencode.json /srv/sandbox/opencode.json
 RUN sed -i "s#http://127.0.0.1:8000/mcp/#${MCP_URL}#" /srv/sandbox/opencode.json \
     && chown -R mfai:mfai /srv/sandbox /srv/ai-runner /home/mfai

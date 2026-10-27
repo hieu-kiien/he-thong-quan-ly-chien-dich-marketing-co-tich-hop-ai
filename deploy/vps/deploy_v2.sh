@@ -250,13 +250,19 @@ echo "==> [8/8] Cap nhat Runner Sandbox, khoi dong lai services va smoke checks.
 
 # Cap nhat runner sandbox neu co file opencode trong release
 if [ -f "$SOURCE_ROOT/deploy/opencode/agent/marketflow.md" ]; then
-    echo "    Cap nhat runner sandbox agent va opencode.json..."
-    mkdir -p /opt/marketflow/ai-runner/sandbox/.opencode/agent
-    cp "$SOURCE_ROOT/deploy/opencode/agent/marketflow.md" /opt/marketflow/ai-runner/sandbox/.opencode/agent/marketflow.md
-    cp "$SOURCE_ROOT/deploy/opencode/opencode.json" /opt/marketflow/ai-runner/sandbox/opencode.json
-    chmod -R a+rX /opt/marketflow/ai-runner/sandbox
-    chown -R root:root /opt/marketflow/ai-runner/sandbox/opencode.json
-    chown -R root:root /opt/marketflow/ai-runner/sandbox/.opencode/agent/marketflow.md
+    echo "    Cap nhat runner sandbox agent, plugin va opencode.json..."
+    SANDBOX_DIR="/var/lib/mfai/sandbox"
+    mkdir -p "$SANDBOX_DIR/.opencode/agent" "$SANDBOX_DIR/.opencode/plugins"
+    if [ ! -d "$SANDBOX_DIR/.git" ]; then
+        git init -q "$SANDBOX_DIR"
+    fi
+    cp "$SOURCE_ROOT/deploy/opencode/agent/marketflow.md" "$SANDBOX_DIR/.opencode/agent/marketflow.md"
+    if [ -f "$SOURCE_ROOT/deploy/opencode/plugins/stream-delta.js" ]; then
+        cp "$SOURCE_ROOT/deploy/opencode/plugins/stream-delta.js" "$SANDBOX_DIR/.opencode/plugins/stream-delta.js"
+    fi
+    cp "$SOURCE_ROOT/deploy/opencode/opencode.json" "$SANDBOX_DIR/opencode.json"
+    chown -R mfai:mfai "$SANDBOX_DIR"
+    chmod -R a+rX "$SANDBOX_DIR"
     systemctl restart marketflow-ai-runner
     sleep 2
     if ! systemctl is-active --quiet marketflow-ai-runner; then

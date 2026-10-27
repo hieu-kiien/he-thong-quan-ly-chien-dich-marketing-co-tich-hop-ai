@@ -216,12 +216,14 @@ def _snapshot_lines(db: Session, user: User, thread: AiThread) -> list[str]:
             lines.append(
                 f"  - Số liệu tổng (từ CSDL): views {s.views}, clicks {s.clicks}, chuyển đổi {s.conversions}, "
                 f"chi phí {_fmt_money(s.cost)}, CTR {_fmt_rate(s.ctr)}, CVR {_fmt_rate(s.cvr)}, "
+                f"CPC {_fmt_money(s.cpc)}, CPA {_fmt_money(s.cpa)}, "
                 f"đã dùng {s.budget_used_pct if s.budget_used_pct is not None else '—'}% ngân sách"
             )
             for row in stats_service.get_by_channel(db, user, StatsFilters(campaign_id=camp.id)):
                 lines.append(
                     f"    - {row.channel.code}: views {row.views}, clicks {row.clicks}, chuyển đổi {row.conversions}, "
-                    f"chi phí {_fmt_money(row.cost)}, CTR {_fmt_rate(row.ctr)}, CPA {_fmt_money(row.cpa)}"
+                    f"chi phí {_fmt_money(row.cost)}, CTR {_fmt_rate(row.ctr)}, CVR {_fmt_rate(row.cvr)}, "
+                    f"CPC {_fmt_money(row.cpc)}, CPA {_fmt_money(row.cpa)}"
                 )
         else:
             lines.append("  - Số liệu: CHƯA CÓ dữ liệu hiệu quả nào được nhập cho chiến dịch này.")
@@ -500,6 +502,8 @@ async def start_turn(
                 if data.get("status") == "running":
                     await out_queue.put(_format_sse("status", {"phase": "tool"}))
                 await out_queue.put(_format_sse("tool_call", data))
+                if data.get("status") in ("done", "error"):
+                    await out_queue.put(_format_sse("status", {"phase": "thinking"}))
             elif etype == "action":
                 await out_queue.put(_format_sse("action", data))
 
@@ -508,6 +512,8 @@ async def start_turn(
     async def _runner_worker() -> None:
         """Chạy ai-runner và bơm sự kiện vào out_queue; lưu kết quả cuối vào DB."""
         accumulated_parts: list[str] = []
+        streaming_part = ""
+        current_phase = ""
         emitted_tools: set[str] = set()
         model_name: str | None = None
         latency: int | None = None
@@ -529,11 +535,20 @@ async def start_turn(
                 etype = ev.get("type")
                 if etype == "run":
                     turn.run_id = ev.get("run_id")
+                    current_phase = "thinking"
+                    await out_queue.put(_format_sse("status", {"phase": "thinking"}))
 
                 elif etype == "queued":
+                    current_phase = "queued"
                     await out_queue.put(
                         _format_sse("status", {"phase": "queued", "queue_position": ev.get("position", 1)})
                     )
+
+                elif etype == "step":
+                    streaming_part = ""
+                    if current_phase != "thinking":
+                        current_phase = "thinking"
+                        await out_queue.put(_format_sse("status", {"phase": "thinking"}))
 
                 elif etype == "session":
                     new_sid = ev.get("id")
@@ -544,10 +559,25 @@ async def start_turn(
                                 t.opencode_session_id = str(new_sid)
                                 db_s.commit()
 
+                elif etype == "text_delta":
+                    delta = ev.get("delta", "")
+                    if delta:
+                        streaming_part += delta
+                        if current_phase != "writing":
+                            current_phase = "writing"
+                            await out_queue.put(_format_sse("status", {"phase": "writing"}))
+                        live_content = _join_parts([*accumulated_parts, streaming_part])
+                        if live_content:
+                            await out_queue.put(_format_sse("text", {"content": live_content}))
+
                 elif etype == "text":
                     part = ev.get("text", "")
+                    streaming_part = ""
                     if part:
                         accumulated_parts.append(part)
+                        if current_phase != "writing":
+                            current_phase = "writing"
+                            await out_queue.put(_format_sse("status", {"phase": "writing"}))
                         # OpenCode gửi từng "part" văn bản hoàn chỉnh (trước/sau khi gọi công cụ)
                         full_content = _join_parts(accumulated_parts)
                         await out_queue.put(_format_sse("text", {"content": full_content}))
@@ -600,6 +630,8 @@ async def start_turn(
             with contextlib.suppress(asyncio.TimeoutError, asyncio.CancelledError):
                 await asyncio.wait_for(asyncio.shield(bus_task), timeout=2.0)
 
+            if streaming_part.strip():
+                accumulated_parts.append(streaming_part)
             full_content = _join_parts(accumulated_parts)
             # Cập nhật DB trạng thái kết thúc
             with get_db_context() as db_final:

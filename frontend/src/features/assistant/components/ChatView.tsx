@@ -38,7 +38,21 @@ export function ChatView({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const bottomAnchorRef = useRef<HTMLDivElement>(null);
   const [showScrollBottomPill, setShowScrollBottomPill] = useState(false);
+  const [elapsedSec, setElapsedSec] = useState(0);
   const isUserScrolledUpRef = useRef(false);
+
+  // Bộ đếm thời gian thực thi (giây) để người dùng thấy phản hồi đang tiến triển
+  useEffect(() => {
+    if (!isStreaming) {
+      setElapsedSec(0);
+      return;
+    }
+    setElapsedSec(0);
+    const timer = window.setInterval(() => {
+      setElapsedSec((prev) => prev + 1);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isStreaming]);
 
   // Kiểm tra vị trí cuộn
   const handleScroll = useCallback(() => {
@@ -165,6 +179,11 @@ export function ChatView({
               >
                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
                 <span>{getPhaseStatusText()}</span>
+                {elapsedSec > 0 && (
+                  <span className="font-mono text-[11px] text-fg-subtle tabular-nums">
+                    ({elapsedSec}s)
+                  </span>
+                )}
               </div>
             )}
 

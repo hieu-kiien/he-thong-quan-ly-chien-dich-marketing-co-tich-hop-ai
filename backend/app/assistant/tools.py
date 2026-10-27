@@ -202,6 +202,7 @@ def handle_list_campaigns(ctx: ToolContext, args: ListCampaignsArgs) -> dict[str
 
 def handle_get_campaign(ctx: ToolContext, args: GetCampaignArgs) -> dict[str, Any]:
     camp = campaign_service.get_campaign(ctx.db, ctx.user, args.campaign_id)
+    ch_stats = stats_service.get_by_channel(ctx.db, ctx.user, StatsFilters(campaign_id=camp.id))
     return {
         "id": camp.id,
         "name": camp.name,
@@ -236,6 +237,21 @@ def handle_get_campaign(ctx: ToolContext, args: GetCampaignArgs) -> dict[str, An
             "cpa": float(camp.stats.cpa) if camp.stats.cpa is not None else None,
             "budget_used_pct": float(camp.stats.budget_used_pct) if camp.stats.budget_used_pct is not None else None,
         },
+        "stats_by_channel": [
+            {
+                "channel_code": r.channel.code,
+                "channel_name": r.channel.name,
+                "views": r.views,
+                "clicks": r.clicks,
+                "conversions": r.conversions,
+                "cost": int(r.cost),
+                "ctr": float(r.ctr) if r.ctr is not None else None,
+                "cvr": float(r.cvr) if r.cvr is not None else None,
+                "cpc": float(r.cpc) if r.cpc is not None else None,
+                "cpa": float(r.cpa) if r.cpa is not None else None,
+            }
+            for r in ch_stats
+        ],
     }
 
 
@@ -663,7 +679,7 @@ registry.register(
 registry.register(
     ToolDefinition(
         name="get_campaign",
-        description="Xem chi tiết chiến dịch gồm thông tin mục tiêu, ngân sách, các kênh và thống kê hiệu quả tổng thể",
+        description="Xem chi tiết chiến dịch gồm thông tin mục tiêu, ngân sách, các kênh, thống kê hiệu quả tổng thể và số liệu phân bổ theo từng kênh (stats_by_channel)",
         args_model=GetCampaignArgs,
         handler=handle_get_campaign,
     )
