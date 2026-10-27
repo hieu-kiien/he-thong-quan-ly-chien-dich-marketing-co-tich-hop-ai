@@ -5,9 +5,6 @@
 #   - VITE_API_URL               : URL cua FastAPI. Mac dinh `/api/v1` ->
 #                                  frontend goi API qua chinh reverse proxy
 #                                  nginx cua container nay, khong lo CORS.
-#   - VITE_ENABLE_OFFLINE_DEMO   : co bat che "offline demo" hay khong. Xem canh
-#                                  bao P0 ben duoi - TUYET DOI KHONG BAO GIO
-#                                  BAT cho production.
 # =============================================================================
 
 # Stage 1: Build Frontend
@@ -22,25 +19,6 @@ COPY . .
 
 ARG VITE_API_URL=/api/v1
 ENV VITE_API_URL=$VITE_API_URL
-
-# P0 SECURITY: build image khong bao gio duoc bat offline demo.
-# Mac dinh false va phai override co y thuc; khi backend loi mang, co che offline
-# cap phien dang nhap gia cho bat ky mat khau va suy doan quyen tu chuoi email.
-#
-# CANH BAO KHONG BO QUA: bien nay duoc `ENV` hoa luc BUILD nen no bi
-# `npm run build` nung vao JS bundle nen KHONG THE tat bang bien moi o runtime,
-# va KHONG THE go lai giup - chi can `docker compose build --build-arg
-# VITE_ENABLE_OFFLINE_DEMO=true` mot lan la shell offline da nam trong
-# frontend/dist/assets/*.js, dung cho moi request sau do. Backend co the
-# dang nhap duoc bang BAT KY mat khau va co quyen tao/xoa/sua du lieu thay
-# vi chay bang mat khau that.
-#   -> KHONG BAO GIO build/deploy production voi co true.
-#   -> CI/CD nen dat co hard (repo variable hoac pipeline policy) chan
-#      `-b VITE_ENABLE_OFFLINE_DEMO=true` o moi pipeline deploy that.
-#   -> Neu da build nham, KHONG sua JS bundle: doi hash cache bang cach xoa
-#      frontend/dist va build lai, roi `docker compose build --no-cache`.
-ARG VITE_ENABLE_OFFLINE_DEMO=false
-ENV VITE_ENABLE_OFFLINE_DEMO=$VITE_ENABLE_OFFLINE_DEMO
 
 RUN npm run build
 

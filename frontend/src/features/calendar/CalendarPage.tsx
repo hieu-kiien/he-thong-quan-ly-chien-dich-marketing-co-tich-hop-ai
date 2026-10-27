@@ -26,7 +26,14 @@ import {
 } from '@/components/ui';
 import { schedulesApi, contentsApi, campaignsApi } from '@/lib/api/endpoints';
 import { useChannels, useUserOptions, useDocumentTitle } from '@/lib/hooks';
-import { formatDateTime, formatTime } from '@/lib/format';
+import {
+  formatDateTime,
+  formatTime,
+  fromDateTimeLocal,
+  localDateKey,
+  todayKey,
+  zonedDateKey,
+} from '@/lib/format';
 import {
   SCHEDULE_STATUS_LABEL,
 } from '@/lib/labels';
@@ -106,8 +113,8 @@ export default function CalendarPage() {
       }
 
       return {
-        dateFrom: startDate.toISOString().slice(0, 10),
-        dateTo: endDate.toISOString().slice(0, 10),
+        dateFrom: localDateKey(startDate),
+        dateTo: localDateKey(endDate),
         calendarDays: days,
       };
     } else {
@@ -125,8 +132,8 @@ export default function CalendarPage() {
 
       const endOfWeek = days[6];
       return {
-        dateFrom: startOfWeek.toISOString().slice(0, 10),
-        dateTo: endOfWeek.toISOString().slice(0, 10),
+        dateFrom: localDateKey(startOfWeek),
+        dateTo: localDateKey(endOfWeek),
         calendarDays: days,
       };
     }
@@ -224,7 +231,8 @@ export default function CalendarPage() {
   const schedulesByDay = useMemo(() => {
     const map: Record<string, Schedule[]> = {};
     (schedules ?? []).forEach((s) => {
-      const dayKey = s.scheduled_at.slice(0, 10);
+      // Nhóm theo NGÀY GIỜ VIỆT NAM (scheduled_at là UTC; cắt chuỗi sẽ lệch ngày với bài đăng buổi sáng)
+      const dayKey = zonedDateKey(s.scheduled_at);
       if (!map[dayKey]) map[dayKey] = [];
       map[dayKey].push(s);
     });
@@ -233,7 +241,7 @@ export default function CalendarPage() {
 
   const monthLabel = `Tháng ${currentDate.getMonth() + 1}, ${currentDate.getFullYear()}`;
   const dayNames = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = todayKey();
 
   return (
     <PageContainer>
@@ -346,7 +354,7 @@ export default function CalendarPage() {
           {/* Calendar Grid */}
           <div className={`grid grid-cols-7 divide-x divide-y divide-border ${viewMode === 'month' ? 'auto-rows-fr' : 'min-h-[450px]'}`}>
             {calendarDays.map((day, idx) => {
-              const dayStr = day.toISOString().slice(0, 10);
+              const dayStr = localDateKey(day);
               const isToday = dayStr === todayIso;
               const isCurrentMonth = day.getMonth() === currentDate.getMonth();
               const items = schedulesByDay[dayStr] ?? [];
@@ -545,7 +553,7 @@ export default function CalendarPage() {
             }
             createMutation.mutate({
               content_id: Number(newContentId),
-              scheduled_at: new Date(newScheduledAt).toISOString(),
+              scheduled_at: fromDateTimeLocal(newScheduledAt),
               assignee_id: newAssigneeId ? Number(newAssigneeId) : null,
               note: newNote.trim() || null,
             });

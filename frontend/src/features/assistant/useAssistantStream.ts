@@ -24,6 +24,9 @@ const INITIAL_STREAMING_STATE: StreamingState = {
   error: null,
 };
 
+/** id tạm của tin nhắn lạc quan = Date.now() (> 1e11); id thật trong DB nhỏ hơn rất nhiều. */
+const OPTIMISTIC_ID_MIN = 1e11;
+
 export function useAssistantStream(threadId?: number) {
   const queryClient = useQueryClient();
   const [streamingState, setStreamingState] = useState<StreamingState>(INITIAL_STREAMING_STATE);
@@ -138,9 +141,13 @@ export function useAssistantStream(threadId?: number) {
 
           // Đồng bộ cache tin nhắn
           queryClient.setQueryData<AiMessage[]>(['assistant', 'messages', activeThreadId], (old = []) => {
-            const list = [...old];
-            if (data.user_message && !list.some((m) => m.id === data.user_message?.id)) {
-              list.push(data.user_message);
+            // Bỏ tin nhắn tạm (id = Date.now()) để thay bằng bản thật từ server — tránh hiện 2 bong bóng
+            const userMessage = data.user_message;
+            const list = old.filter(
+              (m) => !(userMessage && m.id > OPTIMISTIC_ID_MIN && m.role === 'USER' && m.content === userMessage.content),
+            );
+            if (userMessage && !list.some((m) => m.id === userMessage.id)) {
+              list.push(userMessage);
             }
             if (!list.some((m) => m.id === data.assistant_message.id)) {
               const placeholderAssistant: AiMessage = {
@@ -251,6 +258,8 @@ export function useAssistantStream(threadId?: number) {
             return old.map((msg) => (msg.id === data.message.id ? data.message : msg));
           });
 
+          // Lấy lại lịch sử từ server: loại bỏ tin nhắn tạm và câu trả lời cũ đã bị thay khi 'Tạo lại'
+          queryClient.invalidateQueries({ queryKey: ['assistant', 'messages', activeThreadId] });
           // Làm mới danh sách phiên để cập nhật last_message_at
           queryClient.invalidateQueries({ queryKey: ['assistant', 'threads'] });
           // Đồng bộ lại danh sách actions

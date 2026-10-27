@@ -205,7 +205,7 @@ export default function LoginPage() {
               </div>
               <div>
                 <h3 className="text-sm font-bold text-white">
-                  Báo cáo hiệu suất thực tế (ROAS, CTR, CPA, CPC)
+                  Báo cáo hiệu suất thực tế (CTR, CVR, CPC, CPA)
                 </h3>
                 <p className="text-xs text-stone-400 mt-0.5">
                   Nhập chỉ số theo ngày hoặc tải file CSV có bước đối soát trước khi ghi nhận vào hệ thống.

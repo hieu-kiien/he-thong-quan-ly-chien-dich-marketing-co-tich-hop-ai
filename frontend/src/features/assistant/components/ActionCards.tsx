@@ -12,7 +12,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { formatDate, formatMoney, formatRelative } from '@/lib/format';
+import { formatDate, formatMoney, formatRelative, fromDateTimeLocal, toDateTimeLocal } from '@/lib/format';
 import {
   AI_ACTION_STATUS_LABEL,
   AI_ACTION_STATUS_TONE,
@@ -333,16 +333,22 @@ function ActionCardCampaign({
 }: ActionCardProps) {
   const isProposed = action.status === 'PROPOSED';
   const args = action.args_json || {};
+  // propose_campaign_update chỉ chứa các trường AI muốn đổi; trường trống nghĩa là GIỮ NGUYÊN
+  const isUpdate = action.tool.replace(/^marketflow_/, '') === 'propose_campaign_update';
 
+  const original = {
+    name: args.name == null ? '' : String(args.name),
+    goal: args.goal == null ? '' : String(args.goal),
+    objective: args.objective == null ? '' : String(args.objective),
+    target_audience: args.target_audience == null ? '' : String(args.target_audience),
+    product: args.product == null ? '' : String(args.product),
+    start_date: args.start_date == null ? '' : String(args.start_date),
+    end_date: args.end_date == null ? '' : String(args.end_date),
+    budget: args.budget == null ? '' : String(args.budget),
+  };
   const [form, setForm] = useState({
-    name: String(args.name || ''),
-    goal: (args.goal as CampaignGoal) || 'AWARENESS',
-    objective: String(args.objective || ''),
-    target_audience: String(args.target_audience || ''),
-    product: String(args.product || ''),
-    start_date: String(args.start_date || ''),
-    end_date: String(args.end_date || ''),
-    budget: Number(args.budget) || 0,
+    ...original,
+    goal: (original.goal || (isUpdate ? '' : 'AWARENESS')) as CampaignGoal | '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -350,7 +356,18 @@ function ActionCardCampaign({
   const handleConfirm = async () => {
     setIsSubmitting(true);
     try {
-      await onConfirm(action.id, form);
+      // Chỉ gửi các trường người dùng đã SỬA so với đề xuất; phần còn lại backend lấy từ đề xuất gốc
+      // (tránh ghi đè bằng giá trị rỗng/mặc định, nhất là khi sửa chiến dịch có sẵn).
+      const override: Record<string, unknown> = {};
+      (Object.keys(original) as (keyof typeof original)[]).forEach((key) => {
+        if (String(form[key]) === original[key]) return;
+        if (key === 'budget') {
+          if (form.budget !== '') override.budget = Number(form.budget);
+        } else if (form[key] !== '') {
+          override[key] = form[key];
+        }
+      });
+      await onConfirm(action.id, override);
     } finally {
       setIsSubmitting(false);
     }
@@ -380,7 +397,7 @@ function ActionCardCampaign({
           <div className="flex items-center gap-2">
             <Megaphone className="h-4 w-4 text-accent" aria-hidden />
             <h3 className="text-xs font-semibold text-fg">
-              {action.summary || 'Đề xuất tạo chiến dịch mới'}
+              {action.summary || (isUpdate ? 'Đề xuất chỉnh sửa chiến dịch' : 'Đề xuất tạo chiến dịch mới')}
             </h3>
           </div>
           <div className="mt-1 text-[11px] text-fg-subtle">
@@ -414,8 +431,9 @@ function ActionCardCampaign({
                 </label>
                 <Select
                   value={form.goal}
-                  onChange={(e) => setForm({ ...form, goal: e.target.value as CampaignGoal })}
+                  onChange={(e) => setForm({ ...form, goal: e.target.value as CampaignGoal | '' })}
                   options={[
+                    ...(isUpdate ? [{ value: '', label: '(giữ nguyên)' }] : []),
                     { value: 'AWARENESS', label: GOAL_LABEL.AWARENESS },
                     { value: 'TRAFFIC', label: GOAL_LABEL.TRAFFIC },
                     { value: 'LEADS', label: GOAL_LABEL.LEADS },
@@ -432,7 +450,8 @@ function ActionCardCampaign({
                 <Input
                   type="number"
                   value={form.budget}
-                  onChange={(e) => setForm({ ...form, budget: Number(e.target.value) || 0 })}
+                  placeholder={isUpdate ? '(giữ nguyên)' : undefined}
+                  onChange={(e) => setForm({ ...form, budget: e.target.value })}
                   className="text-xs"
                 />
               </div>
@@ -478,10 +497,10 @@ function ActionCardCampaign({
           <div className="space-y-1.5 text-xs text-fg">
             <div className="font-semibold">{form.name}</div>
             <div className="text-fg-muted">
-              Mục tiêu: {GOAL_LABEL[form.goal]} • Ngân sách: {formatMoney(form.budget)}
+              Mục tiêu: {form.goal ? GOAL_LABEL[form.goal] : '—'} • Ngân sách: {form.budget === '' ? '—' : formatMoney(Number(form.budget))}
             </div>
             <div className="text-[11px] text-fg-subtle">
-              Thời gian: {formatDate(form.start_date)} - {formatDate(form.end_date)}
+              Thời gian: {form.start_date ? formatDate(form.start_date) : '—'} - {form.end_date ? formatDate(form.end_date) : '—'}
             </div>
           </div>
         )}
@@ -491,7 +510,7 @@ function ActionCardCampaign({
         <div className="mt-3 rounded-md bg-success-soft p-2.5 text-xs text-success-soft-fg">
           <div className="flex items-center gap-1.5 font-medium">
             <CheckCircle2 className="h-4 w-4" aria-hidden />
-            <span>Đã tạo chiến dịch thành công.</span>
+            <span>{isUpdate ? 'Đã cập nhật chiến dịch thành công.' : 'Đã tạo chiến dịch thành công.'}</span>
           </div>
           {createdCampaignId && (
             <div className="mt-2">
@@ -509,7 +528,7 @@ function ActionCardCampaign({
 
       {action.status === 'FAILED' && (
         <div className="mt-3 rounded-md bg-danger-soft p-2.5 text-xs text-danger-soft-fg">
-          {action.error || 'Tạo chiến dịch thất bại.'}
+          {action.error || (isUpdate ? 'Cập nhật chiến dịch thất bại.' : 'Tạo chiến dịch thất bại.')}
         </div>
       )}
 
@@ -540,7 +559,8 @@ function ActionCardSchedule({
   const isProposed = action.status === 'PROPOSED';
   const args = action.args_json || {};
 
-  const [scheduledAt, setScheduledAt] = useState(String(args.scheduled_at || ''));
+  // Hiển thị và sửa theo giờ Việt Nam; gửi lên kèm múi giờ +07:00 (tránh lệch 7 tiếng)
+  const [scheduledAt, setScheduledAt] = useState(toDateTimeLocal(String(args.scheduled_at || '')));
   const [note, setNote] = useState(String(args.note || ''));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -549,7 +569,7 @@ function ActionCardSchedule({
     try {
       await onConfirm(action.id, {
         content_id: args.content_id,
-        scheduled_at: scheduledAt,
+        scheduled_at: scheduledAt ? fromDateTimeLocal(scheduledAt) : undefined,
         note: note || undefined,
       });
     } finally {
@@ -597,11 +617,11 @@ function ActionCardSchedule({
           <>
             <div>
               <label className="mb-1 block text-[11px] font-medium text-fg-subtle">
-                Thời điểm đăng bài (ISO hoặc ngày giờ)
+                Thời điểm đăng bài (giờ Việt Nam)
               </label>
               <Input
                 type="datetime-local"
-                value={scheduledAt.slice(0, 16)}
+                value={scheduledAt}
                 onChange={(e) => setScheduledAt(e.target.value)}
                 className="text-xs"
               />
@@ -898,6 +918,20 @@ function ActionCardGeneric({
  * Điều phối thẻ hành động thích hợp dựa trên tên tool.
  */
 export function ActionCardRouter(props: ActionCardProps) {
+  return (
+    <>
+      <ActionCardByTool {...props} />
+      {/* Xác nhận thất bại do dữ liệu (vd sai ngày): đề xuất vẫn ở trạng thái chờ để sửa và thử lại */}
+      {props.action.status === 'PROPOSED' && props.action.error && (
+        <div role="alert" className="-mt-1 mb-2 rounded-md bg-danger-soft p-2.5 text-xs text-danger-soft-fg">
+          Lần xác nhận trước chưa thực hiện được: {props.action.error}. Hãy chỉnh lại thông tin rồi xác nhận lần nữa.
+        </div>
+      )}
+    </>
+  );
+}
+
+function ActionCardByTool(props: ActionCardProps) {
   const cleanTool = props.action.tool.replace(/^marketflow_/, '');
 
   switch (cleanTool) {

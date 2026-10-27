@@ -45,7 +45,16 @@ import { statsApi, campaignsApi } from '@/lib/api/endpoints';
 import { useChannels, useDocumentTitle } from '@/lib/hooks';
 import { useAuth } from '@/lib/auth';
 import { isManager } from '@/lib/permissions';
-import { formatDate, formatMoney, formatNumber, formatPct, formatRate } from '@/lib/format';
+import {
+  addDays,
+  formatDate,
+  formatMoney,
+  formatNumber,
+  formatPct,
+  formatRate,
+  startOfMonth,
+  todayKey,
+} from '@/lib/format';
 import type { Granularity, StatsFilters } from '@/lib/types';
 
 export default function DashboardPage() {
@@ -99,16 +108,9 @@ export default function DashboardPage() {
       setDateRange({ from: '', to: '' });
       return;
     }
-    const today = new Date();
-    const to = today.toISOString().slice(0, 10);
-    if (days === 'month') {
-      const from = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
-      setDateRange({ from, to });
-    } else {
-      const past = new Date(today);
-      past.setDate(past.getDate() - days);
-      setDateRange({ from: past.toISOString().slice(0, 10), to });
-    }
+    // Tính theo NGÀY VIỆT NAM (toISOString() dùng UTC nên lệch ngày trước 07:00 sáng)
+    const to = todayKey();
+    setDateRange({ from: days === 'month' ? startOfMonth(to) : addDays(to, -days), to });
   };
 
   const overview = overviewQ.data;

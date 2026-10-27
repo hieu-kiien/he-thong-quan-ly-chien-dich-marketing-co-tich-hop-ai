@@ -475,7 +475,7 @@ export default function CampaignDetailPage() {
                   <p className="mt-1 text-fg whitespace-pre-line">{campaign.target_audience || '—'}</p>
                 </div>
                 <div>
-                  <h4 className="text-xs font-medium text-fg-muted">Chỉ số hiệu quả dự kiến</h4>
+                  <h4 className="text-xs font-medium text-fg-muted">Chỉ số hiệu quả (từ số liệu đã nhập)</h4>
                   <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                     <div className="rounded bg-subtle p-2">
                       <span className="text-fg-muted">Chi phí / chuyển đổi (CPA):</span>

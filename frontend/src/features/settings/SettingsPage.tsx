@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { passwordProblem } from '@/lib/validation';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -320,8 +321,9 @@ export default function SettingsPage() {
                     setPasswordError('Vui lòng nhập mật khẩu hiện tại.');
                     return;
                   }
-                  if (newPassword.length < 6) {
-                    setPasswordError('Mật khẩu mới tối thiểu 6 ký tự.');
+                  const newPasswordProblem = passwordProblem(newPassword);
+                  if (newPasswordProblem) {
+                    setPasswordError(newPasswordProblem);
                     return;
                   }
                   if (newPassword !== confirmPassword) {
@@ -789,8 +791,9 @@ export default function SettingsPage() {
               setUserFormError('Vui lòng nhập họ và tên.');
               return;
             }
-            if (newUserPassword.length < 6) {
-              setUserFormError('Mật khẩu tối thiểu 6 ký tự.');
+            const newUserPasswordProblem = passwordProblem(newUserPassword);
+            if (newUserPasswordProblem) {
+              setUserFormError(newUserPasswordProblem);
               return;
             }
             createUserMutation.mutate({
@@ -944,8 +947,9 @@ export default function SettingsPage() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (resetPasswordVal.length < 6) {
-              toast.error('Mật khẩu mới tối thiểu 6 ký tự');
+            const resetPasswordProblem = passwordProblem(resetPasswordVal);
+            if (resetPasswordProblem) {
+              toast.error(resetPasswordProblem);
               return;
             }
             if (resettingUser) {
