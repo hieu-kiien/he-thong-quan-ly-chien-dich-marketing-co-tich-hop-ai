@@ -291,6 +291,27 @@ class Runner:
             cmd += ["--", prompt]
         return cmd
 
+    async def _rotate_warp(self, run_id: str) -> bool:
+        """Signal systemd path unit to rotate Cloudflare WARP registration/IP and wait for completion."""
+        if not self.s.warp_rotate_trigger:
+            return False
+        trigger = Path(self.s.warp_rotate_trigger)
+        try:
+            trigger.write_text(f"{time.time():.3f} {run_id}\n", encoding="utf-8")
+        except OSError as exc:
+            log.warning("run %s: failed to write warp rotate trigger %s: %s", run_id, trigger, exc)
+            return False
+        log.info("run %s: rate limit hit, triggered WARP IP rotation via %s", run_id, trigger)
+        wait_deadline = time.monotonic() + 14.0
+        while time.monotonic() < wait_deadline:
+            await asyncio.sleep(0.4)
+            if not trigger.exists():
+                self.rate_limited_until = 0.0
+                log.info("run %s: WARP IP rotation completed, retrying request", run_id)
+                return True
+        log.warning("run %s: WARP IP rotation timed out after 14s", run_id)
+        return False
+
     async def _execute(self, req: RunRequestData, handle: RunHandle) -> AsyncIterator[dict[str, Any]]:
         started = time.monotonic()
         timeout = min(req.timeout_s or self.s.timeout_s, self.s.timeout_s)
@@ -299,6 +320,7 @@ class Runner:
         index = 0
         session_id = req.session_id
         session_retry_done = False
+        warp_rotated = False
 
         while True:
             model = models[index]
@@ -327,6 +349,15 @@ class Runner:
                     log.info("run %s: session %s not found, retrying without session", handle.run_id, session_id)
                     session_id = None
                     session_retry_done = True
+                    continue
+                if (
+                    (account_limit or is_rate_limited(failure_text))
+                    and not warp_rotated
+                    and self.s.warp_rotate_trigger
+                    and await self._rotate_warp(handle.run_id)
+                ):
+                    warp_rotated = True
+                    index = 0
                     continue
                 if (
                     not account_limit
