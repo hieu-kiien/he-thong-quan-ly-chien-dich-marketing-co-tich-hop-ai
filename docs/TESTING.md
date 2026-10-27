@@ -13,7 +13,7 @@ Tất cả các lệnh kiểm thử dưới đây được thiết kế độc l
 
 ### 1.1. Kiểm thử Backend (FastAPI - Python 3.12 / 3.13)
 ```powershell
-# Chạy toàn bộ 54 ca kiểm thử backend
+# Chạy toàn bộ ca kiểm thử backend
 cd backend
 python -m pytest -v
 
@@ -26,7 +26,7 @@ python tests/smoke_test_real_http.py
 
 ### 1.2. Kiểm thử Dịch vụ AI Runner (ai-runner)
 ```powershell
-# Chạy toàn bộ 16 ca kiểm thử runner (bao gồm kiểm thử hàng đợi, timeout và luồng NDJSON)
+# Chạy toàn bộ ca kiểm thử runner (bao gồm kiểm thử hàng đợi, timeout và luồng NDJSON)
 cd ai-runner
 python -m pytest -v
 ```
@@ -193,7 +193,7 @@ Bộ kiểm thử được phân nhóm theo từng module nghiệp vụ, bao g�
 
 ### 3.9. Phân hệ AI Runner (`ai-runner/tests/`)
 
-Bộ kiểm thử gồm 16 test cases tự động (`test_api.py` và `test_runner.py`):
+Bộ kiểm thử gồm các test case tự động (`test_api.py` và `test_runner.py`):
 1. `test_health_ok`: Trả về HTTP 200 và cấu hình model khi runner sẵn sàng.
 2. `test_run_success_stream`: Stream NDJSON đầy đủ chu kỳ (`run` -> `session` -> `text` -> `done`).
 3. `test_run_with_tool_call`: Xử lý sự kiện tool MCP, tự động cắt bỏ tiền tố `marketflow_`.
@@ -202,7 +202,7 @@ Bộ kiểm thử gồm 16 test cases tự động (`test_api.py` và `test_runn
 6. `test_run_empty_response`: Nhận diện trường hợp model kết thúc mà không có văn bản -> `AI_EMPTY_RESPONSE`.
 7. `test_abort_endpoint`: Endpoint `POST /abort` huỷ ngay tiến trình đang chạy.
 8. `test_concurrency_queue`: Giới hạn đồng thời 1, yêu cầu thứ 2 nhận sự kiện `queued` với vị trí hàng đợi.
-9. `test_queue_overflow`: Vượt quá `MAX_QUEUE=8` trả về lỗi HTTP 503 `AI_BUSY`.
+9. `test_queue_overflow`: Vượt quá `MAX_QUEUE=8` thì luồng NDJSON trả về sự kiện lỗi `AI_BUSY` (HTTP vẫn là 200).
 10. `test_session_continuity`: Giữ nguyên `-s <session_id>` qua các lượt kế tiếp trong cùng phiên.
 11. `test_fallback_model`: Tự động chuyển model dự phòng khi model chính lỗi.
 12. `test_runner_token_auth`: Từ chối truy cập HTTP 401 khi thiếu hoặc sai `X-Runner-Token`.

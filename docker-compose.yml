@@ -61,10 +61,10 @@ services:
       - CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173
       - AI_RUNNER_URL=${AI_RUNNER_URL:-http://ai-runner:8100}
       - AI_RUNNER_TOKEN=${AI_RUNNER_TOKEN:-}
-    # Tự động chạy migration Alembic và nạp dữ liệu mẫu khi khởi động
+    # Chỉ chạy migration khi khởi động. Dữ liệu mẫu KHÔNG tự nạp (CONTRACT: seed chỉ chạy bằng lệnh tường minh):
+    #   docker compose exec backend python seed/seed_demo.py --force
     command: >
       sh -c "alembic upgrade head &&
-            python seed/seed_demo.py --force &&
             uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
   # ---------------------------------------------------------------------------
@@ -76,7 +76,6 @@ services:
       dockerfile: Dockerfile
       args:
         - VITE_API_URL=/api/v1
-        - VITE_ENABLE_OFFLINE_DEMO=false
     container_name: marketflow_frontend
     restart: unless-stopped
     depends_on:
@@ -93,8 +92,8 @@ services:
     profiles:
       - runner
     build:
-      context: ./ai-runner
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ai-runner/Dockerfile
     container_name: marketflow_ai_runner
     restart: unless-stopped
     ports:
