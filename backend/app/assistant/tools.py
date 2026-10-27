@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.assistant.context import ToolContext
 from app.core.errors import ValidationFailed
-from app.core.timeutil import now_utc, to_utc
+from app.core.timeutil import now_utc, to_utc, today_vn
 from app.models.ai import AiAction
 from app.models.enums import (
     AiActionStatus,
@@ -203,6 +203,20 @@ def handle_list_campaigns(ctx: ToolContext, args: ListCampaignsArgs) -> dict[str
 def handle_get_campaign(ctx: ToolContext, args: GetCampaignArgs) -> dict[str, Any]:
     camp = campaign_service.get_campaign(ctx.db, ctx.user, args.campaign_id)
     ch_stats = stats_service.get_by_channel(ctx.db, ctx.user, StatsFilters(campaign_id=camp.id))
+    planned_by_code = {
+        ch.code: int(ch.planned_budget) if ch.planned_budget is not None else None
+        for ch in camp.channels
+    }
+    today = today_vn()
+    days_total = max(1, (camp.end_date - camp.start_date).days + 1)
+    if today < camp.start_date:
+        days_elapsed = 0
+    elif today > camp.end_date:
+        days_elapsed = days_total
+    else:
+        days_elapsed = (today - camp.start_date).days + 1
+    time_elapsed_pct = round(days_elapsed / days_total * 100, 1)
+
     return {
         "id": camp.id,
         "name": camp.name,
@@ -217,6 +231,12 @@ def handle_get_campaign(ctx: ToolContext, args: GetCampaignArgs) -> dict[str, An
         "end_date": str(camp.end_date),
         "budget": int(camp.budget),
         "owner": camp.owner.full_name,
+        "pacing": {
+            "days_total": days_total,
+            "days_elapsed": days_elapsed,
+            "time_elapsed_pct": time_elapsed_pct,
+            "budget_used_pct": float(camp.stats.budget_used_pct) if camp.stats.budget_used_pct is not None else 0.0,
+        },
         "channels": [
             {
                 "id": ch.id,
@@ -241,10 +261,16 @@ def handle_get_campaign(ctx: ToolContext, args: GetCampaignArgs) -> dict[str, An
             {
                 "channel_code": r.channel.code,
                 "channel_name": r.channel.name,
+                "planned_budget": planned_by_code.get(r.channel.code),
                 "views": r.views,
                 "clicks": r.clicks,
                 "conversions": r.conversions,
                 "cost": int(r.cost),
+                "channel_budget_used_pct": (
+                    round(int(r.cost) / planned_by_code[r.channel.code] * 100, 1)  # type: ignore[operator]
+                    if planned_by_code.get(r.channel.code)
+                    else None
+                ),
                 "ctr": float(r.ctr) if r.ctr is not None else None,
                 "cvr": float(r.cvr) if r.cvr is not None else None,
                 "cpc": float(r.cpc) if r.cpc is not None else None,

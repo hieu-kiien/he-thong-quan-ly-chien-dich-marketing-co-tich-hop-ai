@@ -323,10 +323,23 @@ export default function ContentDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="secondary"
-              onClick={() => navigate(`/assistant?campaign_id=${content.campaign_id}`)}
+              onClick={() => {
+                const promptText = `Hãy chuyển thể bài viết #${content.id} "${content.title}" (hiện đang ở kênh ${content.channel.name}) sang các kênh khác của chiến dịch và tạo đề xuất bản nháp nội dung (propose_content_drafts) tuân thủ đúng quy chuẩn từng kênh.`;
+                navigate(
+                  `/assistant?campaign_id=${content.campaign_id}&prompt=${encodeURIComponent(promptText)}`,
+                );
+              }}
               className="border-accent/40 bg-accent/5 hover:bg-accent/10"
             >
               <Sparkles className="h-4 w-4 text-accent" />
+              Chuyển thể đa kênh (AI)
+            </Button>
+
+            <Button
+              variant="secondary"
+              onClick={() => navigate(`/assistant?campaign_id=${content.campaign_id}`)}
+            >
+              <MessageSquare className="h-4 w-4 text-accent" />
               Hỏi Trợ lý AI
             </Button>
 

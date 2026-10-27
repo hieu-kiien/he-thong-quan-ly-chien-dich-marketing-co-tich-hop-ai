@@ -45,7 +45,7 @@ import {
   Callout,
   type TabItem,
 } from '@/components/ui';
-import { campaignsApi, contentsApi, schedulesApi, metricsApi } from '@/lib/api/endpoints';
+import { campaignsApi, contentsApi, schedulesApi, metricsApi, statsApi } from '@/lib/api/endpoints';
 import { toApiError } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth';
 import { canEditCampaign, canEditMetric } from '@/lib/permissions';
@@ -59,6 +59,7 @@ import {
 } from '@/lib/labels';
 import type {
   CampaignInput,
+  ChannelStats,
   Content,
   ContentType,
   Metric,
@@ -145,11 +146,17 @@ export default function CampaignDetailPage() {
     enabled: !!campaignId && activeTab === 'contents',
   });
 
-  // Queries for tab 3: Metrics
+  // Queries for tab 3: Metrics & Per-channel breakdown
   const metricsQ = useQuery({
     queryKey: ['metrics', { campaign_id: campaignId, page: metricPage, page_size: metricsPageSize }],
     queryFn: () => metricsApi.list({ campaign_id: campaignId, page: metricPage, page_size: metricsPageSize }),
     enabled: !!campaignId && activeTab === 'metrics',
+  });
+
+  const channelStatsQ = useQuery({
+    queryKey: ['stats', 'by-channel', { campaign_id: campaignId }],
+    queryFn: () => statsApi.byChannel({ campaign_id: campaignId }),
+    enabled: !!campaignId,
   });
 
   // Mutations
@@ -235,6 +242,7 @@ export default function CampaignDetailPage() {
     mutationFn: metricsApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['stats', 'by-channel', { campaign_id: campaignId }] });
       queryClient.invalidateQueries({ queryKey: ['campaigns', campaignId] });
       toast.success('Đã ghi nhận số liệu');
       setIsCreatingMetric(false);
@@ -253,6 +261,7 @@ export default function CampaignDetailPage() {
     mutationFn: metricsApi.remove,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['stats', 'by-channel', { campaign_id: campaignId }] });
       queryClient.invalidateQueries({ queryKey: ['campaigns', campaignId] });
       toast.success('Đã xoá bản ghi số liệu');
       setDeletingMetricId(null);
@@ -306,6 +315,7 @@ export default function CampaignDetailPage() {
         `Đã thêm mới ${res.inserted} dòng, cập nhật ${res.updated} dòng (mã lô: ${res.import_batch}).`
       );
       queryClient.invalidateQueries({ queryKey: ['metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['stats', 'by-channel', { campaign_id: campaignId }] });
       queryClient.invalidateQueries({ queryKey: ['campaigns', campaignId] });
       setIsImportingCsv(false);
       setCsvPreview(null);
@@ -344,6 +354,33 @@ export default function CampaignDetailPage() {
     { key: 'contents', label: 'Nội dung & Lịch' },
     { key: 'metrics', label: 'Số liệu & Báo cáo' },
   ];
+
+  // Tính toán Tiến độ thời gian & Nhịp giải ngân (Budget Pacing)
+  const startMs = new Date(`${campaign.start_date}T00:00:00`).getTime();
+  const endMs = new Date(`${campaign.end_date}T00:00:00`).getTime();
+  const nowMs = new Date(`${todayKey()}T00:00:00`).getTime();
+  const daysTotal = Math.max(1, Math.round((endMs - startMs) / 86_400_000) + 1);
+  const daysElapsed =
+    nowMs < startMs
+      ? 0
+      : nowMs > endMs
+        ? daysTotal
+        : Math.round((nowMs - startMs) / 86_400_000) + 1;
+  const timeElapsedPct = Math.round((daysElapsed / daysTotal) * 1000) / 10;
+  const budgetUsedPct = campaign.stats.budget_used_pct ?? 0;
+
+  const pacingBadge: { label: string; tone: 'neutral' | 'success' | 'warning' | 'info' } =
+    campaign.stats.cost <= 0
+      ? { label: 'Chưa giải ngân', tone: 'neutral' }
+      : budgetUsedPct > timeElapsedPct + 15
+        ? { label: 'Tiêu nhanh hơn tiến độ', tone: 'warning' }
+        : timeElapsedPct >= 20 && budgetUsedPct < timeElapsedPct - 20
+          ? { label: 'Giải ngân chậm hơn tiến độ', tone: 'info' }
+          : { label: 'Đúng nhịp kế hoạch', tone: 'success' };
+
+  const channelStatsByCode = new Map<string, ChannelStats>(
+    (channelStatsQ.data ?? []).map((item) => [item.channel.code, item]),
+  );
 
   return (
     <PageContainer>
@@ -468,14 +505,17 @@ export default function CampaignDetailPage() {
             </Card>
 
             <Card>
-              <CardHeader title="Đối tượng mục tiêu" />
+              <CardHeader title="Đối tượng mục tiêu & Tiến độ giải ngân" />
               <CardBody className="space-y-4 text-sm">
                 <div>
                   <h4 className="text-xs font-medium text-fg-muted">Chân dung khách hàng</h4>
                   <p className="mt-1 text-fg whitespace-pre-line">{campaign.target_audience || '—'}</p>
                 </div>
                 <div>
-                  <h4 className="text-xs font-medium text-fg-muted">Chỉ số hiệu quả (từ số liệu đã nhập)</h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-medium text-fg-muted">Chỉ số hiệu quả & Nhịp giải ngân</h4>
+                    <Badge tone={pacingBadge.tone}>{pacingBadge.label}</Badge>
+                  </div>
                   <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                     <div className="rounded bg-subtle p-2">
                       <span className="text-fg-muted">Chi phí / chuyển đổi (CPA):</span>
@@ -484,6 +524,18 @@ export default function CampaignDetailPage() {
                     <div className="rounded bg-subtle p-2">
                       <span className="text-fg-muted">Tỷ lệ sử dụng ngân sách:</span>
                       <p className="font-semibold text-fg">{formatPct(campaign.stats.budget_used_pct)}</p>
+                    </div>
+                    <div className="rounded bg-subtle p-2">
+                      <span className="text-fg-muted">Tiến độ thời gian:</span>
+                      <p className="font-semibold text-fg">
+                        {daysElapsed}/{daysTotal} ngày ({timeElapsedPct.toFixed(1)}%)
+                      </p>
+                    </div>
+                    <div className="rounded bg-subtle p-2">
+                      <span className="text-fg-muted">Ngân sách còn lại:</span>
+                      <p className="font-semibold text-fg">
+                        {formatMoney(Math.max(0, campaign.budget - campaign.stats.cost))}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -495,7 +547,7 @@ export default function CampaignDetailPage() {
           <Card>
             <CardHeader
               title="Kênh triển khai & Ngân sách dự kiến"
-              description="Các kênh được lựa chọn cho chiến dịch cùng với ngân sách dự kiến đã phân bổ."
+              description="Đối chiếu ngân sách kế hoạch với chi tiêu thực tế và hiệu quả chuyển đổi theo từng kênh."
             />
             <div className="overflow-x-auto">
               <Table>
@@ -505,18 +557,28 @@ export default function CampaignDetailPage() {
                     <TH>Mã kênh</TH>
                     <TH>Ngân sách dự kiến</TH>
                     <TH>Tỷ trọng</TH>
+                    <TH className="text-right">Chi tiêu thực tế</TH>
+                    <TH className="text-right">% Giải ngân kênh</TH>
+                    <TH className="text-right">Chuyển đổi</TH>
+                    <TH className="text-right">CPA</TH>
                   </TR>
                 </THead>
                 <TBody>
                   {campaign.channels.length === 0 ? (
                     <TR>
-                      <TD colSpan={4} className="py-6 text-center text-sm text-fg-muted">
+                      <TD colSpan={8} className="py-6 text-center text-sm text-fg-muted">
                         Chưa chọn kênh nào cho chiến dịch này.
                       </TD>
                     </TR>
                   ) : (
                     campaign.channels.map((ch) => {
                       const pct = campaign.budget > 0 && ch.planned_budget ? (ch.planned_budget / campaign.budget) * 100 : null;
+                      const chStat = channelStatsByCode.get(ch.code);
+                      const actualCost = chStat?.cost ?? 0;
+                      const chUsedPct =
+                        ch.planned_budget && ch.planned_budget > 0
+                          ? (actualCost / ch.planned_budget) * 100
+                          : null;
                       return (
                         <TR key={ch.id}>
                           <TD className="font-medium text-fg">{ch.name}</TD>
@@ -527,6 +589,12 @@ export default function CampaignDetailPage() {
                           </TD>
                           <TD>{formatMoney(ch.planned_budget)}</TD>
                           <TD>{pct !== null ? `${pct.toFixed(1)}%` : '—'}</TD>
+                          <TD className="text-right font-mono text-xs">{formatMoney(actualCost)}</TD>
+                          <TD className="text-right font-mono text-xs">
+                            {chUsedPct !== null ? `${chUsedPct.toFixed(1)}%` : '—'}
+                          </TD>
+                          <TD className="text-right font-mono text-xs">{formatNumber(chStat?.conversions ?? 0)}</TD>
+                          <TD className="text-right font-mono text-xs">{formatMoney(chStat?.cpa ?? null)}</TD>
                         </TR>
                       );
                     })
@@ -682,6 +750,91 @@ export default function CampaignDetailPage() {
       {/* TAB 3: SỐ LIỆU & BÁO CÁO */}
       {activeTab === 'metrics' && (
         <TabPanel tabKey="metrics" className="mt-6 space-y-6">
+          {/* Bảng Phân tích Phễu & Đối soát Kênh */}
+          <Card>
+            <CardHeader
+              title="Phân tích phễu chuyển đổi & hiệu quả theo kênh"
+              description="Tổng hợp CTR, CVR, CPC, CPA và nhịp giải ngân của từng kênh từ dữ liệu thực tế."
+              actions={
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="border-accent/40 bg-accent/5 hover:bg-accent/10"
+                    onClick={() => {
+                      const promptText = `Hãy chẩn đoán phễu hiệu quả (CTR, CVR, CPC, CPA) và nhịp giải ngân của chiến dịch #${campaign.id} "${campaign.name}" theo từng kênh, chỉ ra điểm nghẽn và đề xuất phương án điều chỉnh ngân sách hoặc tối ưu nội dung cụ thể.`;
+                      navigate(
+                        `/assistant?campaign_id=${campaign.id}&prompt=${encodeURIComponent(promptText)}`,
+                      );
+                    }}
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-accent" />
+                    Chẩn đoán phễu & ngân sách (AI)
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      const promptText = `Hãy tổng kết bài học thực chiến (Post-Campaign Retrospective) cho chiến dịch #${campaign.id} "${campaign.name}": kênh nào hiệu quả nhất, kênh nào tốn chi phí, thông điệp/định dạng nào nên phát huy cho chiến dịch kế tiếp.`;
+                      navigate(
+                        `/assistant?campaign_id=${campaign.id}&prompt=${encodeURIComponent(promptText)}`,
+                      );
+                    }}
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-accent" />
+                    Đúc kết chiến dịch (AI)
+                  </Button>
+                </div>
+              }
+            />
+            {!channelStatsQ.data || channelStatsQ.data.length === 0 ? (
+              <div className="p-6 text-center text-sm text-fg-muted">
+                Chưa có số liệu phân bổ theo kênh cho chiến dịch này.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <THead>
+                    <TR>
+                      <TH>Kênh</TH>
+                      <TH className="text-right">Hiển thị</TH>
+                      <TH className="text-right">Bấm (Clicks)</TH>
+                      <TH className="text-right">CTR</TH>
+                      <TH className="text-right">Chuyển đổi</TH>
+                      <TH className="text-right">CVR</TH>
+                      <TH className="text-right">CPC</TH>
+                      <TH className="text-right">CPA</TH>
+                      <TH className="text-right">Chi phí / Dự kiến</TH>
+                    </TR>
+                  </THead>
+                  <TBody>
+                    {channelStatsQ.data.map((row: ChannelStats) => {
+                      const planned = campaign.channels.find((c) => c.code === row.channel.code)?.planned_budget;
+                      return (
+                        <TR key={row.channel.id}>
+                          <TD>
+                            <Badge tone="neutral">{row.channel.name}</Badge>
+                          </TD>
+                          <TD className="text-right font-mono text-xs">{formatNumber(row.views)}</TD>
+                          <TD className="text-right font-mono text-xs">{formatNumber(row.clicks)}</TD>
+                          <TD className="text-right font-mono text-xs">{formatRate(row.ctr)}</TD>
+                          <TD className="text-right font-mono text-xs font-medium">{formatNumber(row.conversions)}</TD>
+                          <TD className="text-right font-mono text-xs">{formatRate(row.cvr)}</TD>
+                          <TD className="text-right font-mono text-xs">{formatMoney(row.cpc)}</TD>
+                          <TD className="text-right font-mono text-xs font-semibold text-fg">{formatMoney(row.cpa)}</TD>
+                          <TD className="text-right font-mono text-xs">
+                            {formatMoney(row.cost)}{' '}
+                            <span className="text-fg-subtle">/ {formatMoney(planned ?? null)}</span>
+                          </TD>
+                        </TR>
+                      );
+                    })}
+                  </TBody>
+                </Table>
+              </div>
+            )}
+          </Card>
+
           <Card>
             <CardHeader
               title="Lịch sử số liệu thực tế"

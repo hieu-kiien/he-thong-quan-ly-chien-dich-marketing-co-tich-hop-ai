@@ -211,7 +211,15 @@ def _snapshot_lines(db: Session, user: User, thread: AiThread) -> list[str]:
             f"{c.code} (dự kiến {_fmt_money(c.planned_budget)})" for c in camp.channels
         )
         lines.append(f"  - Kênh của chiến dịch: {channels}")
+        today = today_vn()
+        days_total = max(1, (camp.end_date - camp.start_date).days + 1)
+        days_elapsed = 0 if today < camp.start_date else (days_total if today > camp.end_date else (today - camp.start_date).days + 1)
+        time_pct = round(days_elapsed / days_total * 100, 1)
         s = camp.stats
+        lines.append(
+            f"  - Tiến độ thời gian: {days_elapsed}/{days_total} ngày ({time_pct}% thời gian), "
+            f"đã dùng {s.budget_used_pct if s.budget_used_pct is not None else '—'}% ngân sách"
+        )
         if s.views or s.clicks or s.conversions or s.cost:
             lines.append(
                 f"  - Số liệu tổng (từ CSDL): views {s.views}, clicks {s.clicks}, chuyển đổi {s.conversions}, "
@@ -219,10 +227,12 @@ def _snapshot_lines(db: Session, user: User, thread: AiThread) -> list[str]:
                 f"CPC {_fmt_money(s.cpc)}, CPA {_fmt_money(s.cpa)}, "
                 f"đã dùng {s.budget_used_pct if s.budget_used_pct is not None else '—'}% ngân sách"
             )
+            planned_map = {c.code: c.planned_budget for c in camp.channels}
             for row in stats_service.get_by_channel(db, user, StatsFilters(campaign_id=camp.id)):
+                planned = planned_map.get(row.channel.code)
                 lines.append(
                     f"    - {row.channel.code}: views {row.views}, clicks {row.clicks}, chuyển đổi {row.conversions}, "
-                    f"chi phí {_fmt_money(row.cost)}, CTR {_fmt_rate(row.ctr)}, CVR {_fmt_rate(row.cvr)}, "
+                    f"chi phí {_fmt_money(row.cost)} (dự kiến {_fmt_money(planned)}), CTR {_fmt_rate(row.ctr)}, CVR {_fmt_rate(row.cvr)}, "
                     f"CPC {_fmt_money(row.cpc)}, CPA {_fmt_money(row.cpa)}"
                 )
         else:

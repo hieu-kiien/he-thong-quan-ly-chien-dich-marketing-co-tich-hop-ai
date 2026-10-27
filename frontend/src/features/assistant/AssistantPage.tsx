@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { assistantApi } from '@/lib/api/endpoints';
 import { useDocumentTitle } from '@/lib/hooks';
@@ -15,9 +15,12 @@ import { useAssistantStream } from './useAssistantStream';
 export default function AssistantPage() {
   useDocumentTitle('Trợ lý AI — MarketFlow');
   const navigate = useNavigate();
+  const location = useLocation();
   const { threadId: threadIdParam } = useParams();
   const [searchParams] = useSearchParams();
   const campaignIdQuery = searchParams.get('campaign_id');
+  const promptQuery = searchParams.get('prompt');
+  const statePrompt = (location.state as { prefillPrompt?: string } | null)?.prefillPrompt;
   const queryClient = useQueryClient();
   const toast = useToast();
 
@@ -28,7 +31,7 @@ export default function AssistantPage() {
   const [isActionsPanelOpen, setIsActionsPanelOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
-  const [composerText, setComposerText] = useState('');
+  const [composerText, setComposerText] = useState(promptQuery || statePrompt || '');
   const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(
     campaignIdQuery ? parseInt(campaignIdQuery, 10) : null,
   );
@@ -77,6 +80,14 @@ export default function AssistantPage() {
     stopStreaming,
   } = useAssistantStream(currentThreadId);
 
+  // Điền sẵn gợi ý câu lệnh nếu chuyển hướng từ trang Chiến dịch / Nội dung
+  useEffect(() => {
+    const incomingPrompt = promptQuery || statePrompt;
+    if (incomingPrompt) {
+      setComposerText(incomingPrompt);
+    }
+  }, [promptQuery, statePrompt]);
+
   // Xử lý khi có query param ?campaign_id=<id> (§5): tạo phiên mới gắn chiến dịch
   useEffect(() => {
     if (campaignIdQuery && !currentThreadId) {
@@ -86,14 +97,17 @@ export default function AssistantPage() {
           .createThread({ campaign_id: cid, title: `Chiến dịch #${cid}` })
           .then((newThread) => {
             queryClient.invalidateQueries({ queryKey: ['assistant', 'threads'] });
-            navigate(`/assistant/${newThread.id}`, { replace: true });
+            navigate(`/assistant/${newThread.id}`, {
+              replace: true,
+              state: promptQuery ? { prefillPrompt: promptQuery } : undefined,
+            });
           })
           .catch((err) => {
             toast.error(err instanceof Error ? err.message : 'Không thể khởi tạo phiên cho chiến dịch.');
           });
       }
     }
-  }, [campaignIdQuery, currentThreadId, navigate, queryClient, toast]);
+  }, [campaignIdQuery, currentThreadId, navigate, promptQuery, queryClient, toast]);
 
   // Cập nhật selectedCampaignId khi currentThread thay đổi
   useEffect(() => {
