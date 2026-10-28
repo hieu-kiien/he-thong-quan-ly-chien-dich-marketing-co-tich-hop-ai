@@ -2,7 +2,7 @@
 
 \section{Chiến lược kiểm thử đa tầng (Testing Pyramid)}
 
-Nhằm bảo đảm hệ thống MarketFlow AI vận hành an toàn tuyệt đối trong môi trường sản xuất thực tế, dự án thiết lập một chiến lược kiểm thử đa tầng theo mô hình Kim tự tháp kiểm thử (Testing Pyramid). Chiến lược này bao phủ từ tầng kiểm thử đơn vị (Unit Tests), kiểm thử tích hợp giao diện API (Integration Tests), kiểm thử quy trình máy trạng thái nghiệp vụ (State Machine Workflow Tests) đến tầng kiểm thử bảo mật đối kháng nâng cao (Adversarial Security Tests).
+Nhằm bảo đảm hệ thống MarketFlow AI vận hành an toàn và ổn định trong môi trường sản xuất thực tế, dự án thiết lập một chiến lược kiểm thử đa tầng theo mô hình Kim tự tháp kiểm thử (Testing Pyramid). Chiến lược này bao phủ từ tầng kiểm thử đơn vị (Unit Tests), kiểm thử tích hợp giao diện API (Integration Tests), kiểm thử quy trình máy trạng thái nghiệp vụ (State Machine Workflow Tests) đến tầng kiểm thử bảo mật đối kháng nâng cao (Adversarial Security Tests).
 
 Mọi ca kiểm thử đều được tự động hóa hoàn toàn thông qua framework \texttt{pytest} và thư viện \texttt{httpx}, chạy trên cơ sở dữ liệu kiểm thử cô lập trong bộ nhớ (\texttt{sqlite:///:memory:}) để bảo đảm tính độc lập, có thể tái lập 100\% và không gây ảnh hưởng đến dữ liệu thực tế.
 
@@ -119,7 +119,7 @@ Dịch vụ AI \& Khử ảo giác & 35 & 35 & 0 & Kiểm thực Pydantic v2, Sm
 \hline
 Kiểm thử Đối kháng (Adversarial) & 35 & 35 & 0 & Kháng cự 100\% tấn công SQLi, XSS, IDOR, Fuzzing.\\
 \hline
-\textbf{Tổng cộng toàn hệ thống} & \textbf{205} & \textbf{205} & \textbf{0} & \textbf{Tỷ lệ vượt qua tuyệt đối: 100.0\%}\\
+\textbf{Tổng cộng toàn hệ thống} & \textbf{205} & \textbf{205} & \textbf{0} & \textbf{Đạt toàn bộ các ca kiểm thử: 100.0\%}\\
 \hline
 \end{tabularx}
 \end{table}

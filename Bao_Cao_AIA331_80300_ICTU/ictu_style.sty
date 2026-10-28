@@ -2,6 +2,7 @@
 
 \usepackage{fontspec}
 \setmainfont{Times New Roman}
+\setsansfont{Arial}[Scale=0.90]
 \setmonofont{Consolas}[Scale=0.88]
 
 \usepackage{geometry}
@@ -23,6 +24,8 @@
 \usetikzlibrary{arrows.meta,calc,fit,matrix,positioning,shapes,shapes.geometric,backgrounds,shadows,decorations.pathmorphing}
 \usepackage{enumitem}
 \setlist{itemsep=1.5pt,topsep=2.5pt,parsep=0pt}
+\setlist[itemize,1]{label=\textendash,leftmargin=1.5em}
+\setlist[itemize,2]{label=+,leftmargin=1.5em}
 \usepackage{array,booktabs,tabularx,longtable,multirow,makecell,colortbl,ragged2e}
 \renewcommand{\arraystretch}{1.20}
 \setlength{\LTpre}{5pt}

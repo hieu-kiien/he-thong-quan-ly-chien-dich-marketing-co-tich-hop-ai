@@ -9,85 +9,87 @@
  btn_dark/.style={draw=black,fill=black!16,text=black,rounded corners=2pt,inner sep=3pt,font=\sffamily\bfseries\scriptsize}
 ]
 
-\draw[draw=black!85,fill=white,rounded corners=4pt,line width=0.9pt] (0, 0) rectangle (15.6, 8.4);
+\draw[draw=black!85,fill=white,rounded corners=4pt,line width=0.9pt] (0, 0) rectangle (16.0, 8.6);
 
-\draw[draw=black!85,fill=black!12,rounded corners=3pt] (0, 7.65) rectangle (15.6, 8.4);
-\node[font=\sffamily\bfseries\footnotesize,text=black,anchor=west] at (0.35, 8.02) {KHÔNG GIAN LÀM VIỆC MARKETFLOW AI};
-\node[font=\sffamily\scriptsize,text=black,anchor=east] at (15.25, 8.02) {Tài khoản: Vũ Hiếu Kiên (Quản lý)};
+\draw[draw=black!85,fill=black!10,rounded corners=3pt] (0, 7.80) rectangle (16.0, 8.6);
+\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=west] at (0.35, 8.20) {KHÔNG GIAN LÀM VIỆC 3 CỘT (SPLIT-PANE WORKSPACE) -- MARKETFLOW};
+\node[font=\sffamily\scriptsize,text=black,anchor=east] at (15.65, 8.20) {Tài khoản: Vũ Hiếu Kiên (Quản lý)};
 
-\draw[frame] (0.25, 0.25) rectangle (3.50, 7.45);
-\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=west] at (0.45, 7.05) {ĐIỀU HƯỚNG};
-\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 6.50) {1. Tổng quan};
-\node[anchor=west,font=\sffamily\bfseries\scriptsize] at (0.45, 5.95) {2. Chiến dịch};
-\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 5.40) {3. Sản phẩm};
-\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 4.85) {4. Hàng đợi duyệt};
-\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 4.30) {5. Lịch xuất bản};
-\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 3.75) {6. Chỉ số \& Báo cáo};
-\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 3.20) {7. Cài đặt \& Brand};
-\draw[draw=black!35,line width=0.5pt] (0.45, 2.75) -- (3.30, 2.75);
-\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 2.25) {Đề tài: 80300};
-\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 1.75) {Backend: FastAPI};
-\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 1.25) {AI: Đa nhà cung cấp};
+\draw[frame] (0.25, 0.25) rectangle (3.45, 7.55);
+\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=west] at (0.45, 7.15) {ĐIỀU HƯỚNG CHÍNH};
+\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 6.60) {1. Tổng quan};
+\node[anchor=west,font=\sffamily\bfseries\scriptsize] at (0.45, 6.08) {2. Chiến dịch};
+\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 5.56) {3. Nội dung \& Duyệt bài};
+\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 5.04) {4. Lịch xuất bản};
+\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 4.52) {5. Số liệu \& Báo cáo KPI};
+\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 4.00) {6. Trợ lý Marketing AI};
+\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 3.48) {7. Tài sản thương hiệu};
+\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 2.96) {8. Nhật ký hệ thống};
+\draw[draw=black!35,line width=0.5pt] (0.45, 2.50) -- (3.25, 2.50);
+\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 2.05) {Giao diện: Soft Daylight};
+\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 1.55) {Backend: FastAPI};
+\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 1.05) {AI: Đa mô hình tự động};
 
-\node[font=\sffamily\bfseries\footnotesize,text=black,anchor=west] at (3.75, 7.15) {Chiến dịch: Khuyến mãi Mùa Hè 2026};
-\node[btn_dark,anchor=east] at (15.35, 7.15) {+ Tạo nội dung mới};
+\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=west] at (3.70, 7.25) {Chiến dịch: Khuyến mãi Mùa Hè 2026};
+\node[btn,anchor=east] at (12.40, 7.25) {Xuất báo cáo Excel};
+\node[btn_dark,anchor=east] at (15.75, 7.25) {+ Tạo chiến dịch mới};
 
-\node[card, minimum width=2.7cm, minimum height=1.15cm, align=left, inner sep=4pt] at (5.10, 6.15) {
- {\scriptsize Ngân sách dùng}\\[3pt]
- \textbf{\footnotesize 48M / 60M}
+\node[card, minimum width=2.75cm, minimum height=1.10cm, align=left, inner sep=4pt] at (5.10, 6.25) {
+ {\scriptsize Tổng ngân sách}\\[2pt]
+ \textbf{\scriptsize 48M / 60M VNĐ}
 };
 
-\node[card, minimum width=2.7cm, minimum height=1.15cm, align=left, inner sep=4pt] at (8.00, 6.15) {
- {\scriptsize Chờ phê duyệt}\\[3pt]
- \textbf{\footnotesize 07 bài viết}
+\node[card, minimum width=2.75cm, minimum height=1.10cm, align=left, inner sep=4pt] at (8.10, 6.25) {
+ {\scriptsize Chi phí / Chuyển đổi}\\[2pt]
+ \textbf{\scriptsize 95.000đ (CPA)}
 };
 
-\node[card, minimum width=2.7cm, minimum height=1.15cm, align=left, inner sep=4pt] at (10.95, 6.15) {
- {\scriptsize Lượt hiển thị}\\[3pt]
- \textbf{\footnotesize 124.5K}
+\node[card, minimum width=2.75cm, minimum height=1.10cm, align=left, inner sep=4pt] at (11.10, 6.25) {
+ {\scriptsize Lượt hiển thị}\\[2pt]
+ \textbf{\scriptsize 124.500 lượt}
 };
 
-\node[card, minimum width=2.7cm, minimum height=1.15cm, align=left, inner sep=4pt] at (13.95, 6.15) {
- {\scriptsize Tỷ lệ nhấp CTR}\\[3pt]
- \textbf{\footnotesize 3.42\%}
+\node[card, minimum width=2.75cm, minimum height=1.10cm, align=left, inner sep=4pt] at (14.20, 6.25) {
+ {\scriptsize Tỷ lệ nhấp (CTR)}\\[2pt]
+ \textbf{\scriptsize 3.42\% (+0.6\%)}
 };
 
-\draw[panel] (3.75, 0.25) rectangle (9.35, 5.35);
-\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=west] at (3.95, 5.02) {DANH SÁCH NỘI DUNG CHIẾN DỊCH};
-\draw[draw=black!35,line width=0.5pt] (3.75, 4.75) -- (9.35, 4.75);
+\draw[panel] (3.70, 0.25) rectangle (9.65, 5.45);
+\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=west] at (3.90, 5.10) {BẢNG DỮ LIỆU CHIẾN DỊCH \& NỘI DUNG};
+\draw[draw=black!35,line width=0.5pt] (3.70, 4.82) -- (9.65, 4.82);
 
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.2cm] at (3.95, 4.38) {\textbf{1. Ưu đãi giải nhiệt mùa hè}};
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.2cm] at (3.95, 3.98) {Kênh: Facebook -- Chờ phê duyệt};
-\draw[draw=black!20,line width=0.4pt] (3.95, 3.68) -- (9.15, 3.68);
+\node[font=\sffamily\scriptsize,anchor=west,text width=5.5cm] at (3.90, 4.42) {\textbf{1. Ưu đãi giải nhiệt mùa hè}};
+\node[font=\sffamily\scriptsize,anchor=west,text width=5.5cm] at (3.90, 4.02) {Kênh: Facebook -- Trạng thái: Chờ duyệt};
+\draw[draw=black!20,line width=0.4pt] (3.90, 3.70) -- (9.45, 3.70);
 
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.2cm] at (3.95, 3.30) {\textbf{2. Kịch bản video máy lọc ProAir}};
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.2cm] at (3.95, 2.90) {Kênh: TikTok -- Bản nháp AI};
-\draw[draw=black!20,line width=0.4pt] (3.95, 2.60) -- (9.15, 2.60);
+\node[font=\sffamily\scriptsize,anchor=west,text width=5.5cm] at (3.90, 3.32) {\textbf{2. Kịch bản video ngắn máy lọc ProAir}};
+\node[font=\sffamily\scriptsize,anchor=west,text width=5.5cm] at (3.90, 2.92) {Kênh: TikTok -- Trạng thái: Bản nháp AI};
+\draw[draw=black!20,line width=0.4pt] (3.90, 2.60) -- (9.45, 2.60);
 
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.2cm] at (3.95, 2.22) {\textbf{3. Thư điện tử tri ân khách hàng}};
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.2cm] at (3.95, 1.82) {Kênh: Email -- Đã phê duyệt};
-\draw[draw=black!20,line width=0.4pt] (3.95, 1.52) -- (9.15, 1.52);
+\node[font=\sffamily\scriptsize,anchor=west,text width=5.5cm] at (3.90, 2.22) {\textbf{3. Thư điện tử chăm sóc khách hàng}};
+\node[font=\sffamily\scriptsize,anchor=west,text width=5.5cm] at (3.90, 1.82) {Kênh: Email -- Trạng thái: Đã phê duyệt};
+\draw[draw=black!20,line width=0.4pt] (3.90, 1.50) -- (9.45, 1.50);
 
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.2cm] at (3.95, 1.12) {\textbf{4. Bài giới thiệu tính năng lọc bụi}};
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.2cm] at (3.95, 0.72) {Kênh: Facebook -- Soạn thủ công};
+\node[font=\sffamily\scriptsize,anchor=west,text width=5.5cm] at (3.90, 1.10) {\textbf{4. Bài giới thiệu màng lọc HEPA 3 lớp}};
+\node[font=\sffamily\scriptsize,anchor=west,text width=5.5cm] at (3.90, 0.70) {Kênh: Zalo OA -- Trạng thái: Đã lên lịch};
 
-\draw[panel,fill=black!2] (9.60, 0.25) rectangle (15.35, 5.35);
-\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=west] at (9.80, 5.02) {TRỢ LÝ AI \& PHÊ DUYỆT NỘI DUNG};
-\draw[draw=black!35,line width=0.5pt] (9.60, 4.75) -- (15.35, 4.75);
+\draw[panel,fill=black!2] (9.90, 0.25) rectangle (15.75, 5.45);
+\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=west] at (10.10, 5.10) {KHUNG TÁC VỤ AI (CONTEXTUAL AI PANEL)};
+\draw[draw=black!35,line width=0.5pt] (9.90, 4.82) -- (15.75, 4.82);
 
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.3cm] at (9.80, 4.38) {Kênh: Facebook | SP: Máy lọc ProAir};
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.3cm] at (9.80, 3.98) {Từ cấm Brand Kit: Đạt (0 vi phạm)};
+\node[font=\sffamily\scriptsize,anchor=west,text width=5.4cm] at (10.10, 4.42) {Chiến dịch: Mùa Hè 2026 | Kênh: Facebook};
+\node[font=\sffamily\scriptsize,anchor=west,text width=5.4cm] at (10.10, 4.02) {Kiểm tra Brand Kit: Hợp lệ (0 từ cấm)};
 
-\draw[draw=black!50,fill=white,rounded corners=2pt] (9.80, 1.30) rectangle (15.15, 3.68);
-\node[font=\sffamily\scriptsize,anchor=north west,text width=5.0cm] at (9.95, 3.55) {\textbf{Bản nháp AI đề xuất:}};
-\node[font=\sffamily\scriptsize,anchor=north west,text width=5.0cm] at (9.95, 3.05) {
- \textit{``Không khí trong lành cho cả gia đình! Tìm hiểu dòng máy lọc ProAir với màng lọc HEPA 3 lớp.''}
+\draw[draw=black!50,fill=white,rounded corners=2pt] (10.10, 1.32) rectangle (15.55, 3.72);
+\node[font=\sffamily\scriptsize,anchor=north west,text width=5.1cm] at (10.25, 3.58) {\textbf{Đề xuất bản nháp AI (\#42):}};
+\node[font=\sffamily\scriptsize,anchor=north west,text width=5.1cm] at (10.25, 3.10) {
+ \textit{``Không khí sạch cho cả gia đình! Khám phá máy lọc ProAir màng HEPA 3 lớp.''}
 };
-\node[font=\sffamily\scriptsize,anchor=south west,text width=5.0cm] at (9.95, 1.42) {Độ trễ: 1.4s | Cần Quản lý duyệt};
+\node[font=\sffamily\scriptsize,anchor=south west,text width=5.1cm] at (10.25, 1.45) {Trạng thái: PROPOSED | Chờ xác nhận};
 
-\node[btn_dark,anchor=west] at (9.80, 0.72) {Phê duyệt};
-\node[btn,anchor=west] at (11.75, 0.72) {Chỉnh sửa};
-\node[btn,anchor=east] at (15.15, 0.72) {Từ chối};
+\node[btn_dark,anchor=west] at (10.10, 0.75) {Áp dụng vào bảng};
+\node[btn,anchor=west] at (12.60, 0.75) {Chỉnh sửa};
+\node[btn,anchor=east] at (15.55, 0.75) {Huỷ bỏ};
 
 \end{tikzpicture}%
 }

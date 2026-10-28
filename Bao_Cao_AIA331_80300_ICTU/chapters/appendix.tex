@@ -1,5 +1,6 @@
 \appendix
 \renewcommand{\chaptername}{Phụ lục}
+\renewcommand{\appendixname}{Phụ lục}
 \chapter{MA TRẬN TRUY XUẤT NGUỒN GỐC (REQUIREMENTS TRACEABILITY MATRIX)}
 
 \section{Mục đích và phương pháp truy xuất nguồn gốc}
@@ -27,7 +28,7 @@ FR05 & Phân công thành viên & \texttt{CampaignMember}, \texttt{deps.py} & Ki
 \hline
 FR06 & Soạn thảo nội dung & \texttt{api/v1/contents.py} & Kiểm thử khởi tạo bản thảo ở trạng thái nháp ban đầu. & TESTED\\
 \hline
-FR07 & Máy trạng thái duyệt bài & \texttt{contents.py}, \texttt{ReviewQueue} & Kiểm thử ngăn chặn vượt cấp duyệt; tự động thu hồi khi sửa. & TESTED\\
+FR07 & Máy trạng thái duyệt bài & \texttt{contents.py}, \texttt{ContentsPage} & Kiểm thử ngăn chặn vượt cấp duyệt; tự động thu hồi khi sửa. & TESTED\\
 \hline
 FR08 & Lập lịch xuất bản & \texttt{api/v1/schedules.py} & Kiểm thử chỉ bài viết đã duyệt mới được lên lịch đăng. & TESTED\\
 \hline
@@ -37,7 +38,7 @@ FR10 & Lọc \& Dashboard & \texttt{metrics.py}, \texttt{Dashboard.tsx} & Kiểm
 \hline
 FR11 & AI Gợi ý ý tưởng & \texttt{ai\_service.py}, \texttt{prompts.json} & Kiểm thử cấu trúc JSON Schema 100\%; dự phòng dưới 50ms. & MEASURED\\
 \hline
-FR12 & AI Soạn bản nháp & \texttt{prompt\_engine.py}, \texttt{AIStudio} & Kiểm thử định dạng theo kênh; gắn nhãn xuất xứ AI. & MEASURED\\
+FR12 & AI Soạn bản nháp & \texttt{prompt\_engine.py}, \texttt{AssistantDrawer} & Kiểm thử định dạng theo kênh; gắn nhãn xuất xứ AI. & MEASURED\\
 \hline
 FR13 & AI Tóm tắt chỉ số & \texttt{ai\_service.py}, \texttt{ai\_doctor.py} & Kiểm thử độ bám sát dữ liệu đã lưu; không suy diễn ngoài dữ liệu. & MEASURED\\
 \hline
@@ -55,7 +56,7 @@ FR14 & Nhật ký kiểm toán & \texttt{ai\_logs}, \texttt{content\_reviews} & 
 \hline
 \thead{Mã} & \thead{Thiết kế liên quan} & \thead{Mô-đun cài đặt} & \thead{Phương pháp kiểm thử \& Kết quả} & \thead{Trạng thái}\\
 \hline
-NFR01 & Phạm vi bản ghi & Phân giải Phạm vi \& Bảo vệ Tuyến & Kiểm thử chặn đứng triệt để nguy cơ tấn công leo quyền ngang. & TESTED\\
+NFR01 & Phạm vi bản ghi & Phân giải Phạm vi \& Bảo vệ Tuyến & Kiểm thử ngăn chặn hiệu quả nguy cơ tấn công leo quyền ngang. & TESTED\\
 \hline
 NFR02 & Toàn vẹn CSDL SQLite & Kết nối CSDL \& Ghi nhật ký WAL & Kiểm thử cưỡng chế ràng buộc khóa ngoại trên mọi phiên kết nối. & TESTED\\
 \hline
@@ -90,7 +91,7 @@ Chỉ dẫn hệ thống được thiết kế theo mô hình ràng buộc bảo
 \hline
 Vai trò hệ thống & Thiết lập tư cách trợ lý tiếp thị nội dung số; hoạt động theo nguyên tắc đồng hành và chỉ khởi tạo bản thảo ban đầu phục vụ con người kiểm duyệt.\\
 \hline
-Ràng buộc an toàn & Tuyệt đối không tự động phê duyệt bài viết, không tự động xuất bản lên kênh, và không được bổ sung bất kỳ số liệu khuyến mãi nào ngoài phạm vi ngữ cảnh được cấp.\\
+Ràng buộc an toàn & Không tự động phê duyệt bài viết, không tự động xuất bản lên kênh, và không được bổ sung bất kỳ số liệu khuyến mãi nào ngoài phạm vi ngữ cảnh được cấp.\\
 \hline
 Cấu trúc phản hồi & Định dạng chuẩn JSON bao gồm các trường: Tiêu đề gợi ý, Thân bài tiếp thị, Lời kêu gọi hành động, Giả định nghiệp vụ, Danh mục dữ liệu gốc và Cảnh báo an toàn.\\
 \hline
@@ -135,7 +136,7 @@ Quyết định phê duyệt con người & Hành động can thiệp của chuy
 
 \section{Nhật ký tương tác AI qua bốn mốc chu trình phát triển}\label{sec:sdlc-ai-log}
 
-Tuân thủ định hướng của Đề tài 80300 (Học phần AIA331), việc ứng dụng trí tuệ nhân tạo được triển khai xuyên suốt toàn bộ chu trình phát triển phần mềm (SDLC) theo phương châm con người giữ quyền quyết định tối hậu (\textit{Human-in-the-loop}). Bảng~\ref{tab:sdlc-ai-log} tổng hợp quá trình tương tác, đối sánh giữa đề xuất ban đầu của mô hình, các hạn chế kỹ thuật phát hiện và phương án tinh chỉnh thực tế của sinh viên.
+Tuân thủ định hướng của Đề tài 80300 (Học phần AIA331), việc ứng dụng trí tuệ nhân tạo được triển khai xuyên suốt toàn bộ chu trình phát triển phần mềm (SDLC) theo phương châm con người giữ quyền quyết định cuối cùng (\textit{Human-in-the-loop}). Bảng~\ref{tab:sdlc-ai-log} tổng hợp quá trình tương tác, đối sánh giữa đề xuất ban đầu của mô hình, các hạn chế kỹ thuật phát hiện và phương án tinh chỉnh thực tế của sinh viên.
 
 \begin{table}[H]
 \centering

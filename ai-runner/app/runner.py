@@ -366,8 +366,10 @@ class Runner:
                         None,
                     )
                     if next_non_opencode is not None:
-                        if model:
-                            self.model_cooldown_until[model] = time.monotonic() + 300.0
+                        cooldown_until = time.monotonic() + 600.0
+                        for m in models:
+                            if m and str(m).startswith("opencode/"):
+                                self.model_cooldown_until[str(m)] = cooldown_until
                         log.info(
                             "run %s: opencode free limit on %s; falling back to external provider %s",
                             handle.run_id,

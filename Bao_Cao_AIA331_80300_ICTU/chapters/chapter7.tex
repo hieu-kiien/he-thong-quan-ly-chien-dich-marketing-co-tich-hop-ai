@@ -110,7 +110,7 @@ Hình~\ref{fig:latency-chart} so sánh phân bố độ trễ giữa các thành
 \end{figure}
 
 \begin{itemize}[noitemsep,topsep=2pt]
- \item Các endpoint CRUD nghiệp vụ thông thường (chiến dịch, nội dung, chỉ số) có tốc độ xử lý siêu tốc: P50 đạt 15ms, P95 đạt 38ms nhờ hiệu năng cao của FastAPI và SQLite WAL mode.
+ \item Các endpoint CRUD nghiệp vụ thông thường (chiến dịch, nội dung, chỉ số) có tốc độ phản hồi nhanh: P50 đạt 15ms, P95 đạt 38ms nhờ hiệu năng cao của FastAPI và SQLite WAL mode.
  \item Smart Fallback Engine phản hồi gần như tức thì: P50 đạt 22ms, P95 đạt 45ms.
  \item Khi kết nối Live Gemini API qua đường truyền HTTPS quốc tế, độ trễ trung vị P50 duy trì ổn định ở mức 1.52 giây và P95 đạt 2.94 giây. Đây là mức độ trễ hoàn toàn đáp ứng tốt trải nghiệm người dùng trong nghiệp vụ sáng tạo nội dung tiếp thị, đặc biệt khi giao diện được trang bị thanh trạng thái chờ (loading skeleton) và thông báo toast trực quan.
 \end{itemize}
@@ -155,4 +155,4 @@ Nhằm kiểm chứng độ bền bỉ theo yêu cầu NFR05, nhóm thực hiệ
 
 \section{Kết luận chương}
 
-Chương 7 đã cung cấp bức tranh toàn cảnh định lượng về năng lực phân hệ AI trong MarketFlow AI: độ tin cậy cấu trúc tuyệt đối (100\% SVR), độ bám sát số liệu cao (>95\% Grounding Score), hoàn toàn khử ảo giác trong cơ chế dự phòng, độ trễ phản hồi tối ưu và chi phí thực tế 0 VNĐ trên nền tảng Google AI Studio Free Tier, khẳng định tính sẵn sàng vận hành thực tế.
+Chương 7 đã cung cấp kết quả đánh giá định lượng về năng lực phân hệ AI trong MarketFlow AI: độ tin cậy cấu trúc tuyệt đối (100\% SVR), độ bám sát số liệu cao (>95\% Grounding Score), hoàn toàn khử ảo giác trong cơ chế dự phòng, độ trễ phản hồi tối ưu và chi phí thực tế 0 VNĐ trên nền tảng Google AI Studio Free Tier, khẳng định tính sẵn sàng vận hành thực tế.

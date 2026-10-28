@@ -2,37 +2,35 @@
 
 \section{Tổng quan cấu trúc mã nguồn thực tế}
 
-Toàn bộ hệ thống MarketFlow AI đã được hiện thực hóa hoàn chỉnh bằng mã nguồn thực tế trong hai thư mục chính: \texttt{backend/} và \texttt{frontend/}. Bảng~\ref{tab:source-tree} mô tả cấu trúc phân bổ mã nguồn của dự án.
+Hệ thống MarketFlow được tổ chức thành ba khối mã nguồn độc lập gồm \texttt{backend/} (API nghiệp vụ và máy chủ MCP), \texttt{ai-runner/} (dịch vụ điều phối phiên làm việc AI cô lập), và \texttt{frontend/} (ứng dụng web một trang SPA). Bảng~\ref{tab:source-tree} trình bày chi tiết cấu trúc phân bổ các thành phần trong dự án.
 
 \begin{table}[H]
 \centering
 \footnotesize
-\renewcommand{\arraystretch}{1.00}
-\caption{Cấu trúc phân bổ mã nguồn hệ thống MarketFlow AI}
+\renewcommand{\arraystretch}{1.05}
+\caption{Cấu trúc phân bổ mã nguồn hệ thống MarketFlow}
 \label{tab:source-tree}
 \begin{tabularx}{\textwidth}{|L{4.2cm}|Y|L{3.1cm}|}
 \hline
 \thead{Đường dẫn thư mục} & \thead{Mô tả thành phần mã nguồn} & \thead{Công nghệ sử dụng}\\
 \hline
-\texttt{backend/app/core} & Cấu hình môi trường (\texttt{config.py}) và bảo mật (\texttt{security.py}: Bcrypt, JWT, RoleChecker). & Python 3.11, Passlib, PyJWT\\
+\texttt{backend/app/core} & Cấu hình môi trường (\texttt{config.py}), xử lý ngoại lệ chuẩn hóa và bảo mật (\texttt{security.py}: Bcrypt, JWT, phân quyền vai trò). & Python 3.12, Passlib, PyJWT\\
 \hline
-\texttt{backend/app/db} & Khởi tạo session CSDL (\texttt{session.py}) và Base ORM (\texttt{base.py}), script nạp dữ liệu mẫu (\texttt{init\_db.py}). & SQLAlchemy 2.0, SQLite WAL\\
+\texttt{backend/app/db} & Quản lý phiên kết nối cơ sở dữ liệu (\texttt{session.py}), cấu trúc ORM cơ sở và kịch bản khởi tạo dữ liệu mẫu (\texttt{seed.py}). & SQLAlchemy 2.0, PostgreSQL / SQLite\\
 \hline
-\texttt{backend/app/models} & Định nghĩa 11 thực thể dữ liệu quan hệ (User, Campaign, Content, Metric, Schedule, Product, Channel, AILog, v.v.). & SQLAlchemy 2.0 Declarative\\
+\texttt{backend/app/models} & Định nghĩa các bảng dữ liệu quan hệ (User, Workspace, Campaign, ContentItem, Schedule, MetricEntry, AiThread, AiAction, AuditLog). & SQLAlchemy 2.0 Declarative\\
 \hline
-\texttt{backend/app/schemas} & Định nghĩa hợp đồng dữ liệu vào/ra với các bộ kiểm định hợp lệ (Validation). & Pydantic v2\\
+\texttt{backend/app/schemas} & Đặc tả hợp đồng dữ liệu đầu vào/đầu ra và quy tắc kiểm tra tính hợp lệ. & Pydantic v2\\
 \hline
-\texttt{backend/app/api/v1} & Bộ điều phối API endpoints: xác thực, quản lý chiến dịch, duyệt nội dung, lập lịch, số liệu, AI. & FastAPI Routers\\
+\texttt{backend/app/api/v1} & Các bộ định tuyến REST API: xác thực, chiến dịch, nội dung, phê duyệt, lịch đăng, số liệu KPI và nhật ký. & FastAPI Routers\\
 \hline
-\texttt{backend/app/services} & Động cơ điều phối AI (\texttt{ai\_service.py}) và xây dựng prompt an toàn (\texttt{prompt\_engine.py}). & Google Gemini SDK, Fallback Engine\\
+\texttt{backend/app/assistant} & Máy chủ công cụ ngữ cảnh (\texttt{mcp\_server.py}), quản lý luồng hội thoại (\texttt{chat\_service.py}) và hàng đợi đề xuất hành động (\texttt{actions\_service.py}). & FastMCP, SSE Streaming\\
 \hline
-\texttt{backend/tests} & Toàn bộ bộ kiểm thử tự động: unit tests, integration tests, fuzzing, adversarial security tests. & Pytest, HTTPX\\
+\texttt{ai-runner/app} & Dịch vụ điều phối tiến trình AI (\texttt{runner.py}, \texttt{events.py}): quản lý hàng đợi, cắt chuỗi thời gian thực và xoay vòng đa mô hình dự phòng. & FastAPI, Asyncio, OpenCode CLI\\
 \hline
-\texttt{frontend/src/pages} & Các màn hình chức năng chính: Dashboard, Campaigns, ReviewQueue, AIStudio. & React 18, TypeScript\\
+\texttt{frontend/src/features} & Các phân trang nghiệp vụ theo miền: \texttt{dashboard}, \texttt{campaigns}, \texttt{contents}, \texttt{schedules}, \texttt{metrics}, \texttt{assistant}, \texttt{brand}, \texttt{audit}. & React 18, TypeScript, TanStack Query\\
 \hline
-\texttt{frontend/src/components} & Các thành phần UI tái sử dụng: AIDrawer, CampaignTable, WorkflowCanvas, Skeleton, Toast, ErrorBoundary. & Tailwind CSS, Lucide Icons\\
-\hline
-\texttt{frontend/src/services} & Lớp giao tiếp API (\texttt{api.ts}) với bộ đánh chặn Bearer Token tự động. & Axios, LocalStorage\\
+\texttt{frontend/src/components} & Hệ thống khung bố cục 3 cột (\texttt{AppShell}), ngăn kéo trợ lý AI (\texttt{AssistantDrawer}), thẻ đề xuất hành động (\texttt{ActionProposalCard}) và bảng dữ liệu. & Tailwind CSS, Lucide Icons\\
 \hline
 \end{tabularx}
 \end{table}
@@ -41,100 +39,98 @@ Toàn bộ hệ thống MarketFlow AI đã được hiện thực hóa hoàn ch�
 
 \subsection{Phân hệ Bảo mật, Xác thực và Phân quyền mức bản ghi (Record-level Scope)}
 
-Phân hệ an ninh trong \texttt{backend/app/core/security.py} và \texttt{deps.py} hiện thực hóa mô hình phòng thủ theo chiều sâu (Defense-in-Depth). Thay vì dựa hoàn toàn vào token tĩnh, hệ thống kết hợp kiểm tra 3 điều kiện đồng thời: chữ ký số JWT hợp lệ, trạng thái tài khoản hoạt động trong CSDL (\texttt{user.status == 'ACTIVE'}), và danh sách vai trò cho phép (\texttt{allowed\_roles}).
+Phân hệ an ninh trong \texttt{backend/app/core/security.py} kết hợp kiểm tra đồng thời ba điều kiện trên mỗi yêu cầu truy cập: chữ ký số JWT hợp lệ, trạng thái tài khoản đang hoạt động trong cơ sở dữ liệu (\texttt{user.is\_active == True}), và quyền hạn của người dùng trong không gian làm việc hiện tại.
 
-Để khắc phục triệt để lỗ hổng leo quyền ngang IDOR (Insecure Direct Object Reference), phân hệ triển khai thuật toán giải quyết phạm vi bản ghi (Record Scope Resolution). Quyền thao tác của người dùng trên từng tài nguyên được ma trận hóa chi tiết trong Bảng~\ref{tab:scope-matrix}.
+Nhằm ngăn chặn lỗi truy cập trái phép tài nguyên ngang hàng (IDOR -- Insecure Direct Object Reference), hệ thống áp dụng cơ chế kiểm soát phạm vi bản ghi ngay tại tầng truy vấn dữ liệu. Quyền thao tác của từng nhóm người dùng được quy định cụ thể trong Bảng~\ref{tab:scope-matrix}.
 
 \begin{table}[H]
 \centering
 \small
-\caption{Ma trận phân giải quyền hạn truy cập tài nguyên theo ngữ cảnh nghiệp vụ}
+\caption{Ma trận phân quyền truy cập tài nguyên theo vai trò nghiệp vụ}
 \label{tab:scope-matrix}
 \begin{tabularx}{\textwidth}{|L{2.2cm}|L{2.8cm}|C{2.6cm}|Y|C{2.0cm}|}
 \hline
 \thead{Tài nguyên} & \thead{Hành động} & \thead{Quản lý (Manager)} & \thead{Nhân viên sở hữu / Được phân công} & \thead{Nhân viên ngoài phạm vi}\\
 \hline
-\multirow{3}{2.2cm}{\raggedright Chiến dịch} & Xem / Tìm kiếm & Toàn quyền & Xem chiến dịch được gán & Từ chối (HTTP 403)\\
+\multirow{3}{2.2cm}{\raggedright Chiến dịch} & Xem / Tìm kiếm & Toàn quyền & Xem chiến dịch trong không gian làm việc & Từ chối (HTTP 403)\\
 \cline{2-5}
-& Tạo mới / Sửa & Toàn quyền & Sửa chiến dịch của mình & Từ chối (HTTP 403)\\
+& Tạo mới / Sửa & Toàn quyền & Sửa chiến dịch được phân công & Từ chối (HTTP 403)\\
 \cline{2-5}
-& Xóa chiến dịch & Toàn quyền & Từ chối tuyệt đối & Từ chối (HTTP 403)\\
+& Xóa chiến dịch & Toàn quyền & Không có quyền xóa & Từ chối (HTTP 403)\\
 \hline
-\multirow{2}{2.2cm}{\raggedright Nội dung} & Soạn / Sửa nháp & Toàn quyền & Soạn trong chiến dịch gán & Từ chối (HTTP 403)\\
+\multirow{2}{2.2cm}{\raggedright Nội dung} & Soạn / Sửa nháp & Toàn quyền & Soạn trong chiến dịch được giao & Từ chối (HTTP 403)\\
 \cline{2-5}
-& Phê duyệt (Approve) & Toàn quyền & Từ chối tuyệt đối & Từ chối (HTTP 403)\\
+& Phê duyệt (Approve) & Toàn quyền & Không có quyền duyệt & Từ chối (HTTP 403)\\
 \hline
-Chỉ số kênh & Nhập / Điều chỉnh & Toàn quyền & Nhập cho chiến dịch gán & Từ chối (HTTP 403)\\
+Chỉ số kênh & Nhập / Xuất báo cáo & Toàn quyền & Nhập cho chiến dịch được giao & Từ chối (HTTP 403)\\
 \hline
 \end{tabularx}
 \end{table}
 
 \subsection{Hiện thực hóa Máy trạng thái duyệt nội dung (HITL State Machine)}
 
-Để bảo đảm tính toàn vẹn của quy trình Human-in-the-loop, module \texttt{backend/\allowbreak app/\allowbreak api/\allowbreak v1/\allowbreak contents.py} áp dụng các chốt chặn an toàn (Guard Conditions) tại cấp độ bộ điều khiển API. Bảng~\ref{tab:hitl-rules} đặc tả các quy tắc chuyển dịch trạng thái và cơ chế chống gian lận quy trình đã được hiện thực hóa.
+Để đảm bảo quy trình kiểm duyệt của con người (Human-in-the-loop), phân hệ quản lý nội dung áp dụng các điều kiện kiểm soát chuyển trạng thái chặt chẽ tại tầng dịch vụ. Bảng~\ref{tab:hitl-rules} tổng hợp các quy tắc chuyển trạng thái bài viết và cơ chế bảo vệ dữ liệu sau khi duyệt.
 
 \begin{table}[H]
 \centering
 \small
-\caption{Quy tắc chuyển dịch trạng thái nội dung và cơ chế chống can thiệp (Anti-tampering)}
+\caption{Quy tắc chuyển trạng thái nội dung và kiểm soát phê duyệt}
 \label{tab:hitl-rules}
 \begin{tabularx}{\textwidth}{|L{2.2cm}|L{2.6cm}|C{2.2cm}|Y|C{2.2cm}|}
 \hline
 \thead{Trạng thái gốc} & \thead{Thao tác kích hoạt} & \thead{Quyền hạn} & \thead{Điều kiện bảo vệ (Guard Condition)} & \thead{Trạng thái đích}\\
 \hline
-Khởi tạo mới & \texttt{POST /contents} & Marketer, Manager & Trạng thái yêu cầu bắt buộc là \texttt{DRAFT} hoặc \texttt{AI\_DRAFT}. Cấm tạo trực tiếp bài đã duyệt. & \texttt{DRAFT} hoặc \texttt{AI\_DRAFT}\\
+Khởi tạo mới & \texttt{POST /contents} & Marketer, Manager & Bài viết mới hoặc đề xuất từ AI luôn khởi tạo ở trạng thái nháp; không cho phép tạo trực tiếp bài đã duyệt. & \texttt{DRAFT} hoặc \texttt{AI\_DRAFT}\\
 \hline
-\texttt{DRAFT} & \texttt{POST .../submit} & Tác giả bài viết & Nội dung và tiêu đề không rỗng; thuộc chiến dịch hợp lệ. & \texttt{IN\_REVIEW}\\
+\texttt{DRAFT} & \texttt{POST .../submit} & Tác giả bài viết & Tiêu đề và nội dung bài viết không được để trống; thuộc chiến dịch đang hoạt động. & \texttt{IN\_REVIEW}\\
 \hline
-\texttt{IN\_REVIEW} & \texttt{POST .../approve} & Manager & Người duyệt phải có vai trò Manager; ghi nhận \texttt{reviewer\_id}. & \texttt{APPROVED}\\
+\texttt{IN\_REVIEW} & \texttt{POST .../approve} & Manager & Chỉ người dùng có vai trò Quản lý mới được phép phê duyệt và ghi nhận vào nhật ký kiểm duyệt. & \texttt{APPROVED}\\
 \hline
-\texttt{IN\_REVIEW} & \texttt{POST .../reject} & Manager & Cung cấp lý do từ chối cụ thể để tác giả chỉnh sửa. & \texttt{REJECTED}\\
+\texttt{IN\_REVIEW} & \texttt{POST .../reject} & Manager & Bắt buộc đính kèm nhận xét hoặc lý do từ chối để nhân viên chỉnh sửa lại. & \texttt{REJECTED}\\
 \hline
-\texttt{APPROVED} & \texttt{PUT /contents/\{id\}} & Tác giả, Manager & \textbf{Cơ chế tự động hạ cấp}: Khi sửa đổi tiêu đề, nội dung hoặc CTA, hệ thống tự động thu hồi phê duyệt. & \texttt{AI\_DRAFT}\\
+\texttt{APPROVED} & \texttt{PUT /contents/\{id\}} & Tác giả, Manager & \textbf{Tự động thu hồi trạng thái duyệt}: Khi nội dung đã duyệt bị chỉnh sửa, hệ thống chuyển bài viết về trạng thái nháp để thẩm định lại. & \texttt{DRAFT}\\
 \hline
-\texttt{APPROVED} & \texttt{POST /schedules} & Marketer, Manager & Thời gian xuất bản phải lớn hơn thời điểm hiện tại. & \texttt{SCHEDULED}\\
+\texttt{APPROVED} & \texttt{POST /schedules} & Marketer, Manager & Chỉ các bài viết ở trạng thái \texttt{APPROVED} mới được phép lên lịch xuất bản. & \texttt{SCHEDULED}\\
 \hline
 \end{tabularx}
 \end{table}
 
-\section{Hiện thực hóa giao diện người dùng (Frontend)}
+\section{Hiện thực hóa giao diện làm việc 3 cột (Split-Pane Workspace)}
 
-Giao diện người dùng được tổ chức mạch lạc, cung cấp trải nghiệm làm việc hiện đại theo kiến trúc Bento Grid và luồng thao tác trực quan.
+Giao diện người dùng được thiết kế theo hệ màu sáng dịu mắt (\textit{Soft Daylight}: nền tổng thể \texttt{\#F6F7F9}, bề mặt bảng \texttt{\#FFFFFF}, vùng làm việc AI \texttt{\#F0F4F8}) kết hợp bộ phông chữ chuẩn tiếng Việt (\texttt{Be Vietnam Pro}, \texttt{Plus Jakarta Sans} và số liệu đẳng rộng \texttt{JetBrains Mono} \texttt{tabular-nums}) giúp người dùng làm việc liên tục nhiều giờ với bảng số liệu mà không gây mỏi thị giác.
 
 \begin{figure}[H]
 \centering
 \input{figures/ui-wireframe.tex}
-\caption{Kiến trúc giao diện Bento Grid và các phân vùng thao tác của MarketFlow AI}
+\caption{Kiến trúc không gian làm việc 3 cột (Split-Pane Workspace) và khung tác vụ AI của MarketFlow}
 \label{fig:ui-wireframe}
 \end{figure}
 
-\subsection{Các phân trang chức năng chính}
+\subsection{Bố cục không gian làm việc và các phân trang chính}
 \begin{enumerate}
- \item \textbf{Bảng điều khiển tổng quan (Dashboard)}: Hiển thị các thẻ chỉ số trọng yếu (Ngân sách, Views, Clicks, Conversions, ROI) qua component \texttt{MetricCard}; trực quan hóa biểu đồ xu hướng đa kênh và tự động thích ứng phạm vi dữ liệu theo vai trò đăng nhập.
- \item \textbf{Quản lý chiến dịch (Campaigns)}: Bảng danh sách hỗ trợ tìm kiếm nhanh, lọc theo trạng thái, modal tạo mới và hiệu chỉnh ngân sách với kiểm tra tính hợp lệ dữ liệu tức thời trên client.
- \item \textbf{Hàng đợi phê duyệt nội dung (Review Queue)}: Không gian làm việc riêng biệt cho Manager thẩm định các bài viết \texttt{IN\_REVIEW}; cung cấp thao tác duyệt một chạm hoặc từ chối kèm lý do; hiển thị nhãn \texttt{AI Generated Badge} cảnh báo minh bạch.
- \item \textbf{Xưởng sáng tạo AI Studio \& AI Drawer}: Ngăn kéo trượt thông minh hỗ trợ kích hoạt 3 tác vụ AI (Ý tưởng, Bản nháp, Tóm tắt số liệu); cho phép hiệu chỉnh trực tiếp và lưu thành bản nháp để đưa vào quy trình duyệt.
+ \item \textbf{Cột điều hướng thu gọn bên trái (Collapsible Sidebar)}: Cho phép chuyển đổi nhanh giữa 8 phân trang nghiệp vụ (Tổng quan, Chiến dịch, Nội dung, Lịch đăng, Số liệu \& KPI, Trợ lý AI, Tài sản thương hiệu, Nhật ký hệ thống) mà không cần tải lại trang.
+ \item \textbf{Khu vực làm việc trung tâm (Main Workspace)}: Hiển thị hàng thẻ chỉ số KPI trọng yếu ở phía trên, biểu đồ phân tích hiệu quả đa kênh và bảng dữ liệu có cố định tiêu đề cột khi cuộn. Tích hợp sẵn chức năng \textbf{Xuất báo cáo Excel (CSV UTF-8 BOM)} và nút gửi ngữ cảnh nhanh sang AI trên từng dòng chiến dịch.
+ \item \textbf{Khung tác vụ AI ngữ cảnh bên phải (Contextual AI Copilot Drawer)}: Cho phép vừa theo dõi bảng số liệu ở giữa vừa trao đổi với Trợ lý AI ở cột bên phải. Luồng phản hồi SSE được duy trì ở cấp module giúp người dùng chuyển trang hoặc đổi tab trình duyệt mà không bị ngắt phiên hội thoại đang chạy.
+ \item \textbf{Thẻ xác nhận đề xuất hành động (Action Proposal Card)}: Khi AI đề xuất tạo bản nháp mới, lập lịch đăng hoặc điều chỉnh chiến dịch qua các công cụ \texttt{propose\_*}, hệ thống hiển thị thẻ tóm tắt trực quan để người dùng xem trước và bấm \textit{Áp dụng vào bảng} hoặc \textit{Huỷ bỏ}.
 \end{enumerate}
 
-\section{Hiện thực hóa AI Fallback De-hallucination Engine}
+\section{Hiện thực hóa Cơ chế Điều phối Đa mô hình và Chống ảo giác số liệu}
 
-Cơ chế xử lý dự phòng và khử ảo giác được hiện thực hóa trong \texttt{backend/\allowbreak app/\allowbreak services/\allowbreak ai\_service.py}. Khi yêu cầu gửi tới Google Gemini gặp sự cố mạng hoặc vượt quá hạn mức, hệ thống tự động kích hoạt hàm \texttt{\_generate\_fallback} nhằm duy trì tính liên tục của dịch vụ.
-
-Đối với tác vụ tóm tắt hiệu quả chiến dịch (SUMMARY), động cơ Smart Fallback vận hành dựa trên giải thuật suy diễn xác định (Deterministic Rule-based Engine) với các công thức tổng hợp toán học tiền định:
+Để đảm bảo tốc độ phản hồi nhanh cùng tính sẵn sàng liên tục, dịch vụ \texttt{ai-runner} (\texttt{ai-runner/app/runner.py}) kết hợp với máy chủ công cụ MCP (\texttt{backend/app/assistant/mcp\_server.py}) triển khai cơ chế xoay vòng đa nhà cung cấp và kiểm soát trung thực dữ liệu:
 \begin{align}
 \text{Total\_Views} &= \sum_{m \in M} m.\text{views}, \quad \text{Total\_Clicks} = \sum_{m \in M} m.\text{clicks} \\
-\text{Total\_Cost} &= \sum_{m \in M} m.\text{cost}, \quad \text{Total\_Revenue} = \sum_{m \in M} m.\text{revenue} \\
+\text{Total\_Cost} &= \sum_{m \in M} m.\text{cost}, \quad \text{Total\_Conversions} = \sum_{m \in M} m.\text{conversions} \\
 \text{CTR} &= \begin{cases} \dfrac{\text{Total\_Clicks}}{\text{Total\_Views}} \times 100\% & \text{khi } \text{Total\_Views} > 0 \\ 0.0\% & \text{khi } \text{Total\_Views} = 0 \end{cases} \\
-\text{ROI} &= \begin{cases} \dfrac{\text{Total\_Revenue} - \text{Total\_Cost}}{\text{Total\_Cost}} \times 100\% & \text{khi } \text{Total\_Cost} > 0 \\ 0.0\% & \text{khi } \text{Total\_Cost} = 0 \end{cases}
+\text{CPA} &= \begin{cases} \dfrac{\text{Total\_Cost}}{\text{Total\_Conversions}} & \text{khi } \text{Total\_Conversions} > 0 \\ 0 & \text{khi } \text{Total\_Conversions} = 0 \end{cases}
 \end{align}
 
-Động cơ tuân thủ 3 nguyên tắc khử ảo giác bất biến:
+Hệ thống áp dụng ba nguyên tắc kiểm soát chất lượng phản hồi AI:
 \begin{enumerate}
- \item \textbf{Căn cứ số học thuần túy}: Mọi nhận định trong phần \texttt{insights} chỉ diễn giải trực tiếp từ các tổng số và tỷ lệ tài chính tính toán được từ tập dữ liệu đầu vào $M$.
- \item \textbf{Khử bỏ hoàn toàn suy diễn ngoại lai}: Tuyệt đối không sinh nhận định phỏng đoán về khung giờ đăng bài, thói quen lướt mạng cuối tuần hay tâm lý khách hàng khi các trường dữ liệu này không tồn tại trong context.
- \item \textbf{Minh bạch nguồn gốc}: Đánh dấu cờ \texttt{is\_fallback = True}, định danh mô hình \texttt{RuleBasedFallbackEngine} và lưu trữ đầy đủ trong bảng \texttt{ai\_logs}.
+ \item \textbf{Tính toán chỉ số xác định từ cơ sở dữ liệu}: Các chỉ số CTR, CVR, CPC, CPA và tiến độ giải ngân được tính toán chính xác bằng mã nguồn Python trong các công cụ \texttt{marketflow\_*} trước khi cung cấp cho mô hình ngôn ngữ; mô hình không tự ước lượng số liệu.
+ \item \textbf{Tự động chuyển đổi dự phòng đa nhà cung cấp (Multi-Provider Fallback)}: Hệ thống kết nối đồng thời OpenCode Zen, Groq LPU, Google Gemini và OpenRouter. Khi một mô hình chạm giới hạn tần suất (HTTP 429) hoặc quá thời gian chờ, bộ điều phối tự động đánh dấu thời gian nghỉ (\textit{per-model cooldown}) và chuyển yêu cầu sang mô hình dự phòng kế tiếp.
+ \item \textbf{Cô lập quyền ghi qua cơ chế Đề xuất (Proposal-Only)}: Trợ lý AI chỉ có quyền đọc dữ liệu trong phạm vi không gian làm việc và tạo bản ghi đề xuất ở trạng thái \texttt{PROPOSED}; mọi thao tác ghi chính thức vào bảng nghiệp vụ đều yêu cầu xác nhận từ người dùng.
 \end{enumerate}
 
 \section{Kết luận chương}
 
-Chương 5 đã chứng minh tính hiện thực hóa toàn diện của MarketFlow AI: từ bảo mật phân quyền đa tầng, máy trạng thái nội dung HITL chống can thiệp, giao diện Bento Grid hiện đại đến cơ chế AI Smart Fallback khử ảo giác số học. Toàn bộ các thiết kế đều đã được chuyển giao thành mã nguồn chất lượng cao, vận hành ổn định và sẵn sàng cho các bài kiểm định thực nghiệm ở Chương 6.
+Chương 5 đã trình bày chi tiết quá trình hiện thực hóa hệ thống MarketFlow: từ cơ chế phân quyền theo phạm vi bản ghi, máy trạng thái phê duyệt nội dung, thiết kế không gian làm việc 3 cột dịu mắt đến kiến trúc điều phối trợ lý AI đa mô hình có kiểm soát đề xuất. Các thành phần này là cơ sở thực tế để tiến hành kiểm thử tự động và đánh giá hiệu năng ở Chương 6 và Chương 7.
