@@ -228,7 +228,7 @@ export function CopilotDrawer() {
   return (
     <aside
       aria-label="Khung Tác Vụ AI (Contextual AI Panel)"
-      className="flex h-full w-full shrink-0 flex-col border-l border-border bg-ai-panel sm:w-[380px] xl:w-[410px] animate-slide-in-right"
+      className="contain-panel flex h-full w-full shrink-0 flex-col border-l border-border bg-ai-panel sm:w-[380px] xl:w-[410px] animate-slide-in-right"
     >
       {/* Header Contextual AI Panel */}
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface/90 px-3.5 backdrop-blur-xs">

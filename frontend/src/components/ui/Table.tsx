@@ -2,30 +2,33 @@ import type { HTMLAttributes, ReactNode, TdHTMLAttributes, ThHTMLAttributes } fr
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
-/** Bảng dữ liệu: vùng cuộn ngang có thể focus bằng bàn phím. */
+/** Bảng dữ liệu: vùng cuộn ngang có thể focus bằng bàn phím và hỗ trợ container queries. */
 export function Table({ className, children, label }: { className?: string; children: ReactNode; label?: string }) {
   return (
     <div
-      className={cn('overflow-x-auto rounded-lg border border-border bg-surface', className)}
+      className={cn(
+        'table-wrapper [container-type:inline-size] overflow-x-auto rounded-lg border border-border bg-surface',
+        className,
+      )}
       role="region"
       aria-label={label}
       tabIndex={0}
     >
-      <table className="w-full border-collapse text-left text-sm">{children}</table>
+      <table className="w-full border-separate border-spacing-0 text-left text-sm">{children}</table>
     </div>
   );
 }
 
 export function THead({ children }: { children: ReactNode }) {
   return (
-    <thead className="sticky top-0 z-10 border-b border-border bg-subtle/80 text-xs font-medium text-fg-muted backdrop-blur-xs">
+    <thead className="sticky top-0 z-10 bg-subtle/85 text-xs font-medium text-fg-muted backdrop-blur-xs">
       {children}
     </thead>
   );
 }
 
 export function TBody({ children }: { children: ReactNode }) {
-  return <tbody className="divide-y divide-border">{children}</tbody>;
+  return <tbody className="[&>tr:last-child>td]:border-b-0">{children}</tbody>;
 }
 
 export function TR({ className, ...rest }: HTMLAttributes<HTMLTableRowElement>) {
@@ -37,7 +40,7 @@ export function TH({ className, align, ...rest }: ThHTMLAttributes<HTMLTableCell
     <th
       scope="col"
       className={cn(
-        'whitespace-nowrap px-3.5 py-2.5 font-medium text-fg-muted',
+        'whitespace-nowrap border-b border-border px-3.5 py-2.5 font-medium text-fg-muted',
         align === 'right' && 'text-right',
         align === 'center' && 'text-center',
         className,
@@ -51,7 +54,7 @@ export function TD({ className, align, ...rest }: TdHTMLAttributes<HTMLTableCell
   return (
     <td
       className={cn(
-        'px-3.5 py-2.5 align-middle text-fg tabular-nums',
+        'border-b border-border px-3.5 py-2.5 align-middle text-fg tabular-nums',
         align === 'right' && 'text-right tabular',
         align === 'center' && 'text-center',
         className,
@@ -80,7 +83,7 @@ export function SortableTH({ label, field, sort, onSort, align, className }: Sor
     <th
       scope="col"
       aria-sort={active ? (desc ? 'descending' : 'ascending') : 'none'}
-      className={cn('whitespace-nowrap px-3 py-2.5 font-medium', align === 'right' && 'text-right', className)}
+      className={cn('whitespace-nowrap border-b border-border px-3 py-2.5 font-medium', align === 'right' && 'text-right', className)}
     >
       <button
         type="button"

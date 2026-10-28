@@ -90,6 +90,7 @@
     --chart-axis: #6B7280;
 
     color-scheme: light;
+    accent-color: rgb(var(--accent));
   }
 
   .dark {
@@ -149,15 +150,25 @@
     --chart-axis: #94A3B8;
 
     color-scheme: dark;
+    accent-color: rgb(var(--accent));
   }
 
   html {
     -webkit-text-size-adjust: 100%;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--fg-subtle) / 0.55) rgb(var(--subtle));
   }
 
   body {
     @apply bg-canvas text-fg font-sans antialiased;
     font-weight: 400;
+  }
+
+  /* Chỉ báo lỗi sau khi người dùng đã tương tác (:user-invalid thay vì :invalid) */
+  input:not(input[type='range']):user-invalid,
+  textarea:user-invalid,
+  select:user-invalid {
+    border-color: rgb(var(--danger));
   }
 
   :focus-visible {
@@ -186,6 +197,26 @@
   }
   .scrollbar-thin {
     scrollbar-width: thin;
+    scrollbar-color: rgb(var(--fg-subtle) / 0.55) rgb(var(--subtle));
+  }
+  /* Tự động co giãn khung nhập theo nội dung (field-sizing: content) với chiều rộng cố định 100% */
+  .auto-grow-textarea {
+    field-sizing: content;
+    width: 100%;
+    height: auto;
+    min-block-size: 2.75rem;
+    max-block-size: 12rem;
+    resize: none;
+  }
+  /* Cô lập tính toán bố cục & vẽ lại (content-visibility: auto) cho các vùng độc lập trong bố cục 3 cột */
+  .contain-panel {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 380px auto 640px;
+  }
+  @supports not (content-visibility: auto) {
+    .contain-panel {
+      contain: layout style paint;
+    }
   }
   /* Hiệu ứng Shimmer Skeleton màu xanh ngọc nhạt (#0D9488 độ mờ 10%) cho tiến trình AI */
   .shimmer-ai {

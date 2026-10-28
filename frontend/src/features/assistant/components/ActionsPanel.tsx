@@ -37,7 +37,7 @@ export function ActionsPanel({
   return (
     <aside
       className={cn(
-        'flex h-full flex-col border-l border-border bg-ai-panel shadow-xs',
+        'contain-panel flex h-full flex-col border-l border-border bg-ai-panel shadow-xs',
         className,
       )}
       aria-label="Panel đề xuất và bản nháp"

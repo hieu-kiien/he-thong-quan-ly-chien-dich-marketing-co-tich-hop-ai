@@ -53,8 +53,11 @@ export function Composer({
   const campaigns = campaignsData?.items || [];
   const currentCampaign = campaigns.find((c: CampaignListItem) => c.id === attachedCampaignId);
 
-  // Tự động co giãn chiều cao của textarea (tối đa 192px)
+  // Tự động co giãn chiều cao của textarea (ưu tiên CSS field-sizing: content, fallback JS scrollHeight)
   useEffect(() => {
+    if (typeof CSS !== 'undefined' && CSS.supports?.('field-sizing', 'content')) {
+      return;
+    }
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
@@ -261,7 +264,7 @@ export function Composer({
                 : 'Nhập câu hỏi hoặc yêu cầu cho Trợ lý AI (Shift + Enter để xuống dòng, gõ / để mở mẫu)...'
             }
             disabled={disabled}
-            className="max-h-48 min-h-[44px] flex-1 resize-none bg-transparent px-3.5 py-2.5 text-sm leading-relaxed text-fg placeholder:text-fg-subtle focus:outline-none"
+            className="auto-grow-textarea max-h-48 min-h-[44px] flex-1 resize-none bg-transparent px-3.5 py-2.5 text-sm leading-relaxed text-fg placeholder:text-fg-subtle focus:outline-none"
           />
 
           <div className="flex shrink-0 items-center p-1.5">

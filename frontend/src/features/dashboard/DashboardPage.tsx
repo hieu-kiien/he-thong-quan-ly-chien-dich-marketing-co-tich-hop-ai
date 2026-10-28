@@ -570,7 +570,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* Breakdown by Channel & by Campaign */}
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="contain-panel grid gap-6 lg:grid-cols-2">
             {/* Channel Performance Table */}
             <Card>
               <CardHeader
