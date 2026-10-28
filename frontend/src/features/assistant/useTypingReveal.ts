@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
  * Hook tạo hiệu ứng gõ chữ mượt mà phía client cho phần văn bản mới nhận từ SSE.
  * Do SSE gửi toàn văn tích luỹ (accumulated text per §6 & §11), hook sẽ chỉ cho hiện dần
  * phần đuôi mới thêm vào. Bỏ qua hiệu ứng nếu người dùng bật chế độ giảm chuyển động
- * (prefers-reduced-motion) hoặc khi luồng stream đã kết thúc.
+ * (prefers-reduced-motion), khi tab đang ẩn, hoặc khi luồng stream đã kết thúc.
  */
 export function useTypingReveal(targetText: string, isStreaming: boolean): string {
   const [revealedLength, setRevealedLength] = useState(() => targetText.length);
@@ -16,9 +16,25 @@ export function useTypingReveal(targetText: string, isStreaming: boolean): strin
     typeof window !== 'undefined' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // Khi người dùng đổi tab trình duyệt rồi quay lại, đồng bộ ngay toàn bộ văn bản đã nhận
   useEffect(() => {
-    // Nếu giảm chuyển động hoặc không còn stream, hiển thị toàn bộ ngay lập tức
-    if (prefersReducedMotion || !isStreaming) {
+    if (typeof document === 'undefined') return;
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' || document.visibilityState === 'hidden') {
+        setRevealedLength(targetRef.current.length);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
+    const isTabHidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+
+    // Nếu giảm chuyển động, tab đang ẩn, hoặc không còn stream -> hiển thị toàn bộ ngay lập tức
+    if (prefersReducedMotion || !isStreaming || isTabHidden) {
       setRevealedLength(targetText.length);
       return;
     }

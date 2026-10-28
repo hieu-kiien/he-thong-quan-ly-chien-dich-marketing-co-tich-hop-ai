@@ -37,15 +37,15 @@ export function ActionsPanel({
   return (
     <aside
       className={cn(
-        'flex h-full flex-col border-l border-border bg-surface shadow-xs',
+        'flex h-full flex-col border-l border-border bg-ai-panel shadow-xs',
         className,
       )}
       aria-label="Panel đề xuất và bản nháp"
     >
       {/* Header của panel */}
-      <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
+      <div className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface/80 px-4 backdrop-blur-xs">
         <div className="flex items-center gap-2">
-          <Layers className="h-4 w-4 text-accent" aria-hidden />
+          <Layers className="h-4 w-4 text-ai" aria-hidden />
           <h2 className="text-sm font-semibold text-fg">Đề xuất & bản nháp</h2>
           {proposedCount > 0 && (
             <Badge tone="warning">

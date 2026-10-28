@@ -97,15 +97,15 @@ export function MessageItem({
       <div className="my-4 flex justify-end">
         <div className="flex max-w-[85%] items-end gap-2 sm:max-w-[75%]">
           <div className="min-w-0">
-            <div className="rounded-2xl rounded-tr-sm bg-stone-200 px-4 py-2.5 text-sm text-fg dark:bg-stone-800">
+            <div className="rounded-2xl rounded-tr-sm border border-border bg-surface px-4 py-2.5 text-sm text-fg shadow-xs">
               <p className="whitespace-pre-wrap break-words">{message.content}</p>
             </div>
-            <div className="mt-1 flex justify-end pr-1 text-[11px] text-fg-subtle">
+            <div className="mt-1 flex justify-end pr-1 text-[11px] text-fg-subtle tabular-nums">
               <span>{formatTime(message.created_at)}</span>
             </div>
           </div>
           <div
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-border text-fg-muted"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-subtle text-fg-muted"
             title="Bạn"
           >
             <User className="h-3.5 w-3.5" aria-hidden />
@@ -135,7 +135,7 @@ export function MessageItem({
   return (
     <div className="my-5 flex w-full gap-3">
       <div
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ai-soft text-ai"
         title="Trợ lý AI"
       >
         <Bot className="h-4 w-4" aria-hidden />
@@ -145,7 +145,7 @@ export function MessageItem({
         {/* Tiêu đề & thời gian */}
         <div className="mb-1.5 flex items-center gap-2">
           <span className="text-xs font-semibold text-fg">Trợ lý AI</span>
-          <span className="text-[11px] text-fg-subtle">
+          <span className="text-[11px] text-fg-subtle tabular-nums">
             {formatTime(message.created_at)}
           </span>
           {message.status === 'STOPPED' && (
@@ -241,9 +241,14 @@ export function MessageItem({
             </ReactMarkdown>
           </div>
         ) : isStreamingThisMessage ? (
-          // Đang stream nhưng chưa có text (ví dụ đang gọi tool)
-          <div className="py-2 text-xs text-fg-subtle italic">
-            Đang chuẩn bị câu trả lời...
+          // Hiệu ứng Shimmer Skeleton màu xanh ngọc nhạt (#0D9488 độ mờ 10%) khi đang chờ AI phân tích/viết
+          <div className="my-1.5 max-w-md space-y-2 rounded-lg border border-ai/15 bg-surface/80 p-3">
+            <div className="h-3 w-4/5 rounded shimmer-ai" />
+            <div className="h-3 w-3/5 rounded shimmer-ai" />
+            <div className="h-3 w-2/3 rounded shimmer-ai" />
+            <div className="pt-0.5 text-[11px] text-fg-subtle">
+              Đang tổng hợp dữ liệu và soạn phản hồi...
+            </div>
           </div>
         ) : null}
 
@@ -255,7 +260,7 @@ export function MessageItem({
                 key={act.action_id}
                 type="button"
                 onClick={() => onSelectAction?.(act.action_id)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-3 py-1 text-xs font-medium text-accent-soft-fg shadow-xs transition-colors hover:bg-accent-soft/80 focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                className="inline-flex items-center gap-1.5 rounded-full border border-ai/40 bg-ai-soft px-3 py-1 text-xs font-medium text-ai-soft-fg shadow-xs transition-colors hover:bg-ai hover:text-ai-fg focus:outline-none focus-visible:ring-1 focus-visible:ring-ai"
               >
                 <Sparkles className="h-3.5 w-3.5" aria-hidden />
                 <span>Xem đề xuất #{act.action_id}</span>

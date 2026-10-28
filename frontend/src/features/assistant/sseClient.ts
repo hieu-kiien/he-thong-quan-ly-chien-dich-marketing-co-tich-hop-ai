@@ -43,12 +43,14 @@ function dispatchSseEvent(
   event: string,
   rawJson: string,
   callbacks: AssistantStreamEventCallback,
+  lifecycle?: { onStart: () => void; onTerminal: () => void },
 ): void {
   try {
     const parsedData = JSON.parse(rawJson);
 
     switch (event) {
       case 'message_start':
+        lifecycle?.onStart();
         callbacks.onMessageStart?.(parsedData);
         break;
       case 'status':
@@ -72,9 +74,11 @@ function dispatchSseEvent(
         callbacks.onAction?.(parsedData);
         break;
       case 'message_end':
+        lifecycle?.onTerminal();
         callbacks.onMessageEnd?.(parsedData);
         break;
       case 'error':
+        lifecycle?.onTerminal();
         callbacks.onError?.(parsedData as { code: string; message: string });
         break;
       default:
@@ -113,23 +117,29 @@ export async function streamPost(
 
   if (!response.ok) {
     const apiError = await errorFromResponse(response);
-    callbacks.onError?.({
-      code: apiError.code,
-      message: apiError.message,
-    });
     throw apiError;
   }
 
   const bodyStream = response.body;
   if (!bodyStream) {
     const err = { code: 'AI_EMPTY_RESPONSE', message: 'Phản hồi từ máy chủ không chứa luồng dữ liệu.' };
-    callbacks.onError?.(err);
-    throw new Error(err.message);
+    throw err;
   }
 
   const reader = bodyStream.getReader();
   const decoder = new TextDecoder('utf-8');
   let buffer = '';
+  let started = false;
+  let terminalReceived = false;
+
+  const lifecycle = {
+    onStart: () => {
+      started = true;
+    },
+    onTerminal: () => {
+      terminalReceived = true;
+    },
+  };
 
   try {
     let streamActive = true;
@@ -151,7 +161,7 @@ export async function streamPost(
         if (rawFrame) {
           const parsed = parseSseFrame(rawFrame);
           if (parsed) {
-            dispatchSseEvent(parsed.event, parsed.data, callbacks);
+            dispatchSseEvent(parsed.event, parsed.data, callbacks, lifecycle);
           }
         }
         boundaryIndex = buffer.indexOf('\n\n');
@@ -163,21 +173,36 @@ export async function streamPost(
     if (remaining) {
       const parsed = parseSseFrame(remaining);
       if (parsed) {
-        dispatchSseEvent(parsed.event, parsed.data, callbacks);
+        dispatchSseEvent(parsed.event, parsed.data, callbacks, lifecycle);
       }
+    }
+
+    // Nếu luồng kết thúc đột ngột khi đã bắt đầu nhưng chưa nhận message_end / error (vd: đổi tab làm ngắt kết nối)
+    if (started && !terminalReceived && !signal?.aborted) {
+      throw {
+        code: 'STREAM_INTERRUPTED',
+        message: 'Luồng kết nối tạm gián đoạn, đang đồng bộ kết quả từ máy chủ...',
+        interruptedAfterStart: true,
+      };
     }
   } catch (err: unknown) {
     if (signal?.aborted) {
       // Người dùng chủ động huỷ (Stop)
       return;
     }
-    // Lỗi mạng hoặc ngắt kết nối
+    if (started && !terminalReceived) {
+      throw {
+        code: 'STREAM_INTERRUPTED',
+        message: 'Luồng kết nối tạm gián đoạn, đang đồng bộ kết quả từ máy chủ...',
+        interruptedAfterStart: true,
+      };
+    }
     const message = err instanceof Error ? err.message : 'Mất kết nối với luồng truyền dữ liệu AI.';
-    callbacks.onError?.({
+    throw {
       code: 'NETWORK_ERROR',
       message,
-    });
-    throw err;
+      interruptedAfterStart: false,
+    };
   } finally {
     reader.releaseLock();
   }

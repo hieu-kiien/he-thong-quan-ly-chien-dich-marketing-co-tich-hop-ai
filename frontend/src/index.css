@@ -6,95 +6,147 @@
 @import '@fontsource/be-vietnam-pro/latin-500.css';
 @import '@fontsource/be-vietnam-pro/latin-600.css';
 @import '@fontsource/be-vietnam-pro/latin-700.css';
+@import '@fontsource/plus-jakarta-sans/vietnamese-400.css';
+@import '@fontsource/plus-jakarta-sans/vietnamese-500.css';
+@import '@fontsource/plus-jakarta-sans/vietnamese-600.css';
+@import '@fontsource/plus-jakarta-sans/latin-400.css';
+@import '@fontsource/plus-jakarta-sans/latin-500.css';
+@import '@fontsource/plus-jakarta-sans/latin-600.css';
+@import '@fontsource/jetbrains-mono/vietnamese-400.css';
+@import '@fontsource/jetbrains-mono/vietnamese-500.css';
+@import '@fontsource/jetbrains-mono/vietnamese-600.css';
+@import '@fontsource/jetbrains-mono/latin-400.css';
+@import '@fontsource/jetbrains-mono/latin-500.css';
+@import '@fontsource/jetbrains-mono/latin-600.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /*
- * Bảng màu ngữ nghĩa (kênh RGB để Tailwind ghép alpha).
- * Trung tính ấm (stone) + một màu nhấn (teal). Không gradient.
+ * Hệ thống Thiết kế "Soft Daylight" (Dịu mắt, chống mỏi mắt khi làm việc lâu).
+ * Kết hợp bố cục phân tách không gian làm việc (Linear / Notion AI) và bảng màu dịu mắt (Stripe / Claude).
  */
 @layer base {
   :root {
-    --canvas: 250 250 249;
-    --surface: 255 255 255;
-    --subtle: 245 245 244;
-    --muted: 231 229 228;
-    --border: 231 229 228;
-    --border-strong: 214 211 209;
-    --fg: 28 25 23;
-    --fg-muted: 87 83 78;
-    --fg-subtle: 120 113 108;
+    /* Biến CSS chuẩn theo Design System Soft Daylight */
+    --bg-canvas: #F6F7F9;
+    --bg-surface: #FFFFFF;
+    --bg-ai-panel: #F0F4F8;
+    --bg-hover: #EBF0F5;
+    --text-primary: #111827;
+    --text-secondary: #4B5563;
+    --text-muted: #6B7280;
+    --accent-primary: #2563EB;
+    --accent-ai: #0D9488;
+    --border-subtle: #E2E8F0;
 
-    --accent: 15 118 110;
-    --accent-hover: 17 94 89;
+    /* Kênh RGB cho hệ thống token Tailwind (hỗ trợ <alpha-value>) */
+    --canvas: 246 247 249;        /* #F6F7F9 - Cool Alabaster dịu mắt */
+    --surface: 255 255 255;       /* #FFFFFF - Nền Card & Bảng chính */
+    --ai-panel: 240 244 248;      /* #F0F4F8 - Nền khu vực làm việc với AI */
+    --subtle: 235 240 245;        /* #EBF0F5 - Nền hover dòng bảng & bề mặt phụ */
+    --muted: 226 232 240;         /* #E2E8F0 */
+    --border: 226 232 240;        /* #E2E8F0 - Viền bảng mảnh, sắc nét */
+    --border-strong: 203 213 225; /* #CBD5E1 */
+    --fg: 17 24 39;               /* #111827 - Chữ chính xám than sâu, không dùng #000000 */
+    --fg-muted: 75 85 99;         /* #4B5563 - Chữ phụ, tiêu đề cột bảng */
+    --fg-subtle: 107 114 128;     /* #6B7280 - Chú thích nhỏ, mốc thời gian */
+
+    /* Màu nhấn chính: Xanh Cobalt hiện đại (#2563EB) */
+    --accent: 37 99 235;
+    --accent-hover: 29 78 216;
     --accent-fg: 255 255 255;
-    --accent-soft: 240 253 250;
-    --accent-soft-fg: 17 94 89;
+    --accent-soft: 239 246 255;
+    --accent-soft-fg: 29 78 216;
+
+    /* Màu nhấn AI: Xanh Teal / Sage Emerald (#0D9488) */
+    --ai: 13 148 136;
+    --ai-hover: 15 118 110;
+    --ai-fg: 255 255 255;
+    --ai-soft: 240 253 250;
+    --ai-soft-fg: 15 118 110;
 
     --danger: 220 38 38;
     --danger-soft: 254 242 242;
     --danger-soft-fg: 153 27 27;
-    --warning: 180 83 9;
+    --warning: 217 119 6;
     --warning-soft: 255 251 235;
     --warning-soft-fg: 146 64 14;
-    --success: 21 128 61;
-    --success-soft: 240 253 244;
-    --success-soft-fg: 22 101 52;
-    --info: 29 78 216;
+    --success: 13 148 136;
+    --success-soft: 240 253 250;
+    --success-soft-fg: 15 118 110;
+    --info: 37 99 235;
     --info-soft: 239 246 255;
     --info-soft-fg: 30 64 175;
 
-    /* Màu biểu đồ (dùng trực tiếp trong SVG qua var()). */
-    --chart-1: #0f766e;
-    --chart-2: #b45309;
-    --chart-3: #57534e;
-    --chart-4: #1d4ed8;
-    --chart-5: #be123c;
-    --chart-grid: #e7e5e4;
-    --chart-axis: #78716c;
+    /* Màu Biểu đồ & Trạng thái (Data Visualization) */
+    --chart-1: #2563EB;           /* Doanh thu / Lượt tiếp cận (Xanh Cobalt) */
+    --chart-2: #0D9488;           /* Tỷ lệ chuyển đổi / AI tối ưu (Xanh Teal) */
+    --chart-3: #D97706;           /* Chi phí / Ngân sách (Cam hổ phách dịu) */
+    --chart-4: #4F46E5;
+    --chart-5: #E11D48;
+    --chart-grid: #E2E8F0;
+    --chart-axis: #6B7280;
 
     color-scheme: light;
   }
 
   .dark {
-    --canvas: 18 16 14;
-    --surface: 28 25 23;
-    --subtle: 41 37 36;
-    --muted: 56 52 49;
-    --border: 50 46 43;
-    --border-strong: 68 64 60;
-    --fg: 245 245 244;
-    --fg-muted: 199 194 190;
-    --fg-subtle: 155 148 143;
+    --bg-canvas: #0F172A;
+    --bg-surface: #1E293B;
+    --bg-ai-panel: #162235;
+    --bg-hover: #263449;
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+    --text-muted: #64748B;
+    --accent-primary: #3B82F6;
+    --accent-ai: #14B8A6;
+    --border-subtle: #334155;
 
-    --accent: 45 212 191;
-    --accent-hover: 94 234 212;
-    --accent-fg: 4 47 46;
-    --accent-soft: 19 50 48;
-    --accent-soft-fg: 153 246 228;
+    --canvas: 15 23 42;
+    --surface: 30 41 59;
+    --ai-panel: 22 34 53;
+    --subtle: 38 52 73;
+    --muted: 51 65 85;
+    --border: 51 65 85;
+    --border-strong: 71 85 105;
+    --fg: 241 245 249;
+    --fg-muted: 148 163 184;
+    --fg-subtle: 100 116 139;
+
+    --accent: 59 130 246;
+    --accent-hover: 96 165 250;
+    --accent-fg: 255 255 255;
+    --accent-soft: 30 58 138;
+    --accent-soft-fg: 191 219 254;
+
+    --ai: 20 184 166;
+    --ai-hover: 45 212 191;
+    --ai-fg: 4 47 46;
+    --ai-soft: 19 78 74;
+    --ai-soft-fg: 153 246 228;
 
     --danger: 248 113 113;
-    --danger-soft: 60 24 24;
+    --danger-soft: 69 26 26;
     --danger-soft-fg: 254 202 202;
     --warning: 251 191 36;
-    --warning-soft: 56 40 14;
+    --warning-soft: 69 44 15;
     --warning-soft-fg: 253 230 138;
-    --success: 74 222 128;
-    --success-soft: 20 48 31;
-    --success-soft-fg: 187 247 208;
+    --success: 45 212 191;
+    --success-soft: 19 78 74;
+    --success-soft-fg: 153 246 228;
     --info: 96 165 250;
-    --info-soft: 23 37 66;
+    --info-soft: 30 58 138;
     --info-soft-fg: 191 219 254;
 
-    --chart-1: #2dd4bf;
-    --chart-2: #fbbf24;
-    --chart-3: #a8a29e;
-    --chart-4: #60a5fa;
-    --chart-5: #fb7185;
-    --chart-grid: #322e2b;
-    --chart-axis: #9b948f;
+    --chart-1: #3B82F6;
+    --chart-2: #14B8A6;
+    --chart-3: #F59E0B;
+    --chart-4: #818CF8;
+    --chart-5: #FB7185;
+    --chart-grid: #334155;
+    --chart-axis: #94A3B8;
 
     color-scheme: dark;
   }
@@ -105,7 +157,7 @@
 
   body {
     @apply bg-canvas text-fg font-sans antialiased;
-    font-feature-settings: 'tnum' 0;
+    font-weight: 400;
   }
 
   :focus-visible {
@@ -113,16 +165,38 @@
   }
 
   ::selection {
-    @apply bg-accent/20;
+    @apply bg-accent/15;
+  }
+}
+
+@keyframes ai-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
   }
 }
 
 @layer utilities {
-  .tabular {
+  .tabular,
+  .tabular-nums {
     font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
   }
   .scrollbar-thin {
     scrollbar-width: thin;
+  }
+  /* Hiệu ứng Shimmer Skeleton màu xanh ngọc nhạt (#0D9488 độ mờ 10%) cho tiến trình AI */
+  .shimmer-ai {
+    background: linear-gradient(
+      90deg,
+      rgb(var(--ai) / 0.06) 0%,
+      rgb(var(--ai) / 0.16) 50%,
+      rgb(var(--ai) / 0.06) 100%
+    );
+    background-size: 200% 100%;
+    animation: ai-shimmer 1.8s ease-in-out infinite;
   }
 }
 

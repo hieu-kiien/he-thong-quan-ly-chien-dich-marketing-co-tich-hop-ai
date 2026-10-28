@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useState } from 'react';
+import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { assistantApi } from '@/lib/api/endpoints';
 import type {
   AiAction,
@@ -27,45 +27,206 @@ const INITIAL_STREAMING_STATE: StreamingState = {
 /** id tạm của tin nhắn lạc quan = Date.now() (> 1e11); id thật trong DB nhỏ hơn rất nhiều. */
 const OPTIMISTIC_ID_MIN = 1e11;
 
+/**
+ * Kho lưu trạng thái stream ở cấp module theo từng threadId.
+ * Giúp luồng SSE tiếp tục chạy ngầm khi người dùng chuyển trang trong ứng dụng (Tổng quan, Chiến dịch...)
+ * hoặc đổi tab trình duyệt mà không bị huỷ kết nối hay rơi vào trạng thái lỗi giả.
+ */
+const streamStateByThread = new Map<number, StreamingState>();
+const controllersByThread = new Map<number, AbortController>();
+const pollingTimersByThread = new Map<number, ReturnType<typeof setInterval>>();
+const stateListeners = new Set<() => void>();
+
+function notifyListeners() {
+  stateListeners.forEach((fn) => fn());
+}
+
+function getThreadStreamState(threadId?: number): StreamingState {
+  if (!threadId) return INITIAL_STREAMING_STATE;
+  return streamStateByThread.get(threadId) ?? INITIAL_STREAMING_STATE;
+}
+
+function updateThreadStreamState(
+  threadId: number,
+  updater: StreamingState | ((prev: StreamingState) => StreamingState),
+) {
+  const prev = getThreadStreamState(threadId);
+  const next = typeof updater === 'function' ? updater(prev) : updater;
+  streamStateByThread.set(threadId, next);
+  notifyListeners();
+}
+
+function stopPollingForThread(threadId: number) {
+  const timer = pollingTimersByThread.get(threadId);
+  if (timer) {
+    clearInterval(timer);
+    pollingTimersByThread.delete(threadId);
+  }
+}
+
+/**
+ * Khi luồng SSE bị ngắt tạm thời do đổi tab trình duyệt / mạng chập chờn hoặc khi quay lại phiên đang STREAMING,
+ * tự động hỏi thăm (poll) CSDL mỗi 1.5s cho tới khi lượt xử lý nền hoàn tất (COMPLETE / ERROR / STOPPED).
+ */
+function startPollingRecovery(threadId: number, queryClient: QueryClient) {
+  if (pollingTimersByThread.has(threadId)) return;
+
+  updateThreadStreamState(threadId, (prev) => ({
+    ...prev,
+    isStreaming: true,
+    phase: prev.phase ?? 'writing',
+    error: null,
+  }));
+
+  let attempts = 0;
+  const maxAttempts = 120; // Tối đa ~3 phút (bằng timeout của lượt AI)
+
+  const pollOnce = async () => {
+    attempts += 1;
+    try {
+      const [messages, actions] = await Promise.all([
+        assistantApi.messages(threadId),
+        assistantApi.listActions({ thread_id: threadId }),
+      ]);
+
+      queryClient.setQueryData<AiMessage[]>(['assistant', 'messages', threadId], messages);
+      queryClient.setQueryData<AiAction[]>(['assistant', 'actions', threadId], actions);
+
+      const lastAssistant = [...messages].reverse().find((m) => m.role === 'ASSISTANT');
+      if (!lastAssistant) {
+        if (attempts >= 5) {
+          stopPollingForThread(threadId);
+          updateThreadStreamState(threadId, INITIAL_STREAMING_STATE);
+        }
+        return;
+      }
+
+      if (lastAssistant.status === 'STREAMING') {
+        updateThreadStreamState(threadId, (prev) => ({
+          ...prev,
+          isStreaming: true,
+          assistantMessageId: lastAssistant.id,
+          phase: lastAssistant.content ? 'writing' : prev.phase ?? 'thinking',
+          accumulatedText: lastAssistant.content || prev.accumulatedText,
+        }));
+        if (attempts >= maxAttempts) {
+          stopPollingForThread(threadId);
+          updateThreadStreamState(threadId, (prev) => ({
+            ...prev,
+            isStreaming: false,
+            phase: null,
+          }));
+        }
+      } else {
+        // Đã hoàn tất (COMPLETE / ERROR / STOPPED)
+        stopPollingForThread(threadId);
+        updateThreadStreamState(threadId, (prev) => ({
+          ...prev,
+          isStreaming: false,
+          phase: null,
+          assistantMessageId: lastAssistant.id,
+          accumulatedText: lastAssistant.content,
+          error:
+            lastAssistant.status === 'ERROR'
+              ? {
+                  code: lastAssistant.error_code || 'AI_INTERNAL',
+                  message: 'Lượt xử lý gặp sự cố. Bạn có thể bấm Tạo lại.',
+                }
+              : null,
+        }));
+        queryClient.invalidateQueries({ queryKey: ['assistant', 'threads'] });
+      }
+    } catch {
+      if (attempts >= maxAttempts) {
+        stopPollingForThread(threadId);
+        updateThreadStreamState(threadId, (prev) => ({
+          ...prev,
+          isStreaming: false,
+          phase: null,
+        }));
+      }
+    }
+  };
+
+  void pollOnce();
+  const timer = setInterval(() => {
+    void pollOnce();
+  }, 1500);
+  pollingTimersByThread.set(threadId, timer);
+}
+
 export function useAssistantStream(threadId?: number) {
   const queryClient = useQueryClient();
-  const [streamingState, setStreamingState] = useState<StreamingState>(INITIAL_STREAMING_STATE);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const activeStreamThreadIdRef = useRef<number | null>(null);
+  const [, setTick] = useState(0);
 
-  // Dọn dẹp khi unmount (huỷ luồng fetch ngầm để tránh rò rỉ)
   useEffect(() => {
+    const listener = () => setTick((t) => t + 1);
+    stateListeners.add(listener);
     return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
+      stateListeners.delete(listener);
     };
   }, []);
 
-  // Huỷ luồng khi người dùng chuyển sang xem một phiên khác (tránh huỷ khi chuyển từ undefined sang newThread.id)
+  const streamingState = getThreadStreamState(threadId);
+
+  // Tự động khôi phục / đồng bộ khi người dùng quay lại tab hoặc mở một phiên đang STREAMING trên máy chủ
   useEffect(() => {
-    if (threadId && activeStreamThreadIdRef.current && threadId !== activeStreamThreadIdRef.current) {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
+    if (!threadId) return;
+
+    const checkAndSyncThread = async () => {
+      // Nếu vẫn đang có kết nối SSE sống trên đúng thread này thì không cần can thiệp
+      if (controllersByThread.has(threadId)) return;
+
+      try {
+        const messages = await assistantApi.messages(threadId);
+        queryClient.setQueryData<AiMessage[]>(['assistant', 'messages', threadId], messages);
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg && lastMsg.role === 'ASSISTANT' && lastMsg.status === 'STREAMING') {
+          startPollingRecovery(threadId, queryClient);
+        } else if (getThreadStreamState(threadId).isStreaming && !pollingTimersByThread.has(threadId)) {
+          updateThreadStreamState(threadId, (prev) => ({
+            ...prev,
+            isStreaming: false,
+            phase: null,
+          }));
+        }
+      } catch {
+        // Bỏ qua lỗi mạng tạm thời khi đồng bộ nền
       }
-      activeStreamThreadIdRef.current = null;
-    }
-  }, [threadId]);
+    };
+
+    void checkAndSyncThread();
+
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      void checkAndSyncThread();
+      queryClient.invalidateQueries({ queryKey: ['assistant', 'actions', threadId] });
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+    };
+  }, [threadId, queryClient]);
 
   /**
    * Dừng lượt sinh hiện tại (Stop button): gọi abort fetch + gọi POST /assistant/threads/{id}/stop.
    */
   const stopStreaming = useCallback(async () => {
-    if (!streamingState.isStreaming) return;
+    if (!threadId) return;
+    const current = getThreadStreamState(threadId);
+    if (!current.isStreaming) return;
 
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
+    const ctrl = controllersByThread.get(threadId);
+    if (ctrl) {
+      ctrl.abort();
+      controllersByThread.delete(threadId);
     }
+    stopPollingForThread(threadId);
 
-    if (threadId && !(import.meta.env.DEV && isSimulatorActive)) {
+    if (!(import.meta.env.DEV && isSimulatorActive)) {
       try {
         await assistantApi.stop(threadId);
       } catch (err) {
@@ -75,21 +236,20 @@ export function useAssistantStream(threadId?: number) {
       }
     }
 
-    setStreamingState((prev) => ({
+    updateThreadStreamState(threadId, (prev) => ({
       ...prev,
       isStreaming: false,
       phase: null,
     }));
 
-    // Cập nhật tin nhắn cuối trong cache sang trạng thái STOPPED nếu có
-    if (threadId && streamingState.assistantMessageId) {
+    if (current.assistantMessageId) {
       queryClient.setQueryData<AiMessage[]>(['assistant', 'messages', threadId], (old = []) => {
         return old.map((msg) =>
-          msg.id === streamingState.assistantMessageId ? { ...msg, status: 'STOPPED' } : msg,
+          msg.id === current.assistantMessageId ? { ...msg, status: 'STOPPED' } : msg,
         );
       });
     }
-  }, [streamingState.isStreaming, streamingState.assistantMessageId, threadId, queryClient]);
+  }, [threadId, queryClient]);
 
   /**
    * Bắt đầu một luồng stream (dùng chung cho gửi mới hoặc tạo lại).
@@ -110,16 +270,18 @@ export function useAssistantStream(threadId?: number) {
         },
       ) => Promise<void>,
     ) => {
-      // Huỷ luồng cũ nếu còn
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
+      // Huỷ kết nối cũ trên cùng thread (nếu có)
+      const existingCtrl = controllersByThread.get(activeThreadId);
+      if (existingCtrl) {
+        existingCtrl.abort();
+        controllersByThread.delete(activeThreadId);
       }
+      stopPollingForThread(activeThreadId);
 
       const controller = new AbortController();
-      abortControllerRef.current = controller;
-      activeStreamThreadIdRef.current = activeThreadId;
+      controllersByThread.set(activeThreadId, controller);
 
-      setStreamingState({
+      updateThreadStreamState(activeThreadId, {
         isStreaming: true,
         phase: 'queued',
         queuePosition: undefined,
@@ -133,15 +295,13 @@ export function useAssistantStream(threadId?: number) {
 
       const callbacks = {
         onMessageStart: (data: { user_message: AiMessage | null; assistant_message: { id: number; status: 'STREAMING' } }) => {
-          setStreamingState((prev) => ({
+          updateThreadStreamState(activeThreadId, (prev) => ({
             ...prev,
             userMessageId: data.user_message?.id,
             assistantMessageId: data.assistant_message.id,
           }));
 
-          // Đồng bộ cache tin nhắn
           queryClient.setQueryData<AiMessage[]>(['assistant', 'messages', activeThreadId], (old = []) => {
-            // Bỏ tin nhắn tạm (id = Date.now()) để thay bằng bản thật từ server — tránh hiện 2 bong bóng
             const userMessage = data.user_message;
             const list = old.filter(
               (m) => !(userMessage && m.id > OPTIMISTIC_ID_MIN && m.role === 'USER' && m.content === userMessage.content),
@@ -170,7 +330,7 @@ export function useAssistantStream(threadId?: number) {
         },
 
         onStatus: (data: { phase: AssistantPhase; queue_position?: number }) => {
-          setStreamingState((prev) => ({
+          updateThreadStreamState(activeThreadId, (prev) => ({
             ...prev,
             phase: data.phase,
             queuePosition: data.queue_position,
@@ -178,12 +338,11 @@ export function useAssistantStream(threadId?: number) {
         },
 
         onText: (data: { content: string }) => {
-          setStreamingState((prev) => ({
+          updateThreadStreamState(activeThreadId, (prev) => ({
             ...prev,
             accumulatedText: data.content,
           }));
 
-          // Cập nhật nội dung tạm vào cache tin nhắn đang stream
           queryClient.setQueryData<AiMessage[]>(['assistant', 'messages', activeThreadId], (old = []) => {
             if (!old) return [];
             return old.map((msg) =>
@@ -193,7 +352,7 @@ export function useAssistantStream(threadId?: number) {
         },
 
         onToolCall: (data: { id: string; name: string; args: Record<string, unknown>; status: ToolCallStatus; summary?: string | null }) => {
-          setStreamingState((prev) => {
+          updateThreadStreamState(activeThreadId, (prev) => {
             const existingIndex = prev.toolCalls.findIndex((t) => t.id === data.id);
             const updatedCalls = [...prev.toolCalls];
             if (existingIndex >= 0) {
@@ -212,7 +371,6 @@ export function useAssistantStream(threadId?: number) {
             };
           });
 
-          // Cập nhật parts_json vào tin nhắn đang stream trong cache
           queryClient.setQueryData<AiMessage[]>(['assistant', 'messages', activeThreadId], (old = []) => {
             if (!old) return [];
             return old.map((msg) => {
@@ -231,12 +389,11 @@ export function useAssistantStream(threadId?: number) {
         },
 
         onAction: (action: AiAction) => {
-          setStreamingState((prev) => ({
+          updateThreadStreamState(activeThreadId, (prev) => ({
             ...prev,
             proposedActions: [...prev.proposedActions, action],
           }));
 
-          // Cập nhật danh sách actions của thread trong React Query
           queryClient.setQueryData<AiAction[]>(['assistant', 'actions', activeThreadId], (old = []) => {
             if (old.some((a) => a.id === action.id)) {
               return old.map((a) => (a.id === action.id ? action : a));
@@ -246,35 +403,36 @@ export function useAssistantStream(threadId?: number) {
         },
 
         onMessageEnd: (data: { message: AiMessage }) => {
-          setStreamingState((prev) => ({
+          controllersByThread.delete(activeThreadId);
+          stopPollingForThread(activeThreadId);
+
+          updateThreadStreamState(activeThreadId, (prev) => ({
             ...prev,
             isStreaming: false,
             phase: null,
             accumulatedText: data.message.content,
           }));
 
-          // Ghi đè tin nhắn hoàn chỉnh đã lưu DB vào cache
           queryClient.setQueryData<AiMessage[]>(['assistant', 'messages', activeThreadId], (old = []) => {
             return old.map((msg) => (msg.id === data.message.id ? data.message : msg));
           });
 
-          // Lấy lại lịch sử từ server: loại bỏ tin nhắn tạm và câu trả lời cũ đã bị thay khi 'Tạo lại'
           queryClient.invalidateQueries({ queryKey: ['assistant', 'messages', activeThreadId] });
-          // Làm mới danh sách phiên để cập nhật last_message_at
           queryClient.invalidateQueries({ queryKey: ['assistant', 'threads'] });
-          // Đồng bộ lại danh sách actions
           queryClient.invalidateQueries({ queryKey: ['assistant', 'actions', activeThreadId] });
         },
 
         onError: (data: { code: string; message: string }) => {
-          setStreamingState((prev) => ({
+          controllersByThread.delete(activeThreadId);
+          stopPollingForThread(activeThreadId);
+
+          updateThreadStreamState(activeThreadId, (prev) => ({
             ...prev,
             isStreaming: false,
             phase: null,
             error: data,
           }));
 
-          // Đánh dấu tin nhắn đang stream thành ERROR trong cache
           queryClient.setQueryData<AiMessage[]>(['assistant', 'messages', activeThreadId], (old = []) => {
             return old.map((msg) =>
               msg.status === 'STREAMING'
@@ -292,12 +450,35 @@ export function useAssistantStream(threadId?: number) {
       try {
         await executeCall(controller, callbacks);
       } catch (err: unknown) {
-        if (!controller.signal.aborted) {
-          const errObj = err as { code?: string; message?: string };
-          callbacks.onError({
-            code: errObj.code || 'AI_INTERNAL',
-            message: errObj.message || 'Đã xảy ra lỗi trong quá trình xử lý luồng.',
-          });
+        controllersByThread.delete(activeThreadId);
+        if (controller.signal.aborted) {
+          return;
+        }
+        const errObj = err as {
+          code?: string;
+          message?: string;
+          interruptedAfterStart?: boolean;
+        };
+
+        // Nếu kết nối SSE bị ngắt sau khi lượt chạy đã bắt đầu trên máy chủ (vd: đổi tab trình duyệt, mạng chập chờn)
+        // hoặc phiên đang bận xử lý nền (THREAD_BUSY), chuyển sang chế độ đồng bộ nền (polling) thay vì báo lỗi!
+        if (
+          errObj.interruptedAfterStart ||
+          errObj.code === 'STREAM_INTERRUPTED' ||
+          errObj.code === 'THREAD_BUSY' ||
+          Boolean(getThreadStreamState(activeThreadId).assistantMessageId)
+        ) {
+          startPollingRecovery(activeThreadId, queryClient);
+          return;
+        }
+
+        callbacks.onError({
+          code: errObj.code || 'AI_INTERNAL',
+          message: errObj.message || 'Đã xảy ra lỗi trong quá trình xử lý luồng.',
+        });
+      } finally {
+        if (controllersByThread.get(activeThreadId) === controller) {
+          controllersByThread.delete(activeThreadId);
         }
       }
     },
@@ -314,7 +495,6 @@ export function useAssistantStream(threadId?: number) {
 
       const trimmed = content.trim();
 
-      // Thêm ngay tin nhắn người dùng tạm thời vào giao diện
       const optimisticUserMsg: AiMessage = {
         id: Date.now(),
         thread_id: activeId,
@@ -351,6 +531,14 @@ export function useAssistantStream(threadId?: number) {
     async (messageId: number) => {
       if (!threadId) return;
 
+      // Xoá tạm bong bóng lỗi/cũ và các đề xuất chưa thực thi gắn với messageId trên UI ngay khi bấm Tạo lại
+      queryClient.setQueryData<AiMessage[]>(['assistant', 'messages', threadId], (old = []) =>
+        old.filter((m) => m.id !== messageId),
+      );
+      queryClient.setQueryData<AiAction[]>(['assistant', 'actions', threadId], (old = []) =>
+        old.filter((a) => !(a.message_id === messageId && a.status !== 'EXECUTED')),
+      );
+
       await executeStream(threadId, (controller, callbacks) => {
         if (import.meta.env.DEV && isSimulatorActive) {
           return simulateAssistantStream(threadId, 'Tạo lại câu trả lời', callbacks, controller.signal);
@@ -358,7 +546,7 @@ export function useAssistantStream(threadId?: number) {
         return streamRegenerateMessage(messageId, callbacks, controller.signal);
       });
     },
-    [threadId, executeStream],
+    [threadId, executeStream, queryClient],
   );
 
   return {

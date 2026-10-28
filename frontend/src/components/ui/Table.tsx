@@ -17,7 +17,11 @@ export function Table({ className, children, label }: { className?: string; chil
 }
 
 export function THead({ children }: { children: ReactNode }) {
-  return <thead className="border-b border-border bg-subtle/60 text-xs font-medium text-fg-muted">{children}</thead>;
+  return (
+    <thead className="sticky top-0 z-10 border-b border-border bg-subtle/80 text-xs font-medium text-fg-muted backdrop-blur-xs">
+      {children}
+    </thead>
+  );
 }
 
 export function TBody({ children }: { children: ReactNode }) {
@@ -25,7 +29,7 @@ export function TBody({ children }: { children: ReactNode }) {
 }
 
 export function TR({ className, ...rest }: HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className={cn('transition-colors hover:bg-subtle/50', className)} {...rest} />;
+  return <tr className={cn('h-11 transition-colors hover:bg-subtle', className)} {...rest} />;
 }
 
 export function TH({ className, align, ...rest }: ThHTMLAttributes<HTMLTableCellElement> & { align?: 'left' | 'right' | 'center' }) {
@@ -33,7 +37,7 @@ export function TH({ className, align, ...rest }: ThHTMLAttributes<HTMLTableCell
     <th
       scope="col"
       className={cn(
-        'whitespace-nowrap px-3 py-2.5 font-medium',
+        'whitespace-nowrap px-3.5 py-2.5 font-medium text-fg-muted',
         align === 'right' && 'text-right',
         align === 'center' && 'text-center',
         className,
@@ -47,7 +51,7 @@ export function TD({ className, align, ...rest }: TdHTMLAttributes<HTMLTableCell
   return (
     <td
       className={cn(
-        'px-3 py-2.5 align-middle text-fg',
+        'px-3.5 py-2.5 align-middle text-fg tabular-nums',
         align === 'right' && 'text-right tabular',
         align === 'center' && 'text-center',
         className,

@@ -5,6 +5,8 @@ import {
   Calendar,
   Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   ExternalLink,
   Layers,
   Megaphone,
@@ -16,6 +18,7 @@ import { formatDate, formatMoney, formatRelative, fromDateTimeLocal, toDateTimeL
 import {
   AI_ACTION_STATUS_LABEL,
   AI_ACTION_STATUS_TONE,
+  CAMPAIGN_STATUS_LABEL,
   CHANNEL_LABEL,
   CONTENT_TYPE_LABEL,
   GOAL_LABEL,
@@ -23,6 +26,7 @@ import {
 import type {
   AiAction,
   CampaignGoal,
+  CampaignStatus,
   ChannelCode,
   ContentType,
 } from '@/lib/types';
@@ -298,24 +302,29 @@ function ActionCardDrafts({
 
       {/* Nút hành động Xác nhận / Bỏ qua */}
       {isProposed && (
-        <div className="mt-4 flex items-center justify-end gap-2 border-t border-border/70 pt-3">
-          <Button
-            size="sm"
-            variant="secondary"
-            loading={isSubmitting}
-            onClick={handleReject}
-          >
-            Bỏ qua
-          </Button>
-          <Button
-            size="sm"
-            variant="primary"
-            loading={isSubmitting}
-            onClick={handleConfirm}
-          >
-            <Check className="mr-1 h-3.5 w-3.5" aria-hidden />
-            Xác nhận
-          </Button>
+        <div className="mt-4 border-t border-border/70 pt-3">
+          <p className="mb-2.5 text-[11px] leading-relaxed text-fg-subtle">
+            Chỉnh sửa chỉ áp dụng trên bản nháp khi bạn bấm <strong className="font-medium text-fg-muted">Xác nhận</strong>. Bạn có thể sửa trực tiếp các ô trên hoặc hoàn tác bất kỳ lúc nào.
+          </p>
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={isSubmitting}
+              onClick={handleReject}
+            >
+              Bỏ qua
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              loading={isSubmitting}
+              onClick={handleConfirm}
+            >
+              <Check className="mr-1 h-3.5 w-3.5" aria-hidden />
+              Áp dụng gợi ý
+            </Button>
+          </div>
         </div>
       )}
     </div>
@@ -323,7 +332,7 @@ function ActionCardDrafts({
 }
 
 /**
- * Thẻ hiển thị đề xuất tạo chiến dịch mới: propose_campaign
+ * Thẻ hiển thị đề xuất tạo mới hoặc cập nhật chiến dịch: propose_campaign / propose_campaign_update
  */
 function ActionCardCampaign({
   action,
@@ -339,25 +348,38 @@ function ActionCardCampaign({
   const original = {
     name: args.name == null ? '' : String(args.name),
     goal: args.goal == null ? '' : String(args.goal),
+    status: args.status == null ? '' : String(args.status),
     objective: args.objective == null ? '' : String(args.objective),
     target_audience: args.target_audience == null ? '' : String(args.target_audience),
     product: args.product == null ? '' : String(args.product),
+    key_message: args.key_message == null ? '' : String(args.key_message),
     start_date: args.start_date == null ? '' : String(args.start_date),
     end_date: args.end_date == null ? '' : String(args.end_date),
     budget: args.budget == null ? '' : String(args.budget),
   };
+
   const [form, setForm] = useState({
     ...original,
     goal: (original.goal || (isUpdate ? '' : 'AWARENESS')) as CampaignGoal | '',
+    status: (original.status || '') as CampaignStatus | '',
   });
-
+  const [showUnchanged, setShowUnchanged] = useState(!isUpdate);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const hasProposedValue = (key: keyof typeof original) => original[key] !== '';
+  const proposedFieldCount = (Object.keys(original) as (keyof typeof original)[]).filter(hasProposedValue).length;
+  // Nếu vì lý do nào đó isUpdate không có trường đơn lẻ nào (vd chỉ đổi channels), hoặc người dùng mở rộng
+  const shouldShowField = (key: keyof typeof original) =>
+    !isUpdate || showUnchanged || hasProposedValue(key) || proposedFieldCount === 0;
+
+  const proposedChannels = Array.isArray(args.channels)
+    ? (args.channels as Array<{ code?: string; channel_code?: string; planned_budget?: number }>)
+    : [];
 
   const handleConfirm = async () => {
     setIsSubmitting(true);
     try {
       // Chỉ gửi các trường người dùng đã SỬA so với đề xuất; phần còn lại backend lấy từ đề xuất gốc
-      // (tránh ghi đè bằng giá trị rỗng/mặc định, nhất là khi sửa chiến dịch có sẵn).
       const override: Record<string, unknown> = {};
       (Object.keys(original) as (keyof typeof original)[]).forEach((key) => {
         if (String(form[key]) === original[key]) return;
@@ -382,7 +404,10 @@ function ActionCardCampaign({
     }
   };
 
-  const createdCampaignId = (action.result_json?.campaign_id as number) || (action.result_json?.id as number);
+  const createdCampaignId =
+    (action.result_json?.campaign_id as number) ||
+    (action.result_json?.id as number) ||
+    (args.campaign_id as number | undefined);
 
   return (
     <div
@@ -400,8 +425,13 @@ function ActionCardCampaign({
               {action.summary || (isUpdate ? 'Đề xuất chỉnh sửa chiến dịch' : 'Đề xuất tạo chiến dịch mới')}
             </h3>
           </div>
-          <div className="mt-1 text-[11px] text-fg-subtle">
-            Tạo lúc {formatRelative(action.created_at)}
+          <div className="mt-1 flex items-center gap-2 text-[11px] text-fg-subtle">
+            <span>Tạo lúc {formatRelative(action.created_at)}</span>
+            {isUpdate && args.campaign_id != null && (
+              <span className="rounded bg-subtle px-1.5 py-0.5 font-mono text-[10px] font-medium text-fg-muted">
+                Chiến dịch #{String(args.campaign_id)}
+              </span>
+            )}
           </div>
         </div>
 
@@ -413,95 +443,266 @@ function ActionCardCampaign({
       <div className="mt-3 space-y-2.5 text-xs">
         {isProposed ? (
           <>
-            <div>
-              <label className="mb-1 block text-[11px] font-medium text-fg-subtle">
-                Tên chiến dịch
-              </label>
-              <Input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="text-xs"
-              />
-            </div>
+            {shouldShowField('name') && (
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="text-[11px] font-medium text-fg-subtle">Tên chiến dịch</label>
+                  {isUpdate && hasProposedValue('name') && (
+                    <span className="text-[10px] font-medium text-ai">Đề xuất đổi</span>
+                  )}
+                </div>
+                <Input
+                  value={form.name}
+                  placeholder={isUpdate ? '(giữ nguyên tên hiện tại)' : 'Nhập tên chiến dịch...'}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  className="text-xs"
+                />
+              </div>
+            )}
 
-            <div className="grid grid-cols-2 gap-2">
+            {(shouldShowField('goal') || shouldShowField('budget')) && (
+              <div className="grid grid-cols-2 gap-2">
+                {shouldShowField('goal') && (
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium text-fg-subtle">
+                      Mục tiêu tổng quát
+                    </label>
+                    <Select
+                      value={form.goal}
+                      onChange={(e) => setForm({ ...form, goal: e.target.value as CampaignGoal | '' })}
+                      options={[
+                        ...(isUpdate ? [{ value: '', label: '(giữ nguyên)' }] : []),
+                        { value: 'AWARENESS', label: GOAL_LABEL.AWARENESS },
+                        { value: 'TRAFFIC', label: GOAL_LABEL.TRAFFIC },
+                        { value: 'LEADS', label: GOAL_LABEL.LEADS },
+                        { value: 'SALES', label: GOAL_LABEL.SALES },
+                      ]}
+                      className="text-xs"
+                    />
+                  </div>
+                )}
+
+                {shouldShowField('budget') && (
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium text-fg-subtle">
+                      Ngân sách (VND)
+                    </label>
+                    <Input
+                      type="number"
+                      value={form.budget}
+                      placeholder={isUpdate ? '(giữ nguyên)' : undefined}
+                      onChange={(e) => setForm({ ...form, budget: e.target.value })}
+                      className="text-xs tabular-nums"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isUpdate && shouldShowField('status') && (
               <div>
                 <label className="mb-1 block text-[11px] font-medium text-fg-subtle">
-                  Mục tiêu
+                  Trạng thái chiến dịch
                 </label>
                 <Select
-                  value={form.goal}
-                  onChange={(e) => setForm({ ...form, goal: e.target.value as CampaignGoal | '' })}
+                  value={form.status}
+                  onChange={(e) => setForm({ ...form, status: e.target.value as CampaignStatus | '' })}
                   options={[
-                    ...(isUpdate ? [{ value: '', label: '(giữ nguyên)' }] : []),
-                    { value: 'AWARENESS', label: GOAL_LABEL.AWARENESS },
-                    { value: 'TRAFFIC', label: GOAL_LABEL.TRAFFIC },
-                    { value: 'LEADS', label: GOAL_LABEL.LEADS },
-                    { value: 'SALES', label: GOAL_LABEL.SALES },
+                    { value: '', label: '(giữ nguyên)' },
+                    { value: 'PLANNED', label: CAMPAIGN_STATUS_LABEL.PLANNED },
+                    { value: 'ACTIVE', label: CAMPAIGN_STATUS_LABEL.ACTIVE },
+                    { value: 'PAUSED', label: CAMPAIGN_STATUS_LABEL.PAUSED },
+                    { value: 'COMPLETED', label: CAMPAIGN_STATUS_LABEL.COMPLETED },
+                    { value: 'CANCELLED', label: CAMPAIGN_STATUS_LABEL.CANCELLED },
                   ]}
                   className="text-xs"
                 />
               </div>
+            )}
 
+            {shouldShowField('product') && (
               <div>
-                <label className="mb-1 block text-[11px] font-medium text-fg-subtle">
-                  Ngân sách (VND)
-                </label>
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="text-[11px] font-medium text-fg-subtle">Sản phẩm / Dịch vụ</label>
+                  {isUpdate && hasProposedValue('product') && (
+                    <span className="text-[10px] font-medium text-ai">Đề xuất đổi</span>
+                  )}
+                </div>
                 <Input
-                  type="number"
-                  value={form.budget}
-                  placeholder={isUpdate ? '(giữ nguyên)' : undefined}
-                  onChange={(e) => setForm({ ...form, budget: e.target.value })}
+                  value={form.product}
+                  placeholder={isUpdate ? '(giữ nguyên)' : 'Tên sản phẩm hoặc dịch vụ...'}
+                  onChange={(e) => setForm({ ...form, product: e.target.value })}
                   className="text-xs"
                 />
               </div>
-            </div>
+            )}
 
-            <div>
-              <label className="mb-1 block text-[11px] font-medium text-fg-subtle">
-                Sản phẩm / Dịch vụ
-              </label>
-              <Input
-                value={form.product}
-                onChange={(e) => setForm({ ...form, product: e.target.value })}
-                className="text-xs"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
+            {shouldShowField('key_message') && (
               <div>
-                <label className="mb-1 block text-[11px] font-medium text-fg-subtle">
-                  Ngày bắt đầu
-                </label>
-                <Input
-                  type="date"
-                  value={form.start_date}
-                  onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="text-[11px] font-medium text-fg-subtle">Thông điệp chính (Key Message)</label>
+                  {isUpdate && hasProposedValue('key_message') && (
+                    <span className="text-[10px] font-medium text-ai">Đề xuất đổi</span>
+                  )}
+                </div>
+                <Textarea
+                  rows={2}
+                  value={form.key_message}
+                  placeholder={isUpdate ? '(giữ nguyên thông điệp hiện tại)' : 'Thông điệp xuyên suốt chiến dịch...'}
+                  onChange={(e) => setForm({ ...form, key_message: e.target.value })}
                   className="text-xs"
                 />
               </div>
+            )}
+
+            {shouldShowField('target_audience') && (
               <div>
-                <label className="mb-1 block text-[11px] font-medium text-fg-subtle">
-                  Ngày kết thúc
-                </label>
-                <Input
-                  type="date"
-                  value={form.end_date}
-                  onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="text-[11px] font-medium text-fg-subtle">Đối tượng mục tiêu</label>
+                  {isUpdate && hasProposedValue('target_audience') && (
+                    <span className="text-[10px] font-medium text-ai">Đề xuất đổi</span>
+                  )}
+                </div>
+                <Textarea
+                  rows={3}
+                  value={form.target_audience}
+                  placeholder={isUpdate ? '(giữ nguyên đối tượng hiện tại)' : 'Chân dung khách hàng mục tiêu...'}
+                  onChange={(e) => setForm({ ...form, target_audience: e.target.value })}
                   className="text-xs"
                 />
               </div>
-            </div>
+            )}
+
+            {shouldShowField('objective') && (
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="text-[11px] font-medium text-fg-subtle">Mục tiêu chi tiết (KPI)</label>
+                  {isUpdate && hasProposedValue('objective') && (
+                    <span className="text-[10px] font-medium text-ai">Đề xuất đổi</span>
+                  )}
+                </div>
+                <Textarea
+                  rows={2}
+                  value={form.objective}
+                  placeholder={isUpdate ? '(giữ nguyên mục tiêu chi tiết)' : 'KPI cụ thể cần đạt...'}
+                  onChange={(e) => setForm({ ...form, objective: e.target.value })}
+                  className="text-xs"
+                />
+              </div>
+            )}
+
+            {(shouldShowField('start_date') || shouldShowField('end_date')) && (
+              <div className="grid grid-cols-2 gap-2">
+                {shouldShowField('start_date') && (
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium text-fg-subtle">
+                      Ngày bắt đầu
+                    </label>
+                    <Input
+                      type="date"
+                      value={form.start_date}
+                      onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+                      className="text-xs tabular-nums"
+                    />
+                  </div>
+                )}
+                {shouldShowField('end_date') && (
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium text-fg-subtle">
+                      Ngày kết thúc
+                    </label>
+                    <Input
+                      type="date"
+                      value={form.end_date}
+                      onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+                      className="text-xs tabular-nums"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {proposedChannels.length > 0 && (
+              <div className="rounded-md border border-border/80 bg-subtle/40 p-2.5">
+                <div className="mb-1.5 text-[11px] font-medium text-fg-subtle">
+                  Phân bổ kênh tiếp thị đề xuất
+                </div>
+                <div className="space-y-1">
+                  {proposedChannels.map((ch, idx) => {
+                    const code = (ch.code || ch.channel_code || '') as ChannelCode;
+                    return (
+                      <div key={idx} className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-fg">{CHANNEL_LABEL[code] || code}</span>
+                        <span className="font-mono text-fg-muted tabular-nums">
+                          {ch.planned_budget != null ? formatMoney(Number(ch.planned_budget)) : '—'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {isUpdate && proposedFieldCount > 0 && proposedFieldCount < Object.keys(original).length && (
+              <button
+                type="button"
+                onClick={() => setShowUnchanged((v) => !v)}
+                className="inline-flex items-center gap-1 pt-1 text-[11px] font-medium text-accent hover:underline"
+              >
+                {showUnchanged ? (
+                  <>
+                    <ChevronUp className="h-3.5 w-3.5" aria-hidden />
+                    <span>Thu gọn các trường đang giữ nguyên</span>
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+                    <span>Chỉnh sửa thêm các trường khác (đang giữ nguyên)</span>
+                  </>
+                )}
+              </button>
+            )}
           </>
         ) : (
-          <div className="space-y-1.5 text-xs text-fg">
-            <div className="font-semibold">{form.name}</div>
-            <div className="text-fg-muted">
-              Mục tiêu: {form.goal ? GOAL_LABEL[form.goal] : '—'} • Ngân sách: {form.budget === '' ? '—' : formatMoney(Number(form.budget))}
-            </div>
-            <div className="text-[11px] text-fg-subtle">
-              Thời gian: {form.start_date ? formatDate(form.start_date) : '—'} - {form.end_date ? formatDate(form.end_date) : '—'}
-            </div>
+          <div className="space-y-2 text-xs text-fg">
+            {form.name && <div className="font-semibold text-fg">{form.name}</div>}
+            {(form.goal || form.budget !== '' || form.status) && (
+              <div className="text-fg-muted">
+                {form.goal ? `Mục tiêu: ${GOAL_LABEL[form.goal]}` : ''}
+                {form.goal && form.budget !== '' ? ' • ' : ''}
+                {form.budget !== '' ? `Ngân sách: ${formatMoney(Number(form.budget))}` : ''}
+                {form.status ? ` • Trạng thái: ${CAMPAIGN_STATUS_LABEL[form.status] || form.status}` : ''}
+              </div>
+            )}
+            {form.product && (
+              <div className="text-fg-muted">
+                <span className="font-medium text-fg-subtle">Sản phẩm:</span> {form.product}
+              </div>
+            )}
+            {form.key_message && (
+              <div className="rounded bg-subtle/60 p-2 text-fg-muted">
+                <span className="block text-[11px] font-medium text-fg-subtle">Thông điệp chính:</span>
+                {form.key_message}
+              </div>
+            )}
+            {form.target_audience && (
+              <div className="rounded bg-subtle/60 p-2 text-fg-muted">
+                <span className="block text-[11px] font-medium text-fg-subtle">Đối tượng mục tiêu:</span>
+                {form.target_audience}
+              </div>
+            )}
+            {form.objective && (
+              <div className="rounded bg-subtle/60 p-2 text-fg-muted">
+                <span className="block text-[11px] font-medium text-fg-subtle">Mục tiêu chi tiết:</span>
+                {form.objective}
+              </div>
+            )}
+            {(form.start_date || form.end_date) && (
+              <div className="text-[11px] text-fg-subtle tabular-nums">
+                Thời gian: {form.start_date ? formatDate(form.start_date) : '—'} -{' '}
+                {form.end_date ? formatDate(form.end_date) : '—'}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -533,14 +734,19 @@ function ActionCardCampaign({
       )}
 
       {isProposed && (
-        <div className="mt-4 flex items-center justify-end gap-2 border-t border-border/70 pt-3">
-          <Button size="sm" variant="secondary" loading={isSubmitting} onClick={handleReject}>
-            Bỏ qua
-          </Button>
-          <Button size="sm" variant="primary" loading={isSubmitting} onClick={handleConfirm}>
-            <Check className="mr-1 h-3.5 w-3.5" aria-hidden />
-            Xác nhận
-          </Button>
+        <div className="mt-4 border-t border-border/70 pt-3">
+          <p className="mb-2.5 text-[11px] leading-relaxed text-fg-subtle">
+            Chỉnh sửa chỉ áp dụng khi bạn bấm <strong className="font-medium text-fg-muted">Áp dụng gợi ý</strong>. Các trường giữ nguyên sẽ không bị ghi đè.
+          </p>
+          <div className="flex items-center justify-end gap-2">
+            <Button size="sm" variant="secondary" loading={isSubmitting} onClick={handleReject}>
+              Bỏ qua
+            </Button>
+            <Button size="sm" variant="primary" loading={isSubmitting} onClick={handleConfirm}>
+              <Check className="mr-1 h-3.5 w-3.5" aria-hidden />
+              Áp dụng gợi ý
+            </Button>
+          </div>
         </div>
       )}
     </div>
@@ -664,14 +870,19 @@ function ActionCardSchedule({
       )}
 
       {isProposed && (
-        <div className="mt-4 flex items-center justify-end gap-2 border-t border-border/70 pt-3">
-          <Button size="sm" variant="secondary" loading={isSubmitting} onClick={handleReject}>
-            Bỏ qua
-          </Button>
-          <Button size="sm" variant="primary" loading={isSubmitting} onClick={handleConfirm}>
-            <Check className="mr-1 h-3.5 w-3.5" aria-hidden />
-            Xác nhận
-          </Button>
+        <div className="mt-4 border-t border-border/70 pt-3">
+          <p className="mb-2.5 text-[11px] leading-relaxed text-fg-subtle">
+            Chỉnh sửa chỉ áp dụng khi bạn bấm <strong className="font-medium text-fg-muted">Áp dụng gợi ý</strong>. Bạn có thể huỷ lịch bất kỳ lúc nào.
+          </p>
+          <div className="flex items-center justify-end gap-2">
+            <Button size="sm" variant="secondary" loading={isSubmitting} onClick={handleReject}>
+              Bỏ qua
+            </Button>
+            <Button size="sm" variant="primary" loading={isSubmitting} onClick={handleConfirm}>
+              <Check className="mr-1 h-3.5 w-3.5" aria-hidden />
+              Áp dụng gợi ý
+            </Button>
+          </div>
         </div>
       )}
     </div>
@@ -826,14 +1037,19 @@ function ActionCardMetrics({
       )}
 
       {isProposed && (
-        <div className="mt-4 flex items-center justify-end gap-2 border-t border-border/70 pt-3">
-          <Button size="sm" variant="secondary" loading={isSubmitting} onClick={handleReject}>
-            Bỏ qua
-          </Button>
-          <Button size="sm" variant="primary" loading={isSubmitting} onClick={handleConfirm}>
-            <Check className="mr-1 h-3.5 w-3.5" aria-hidden />
-            Xác nhận
-          </Button>
+        <div className="mt-4 border-t border-border/70 pt-3">
+          <p className="mb-2.5 text-[11px] leading-relaxed text-fg-subtle">
+            Chỉnh sửa chỉ áp dụng khi bạn bấm <strong className="font-medium text-fg-muted">Áp dụng gợi ý</strong>. Bạn có thể huỷ lịch bất kỳ lúc nào.
+          </p>
+          <div className="flex items-center justify-end gap-2">
+            <Button size="sm" variant="secondary" loading={isSubmitting} onClick={handleReject}>
+              Bỏ qua
+            </Button>
+            <Button size="sm" variant="primary" loading={isSubmitting} onClick={handleConfirm}>
+              <Check className="mr-1 h-3.5 w-3.5" aria-hidden />
+              Áp dụng gợi ý
+            </Button>
+          </div>
         </div>
       )}
     </div>
@@ -900,14 +1116,19 @@ function ActionCardGeneric({
       </div>
 
       {isProposed && (
-        <div className="mt-4 flex items-center justify-end gap-2 border-t border-border/70 pt-3">
-          <Button size="sm" variant="secondary" loading={isSubmitting} onClick={handleReject}>
-            Bỏ qua
-          </Button>
-          <Button size="sm" variant="primary" loading={isSubmitting} onClick={handleConfirm}>
-            <Check className="mr-1 h-3.5 w-3.5" aria-hidden />
-            Xác nhận
-          </Button>
+        <div className="mt-4 border-t border-border/70 pt-3">
+          <p className="mb-2.5 text-[11px] leading-relaxed text-fg-subtle">
+            Chỉnh sửa chỉ áp dụng khi bạn bấm <strong className="font-medium text-fg-muted">Áp dụng gợi ý</strong>. Bạn có thể huỷ lịch bất kỳ lúc nào.
+          </p>
+          <div className="flex items-center justify-end gap-2">
+            <Button size="sm" variant="secondary" loading={isSubmitting} onClick={handleReject}>
+              Bỏ qua
+            </Button>
+            <Button size="sm" variant="primary" loading={isSubmitting} onClick={handleConfirm}>
+              <Check className="mr-1 h-3.5 w-3.5" aria-hidden />
+              Áp dụng gợi ý
+            </Button>
+          </div>
         </div>
       )}
     </div>

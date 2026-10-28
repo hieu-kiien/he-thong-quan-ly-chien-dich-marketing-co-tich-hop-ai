@@ -8,12 +8,15 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["'Be Vietnam Pro'", 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        sans: ["'Be Vietnam Pro'", "'Plus Jakarta Sans'", 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        body: ["'Plus Jakarta Sans'", "'Be Vietnam Pro'", 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        mono: ["'JetBrains Mono'", 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
       colors: {
-        // Màu ngữ nghĩa, giá trị nằm trong src/index.css (sáng/tối).
+        // Màu ngữ nghĩa theo Design System "Soft Daylight", giá trị nằm trong src/index.css (sáng/tối).
         canvas: token('canvas'),
         surface: token('surface'),
+        'ai-panel': token('ai-panel'),
         subtle: token('subtle'),
         muted: token('muted'),
         border: token('border'),
@@ -27,6 +30,13 @@ export default {
           fg: token('accent-fg'),
           soft: token('accent-soft'),
           'soft-fg': token('accent-soft-fg'),
+        },
+        ai: {
+          DEFAULT: token('ai'),
+          hover: token('ai-hover'),
+          fg: token('ai-fg'),
+          soft: token('ai-soft'),
+          'soft-fg': token('ai-soft-fg'),
         },
         danger: { DEFAULT: token('danger'), soft: token('danger-soft'), 'soft-fg': token('danger-soft-fg') },
         warning: { DEFAULT: token('warning'), soft: token('warning-soft'), 'soft-fg': token('warning-soft-fg') },

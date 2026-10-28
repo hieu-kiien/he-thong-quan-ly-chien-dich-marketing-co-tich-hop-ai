@@ -13,8 +13,8 @@ from sqlalchemy.orm import Session
 
 from app.assistant import chat_service
 from app.assistant.runner_client import FakeRunner
-from app.models import AiMessage, AiThread, Campaign
-from app.models.enums import AiMessageRole, AiMessageStatus
+from app.models import AiAction, AiMessage, AiThread, Campaign
+from app.models.enums import AiActionStatus, AiMessageRole, AiMessageStatus
 
 
 @pytest.fixture
@@ -429,4 +429,58 @@ def test_sse_realtime_text_delta_and_phase_progression(
     db.expire_all()
     msgs = db.query(AiMessage).filter(AiMessage.thread_id == thread_id).order_by(AiMessage.id).all()
     assert msgs[-1].content == "Xin chào bạn!\n\nĐây là bước 2."
+
+
+def test_regenerate_replaces_message_with_unexecuted_proposed_action(
+    client: TestClient,
+    marketer1_user,
+    marketer1_headers: dict[str, str],
+    fake_runner_fixture: FakeRunner,
+    db: Session,
+):
+    """Khi tạo lại câu trả lời có đề xuất chưa xác nhận (PROPOSED), xoá đề xuất cũ và không nhân đôi bong bóng."""
+    thread_id = client.post("/api/v1/assistant/threads", json={}, headers=marketer1_headers).json()["id"]
+    user_msg = AiMessage(
+        thread_id=thread_id,
+        role=AiMessageRole.USER,
+        content="Cập nhật thông điệp chiến dịch",
+        status=AiMessageStatus.COMPLETE,
+    )
+    asst_msg = AiMessage(
+        thread_id=thread_id,
+        role=AiMessageRole.ASSISTANT,
+        content="Câu trả lời bị lỗi suy luận",
+        status=AiMessageStatus.COMPLETE,
+    )
+    db.add_all([user_msg, asst_msg])
+    db.commit()
+
+    proposed_action = AiAction(
+        thread_id=thread_id,
+        message_id=asst_msg.id,
+        user_id=marketer1_user.id,
+        tool="propose_campaign_update",
+        args_json={"campaign_id": 1, "key_message": "Thông điệp mới"},
+        summary="Đề xuất cập nhật chiến dịch #1",
+        status=AiActionStatus.PROPOSED,
+    )
+    db.add(proposed_action)
+    db.commit()
+    old_asst_id = asst_msg.id
+    old_action_id = proposed_action.id
+
+    fake_runner_fixture.set_events([
+        {"type": "text", "text": "Tôi đã tạo lại đề xuất chuẩn xác cho bạn."},
+        {"type": "done", "model": "m", "latency_ms": 100},
+    ])
+    resp = client.post(f"/api/v1/assistant/messages/{old_asst_id}/regenerate", headers=marketer1_headers)
+    assert resp.status_code == 200
+
+    db.expire_all()
+    msgs = db.query(AiMessage).filter(AiMessage.thread_id == thread_id).order_by(AiMessage.id).all()
+    assert [m.role for m in msgs] == [AiMessageRole.USER, AiMessageRole.ASSISTANT]
+    assert msgs[1].id != old_asst_id
+    assert msgs[1].content == "Tôi đã tạo lại đề xuất chuẩn xác cho bạn."
+    assert db.get(AiAction, old_action_id) is None
+
 

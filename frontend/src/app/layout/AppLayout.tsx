@@ -1,11 +1,13 @@
 import { Outlet, useLocation } from 'react-router-dom';
+import { CopilotDrawer } from '@/features/assistant/CopilotDrawer';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 
 /**
- * Khung ứng dụng: Sidebar trái + Topbar + vùng nội dung.
- * Vùng <main> không có padding: trang thường dùng <PageContainer>, còn /assistant
- * dùng toàn bộ chiều cao/chiều rộng với bố cục 3 cột riêng (`h-full`).
+ * Khung ứng dụng: Bố cục 3 Cột Linh Hoạt (Collapsible Split-Pane):
+ * 1. Cột trái: Sidebar điều hướng (240px <-> 64px).
+ * 2. Khu vực trung tâm: Main Workspace.
+ * 3. Cột phải: Contextual AI Copilot Drawer (380px - 410px, phím tắt Ctrl + K / Cmd + J).
  */
 export function AppLayout() {
   const location = useLocation();
@@ -21,13 +23,16 @@ export function AppLayout() {
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
-        <main
-          id="main"
-          tabIndex={-1}
-          className={fullBleed ? 'min-h-0 flex-1 overflow-hidden' : 'min-h-0 flex-1 overflow-y-auto focus:outline-none'}
-        >
-          <Outlet />
-        </main>
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <main
+            id="main"
+            tabIndex={-1}
+            className={fullBleed ? 'min-h-0 flex-1 overflow-hidden' : 'min-h-0 flex-1 overflow-y-auto focus:outline-none'}
+          >
+            <Outlet />
+          </main>
+          <CopilotDrawer />
+        </div>
       </div>
     </div>
   );

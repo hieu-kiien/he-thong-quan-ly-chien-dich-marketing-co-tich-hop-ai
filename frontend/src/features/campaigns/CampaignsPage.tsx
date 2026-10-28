@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Filter, Trash2, Edit3, Eye, AlertCircle } from 'lucide-react';
+import { Plus, Filter, Trash2, Edit3, Eye, AlertCircle, Sparkles } from 'lucide-react';
 import { PageContainer } from '@/app/layout/PageContainer';
+import { openContextualCopilot } from '@/features/assistant/CopilotDrawer';
 import {
   Button,
   IconButton,
@@ -148,7 +149,7 @@ export default function CampaignsPage() {
         actions={
           <Button variant="primary" onClick={() => navigate('/campaigns/new')}>
             <Plus className="h-4 w-4" />
-            Tạo chiến dịch
+            Tạo chiến dịch mới
           </Button>
         }
       />
@@ -395,6 +396,24 @@ export default function CampaignsPage() {
                       </TD>
                       <TD className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openContextualCopilot({
+                                campaignId: item.id,
+                                campaignName: item.name,
+                                prompt:
+                                  spentPct > 85
+                                    ? `Phân tích nguyên nhân chiến dịch "${item.name}" đã dùng ${spentPct}% ngân sách và gợi ý phương án tối ưu.`
+                                    : `Gợi ý tối ưu thông điệp, phân bổ kênh và bài viết cho chiến dịch "${item.name}".`,
+                              })
+                            }
+                            className="mr-1 inline-flex items-center gap-1 rounded-md border border-ai/30 bg-ai-soft px-2 py-1 text-[11px] font-medium text-ai-soft-fg transition-colors hover:bg-ai hover:text-ai-fg"
+                            title="Mở khung Trợ lý AI cho chiến dịch này"
+                          >
+                            <Sparkles className="h-3 w-3" aria-hidden />
+                            <span>{spentPct > 85 ? 'Phân tích AI' : 'Tối ưu bằng AI'}</span>
+                          </button>
                           <IconButton
                             label="Xem chi tiết"
                             size="sm"

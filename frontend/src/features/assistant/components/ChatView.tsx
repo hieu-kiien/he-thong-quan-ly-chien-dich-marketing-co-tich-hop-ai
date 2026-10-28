@@ -7,7 +7,6 @@ import {
 import {
   ArrowDown,
   Bot,
-  Loader2,
   Sparkles,
 } from 'lucide-react';
 import type { AiMessage, AssistantPhase } from '@/lib/types';
@@ -171,13 +170,13 @@ export function ChatView({
               );
             })}
 
-            {/* Dòng trạng thái khi đang stream */}
+            {/* Dòng trạng thái khi đang stream (Shimmer Skeleton màu xanh Teal #0D9488) */}
             {isStreaming && phase && (
               <div
                 aria-live="polite"
-                className="my-3 flex items-center gap-2 text-xs font-medium text-accent"
+                className="my-3 inline-flex items-center gap-2 rounded-full border border-ai/25 px-3 py-1 text-xs font-medium text-ai shimmer-ai"
               >
-                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                <span className="h-2 w-2 rounded-full bg-ai animate-pulse" aria-hidden />
                 <span>{getPhaseStatusText()}</span>
                 {elapsedSec > 0 && (
                   <span className="font-mono text-[11px] text-fg-subtle tabular-nums">

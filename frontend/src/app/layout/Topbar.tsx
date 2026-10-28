@@ -1,6 +1,6 @@
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, ChevronDown, LogOut, Moon, Sun, UserRound } from 'lucide-react';
+import { Bell, ChevronDown, LogOut, Moon, Sparkles, Sun, UserRound } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
@@ -8,6 +8,7 @@ import { ROLE_LABEL } from '@/lib/labels';
 import { formatRelative } from '@/lib/format';
 import { notificationsApi } from '@/lib/api/endpoints';
 import { IconButton, Popover, Spinner, useToast } from '@/components/ui';
+import { toggleContextualCopilot, useCopilotDrawerState } from '@/features/assistant/CopilotDrawer';
 import type { Notification } from '@/lib/types';
 
 function NotificationsMenu() {
@@ -177,8 +178,31 @@ function UserMenu() {
 
 export function Topbar() {
   const { mode, toggle } = useTheme();
+  const location = useLocation();
+  const copilotState = useCopilotDrawerState();
+  const isAssistantRoute = location.pathname.startsWith('/assistant');
+
   return (
-    <header className="flex h-14 shrink-0 items-center justify-end gap-1 border-b border-border bg-surface px-4">
+    <header className="flex h-14 shrink-0 items-center justify-end gap-1.5 border-b border-border bg-surface px-4">
+      {!isAssistantRoute && (
+        <button
+          type="button"
+          onClick={toggleContextualCopilot}
+          className={cn(
+            'mr-1 inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors',
+            copilotState.open
+              ? 'border-ai/40 bg-ai-soft text-ai-soft-fg shadow-xs'
+              : 'border-border bg-subtle/60 text-fg-muted hover:border-ai/40 hover:bg-ai-soft/60 hover:text-ai',
+          )}
+          title="Mở/đóng khung Trợ lý AI ngữ cảnh (Ctrl+K)"
+        >
+          <Sparkles className="h-3.5 w-3.5 text-ai" aria-hidden />
+          <span>Trợ lý AI</span>
+          <kbd className="hidden rounded border border-border bg-surface px-1 py-0.5 font-mono text-[10px] text-fg-subtle sm:inline">
+            Ctrl+K
+          </kbd>
+        </button>
+      )}
       <IconButton label={mode === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'} onClick={toggle}>
         {mode === 'dark' ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
       </IconButton>

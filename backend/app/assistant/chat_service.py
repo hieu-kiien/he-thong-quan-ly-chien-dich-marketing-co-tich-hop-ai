@@ -6,12 +6,13 @@ import asyncio
 import contextlib
 import json
 import logging
+import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.assistant.bus import event_bus
@@ -25,7 +26,7 @@ from app.core.timeutil import VN_TZ, now_utc, today_vn
 from app.models.ai import AiAction, AiMessage, AiThread
 from app.models.campaign import Campaign
 from app.models.content import Content
-from app.models.enums import AiMessageRole, AiMessageStatus
+from app.models.enums import AiActionStatus, AiMessageRole, AiMessageStatus
 from app.models.user import User
 from app.schemas.ai import (
     AiMessageOut,
@@ -389,9 +390,21 @@ def _prepare_regenerate(db: Session, thread: AiThread, message_id: int) -> AiMes
     if prev_user is None:
         raise NotFound("Không tìm thấy tin nhắn người dùng tương ứng để tạo lại")
 
-    has_actions = db.execute(select(AiAction.id).where(AiAction.message_id == msg.id).limit(1)).first()
+    # Xoá các đề xuất chưa thực thi (PROPOSED / REJECTED / FAILED) gắn với câu trả lời cũ
+    # để khi tạo lại không bị nhân đôi bong bóng trả lời của Trợ lý AI.
+    db.execute(
+        delete(AiAction).where(
+            AiAction.message_id == msg.id,
+            AiAction.status != AiActionStatus.EXECUTED,
+        )
+    )
+    has_executed_actions = db.execute(
+        select(AiAction.id)
+        .where(AiAction.message_id == msg.id, AiAction.status == AiActionStatus.EXECUTED)
+        .limit(1)
+    ).first()
     has_contents = db.execute(select(Content.id).where(Content.ai_message_id == msg.id).limit(1)).first()
-    if not has_actions and not has_contents:
+    if not has_executed_actions and not has_contents:
         db.delete(msg)
     return prev_user
 
@@ -529,6 +542,22 @@ async def start_turn(
         latency: int | None = None
         final_status = AiMessageStatus.COMPLETE
         error_code: str | None = None
+        last_db_flush_at = 0.0
+
+        def _flush_partial_content(content_snapshot: str, *, force: bool = False) -> None:
+            nonlocal last_db_flush_at
+            if not content_snapshot:
+                return
+            now_mono = time.monotonic()
+            if not force and (now_mono - last_db_flush_at) < 1.2:
+                return
+            last_db_flush_at = now_mono
+            with contextlib.suppress(Exception):
+                with get_db_context() as db_p:
+                    m = db_p.get(AiMessage, assistant_msg_id)
+                    if m and m.status == AiMessageStatus.STREAMING:
+                        m.content = content_snapshot
+                        db_p.commit()
 
         try:
             stream = r.stream_run(
@@ -579,6 +608,7 @@ async def start_turn(
                         live_content = _join_parts([*accumulated_parts, streaming_part])
                         if live_content:
                             await out_queue.put(_format_sse("text", {"content": live_content}))
+                            _flush_partial_content(live_content, force=False)
 
                 elif etype == "text":
                     part = ev.get("text", "")
@@ -591,8 +621,11 @@ async def start_turn(
                         # OpenCode gửi từng "part" văn bản hoàn chỉnh (trước/sau khi gọi công cụ)
                         full_content = _join_parts(accumulated_parts)
                         await out_queue.put(_format_sse("text", {"content": full_content}))
+                        _flush_partial_content(full_content, force=True)
 
                 elif etype == "tool":
+                    # Xoá mọi phân đoạn delta chưa xác nhận trước khi gọi công cụ (ví dụ suy luận nội bộ)
+                    streaming_part = ""
                     name = str(ev.get("name") or "")
                     # Công cụ MarketFlow chạy qua MCP của chính backend nên event bus đã phát
                     # running/done kèm tóm tắt tiếng Việt — bỏ bản sao từ runner để tránh trùng.
@@ -647,6 +680,15 @@ async def start_turn(
             with get_db_context() as db_final:
                 msg = db_final.get(AiMessage, assistant_msg_id)
                 if msg:
+                    if not full_content and final_status == AiMessageStatus.COMPLETE:
+                        has_proposed = db_final.execute(
+                            select(AiAction.id).where(AiAction.message_id == assistant_msg_id).limit(1)
+                        ).first()
+                        if has_proposed:
+                            full_content = (
+                                "Tôi đã chuẩn bị đề xuất cập nhật bên dưới. "
+                                "Bạn có thể kiểm tra chi tiết ở khung bên phải và bấm **Xác nhận** để áp dụng."
+                            )
                     msg.content = full_content
                     msg.status = final_status
                     msg.error_code = error_code

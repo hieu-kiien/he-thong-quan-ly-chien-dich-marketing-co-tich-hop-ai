@@ -9,6 +9,7 @@ import {
   DollarSign,
   Calendar,
   ArrowRight,
+  Sparkles,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -20,6 +21,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { PageContainer } from '@/app/layout/PageContainer';
+import { openContextualCopilot } from '@/features/assistant/CopilotDrawer';
 import {
   Card,
   CardHeader,
@@ -57,6 +59,42 @@ import {
 } from '@/lib/format';
 import type { Granularity, StatsFilters } from '@/lib/types';
 
+/** Biểu đồ đường thu nhỏ (Sparkline) hiển thị xu hướng ngay trong thẻ KPI. */
+function MiniSparkline({
+  values,
+  color = 'var(--chart-1, #2563EB)',
+}: {
+  values: number[];
+  color?: string;
+}) {
+  if (!values || values.length < 2) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const width = 84;
+  const height = 28;
+  const pts = values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * width;
+      const y = height - 3 - ((v - min) / range) * (height - 6);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(' ');
+
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="shrink-0 overflow-visible" aria-hidden>
+      <polyline
+        fill="none"
+        stroke={color}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={pts}
+      />
+    </svg>
+  );
+}
+
 export default function DashboardPage() {
   useDocumentTitle('Tổng quan');
   const { user } = useAuth();
@@ -67,6 +105,7 @@ export default function DashboardPage() {
   const [channelIdFilter, setChannelIdFilter] = useState<string>('');
   const [granularity, setGranularity] = useState<Granularity>('day');
   const [chartMetric, setChartMetric] = useState<'views' | 'clicks' | 'conversions' | 'cost'>('views');
+  const [hoveredMetricMode, setHoveredMetricMode] = useState<'views' | 'clicks' | 'conversions' | 'cost' | null>(null);
 
   const channelsQ = useChannels();
   const campaignsListQ = useQuery({
@@ -182,72 +221,124 @@ export default function DashboardPage() {
         <ErrorState error={overviewQ.error} onRetry={() => overviewQ.refetch()} />
       ) : overview ? (
         <div className="space-y-6">
-          {/* Top Summary Stat Cards */}
+          {/* Top Summary Stat Cards (kèm Sparkline & tương tác lọc nhanh biểu đồ) */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card>
+            <Card
+              className={`cursor-pointer transition-all ${
+                chartMetric === 'views' ? 'ring-1 ring-accent/40 border-accent/40' : 'hover:border-border-strong'
+              }`}
+              onClick={() => setChartMetric('views')}
+              onMouseEnter={() => setHoveredMetricMode('views')}
+              onMouseLeave={() => setHoveredMetricMode(null)}
+            >
               <CardBody>
                 <div className="flex items-center justify-between text-xs text-fg-muted">
                   <span>Lượt hiển thị (Views)</span>
-                  <Eye className="h-4 w-4 text-fg-subtle" />
+                  <Eye className="h-4 w-4 text-accent" />
                 </div>
-                <p className="mt-2 text-2xl font-bold tracking-tight text-fg font-mono">
-                  {formatNumber(overview.totals.views)}
-                </p>
-                <div className="mt-2 text-xs text-fg-muted">
+                <div className="mt-2 flex items-end justify-between gap-2">
+                  <p className="text-2xl font-semibold tracking-tight text-fg font-mono tabular-nums">
+                    {formatNumber(overview.totals.views)}
+                  </p>
+                  <MiniSparkline
+                    values={(timeseriesQ.data ?? []).map((d) => d.views)}
+                    color="var(--chart-1, #2563EB)"
+                  />
+                </div>
+                <div className="mt-2 text-xs text-fg-muted tabular-nums">
                   CPM: <span className="font-medium text-fg">{formatMoney(overview.rates.cpm)}</span>
                 </div>
               </CardBody>
             </Card>
 
-            <Card>
+            <Card
+              className={`cursor-pointer transition-all ${
+                chartMetric === 'clicks' ? 'ring-1 ring-accent/40 border-accent/40' : 'hover:border-border-strong'
+              }`}
+              onClick={() => setChartMetric('clicks')}
+              onMouseEnter={() => setHoveredMetricMode('clicks')}
+              onMouseLeave={() => setHoveredMetricMode(null)}
+            >
               <CardBody>
                 <div className="flex items-center justify-between text-xs text-fg-muted">
                   <span>Lượt bấm (Clicks)</span>
-                  <MousePointer className="h-4 w-4 text-fg-subtle" />
+                  <MousePointer className="h-4 w-4 text-accent" />
                 </div>
-                <p className="mt-2 text-2xl font-bold tracking-tight text-fg font-mono">
-                  {formatNumber(overview.totals.clicks)}
-                </p>
-                <div className="mt-2 flex items-center justify-between text-xs text-fg-muted">
+                <div className="mt-2 flex items-end justify-between gap-2">
+                  <p className="text-2xl font-semibold tracking-tight text-fg font-mono tabular-nums">
+                    {formatNumber(overview.totals.clicks)}
+                  </p>
+                  <MiniSparkline
+                    values={(timeseriesQ.data ?? []).map((d) => d.clicks)}
+                    color="var(--chart-1, #2563EB)"
+                  />
+                </div>
+                <div className="mt-2 flex items-center justify-between text-xs text-fg-muted tabular-nums">
                   <span>CTR: <span className="font-medium text-fg">{formatRate(overview.rates.ctr)}</span></span>
                   <span>CPC: <span className="font-medium text-fg">{formatMoney(overview.rates.cpc)}</span></span>
                 </div>
               </CardBody>
             </Card>
 
-            <Card>
+            <Card
+              className={`cursor-pointer transition-all ${
+                chartMetric === 'conversions' ? 'ring-1 ring-ai/40 border-ai/40' : 'hover:border-border-strong'
+              }`}
+              onClick={() => setChartMetric('conversions')}
+              onMouseEnter={() => setHoveredMetricMode('conversions')}
+              onMouseLeave={() => setHoveredMetricMode(null)}
+            >
               <CardBody>
                 <div className="flex items-center justify-between text-xs text-fg-muted">
                   <span>Chuyển đổi (Conversions)</span>
-                  <Target className="h-4 w-4 text-fg-subtle" />
+                  <Target className="h-4 w-4 text-ai" />
                 </div>
-                <p className="mt-2 text-2xl font-bold tracking-tight text-fg font-mono">
-                  {formatNumber(overview.totals.conversions)}
-                </p>
-                <div className="mt-2 flex items-center justify-between text-xs text-fg-muted">
+                <div className="mt-2 flex items-end justify-between gap-2">
+                  <p className="text-2xl font-semibold tracking-tight text-fg font-mono tabular-nums">
+                    {formatNumber(overview.totals.conversions)}
+                  </p>
+                  <MiniSparkline
+                    values={(timeseriesQ.data ?? []).map((d) => d.conversions)}
+                    color="var(--chart-2, #0D9488)"
+                  />
+                </div>
+                <div className="mt-2 flex items-center justify-between text-xs text-fg-muted tabular-nums">
                   <span>CVR: <span className="font-medium text-fg">{formatRate(overview.rates.cvr)}</span></span>
                   <span>CPA: <span className="font-medium text-fg">{formatMoney(overview.rates.cpa)}</span></span>
                 </div>
               </CardBody>
             </Card>
 
-            <Card>
+            <Card
+              className={`cursor-pointer transition-all ${
+                chartMetric === 'cost' ? 'ring-1 ring-warning/40 border-warning/40' : 'hover:border-border-strong'
+              }`}
+              onClick={() => setChartMetric('cost')}
+              onMouseEnter={() => setHoveredMetricMode('cost')}
+              onMouseLeave={() => setHoveredMetricMode(null)}
+            >
               <CardBody>
                 <div className="flex items-center justify-between text-xs text-fg-muted">
                   <span>Tổng chi phí / Ngân sách</span>
-                  <DollarSign className="h-4 w-4 text-fg-subtle" />
+                  <DollarSign className="h-4 w-4 text-warning" />
                 </div>
-                <p className="mt-2 text-xl font-bold tracking-tight text-fg font-mono">
-                  {formatMoney(overview.budget.spent)}
-                </p>
+                <div className="mt-2 flex items-end justify-between gap-2">
+                  <p className="text-xl font-semibold tracking-tight text-fg font-mono tabular-nums">
+                    {formatMoney(overview.budget.spent)}
+                  </p>
+                  <MiniSparkline
+                    values={(timeseriesQ.data ?? []).map((d) => d.cost)}
+                    color="var(--chart-3, #D97706)"
+                  />
+                </div>
                 <div className="mt-2 space-y-1">
-                  <div className="flex justify-between text-xs text-fg-muted">
+                  <div className="flex justify-between text-xs text-fg-muted tabular-nums">
                     <span>Ngân sách: {formatMoney(overview.budget.total_budget)}</span>
                     <span className="font-medium text-fg">{formatPct(overview.budget.used_pct)}</span>
                   </div>
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-subtle">
                     <div
-                      className="h-full rounded-full bg-accent"
+                      className="h-full rounded-full bg-warning"
                       style={{ width: `${Math.min(overview.budget.used_pct ?? 0, 100)}%` }}
                     />
                   </div>
@@ -396,11 +487,31 @@ export default function DashboardPage() {
                     <AreaChart data={timeseriesQ.data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                       <defs>
                         <linearGradient id="metricGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="var(--color-accent, #44403c)" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="var(--color-accent, #44403c)" stopOpacity={0} />
+                          <stop
+                            offset="5%"
+                            stopColor={
+                              chartMetric === 'conversions'
+                                ? 'var(--chart-2, #0D9488)'
+                                : chartMetric === 'cost'
+                                  ? 'var(--chart-3, #D97706)'
+                                  : 'var(--chart-1, #2563EB)'
+                            }
+                            stopOpacity={0.22}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor={
+                              chartMetric === 'conversions'
+                                ? 'var(--chart-2, #0D9488)'
+                                : chartMetric === 'cost'
+                                  ? 'var(--chart-3, #D97706)'
+                                  : 'var(--chart-1, #2563EB)'
+                            }
+                            stopOpacity={0}
+                          />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color, #e7e5e4)" />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid, #E2E8F0)" />
                       <XAxis
                         dataKey="period"
                         tickLine={false}
@@ -420,8 +531,8 @@ export default function DashboardPage() {
                       />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: 'var(--surface-color, #ffffff)',
-                          borderColor: 'var(--border-color, #e7e5e4)',
+                          backgroundColor: 'var(--bg-surface, #FFFFFF)',
+                          borderColor: 'var(--border-subtle, #E2E8F0)',
                           borderRadius: '8px',
                           fontSize: '12px',
                         }}
@@ -440,7 +551,13 @@ export default function DashboardPage() {
                       <Area
                         type="monotone"
                         dataKey={chartMetric}
-                        stroke="var(--color-accent, #44403c)"
+                        stroke={
+                          chartMetric === 'conversions'
+                            ? 'var(--chart-2, #0D9488)'
+                            : chartMetric === 'cost'
+                              ? 'var(--chart-3, #D97706)'
+                              : 'var(--chart-1, #2563EB)'
+                        }
                         strokeWidth={2}
                         fillOpacity={1}
                         fill="url(#metricGradient)"
@@ -487,13 +604,22 @@ export default function DashboardPage() {
                       </TR>
                     ) : (
                       byChannelQ.data.map((c) => (
-                        <TR key={c.channel.id}>
+                        <TR
+                          key={c.channel.id}
+                          className={
+                            hoveredMetricMode === 'conversions' && c.conversions > 0
+                              ? 'bg-ai-soft/40'
+                              : hoveredMetricMode === 'cost' && c.cost > 0
+                                ? 'bg-warning-soft/40'
+                                : ''
+                          }
+                        >
                           <TD className="font-medium text-fg">{c.channel.name}</TD>
-                          <TD className="text-right text-xs font-mono">{formatNumber(c.views)}</TD>
-                          <TD className="text-right text-xs font-mono">{formatNumber(c.clicks)}</TD>
-                          <TD className="text-right text-xs font-mono">{formatRate(c.ctr)}</TD>
-                          <TD className="text-right text-xs font-mono">{formatNumber(c.conversions)}</TD>
-                          <TD className="text-right text-xs font-mono font-medium">{formatMoney(c.cost)}</TD>
+                          <TD className="text-right text-xs font-mono tabular-nums">{formatNumber(c.views)}</TD>
+                          <TD className="text-right text-xs font-mono tabular-nums">{formatNumber(c.clicks)}</TD>
+                          <TD className="text-right text-xs font-mono tabular-nums">{formatRate(c.ctr)}</TD>
+                          <TD className="text-right text-xs font-mono tabular-nums">{formatNumber(c.conversions)}</TD>
+                          <TD className="text-right text-xs font-mono font-medium tabular-nums">{formatMoney(c.cost)}</TD>
                         </TR>
                       ))
                     )}
@@ -517,52 +643,74 @@ export default function DashboardPage() {
                       <TH className="text-right">Đã chi</TH>
                       <TH className="text-right">Tỷ lệ</TH>
                       <TH>Trạng thái</TH>
+                      <TH className="text-right">Tác vụ AI</TH>
                     </TR>
                   </THead>
                   <TBody>
                     {byCampaignQ.isLoading ? (
                       <TR>
-                        <TD colSpan={5}>
+                        <TD colSpan={6}>
                           <SkeletonRows rows={4} />
                         </TD>
                       </TR>
                     ) : !byCampaignQ.data || byCampaignQ.data.length === 0 ? (
                       <TR>
-                        <TD colSpan={5} className="py-6 text-center text-xs text-fg-muted">
+                        <TD colSpan={6} className="py-6 text-center text-xs text-fg-muted">
                           Chưa có dữ liệu chiến dịch trong khoảng thời gian này.
                         </TD>
                       </TR>
                     ) : (
-                      byCampaignQ.data.map((item) => (
-                        <TR key={item.campaign.id}>
-                          <TD>
-                            <Link
-                              to={`/campaigns/${item.campaign.id}`}
-                              className="font-medium text-fg hover:underline"
-                            >
-                              {item.campaign.name}
-                            </Link>
-                          </TD>
-                          <TD className="text-right text-xs font-mono">{formatMoney(item.budget)}</TD>
-                          <TD className="text-right text-xs font-mono font-medium">{formatMoney(item.cost)}</TD>
-                          <TD className="text-right text-xs font-mono">
-                            <span
-                              className={
-                                (item.used_pct ?? 0) > 100
-                                  ? 'font-semibold text-rose-600 dark:text-rose-400'
-                                  : (item.used_pct ?? 0) > 85
-                                    ? 'text-amber-600 dark:text-amber-400'
-                                    : 'text-fg'
-                              }
-                            >
-                              {formatPct(item.used_pct)}
-                            </span>
-                          </TD>
-                          <TD>
-                            <StatusBadge kind="campaign" status={item.campaign.status} />
-                          </TD>
-                        </TR>
-                      ))
+                      byCampaignQ.data.map((item) => {
+                        const isOverOrHigh = (item.used_pct ?? 0) > 85;
+                        return (
+                          <TR key={item.campaign.id} className="group">
+                            <TD>
+                              <Link
+                                to={`/campaigns/${item.campaign.id}`}
+                                className="font-medium text-fg hover:text-accent hover:underline"
+                              >
+                                {item.campaign.name}
+                              </Link>
+                            </TD>
+                            <TD className="text-right text-xs font-mono tabular-nums">{formatMoney(item.budget)}</TD>
+                            <TD className="text-right text-xs font-mono font-medium tabular-nums">{formatMoney(item.cost)}</TD>
+                            <TD className="text-right text-xs font-mono tabular-nums">
+                              <span
+                                className={
+                                  (item.used_pct ?? 0) > 100
+                                    ? 'font-semibold text-danger'
+                                    : (item.used_pct ?? 0) > 85
+                                      ? 'font-medium text-warning'
+                                      : 'text-fg'
+                                }
+                              >
+                                {formatPct(item.used_pct)}
+                              </span>
+                            </TD>
+                            <TD>
+                              <StatusBadge kind="campaign" status={item.campaign.status} />
+                            </TD>
+                            <TD className="text-right">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openContextualCopilot({
+                                    campaignId: item.campaign.id,
+                                    campaignName: item.campaign.name,
+                                    prompt: isOverOrHigh
+                                      ? `Phân tích nguyên nhân chi phí chiến dịch "${item.campaign.name}" đã dùng ${formatPct(item.used_pct)} ngân sách (${formatMoney(item.cost)} / ${formatMoney(item.budget)}) và đề xuất phương án tối ưu ngân sách ngay.`
+                                      : `Đánh giá hiệu quả hiện tại của chiến dịch "${item.campaign.name}" và đề xuất cách tối ưu tỷ lệ chuyển đổi.`,
+                                  })
+                                }
+                                className="inline-flex items-center gap-1 rounded-md border border-ai/30 bg-ai-soft px-2 py-1 text-[11px] font-medium text-ai-soft-fg transition-colors hover:bg-ai hover:text-ai-fg"
+                              >
+                                <Sparkles className="h-3 w-3" aria-hidden />
+                                <span>{isOverOrHigh ? 'Phân tích nguyên nhân' : 'Tối ưu bằng AI'}</span>
+                              </button>
+                            </TD>
+                          </TR>
+                        );
+                      })
                     )}
                   </TBody>
                 </Table>
