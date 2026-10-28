@@ -30,10 +30,14 @@ _RATE_LIMIT_MARKERS = (
     "free usage limit",
     "free tier",
     "rate limit",
+    "rate-limited",
     "rate_limit",
     "ratelimit",
     "too many requests",
     "quota",
+    "tokens per minute",
+    "input tokens per minute",
+    "request too large for model",
 )
 _MODEL_ERROR_MARKERS = (
     "model not found",
@@ -41,6 +45,9 @@ _MODEL_ERROR_MARKERS = (
     "providermodelnotfounderror",
     "unknown model",
     "model is not available",
+    "model is unavailable",
+    "no longer available",
+    "upstream request failed",
     "no such model",
     "model_not_found",
     # opencode 1.19 answers an unknown `-m provider/model` with a generic

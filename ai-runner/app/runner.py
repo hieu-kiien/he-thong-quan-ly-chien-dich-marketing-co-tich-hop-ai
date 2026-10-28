@@ -44,6 +44,16 @@ _BASE_ENV_KEYS = (
     "XDG_CACHE_HOME",
     "XDG_STATE_HOME",
     "TMPDIR",
+    # Provider API keys for multi-provider fallback
+    "GOOGLE_GENERATIVE_AI_API_KEY",
+    "GEMINI_API_KEY",
+    "GROQ_API_KEY",
+    "OPENROUTER_API_KEY",
+    "NVIDIA_API_KEY",
+    "CEREBRAS_API_KEY",
+    "MISTRAL_API_KEY",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
     # Windows (local development / tests only)
     "SYSTEMROOT",
     "SYSTEMDRIVE",
@@ -102,6 +112,8 @@ class Runner:
         self.last_error: str | None = None
         # monotonic deadline until which runs fail fast with AI_RATE_LIMITED (no opencode spawn)
         self.rate_limited_until: float = 0.0
+        # per-model cooldown deadlines so rate-limited primary models are skipped automatically
+        self.model_cooldown_until: dict[str, float] = {}
 
     @property
     def cooldown_remaining_s(self) -> int:
@@ -251,11 +263,16 @@ class Runner:
     # ------------------------------------------------------------- execution
     def _models(self, override: str | None) -> list[str | None]:
         first = override or self.s.model
-        models: list[str | None] = [first]
+        candidates: list[str | None] = [first]
         for m in self.s.fallback_models:
-            if m not in models:
-                models.append(m)
-        return models
+            if m not in candidates:
+                candidates.append(m)
+        if override or len(candidates) <= 1:
+            return candidates
+        now = time.monotonic()
+        ready = [m for m in candidates if not m or self.model_cooldown_until.get(m, 0.0) <= now]
+        cooling = [m for m in candidates if m and self.model_cooldown_until.get(m, 0.0) > now]
+        return ready + cooling
 
     def _child_env(self, run_token: str | None) -> dict[str, str]:
         env: dict[str, str] = {}
@@ -326,30 +343,66 @@ class Runner:
 
             failure_text = f"{state.error_raw or ''}\n{attempt.stderr_tail}"
             failed = attempt.limit_hit or state.error_raw is not None or (attempt.rc not in (0, None))
-            # The free tier limit ("Free usage limit reached") is account-wide: every free model
-            # fails the same way, so falling back would only waste time and memory.
-            account_limit = attempt.limit_hit or "free usage limit" in failure_text.lower()
+            # OpenCode Zen's free tier limit ("Free usage limit reached") is shared across all
+            # `opencode/*` free models, so skip remaining `opencode/*` models when it triggers,
+            # but still fall back to non-opencode providers (e.g. groq/*, openrouter/*).
+            opencode_account_limit = "free usage limit" in failure_text.lower() and (
+                model is None or model.startswith("opencode/")
+            )
 
-            if failed and not state.emitted_output:
+            if failed and not state.has_text:
                 if session_id and not session_retry_done and is_session_error(failure_text):
                     log.info("run %s: session %s not found, retrying without session", handle.run_id, session_id)
                     session_id = None
                     session_retry_done = True
                     continue
-                if (
-                    not account_limit
-                    and (is_rate_limited(failure_text) or is_model_error(failure_text))
+                if opencode_account_limit:
+                    next_non_opencode = next(
+                        (
+                            i
+                            for i in range(index + 1, len(models))
+                            if models[i] and not str(models[i]).startswith("opencode/")
+                        ),
+                        None,
+                    )
+                    if next_non_opencode is not None:
+                        if model:
+                            self.model_cooldown_until[model] = time.monotonic() + 300.0
+                        log.info(
+                            "run %s: opencode free limit on %s; falling back to external provider %s",
+                            handle.run_id,
+                            model,
+                            models[next_non_opencode],
+                        )
+                        if state.session_id:
+                            session_id = state.session_id
+                        index = next_non_opencode
+                        continue
+                elif (
+                    (attempt.limit_hit or is_rate_limited(failure_text) or is_model_error(failure_text))
                     and index + 1 < len(models)
                 ):
-                    log.info("run %s: model %s failed (%s); falling back to %s",
-                             handle.run_id, model, state.error_short, models[index + 1])
+                    if model:
+                        self.model_cooldown_until[model] = time.monotonic() + 60.0
+                    if state.session_id:
+                        session_id = state.session_id
+                    log.info(
+                        "run %s: model %s failed (%s); falling back to %s",
+                        handle.run_id,
+                        model,
+                        state.error_short or "rate_limit",
+                        models[index + 1],
+                    )
                     index += 1
                     continue
 
             if failed:
-                rate_limited = account_limit or is_rate_limited(failure_text)
+                rate_limited = opencode_account_limit or attempt.limit_hit or is_rate_limited(failure_text)
                 if rate_limited and self.s.rate_limit_cooldown_s > 0:
-                    self.rate_limited_until = time.monotonic() + self.s.rate_limit_cooldown_s
+                    # Only apply long cooldown for single-provider opencode account limit;
+                    # multi-provider transient rate limits recover within seconds.
+                    cooldown_s = self.s.rate_limit_cooldown_s if opencode_account_limit else min(self.s.rate_limit_cooldown_s, 15.0)
+                    self.rate_limited_until = time.monotonic() + cooldown_s
                 code = AI_RATE_LIMITED if rate_limited else AI_UNAVAILABLE
                 detail = state.error_short or attempt.stderr_tail.strip()[-400:] or f"exit code {attempt.rc}"
                 yield error_event(code, detail=detail)
