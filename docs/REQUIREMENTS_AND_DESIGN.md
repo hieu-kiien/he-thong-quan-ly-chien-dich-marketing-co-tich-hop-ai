@@ -2,7 +2,7 @@
 
 > Học phần: Ứng dụng trí tuệ nhân tạo (AIA331)  
 > Đề tài: Hệ thống quản lý chiến dịch marketing có tích hợp AI (Mã số: 80300)  
-> Phiên bản hệ thống: MarketFlow v2 (Clean Rebuild)  
+> Phiên bản hệ thống: MarketFlow  
 > Ngày lập: 24/10/2026  
 
 ---
@@ -17,7 +17,7 @@ Các doanh nghiệp vừa và nhỏ (SME) tại Việt Nam khi triển khai ho�
 - Khó khăn trong tổng hợp báo cáo: Dữ liệu hiệu quả (lượt xem, lượt nhấp, chuyển đổi, chi phí) không được phân tích tức thời để đưa ra quyết định điều chỉnh ngân sách kịp thời.
 
 ### 1.2. Mục tiêu hệ thống
-MarketFlow v2 được xây dựng nhằm giải quyết triệt để các vấn đề trên với các mục tiêu cụ thể:
+MarketFlow được xây dựng nhằm giải quyết triệt để các vấn đề trên với các mục tiêu cụ thể:
 1. Quản lý tập trung vòng đời chiến dịch: Kế hoạch, mục tiêu, ngân sách, kênh truyền thông, nội dung, lịch đăng và chỉ số hiệu quả.
 2. Kiểm soát chặt chẽ quy trình phê duyệt nội dung: Tách biệt quyền hạn giữa nhân viên marketing (người tạo) và người quản lý (người duyệt), bắt buộc nội dung phải được duyệt trước khi đăng tải thực tế.
 3. Tích hợp AI một cách trung thực và an toàn: Sử dụng Trợ lý AI dựa trên mô hình ngôn ngữ lớn để hỗ trợ lên ý tưởng, viết nháp nội dung theo chuẩn từng kênh, tóm tắt chỉ số và phát hiện từ cấm.
@@ -201,7 +201,7 @@ flowchart LR
 
 ### 7.1. Sơ đồ Quan hệ Thực thể (ERD)
 
-Cơ sở dữ liệu của MarketFlow v2 bao gồm đúng **14 bảng** theo mô hình dữ liệu SQLAlchemy 2.0 (`backend/app/models/`):
+Cơ sở dữ liệu của MarketFlow bao gồm đúng **14 bảng** theo mô hình dữ liệu SQLAlchemy 2.0 (`backend/app/models/`):
 
 ```mermaid
 erDiagram

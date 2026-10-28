@@ -1,0 +1,66 @@
+\begin{tikzpicture}[
+ font=\sffamily\footnotesize,
+ >=Latex,
+ node_box/.style={
+ draw=black,
+ fill=white,
+ rounded corners=4pt,
+ minimum width=3.7cm,
+ minimum height=1.75cm,
+ align=center,
+ line width=0.85pt,
+ text width=3.5cm,
+ inner sep=4pt
+ },
+ cloud_box/.style={
+ draw=black!80,
+ fill=black!3,
+ rounded corners=4pt,
+ minimum width=3.4cm,
+ minimum height=1.65cm,
+ align=center,
+ line width=0.8pt,
+ dashed,
+ text width=3.2cm,
+ inner sep=4pt
+ },
+ rel/.style={draw=black,line width=0.75pt,-{Latex[length=2.2mm]}},
+ comm/.style={font=\sffamily\scriptsize,fill=white,inner sep=1.5pt,text=black,align=center}
+]
+
+\node[node_box] (client) at (1.9, 0) {
+ \textbf{Máy trạm Người dùng}\\[2pt]
+ {\scriptsize Trình duyệt Web}\\
+ {\scriptsize Giao diện React 18 SPA}
+};
+
+\node[node_box] (server) at (7.0, 1.5) {
+ \textbf{Máy chủ Ứng dụng}\\[2pt]
+ {\scriptsize Docker / Linux}\\
+ {\scriptsize Nginx \& FastAPI (Python)}
+};
+
+\node[node_box] (database) at (7.0, -1.5) {
+ \textbf{Hệ quản trị CSDL}\\[2pt]
+ {\scriptsize Lưu trữ quan hệ}\\
+ {\scriptsize PostgreSQL 16 / SQLite WAL}
+};
+
+\node[cloud_box] (ai_cloud) at (12.1, 1.5) {
+ \textbf{Dịch vụ AI (LLM)}\\[2pt]
+ {\scriptsize Gemini / OpenAI / Ollama}\\
+ {\scriptsize Xử lý prompt, trả JSON}
+};
+
+\node[cloud_box] (soc_cloud) at (12.1, -1.5) {
+ \textbf{Kênh Truyền thông}\\[2pt]
+ {\scriptsize Facebook / TikTok / Email}\\
+ {\scriptsize Tiếp nhận bài đã duyệt}
+};
+
+\draw[rel] (client.east) -- node[comm,above,sloped]{HTTPS} (server.west);
+\draw[rel] (server.south) -- node[comm,right=2pt]{SQL / TCP} (database.north);
+\draw[rel] (server.east) -- node[comm,above=2pt]{HTTPS / JSON} (ai_cloud.west);
+\draw[rel] (server.south east) -- node[comm,above,sloped]{REST API} (soc_cloud.north west);
+
+\end{tikzpicture}

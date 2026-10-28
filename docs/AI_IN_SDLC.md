@@ -1,7 +1,7 @@
 # Minh Chứng Ứng Dụng AI Trong Vòng Đời Phát Triển Phần Mềm (AI in SDLC)
 
 > Học phần: Ứng dụng trí tuệ nhân tạo (AIA331)  
-> Hệ thống: MarketFlow v2 (Clean Rebuild)  
+> Hệ thống: MarketFlow  
 > Mục tiêu: Ghi nhận minh chứng thực tế về việc ứng dụng AI xuyên suốt các giai đoạn KT1, KT2, KT3 và Đánh giá cuối kỳ  
 > Căn cứ thực tế: `ke_hoach_xay_dung_lai.md`, `docs/rebuild/CONTRACT.md`, `docs/rebuild/P0_SPIKE_REPORT.md`  
 
@@ -9,7 +9,7 @@
 
 ## 1. Tổng quan Phương pháp Tiếp cận
 
-Trong dự án MarketFlow v2, Trí tuệ Nhân tạo được sử dụng có hệ thống theo mô hình **AI-Assisted Pair Programming & Multi-Agent Orchestration**:
+Trong dự án MarketFlow, Trí tuệ Nhân tạo được sử dụng có hệ thống theo mô hình **AI-Assisted Pair Programming & Multi-Agent Orchestration**:
 - AI không chỉ đóng vai trò là một tính năng nghiệp vụ của sản phẩm (Trợ lý Marketing AI), mà còn là một **công cụ kỹ thuật hỗ trợ toàn diện** trong suốt vòng đời phát triển phần mềm (Software Development Life Cycle - SDLC): từ phân tích hiện trạng, thiết kế kiến trúc, sinh mã nguồn, rà soát bảo mật, tối ưu prompt đến kiểm thử tự động.
 - Mọi kết quả do AI đề xuất đều trải qua **Quy trình Kiểm chứng của Con người (Human Quality Gates)**: kiểm tra định dạng tĩnh, đo đạc tài nguyên thực nghiệm trên máy chủ VPS, kiểm thử đơn vị tự động và phân tích ảnh hưởng mã nguồn (GitNexus Impact Analysis) trước khi tích hợp vào nhánh chính.
 

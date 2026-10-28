@@ -1,6 +1,6 @@
-# Hướng Dẫn Triển Khai Production — MarketFlow v2 (Ubuntu VPS)
+# Hướng Dẫn Triển Khai Production — MarketFlow (Ubuntu VPS)
 
-Tài liệu này là **nguồn sự thật duy nhất** về kiến trúc vận hành, cấu hình dịch vụ, quy trình triển khai, sao lưu và xử lý sự cố cho hệ thống **MarketFlow v2** trên máy chủ CloudCode VPS (Ubuntu 24.04 LTS, 2 vCPU, 2 GiB RAM, 40 GiB NVMe).
+Tài liệu này là **nguồn sự thật duy nhất** về kiến trúc vận hành, cấu hình dịch vụ, quy trình triển khai, sao lưu và xử lý sự cố cho hệ thống **MarketFlow** trên máy chủ CloudCode VPS (Ubuntu 24.04 LTS, 2 vCPU, 2 GiB RAM, 40 GiB NVMe).
 
 ---
 

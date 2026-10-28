@@ -1,8 +1,8 @@
-# Mục Lục Tài Liệu Kỹ Thuật — MarketFlow v2
+# Mục Lục Tài Liệu Kỹ Thuật — MarketFlow
 
 > Dự án môn học: Ứng dụng trí tuệ nhân tạo (AIA331)  
 > Đề tài: Hệ thống quản lý chiến dịch marketing có tích hợp AI (Mã số: 80300)  
-> Phiên bản hệ thống: MarketFlow v2 (Clean Rebuild)  
+> Phiên bản hệ thống: MarketFlow  
 
 ---
 

@@ -1,8 +1,8 @@
-# MarketFlow v2 — Backend Implementation Notes
+# MarketFlow — Backend Implementation Notes
 
 ## 1. Tổng quan & Kiến trúc
 
-Backend của MarketFlow v2 được tái cấu trúc hoàn toàn (clean rebuild) tuân thủ nghiêm ngặt theo **Design Contract** (`docs/rebuild/CONTRACT.md`), đề bài môn học AIA331 và bộ quy tắc chống "tính năng ảo" (Rule 0).
+Backend của MarketFlow được tái cấu trúc hoàn toàn (clean rebuild) tuân thủ nghiêm ngặt theo **Design Contract** (`docs/rebuild/CONTRACT.md`), đề bài môn học AIA331 và bộ quy tắc chống "tính năng ảo" (Rule 0).
 
 - **Framework**: FastAPI (Python 3.13 môi trường local Windows; Python 3.12 trên Ubuntu VPS Production).
 - **ORM**: SQLAlchemy 2.0 (Typed `Mapped[...]`, `DeclarativeBase`).

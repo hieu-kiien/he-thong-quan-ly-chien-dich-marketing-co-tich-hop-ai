@@ -1,0 +1,89 @@
+\resizebox{0.98\textwidth}{!}{%
+\begin{tikzpicture}[
+  font=\sffamily\footnotesize,
+  >=Latex,
+  stage/.style={
+    draw=black,
+    fill=white,
+    rounded corners=3pt,
+    minimum width=2.35cm,
+    minimum height=1.35cm,
+    align=center,
+    line width=0.8pt,
+    text width=2.15cm,
+    inner sep=2pt
+  },
+  gate/.style={
+    draw=black,
+    fill=black!8,
+    rounded corners=3pt,
+    minimum width=2.35cm,
+    minimum height=1.35cm,
+    align=center,
+    line width=1.0pt,
+    text width=2.15cm,
+    inner sep=2pt
+  },
+  ctrl_box/.style={
+    draw=black!80,
+    fill=white,
+    rounded corners=3pt,
+    minimum width=4.6cm,
+    minimum height=1.35cm,
+    align=center,
+    line width=0.8pt,
+    dashed,
+    text width=4.4cm,
+    inner sep=3pt
+  },
+  rel/.style={-{Latex[length=2.2mm]},draw=black,line width=0.75pt},
+  lab/.style={font=\sffamily\scriptsize,fill=white,inner sep=1.5pt,align=center,text=black}
+]
+
+\node[stage] (p1) at (1.2, 0) {
+  \textbf{1. Ngữ cảnh}\\[2pt]
+  {\scriptsize Lọc brief, sản phẩm, Brand Kit}
+};
+
+\node[stage] (p2) at (4.1, 0) {
+  \textbf{2. Tạo Prompt}\\[2pt]
+  {\scriptsize Nạp prompts.json, gắn biến}
+};
+
+\node[stage] (p3) at (7.0, 0) {
+  \textbf{3. Gọi Model}\\[2pt]
+  {\scriptsize Gọi LLM API, kiểm soát timeout}
+};
+
+\node[stage] (p4) at (9.9, 0) {
+  \textbf{4. Kiểm định}\\[2pt]
+  {\scriptsize Xác thực JSON, quét từ cấm}
+};
+
+\node[gate] (p5) at (12.8, 0) {
+  \textbf{5. Phê duyệt}\\[2pt]
+  {\scriptsize Quản lý duyệt trước khi đăng}
+};
+
+\draw[rel] (p1) -- (p2);
+\draw[rel] (p2) -- (p3);
+\draw[rel] (p3) -- (p4);
+\draw[rel] (p4) -- node[lab,above=1pt]{Đạt} (p5);
+
+\node[ctrl_box] (fallback) at (3.5, -3.25) {
+  \textbf{Chế độ Dự phòng (Smart Fallback)}\\[2pt]
+  {\scriptsize Khi lỗi mạng hoặc sai Schema: trả mẫu dự phòng kèm cờ is\_fallback = true}
+};
+
+\node[ctrl_box] (audit) at (10.5, -3.25) {
+  \textbf{Nhật ký Kiểm toán (ai\_logs)}\\[2pt]
+  {\scriptsize Lưu vết người gọi, độ trễ, số token, phiên bản prompt và trạng thái}
+};
+
+\draw[rel] (p3.south) -- (7.0,-1.40) -| node[lab,pos=0.25]{Timeout / Lỗi API} ([xshift=-0.6cm]fallback.north);
+\draw[rel] (p4.south) -- (9.9,-2.05) -| node[lab,pos=0.25]{Sai cấu trúc JSON} ([xshift=0.8cm]fallback.north);
+\draw[rel] (p5.south) -- (12.8,-1.40) -| node[lab,pos=0.25]{Lưu vết duyệt} (audit.north);
+\draw[rel] (fallback.east) -- node[lab,above=1pt]{Ghi nhận lỗi} (audit.west);
+
+\end{tikzpicture}%
+}

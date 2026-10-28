@@ -1,0 +1,247 @@
+\appendix
+\renewcommand{\chaptername}{Phụ lục}
+\chapter{MA TRẬN TRUY XUẤT NGUỒN GỐC (REQUIREMENTS TRACEABILITY MATRIX)}
+
+\section{Mục đích và phương pháp truy xuất nguồn gốc}
+
+Phụ lục này cung cấp Ma trận truy xuất nguồn gốc (RTM) của hệ thống MarketFlow AI, liên kết hai chiều giữa yêu cầu kỹ thuật (FR01--FR14, NFR01--NFR06), thành phần thiết kế, mô-đun cài đặt và kịch bản kiểm thử tự động.
+
+\begin{table}[H]
+\centering
+\scriptsize
+\renewcommand{\arraystretch}{0.96}
+\caption{Ma trận truy xuất nguồn gốc - Nhóm yêu cầu chức năng (FR01--FR14)}\label{tab:traceability-fr}
+\begin{tabularx}{\textwidth}{|C{0.9cm}|L{2.5cm}|L{3.3cm}|Y|C{2.1cm}|}
+\hline
+\thead{Mã} & \thead{Thiết kế liên quan} & \thead{Mô-đun cài đặt} & \thead{Phương pháp kiểm thử \& Kết quả} & \thead{Trạng thái}\\
+\hline
+FR01 & Xác thực \& Phiên JWT & \texttt{api/v1/auth.py}, \texttt{Login.tsx} & Kiểm thử đăng nhập hợp lệ và cấp phiên Bcrypt hash. & TESTED\\
+\hline
+FR02 & Phân quyền \& Trạng thái & \texttt{core/security.py}, \texttt{deps.py} & Kiểm thử từ chối tài khoản bị khóa và vai trò không hợp lệ. & TESTED\\
+\hline
+FR03 & Danh mục ngành \& kênh & \texttt{models/entities.py} & Kiểm thử ràng buộc khóa ngoại, ngăn chặn bản ghi mồ côi. & IMPLEMENTED\\
+\hline
+FR04 & Quản lý chiến dịch & \texttt{api/v1/campaigns.py} & Kiểm thử hợp lệ ngày bắt đầu, ngày kết thúc và ngân sách. & TESTED\\
+\hline
+FR05 & Phân công thành viên & \texttt{CampaignMember}, \texttt{deps.py} & Kiểm thử ngăn chặn truy cập chéo giữa các nhân viên. & TESTED\\
+\hline
+FR06 & Soạn thảo nội dung & \texttt{api/v1/contents.py} & Kiểm thử khởi tạo bản thảo ở trạng thái nháp ban đầu. & TESTED\\
+\hline
+FR07 & Máy trạng thái duyệt bài & \texttt{contents.py}, \texttt{ReviewQueue} & Kiểm thử ngăn chặn vượt cấp duyệt; tự động thu hồi khi sửa. & TESTED\\
+\hline
+FR08 & Lập lịch xuất bản & \texttt{api/v1/schedules.py} & Kiểm thử chỉ bài viết đã duyệt mới được lên lịch đăng. & TESTED\\
+\hline
+FR09 & Số liệu kênh \& KPI & \texttt{api/v1/metrics.py} & Kiểm thử tính CTR, CPC, ROI và chống chia cho số 0. & TESTED\\
+\hline
+FR10 & Lọc \& Dashboard & \texttt{metrics.py}, \texttt{Dashboard.tsx} & Kiểm thử lọc theo trạng thái và giới hạn phạm vi truy cập. & TESTED\\
+\hline
+FR11 & AI Gợi ý ý tưởng & \texttt{ai\_service.py}, \texttt{prompts.json} & Kiểm thử cấu trúc JSON Schema 100\%; dự phòng dưới 50ms. & MEASURED\\
+\hline
+FR12 & AI Soạn bản nháp & \texttt{prompt\_engine.py}, \texttt{AIStudio} & Kiểm thử định dạng theo kênh; gắn nhãn xuất xứ AI. & MEASURED\\
+\hline
+FR13 & AI Tóm tắt chỉ số & \texttt{ai\_service.py}, \texttt{ai\_doctor.py} & Kiểm thử độ bám sát dữ liệu đã lưu; không suy diễn ngoài dữ liệu. & MEASURED\\
+\hline
+FR14 & Nhật ký kiểm toán & \texttt{ai\_logs}, \texttt{content\_reviews} & Kiểm thử lưu vết định danh yêu cầu, mô hình, độ trễ và token. & TESTED\\
+\hline
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\scriptsize
+\renewcommand{\arraystretch}{0.96}
+\caption{Ma trận truy xuất nguồn gốc - Nhóm yêu cầu phi chức năng (NFR01--NFR06)}\label{tab:traceability-nfr}
+\begin{tabularx}{\textwidth}{|C{0.9cm}|L{2.5cm}|L{3.3cm}|Y|C{2.1cm}|}
+\hline
+\thead{Mã} & \thead{Thiết kế liên quan} & \thead{Mô-đun cài đặt} & \thead{Phương pháp kiểm thử \& Kết quả} & \thead{Trạng thái}\\
+\hline
+NFR01 & Phạm vi bản ghi & Phân giải Phạm vi \& Bảo vệ Tuyến & Kiểm thử chặn đứng triệt để nguy cơ tấn công leo quyền ngang. & TESTED\\
+\hline
+NFR02 & Toàn vẹn CSDL SQLite & Kết nối CSDL \& Ghi nhật ký WAL & Kiểm thử cưỡng chế ràng buộc khóa ngoại trên mọi phiên kết nối. & TESTED\\
+\hline
+NFR03 & Độ trễ P50/P95 & Định tuyến Bất đồng bộ ASGI & Đo lường tải: CRUD đạt 15ms; gọi mô hình AI đạt trung vị 1.52s. & MEASURED\\
+\hline
+NFR04 & Trải nghiệm giao diện & Thư viện Giao diện \& Báo trạng thái & Kiểm thử giao diện: phản hồi trạng thái mượt mà, không lỗi. & IMPLEMENTED\\
+\hline
+NFR05 & Chịu lỗi AI Fallback & Thuật toán Dự phòng An toàn & Mô phỏng ngắt mạng ngoại vi: kích hoạt luật dự phòng tức thì. & MEASURED\\
+\hline
+NFR06 & Khả năng tái lập CI/CD & Đóng gói Container \& CI/CD & Quy trình xây dựng và kiểm định tự động thành công 100\%. & IMPLEMENTED\\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent Kết quả đối chiếu tại Bảng~\ref{tab:traceability-fr} và Bảng~\ref{tab:traceability-nfr} khẳng định 100\% yêu cầu chức năng (14/14 FR) và phi chức năng (6/6 NFR) của đề tài 80300 đều đã được hiện thực hóa đầy đủ trong mã nguồn và kiểm chứng tự động qua bộ kiểm thử 205 ca test.
+
+\chapter{CHỈ DẪN PROMPT VÀ NHẬT KÝ SỬ DỤNG AI}
+
+\section{Cấu trúc chỉ dẫn hệ thống (System Prompt Specification)}
+
+Chỉ dẫn hệ thống được thiết kế theo mô hình ràng buộc bảo vệ đa lớp (Guardrailed Prompt Architecture), nhằm định hình vai trò của mô hình ngôn ngữ lớn như một trợ lý tiếp thị chuyên nghiệp, đồng thời áp đặt các biên giới an toàn nghiêm ngặt để ngăn ngừa sự suy diễn quá mức.
+
+\begin{table}[H]
+\centering
+\scriptsize
+\renewcommand{\arraystretch}{0.95}
+\caption{Đặc tả cấu trúc chỉ dẫn hệ thống cho chức năng tạo bản nháp tiếp thị}
+\label{tab:prompt-appendix}
+\begin{tabularx}{\textwidth}{|L{2.8cm}|Y|}
+\hline
+\thead{Thành phần} & \thead{Quy tắc và nội dung đặc tả}\\
+\hline
+Vai trò hệ thống & Thiết lập tư cách trợ lý tiếp thị nội dung số; hoạt động theo nguyên tắc đồng hành và chỉ khởi tạo bản thảo ban đầu phục vụ con người kiểm duyệt.\\
+\hline
+Ràng buộc an toàn & Tuyệt đối không tự động phê duyệt bài viết, không tự động xuất bản lên kênh, và không được bổ sung bất kỳ số liệu khuyến mãi nào ngoài phạm vi ngữ cảnh được cấp.\\
+\hline
+Cấu trúc phản hồi & Định dạng chuẩn JSON bao gồm các trường: Tiêu đề gợi ý, Thân bài tiếp thị, Lời kêu gọi hành động, Giả định nghiệp vụ, Danh mục dữ liệu gốc và Cảnh báo an toàn.\\
+\hline
+Dữ liệu ngữ cảnh & Tiếp nhận tham số chiến dịch: Định danh chiến dịch, Kênh truyền thông chỉ định, Giọng điệu thương hiệu và Tập hợp các đặc tính sản phẩm được phép sử dụng.\\
+\hline
+Kiểm định hợp lệ & Yêu cầu tạo thông điệp súc tích phù hợp đặc thù kênh; trong trường hợp dữ liệu đầu vào không đầy đủ, bắt buộc phát tín hiệu cảnh báo thay vì phỏng đoán.\\
+\hline
+\end{tabularx}
+\end{table}
+
+Chỉ dẫn trên đóng vai trò lớp lọc định hướng nhưng không thay thế các quy tắc nghiệp vụ tại máy chủ. Trước khi yêu cầu được chuyển tới mô hình trí tuệ nhân tạo, hệ thống tiến hành thẩm định quyền hạn của người dùng và phạm vi dữ liệu; sau khi nhận phản hồi, hệ thống xác thực tính toàn vẹn của cấu trúc dữ liệu trước khi đưa bài viết vào hàng đợi xem xét của con người.
+
+\section{Đặc tả cấu trúc dữ liệu nhật ký kiểm toán AI}
+
+Nhằm đáp ứng yêu cầu giám sát minh bạch và bảo đảm tính giải trình trong các hệ thống phần mềm ứng dụng AI, mọi phiên tương tác giữa người dùng và mô hình đều được ghi nhận vào nhật ký kiểm toán theo các trường dữ liệu tiêu chuẩn (Bảng~\ref{tab:audit-fields}).
+
+\begin{table}[H]
+\centering
+\scriptsize
+\renewcommand{\arraystretch}{0.95}
+\caption{Danh mục các trường dữ liệu kiểm toán tương tác AI}\label{tab:audit-fields}
+\begin{tabularx}{\textwidth}{|L{4.2cm}|Y|}
+\hline
+\thead{Trường dữ liệu} & \thead{Ý nghĩa và mục đích kiểm soát}\\
+\hline
+Mã định danh yêu cầu & Chuỗi định danh duy nhất của từng phiên tương tác, không chứa thông tin nhạy cảm; phục vụ liên kết vết giữa màn hình thao tác và dữ liệu lưu vết.\\
+\hline
+Nhà cung cấp \& Phiên bản mô hình & Tên định danh dịch vụ và phiên bản mô hình thực tế vận hành tại thời điểm gửi yêu cầu.\\
+\hline
+Phiên bản chỉ dẫn & Phiên bản của tài liệu quy định chỉ dẫn hệ thống và khuôn mẫu yêu cầu người dùng.\\
+\hline
+Danh mục bản ghi ngữ cảnh & Danh sách các bản ghi dữ liệu được trích xuất hợp lệ làm căn cứ đầu vào cho mô hình.\\
+\hline
+Đo lường dung lượng xử lý & Số lượng thẻ từ đầu vào và đầu ra phục vụ công tác giám sát hiệu năng và kiểm soát hạn ngạch.\\
+\hline
+Trạng thái phản hồi & Kết quả xử lý phiên gọi: Thành công, Sai định dạng cấu trúc, Vượt thời gian chờ, hoặc Kích hoạt chế độ dự phòng.\\
+\hline
+Quyết định phê duyệt con người & Hành động can thiệp của chuyên viên quản trị: Chỉnh sửa trực tiếp, Phê duyệt, Từ chối kèm lý do hoặc Hủy bỏ.\\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Nhật ký tương tác AI qua bốn mốc chu trình phát triển}\label{sec:sdlc-ai-log}
+
+Tuân thủ định hướng của Đề tài 80300 (Học phần AIA331), việc ứng dụng trí tuệ nhân tạo được triển khai xuyên suốt toàn bộ chu trình phát triển phần mềm (SDLC) theo phương châm con người giữ quyền quyết định tối hậu (\textit{Human-in-the-loop}). Bảng~\ref{tab:sdlc-ai-log} tổng hợp quá trình tương tác, đối sánh giữa đề xuất ban đầu của mô hình, các hạn chế kỹ thuật phát hiện và phương án tinh chỉnh thực tế của sinh viên.
+
+\begin{table}[H]
+\centering
+\scriptsize
+\renewcommand{\arraystretch}{0.95}
+\caption{Nhật ký minh chứng tương tác AI qua 4 mốc phát triển phần mềm (SDLC)}\label{tab:sdlc-ai-log}
+\begin{tabularx}{\textwidth}{|C{1.8cm}|L{3.1cm}|Y|Y|}
+\hline
+\thead{Mốc SDLC} & \thead{Nhiệm vụ \& Chỉ dẫn đầu vào} & \thead{Đề xuất của AI \& Khiếm khuyết phát hiện} & \thead{Quy trình kiểm chứng \& Hiệu chỉnh thực tế} \\
+\hline
+\textbf{KT1}\par (Phân tích \& Thiết kế) &
+Thiết kế lược đồ quan hệ cho các phân hệ nghiệp vụ quản lý chiến dịch và tương tác AI. &
+Mô hình đề xuất thiếu bảng lưu vết kiểm toán tương tác AI; khóa chính bảng chỉ số dễ trùng lặp khi ghi nhận dữ liệu nhiều kênh trong cùng một ngày. &
+Bổ sung bảng lưu vết kiểm toán với đầy đủ trường định danh, phiên bản chỉ dẫn và phản hồi con người; thiết lập khóa ngoại kép và ràng buộc duy nhất.\\
+\hline
+\textbf{KT2}\par (Hiện thực hóa \& Xử lý lỗi) &
+Xây dựng thuật toán tính toán chỉ số hiệu quả chuyển đổi và tỷ lệ hoàn vốn tiếp thị. &
+Mô hình đưa ra công thức chia trực tiếp giữa lượt tương tác và lượt hiển thị, dẫn đến lỗi chia 0 khi chiến dịch mới chưa phát sinh tương tác; thiếu kiểm tra quyền. &
+Bổ sung điều kiện kiểm tra biên an toàn trước khi thực hiện phép chia; tích hợp cơ chế bảo vệ phân quyền theo vai trò quản lý và phạm vi bản ghi.\\
+\hline
+\textbf{KT3}\par (Chỉ dẫn \& Kiểm thử biên) &
+Thiết kế mẫu chỉ dẫn trích xuất ý tưởng và kiểm thử với các bản tóm tắt chiến dịch dài. &
+Phản hồi của AI vượt ngưỡng độ dài dẫn đến đứt gãy JSON; xuất hiện hiện tượng tự suy diễn các chương trình khuyến mãi không có trong ngữ cảnh ban đầu. &
+Áp dụng cơ chế tóm lược dữ liệu theo trọng số ưu tiên; thiết lập quy tắc cứng cấm suy đoán ngoài dữ liệu; bổ sung bộ kiểm định Pydantic v2 nghiêm ngặt.\\
+\hline
+\textbf{Cuối kỳ}\par (Đóng gói \& Vận hành) &
+Đóng gói container hóa toàn bộ hệ thống phục vụ triển khai trên môi trường phân tán. &
+Cấu hình mặc định sử dụng quyền root tiềm ẩn nguy cơ mất an toàn; kích thước gói giao diện quá lớn do chứa cả môi trường biên dịch Node.js. &
+Chuyển đổi dịch vụ sang tài khoản phi đặc quyền (UID 1001); áp dụng đóng gói đa tầng (Multi-stage Build) giúp giảm 98\% dung lượng ảnh xuống $\sim$24,8~MB.\\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Đánh giá chất lượng mã nguồn và tối ưu hóa an ninh (AI Code Review)}\label{sec:ai-code-review}
+
+Nhóm phát triển đã áp dụng quy trình rà soát mã nguồn kết hợp phân tích tĩnh theo khung tiêu chuẩn OWASP API Security và tối ưu hóa truy vấn SQL (Bảng~\ref{tab:ai-code-review}).
+
+\begin{table}[H]
+\centering
+\scriptsize
+\renewcommand{\arraystretch}{0.95}
+\caption{Kết quả đánh giá chất lượng mã nguồn và tối ưu hóa an ninh (AI Code Review)}\label{tab:ai-code-review}
+\begin{tabularx}{\textwidth}{|C{0.8cm}|L{2.7cm}|Y|Y|L{2.8cm}|}
+\hline
+\thead{STT} & \thead{Hạng mục rà soát} & \thead{Khiếm khuyết ban đầu} & \thead{Giải pháp kiến trúc đã áp dụng} & \thead{Hiệu quả đạt được} \\
+\hline
+1 & Bảo vệ khóa bí mật \& Lọc nhật ký & Khóa kết nối dịch vụ ngoại vi đọc phân tán; nguy cơ lộ khóa rõ khi in log lỗi mạng. & Mã hóa khóa BYOK bằng Fernet AES-128; cài đặt bộ biến đổi che mặt nạ chuỗi nhạy cảm (chỉ giữ 4 ký tự đầu/cuối). & Bảo vệ 100\% khóa bí mật; khử hoàn toàn rò rỉ trên tệp nhật ký. \\
+\hline
+2 & Phân quyền vai trò \& Phạm vi bản ghi & Các tuyến xóa chiến dịch và duyệt nội dung ban đầu thiếu kiểm tra chéo trạng thái tài khoản và phạm vi sở hữu. & Tách biệt tầng xác thực JWT và tầng thẩm định RBAC + Record-level Scope (\texttt{CampaignMember}). & Chặn 100\% hành vi leo quyền dọc và ngang (IDOR) với mã 403. \\
+\hline
+3 & Tối ưu hóa truy vấn CSDL quan hệ & Lấy danh sách chiến dịch kèm chỉ số hiệu suất dùng vòng lặp tuần tự gây hiện tượng truy vấn lặp $N+1$. & Tái cấu trúc sang phép kết nối ngoài (\texttt{OUTER JOIN}) kết hợp gom nhóm \texttt{GROUP BY} trực tiếp tại động cơ CSDL. & Độ trễ P95 giảm từ 1.240~ms xuống 18~ms (nhanh hơn 68,8 lần). \\
+\hline
+\end{tabularx}
+\end{table}
+
+\chapter{HƯỚNG DẪN CÀI ĐẶT, CẤU HÌNH VÀ ĐÓNG GÓI TRIỂN KHAI}
+
+\section{Quy trình thiết lập môi trường và vận hành tiêu chuẩn}
+
+Quy trình khởi tạo và đưa hệ thống MarketFlow AI vào trạng thái sẵn sàng phục vụ kiểm thử nghiệm thu được chuẩn hóa qua 4 bước tuần tự trong Bảng~\ref{tab:app-lifecycle}.
+
+\begin{table}[H]
+\centering
+\scriptsize
+\renewcommand{\arraystretch}{0.95}
+\caption{Quy trình 4 giai đoạn thiết lập, nạp dữ liệu mẫu và vận hành hệ thống}
+\label{tab:app-lifecycle}
+\begin{tabularx}{\textwidth}{|C{1.0cm}|L{3.0cm}|L{4.8cm}|Y|}
+\hline
+\thead{Bước} & \thead{Phân hệ} & \thead{Thao tác / Lệnh thực thi tiêu chuẩn} & \thead{Kết quả đầu ra kiểm chứng}\\
+\hline
+1 & Môi trường Backend & Cài đặt gói phụ thuộc Python 3.11 trong môi trường ảo cô lập (\texttt{pip install -r requirements.txt}). & Thiết lập đồng nhất thư viện FastAPI, SQLAlchemy 2.0, Pydantic v2, Cryptography. \\
+\hline
+2 & Cơ sở dữ liệu \& Seed Data & Khởi tạo lược đồ 11 bảng 3NF (SQLite WAL) và chạy script \texttt{init\_db.py} nạp dữ liệu mẫu. & Nạp sẵn tài khoản Manager/Marketer, 4 chiến dịch, 14 nội dung, 60 bản ghi metrics. \\
+\hline
+3 & Máy chủ API \& Giao diện Web & Khởi chạy Backend (\texttt{uvicorn app.main:app --port 8000}) và Frontend (\texttt{npm run dev} tại cổng 5173). & Hệ thống phục vụ đầy đủ giao diện Bento Grid, AI Studio và Swagger UI (\texttt{/docs}). \\
+\hline
+4 & Kiểm thử Tự động & Thực thi bộ kiểm thử \texttt{pytest backend/tests -q} trên CSDL in-memory cô lập. & Vượt qua toàn bộ 205/205 ca kiểm thử tự động (100\% Pass, 0 Warnings). \\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Danh mục tham số cấu hình môi trường (\texttt{.env.example}) và Đóng gói Docker}
+
+Toàn bộ tham số nhạy cảm và cấu hình đóng gói đa tầng (\texttt{Dockerfile}, \texttt{docker-compose.yml}) được quản lý tập trung theo Bảng~\ref{tab:app-env-vars}.
+
+\begin{table}[H]
+\centering
+\scriptsize
+\renewcommand{\arraystretch}{0.95}
+\caption{Đặc tả tham số môi trường trọng yếu và kiến trúc đóng gói Container}
+\label{tab:app-env-vars}
+\begin{tabularx}{\textwidth}{|L{4.1cm}|L{4.1cm}|Y|}
+\hline
+\thead{Tham số / Thành phần} & \thead{Giá trị / Cấu hình chuẩn} & \thead{Vai trò kỹ thuật và Chính sách an ninh}\\
+\hline
+\texttt{DATABASE\_URL} & \texttt{sqlite:///./marketflow.db} & Kết nối CSDL SQLite kích hoạt tự động \texttt{PRAGMA journal\_mode=WAL} và \texttt{foreign\_keys=ON}. \\
+\hline
+\texttt{SECRET\_KEY} \& \texttt{ALGORITHM} & Chuỗi 256-bit / \texttt{HS256} & Khóa ký số JWT Bearer Token và khóa dẫn xuất PBKDF2-HMAC-SHA256 cho BYOK Vault. \\
+\hline
+\texttt{GEMINI\_API\_KEY} \& \texttt{AI\_TIMEOUT} & Khóa AI Studio / \texttt{10s} & Khóa kết nối mặc định tầng môi trường (Tier 3) và ngưỡng ngắt mạch tự động chuyển sang Smart Fallback. \\
+\hline
+Container Backend (\texttt{:8000}) & \texttt{python:3.11-slim} (UID 1001) & Vận hành dưới tài khoản phi đặc quyền; tích hợp \texttt{HEALTHCHECK} định kỳ 30 giây và gắn kết ổ đĩa bền vững. \\
+\hline
+Container Frontend (\texttt{:80}) & Multi-stage Build + \texttt{nginx:alpine} & Biên dịch tĩnh TypeScript/Vite ở tầng 1 và phân phối qua Nginx ở tầng 2 (giảm 98\% dung lượng ảnh xuống $\sim$24,8~MB). \\
+\hline
+\end{tabularx}
+\end{table}
+

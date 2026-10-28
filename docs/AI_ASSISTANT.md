@@ -1,7 +1,7 @@
 # Phân Hệ Trợ Lý AI — Kiến Trúc, Công Cụ & Tối Ưu Prompt (KT3)
 
 > Học phần: Ứng dụng trí tuệ nhân tạo (AIA331)  
-> Hệ thống: MarketFlow v2  
+> Hệ thống: MarketFlow  
 > Đối tượng: Trợ lý Marketing AI (`marketflow`)  
 > Căn cứ kỹ thuật: `docs/rebuild/CONTRACT.md`, `docs/rebuild/P0_SPIKE_REPORT.md`, `deploy/opencode/prompts/*`  
 
@@ -9,7 +9,7 @@
 
 ## 1. Tổng quan & Nguyên tắc cốt lõi
 
-Trợ lý AI trong MarketFlow v2 được thiết kế như một không gian làm việc hội thoại chuyên biệt (route `/assistant`, tương tự Claude.ai), phục vụ đội ngũ tiếp thị của doanh nghiệp vừa và nhỏ (SME) tại Việt Nam.
+Trợ lý AI trong MarketFlow được thiết kế như một không gian làm việc hội thoại chuyên biệt (route `/assistant`, tương tự Claude.ai), phục vụ đội ngũ tiếp thị của doanh nghiệp vừa và nhỏ (SME) tại Việt Nam.
 
 Hệ thống tuân thủ nghiêm ngặt **Bộ quy tắc chống tính năng ảo (CONTRACT §0)**:
 1. **Chỉ gọi là AI khi thực sự gọi LLM**: Toàn bộ phản hồi của Trợ lý AI đều được sinh trực tiếp từ mô hình ngôn ngữ lớn (OpenCode Zen) thông qua OpenCode CLI. Không sử dụng các luật if/else giả danh AI.

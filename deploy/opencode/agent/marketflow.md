@@ -5,10 +5,6 @@ options:
   reasoningEffort: low
 permission:
   "*": deny
-  read: {"*": deny, "/__mf_never__/x": allow}
-  glob: {"*": deny, "/__mf_never__/x": allow}
-  grep: {"*": deny, "/__mf_never__/x": allow}
-  list: {"*": deny, "/__mf_never__/x": allow}
   external_directory: deny
   "marketflow_*": allow
 ---

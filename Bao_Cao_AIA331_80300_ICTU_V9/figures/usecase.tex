@@ -1,0 +1,83 @@
+\resizebox{0.98\textwidth}{!}{%
+\begin{tikzpicture}[
+  font=\sffamily\footnotesize,
+  >=Latex,
+  uc/.style={
+    draw=black,
+    fill=white,
+    rounded corners=8pt,
+    minimum width=4.0cm,
+    minimum height=0.72cm,
+    align=center,
+    line width=0.8pt,
+    text width=3.7cm,
+    inner sep=3pt,
+    font=\sffamily\scriptsize
+  },
+  uc_ai/.style={
+    draw=black,
+    fill=black!6,
+    rounded corners=8pt,
+    minimum width=4.0cm,
+    minimum height=0.72cm,
+    align=center,
+    line width=0.85pt,
+    text width=3.7cm,
+    inner sep=3pt,
+    font=\sffamily\scriptsize
+  },
+  actor_lbl/.style={font=\sffamily\bfseries\scriptsize,text=black,align=center},
+  assoc/.style={draw=black!90,line width=0.75pt},
+  dep/.style={draw=black!80,dashed,line width=0.75pt,-{Latex[length=2.2mm]}},
+  ste/.style={font=\sffamily\scriptsize\itshape,fill=white,inner sep=1.5pt,text=black}
+]
+
+\draw[draw=black!75,fill=black!1,rounded corners=5pt,line width=0.85pt] (2.4,-4.3) rectangle (13.8,4.35);
+\node[font=\sffamily\bfseries\footnotesize,text=black,anchor=center] at (8.1, 3.95) {HỆ THỐNG QUẢN LÝ CHIẾN DỊCH MARKETING (MARKETFLOW AI)};
+
+\coordinate (mgr_c) at (0.95, 2.0);
+\draw[line width=0.9pt,draw=black] (mgr_c) circle (0.22cm);
+\draw[line width=0.9pt,draw=black] (0.95, 1.78) -- (0.95, 1.15);
+\draw[line width=0.9pt,draw=black] (0.55, 1.55) -- (1.35, 1.55);
+\draw[line width=0.9pt,draw=black] (0.95, 1.15) -- (0.60, 0.65);
+\draw[line width=0.9pt,draw=black] (0.95, 1.15) -- (1.30, 0.65);
+\node[actor_lbl] at (0.95, 0.20) {Quản lý /\\Người duyệt};
+\coordinate (mgr_pt) at (1.45, 1.3);
+
+\coordinate (stf_c) at (0.95, -1.8);
+\draw[line width=0.9pt,draw=black] (stf_c) circle (0.22cm);
+\draw[line width=0.9pt,draw=black] (0.95, -2.02) -- (0.95, -2.65);
+\draw[line width=0.9pt,draw=black] (0.55, -2.25) -- (1.35, -2.25);
+\draw[line width=0.9pt,draw=black] (0.95, -2.65) -- (0.60, -3.15);
+\draw[line width=0.9pt,draw=black] (0.95, -2.65) -- (1.30, -3.15);
+\node[actor_lbl] at (0.95, -3.60) {Nhân viên\\Marketing};
+\coordinate (stf_pt) at (1.45, -2.3);
+
+\node[uc] (uc_auth) at (5.0, 3.10) {Đăng nhập \& Phân quyền};
+\node[uc] (uc_camp) at (5.0, 2.00) {Quản lý chiến dịch \& Ngân sách};
+\node[uc] (uc_chan) at (5.0, 0.90) {Quản lý kênh \& Brand Kit};
+\node[uc] (uc_appr) at (5.0, -0.20) {\textbf{Phê duyệt nội dung (HITL)}};
+\node[uc] (uc_cont) at (5.0, -1.30) {Soạn thảo \& Gửi duyệt bài};
+\node[uc] (uc_plan) at (5.0, -2.40) {Quản lý lịch xuất bản bài};
+\node[uc] (uc_metr) at (5.0, -3.50) {Ghi nhận \& Thống kê chỉ số};
+
+\node[uc_ai] (uc_idea)  at (11.3, -0.40) {AI: Sinh ý tưởng chiến dịch};
+\node[uc_ai] (uc_draft) at (11.3, -1.90) {AI: Sinh bản nháp theo kênh};
+\node[uc_ai] (uc_sum)   at (11.3, -3.50) {AI: Tóm tắt hiệu quả \& Gợi ý};
+
+\draw[assoc] (mgr_pt) -- (uc_auth.west);
+\draw[assoc] (mgr_pt) -- (uc_camp.west);
+\draw[assoc] (mgr_pt) -- (uc_chan.west);
+\draw[assoc] (mgr_pt) -- (uc_appr.west);
+
+\draw[assoc] (stf_pt) -- (uc_auth.west);
+\draw[assoc] (stf_pt) -- (uc_cont.west);
+\draw[assoc] (stf_pt) -- (uc_plan.west);
+\draw[assoc] (stf_pt) -- (uc_metr.west);
+
+\draw[dep] (uc_idea.west)  -- node[ste,pos=0.48]{<<extend>>} (uc_cont.12);
+\draw[dep] (uc_draft.west) -- node[ste,pos=0.48]{<<extend>>} (uc_cont.348);
+\draw[dep] (uc_sum.west)   -- node[ste,pos=0.50]{<<extend>>} (uc_metr.east);
+
+\end{tikzpicture}%
+}

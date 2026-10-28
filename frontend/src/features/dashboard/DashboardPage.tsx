@@ -10,6 +10,7 @@ import {
   Calendar,
   ArrowRight,
   Sparkles,
+  Download,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -154,6 +155,67 @@ export default function DashboardPage() {
 
   const overview = overviewQ.data;
 
+  const handleExportReport = () => {
+    if (!overview) return;
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows: string[] = [
+      ['BÁO CÁO TỔNG QUAN HIỆU QUẢ MARKETING - MARKETFLOW'].map(esc).join(','),
+      ['Ngày xuất báo cáo', formatDate(todayKey())].map(esc).join(','),
+      '',
+      ['1. CHỈ SỐ TỔNG HỢP'].map(esc).join(','),
+      ['Lượt hiển thị (Views)', 'Lượt nhấp (Clicks)', 'Chuyển đổi (Conversions)', 'Tổng chi phí (VNĐ)', 'CTR (%)', 'CPC (VNĐ)', 'CPA (VNĐ)', 'CPM (VNĐ)'].map(esc).join(','),
+      [
+        overview.totals.views,
+        overview.totals.clicks,
+        overview.totals.conversions,
+        overview.totals.cost,
+        overview.rates.ctr !== null ? (overview.rates.ctr * 100).toFixed(2) : '0.00',
+        overview.rates.cpc ?? 0,
+        overview.rates.cpa ?? 0,
+        overview.rates.cpm ?? 0,
+      ].map(esc).join(','),
+      '',
+      ['2. HIỆU QUẢ THEO CHIẾN DỊCH'].map(esc).join(','),
+      ['Mã CD', 'Tên chiến dịch', 'Trạng thái', 'Ngân sách (VNĐ)', 'Chi phí thực tế (VNĐ)', 'Lượt hiển thị', 'Lượt nhấp', 'Chuyển đổi', 'CTR (%)', 'CPA (VNĐ)'].map(esc).join(','),
+      ...(byCampaignQ.data ?? []).map((c) =>
+        [
+          c.campaign.id,
+          c.campaign.name,
+          c.campaign.status,
+          c.budget,
+          c.cost,
+          c.views,
+          c.clicks,
+          c.conversions,
+          c.ctr !== null ? (c.ctr * 100).toFixed(2) : '0.00',
+          c.cpa ?? 0,
+        ].map(esc).join(',')
+      ),
+      '',
+      ['3. HIỆU QUẢ THEO KÊNH TRIỂN KHAI'].map(esc).join(','),
+      ['Kênh', 'Lượt hiển thị', 'Lượt nhấp', 'Chuyển đổi', 'Chi phí (VNĐ)', 'CTR (%)', 'CPC (VNĐ)', 'CPA (VNĐ)'].map(esc).join(','),
+      ...(byChannelQ.data ?? []).map((ch) =>
+        [
+          ch.channel.name,
+          ch.views,
+          ch.clicks,
+          ch.conversions,
+          ch.cost,
+          ch.ctr !== null ? (ch.ctr * 100).toFixed(2) : '0.00',
+          ch.cpc ?? 0,
+          ch.cpa ?? 0,
+        ].map(esc).join(',')
+      ),
+    ];
+    const blob = new Blob(['\uFEFF' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bao-cao-marketing-${todayKey()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <PageContainer>
       <PageHeader
@@ -164,6 +226,26 @@ export default function DashboardPage() {
           </div>
         }
         description="Hiệu quả và chi phí chiến dịch tổng hợp từ số liệu đã nhập hoặc import."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" onClick={handleExportReport} disabled={!overview}>
+              <Download className="h-4 w-4" />
+              Xuất báo cáo Excel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() =>
+                openContextualCopilot({
+                  prompt:
+                    'Hãy lập báo cáo phân tích tổng quan hiệu quả các chiến dịch marketing hiện tại, chỉ ra kênh hiệu quả nhất, chiến dịch cần tối ưu chi phí CPA và đề xuất hành động cụ thể.',
+                })
+              }
+            >
+              <Sparkles className="h-4 w-4" />
+              Báo cáo AI chuyên sâu
+            </Button>
+          </div>
+        }
       />
 
       {/* Filter bar */}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Filter, Trash2, Edit3, Eye, AlertCircle, Sparkles } from 'lucide-react';
+import { Plus, Filter, Trash2, Edit3, Eye, AlertCircle, Sparkles, Download } from 'lucide-react';
 import { PageContainer } from '@/app/layout/PageContainer';
 import { openContextualCopilot } from '@/features/assistant/CopilotDrawer';
 import {
@@ -141,16 +141,50 @@ export default function CampaignsPage() {
     await updateMutation.mutateAsync({ id: editingCampaignId, body });
   };
 
+  const handleExportCampaigns = () => {
+    const items = data?.items ?? [];
+    if (!items.length) return;
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows = [
+      ['Mã CD', 'Tên chiến dịch', 'Mục tiêu', 'Trạng thái', 'Ngân sách (VNĐ)', 'Ngày bắt đầu', 'Ngày kết thúc', 'Người phụ trách'].map(esc).join(','),
+      ...items.map((c) =>
+        [
+          c.id,
+          c.name,
+          GOAL_LABEL[c.goal] ?? c.goal,
+          CAMPAIGN_STATUS_LABEL[c.status] ?? c.status,
+          c.budget,
+          formatDate(c.start_date),
+          formatDate(c.end_date),
+          c.owner?.full_name ?? '',
+        ].map(esc).join(',')
+      ),
+    ];
+    const blob = new Blob(['\uFEFF' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `danh-sach-chien-dich.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <PageContainer>
       <PageHeader
         title="Chiến dịch"
         description="Quản lý các chiến dịch marketing, mục tiêu, kênh triển khai và phân bổ ngân sách."
         actions={
-          <Button variant="primary" onClick={() => navigate('/campaigns/new')}>
-            <Plus className="h-4 w-4" />
-            Tạo chiến dịch mới
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" onClick={handleExportCampaigns} disabled={!data?.items?.length}>
+              <Download className="h-4 w-4" />
+              Xuất báo cáo Excel
+            </Button>
+            <Button variant="primary" onClick={() => navigate('/campaigns/new')}>
+              <Plus className="h-4 w-4" />
+              Tạo chiến dịch mới
+            </Button>
+          </div>
         }
       />
 

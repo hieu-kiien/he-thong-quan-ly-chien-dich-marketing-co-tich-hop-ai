@@ -1,0 +1,98 @@
+\resizebox{0.98\textwidth}{!}{%
+\begin{tikzpicture}[
+  font=\sffamily\footnotesize,
+  >=Latex,
+  entity/.style={
+    matrix of nodes,
+    nodes={
+      draw=black!80,
+      fill=white,
+      minimum width=4.0cm,
+      minimum height=0.44cm,
+      text width=3.7cm,
+      align=left,
+      inner sep=2.5pt,
+      font=\sffamily\scriptsize
+    },
+    row sep=-0.5pt,
+    column sep=0pt
+  },
+  header/.style={nodes={fill=black!10,text=black,font=\sffamily\bfseries\scriptsize,align=center,minimum height=0.52cm}},
+  header_core/.style={nodes={fill=black!18,text=black,font=\sffamily\bfseries\scriptsize,align=center,minimum height=0.52cm}},
+  rel/.style={draw=black,line width=0.75pt,-{Latex[length=2mm]}},
+  card/.style={font=\sffamily\bfseries\scriptsize,text=black,fill=white,inner sep=1.5pt}
+]
+
+\matrix (reviews) [entity,row 1/.style={header}] at (2.1, 2.3) {
+  content\_reviews (Lịch sử duyệt)\\
+  \textbf{PK} id : INTEGER\\
+  \textbf{FK} content\_id : INT\\
+  \textbf{FK} reviewer\_id : INT\\
+  decision : VARCHAR(20)\\
+  reason : TEXT\\
+  reviewed\_at : TIMESTAMP\\
+};
+
+\matrix (contents) [entity,row 1/.style={header_core}] at (7.6, 2.3) {
+  marketing\_contents (Bảng lõi)\\
+  \textbf{PK} id : INTEGER\\
+  \textbf{FK} campaign\_id : INT\\
+  \textbf{FK} channel\_id : INT\\
+  status : VARCHAR(20)\\
+  title, body : TEXT\\
+};
+
+\matrix (schedules) [entity,row 1/.style={header}] at (13.1, 2.3) {
+  marketing\_schedules (Lịch đăng)\\
+  \textbf{PK} id : INTEGER\\
+  \textbf{FK} content\_id : INT\\
+  scheduled\_at : TIMESTAMP\\
+  timezone : VARCHAR(50)\\
+  status : VARCHAR(20)\\
+};
+
+\matrix (members) [entity,row 1/.style={header}] at (2.1, -1.4) {
+  campaign\_members (Phân công)\\
+  \textbf{PK, FK} campaign\_id : INT\\
+  \textbf{PK, FK} user\_id : INT\\
+  role : VARCHAR(30)\\
+  assigned\_at : TIMESTAMP\\
+};
+
+\matrix (campaigns) [entity,row 1/.style={header_core}] at (7.6, -1.4) {
+  campaigns (Bảng lõi)\\
+  \textbf{PK} id : INTEGER\\
+  \textbf{FK} product\_id : INT\\
+  title : VARCHAR(200)\\
+  budget : NUMERIC(15,2)\\
+};
+
+\matrix (metrics) [entity,row 1/.style={header}] at (13.1, -1.4) {
+  campaign\_metrics (Chỉ số)\\
+  \textbf{PK} id : INTEGER\\
+  \textbf{FK} campaign\_id : INT\\
+  \textbf{FK} channel\_id : INT\\
+  metric\_date : DATE\\
+  views, clicks : INT\\
+  cost, rev : NUMERIC(12,2)\\
+};
+
+\matrix (ailogs) [entity, anchor=north, row 1/.style={header}] at ([yshift=-1.2cm]campaigns.south) {
+  ai\_logs (Nhật ký kiểm toán AI)\\
+  \textbf{PK} id : INTEGER\\
+  \textbf{FK} user\_id, campaign\_id : INT\\
+  provider, model : TEXT\\
+  prompt\_version : TEXT\\
+  status : VARCHAR(20)\\
+  latency\_ms, tokens\_used : INT\\
+  created\_at : TIMESTAMP\\
+};
+
+\draw[rel] (contents) -- node[card,above=1pt,pos=0.5]{1..*} (reviews);
+\draw[rel] (contents) -- node[card,above=1pt,pos=0.5]{1..*} (schedules);
+\draw[rel] (campaigns) -- node[card,above=1pt,pos=0.5]{1..*} (members);
+\draw[rel] (campaigns) -- node[card,above=1pt,pos=0.5]{1..*} (metrics);
+\draw[rel] (campaigns.south) -- node[card,right=2pt,pos=0.5]{1..*} (ailogs.north);
+
+\end{tikzpicture}%
+}

@@ -1,0 +1,64 @@
+\resizebox{0.98\textwidth}{!}{%
+\begin{tikzpicture}[
+  font=\sffamily\footnotesize,
+  >=Latex,
+  part/.style={
+    draw=black,
+    fill=black!6,
+    rounded corners=3pt,
+    minimum width=2.5cm,
+    minimum height=0.75cm,
+    align=center,
+    line width=0.85pt,
+    font=\sffamily\bfseries\scriptsize
+  },
+  act/.style={draw=black,fill=black!8,line width=0.6pt},
+  lifeline/.style={draw=black!50,dashed,line width=0.55pt},
+  msg/.style={-{Latex[length=1.9mm]},draw=black,line width=0.75pt},
+  ret/.style={-{Latex[length=1.9mm]},draw=black!85,dashed,line width=0.75pt},
+  lab/.style={font=\sffamily\scriptsize,fill=white,inner sep=1.5pt,align=center,text=black}
+]
+
+\node[part] (p_stf) at (0.8, 0) {Nhân viên};
+\node[part] (p_ui)  at (4.2, 0) {Giao diện Web};
+\node[part] (p_api) at (7.8, 0) {API Backend};
+\node[part] (p_ai)  at (11.4, 0) {Điều phối AI};
+\node[part] (p_db)  at (14.8, 0) {Cơ sở Dữ liệu};
+
+\foreach \x in {0.8, 4.2, 7.8, 11.4, 14.8} {
+  \draw[lifeline] (\x, -0.42) -- (\x, -11.8);
+}
+
+\draw[act] (4.13, -0.95) rectangle (4.27, -10.2);
+\draw[act] (7.73, -1.55) rectangle (7.87, -11.4);
+\draw[act] (11.33, -3.40) rectangle (11.47, -7.95);
+\draw[act] (14.73, -2.10) rectangle (14.87, -2.85);
+\draw[act] (14.73, -5.95) rectangle (14.87, -6.45);
+\draw[act] (14.73, -10.65) rectangle (14.87, -11.4);
+
+\draw[msg] (0.8, -0.95) -- node[lab,above]{1: Yêu cầu sinh nháp} (4.13, -0.95);
+\draw[msg] (4.27, -1.55) -- node[lab,above]{2: POST /api/v1/ai/draft} (7.73, -1.55);
+\draw[msg] (7.87, -2.15) -- node[lab,above,pos=0.5]{3: Kiểm tra quyền \& Đọc ngữ cảnh} (14.73, -2.15);
+\draw[ret] (14.73, -2.80) -- node[lab,above,pos=0.5]{4: Ngữ cảnh hợp lệ} (7.87, -2.80);
+\draw[msg] (7.87, -3.45) -- node[lab,above]{5: Tạo Prompt (prompts.json)} (11.33, -3.45);
+\draw[msg] (11.47, -3.95) -- ++(0.85, 0) -- ++(0, -0.45) node[lab,right]{6: Gọi LLM API} -- (11.47, -4.40);
+
+\draw[draw=black!75,line width=0.75pt,rounded corners=3pt,fill=black!1] (6.80, -4.75) rectangle (15.50, -8.55);
+\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=north west] at (6.95, -4.82) {alt [Phản hồi JSON hợp lệ]};
+
+\draw[msg] (11.33, -5.65) -- node[lab,above]{7a: Trả JSON đúng Schema} (7.87, -5.65);
+\draw[msg] (11.47, -6.20) -- node[lab,above]{8a: Ghi nhật ký ai\_logs} (14.73, -6.20);
+
+\draw[line width=0.55pt,dashed,draw=black!60] (6.80, -6.75) -- (15.50, -6.75);
+\node[font=\sffamily\scriptsize\itshape,text=black,anchor=north west] at (6.95, -6.83) {[Timeout / Lỗi Schema]: Chuyển sang Smart Fallback};
+
+\draw[ret] (11.33, -7.85) -- node[lab,above]{7b: Bản nháp dự phòng (is\_fallback)} (7.87, -7.85);
+
+\draw[ret] (7.73, -9.10) -- node[lab,above]{9: Hiển thị bản nháp \& nguồn gốc} (4.27, -9.10);
+\draw[msg] (0.8, -9.70) -- node[lab,above]{10: Chỉnh sửa \& Gửi duyệt} (4.13, -9.70);
+\draw[msg] (4.27, -10.30) -- node[lab,above]{11: POST /contents/\{id\}/submit} (7.73, -10.30);
+\draw[msg] (7.87, -10.80) -- node[lab,above,pos=0.5]{12: Lưu trạng thái IN\_REVIEW} (14.73, -10.80);
+\draw[ret] (14.73, -11.35) -- node[lab,above,pos=0.5]{13: Xác nhận thành công} (7.87, -11.35);
+
+\end{tikzpicture}%
+}

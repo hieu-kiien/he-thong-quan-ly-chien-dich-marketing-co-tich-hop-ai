@@ -1,4 +1,4 @@
-# MarketFlow v2 — Design Contract (nguồn sự thật chung cho mọi agent)
+# MarketFlow — Design Contract (nguồn sự thật chung cho mọi agent)
 
 > Branch: `rebuild/v2`. Code cũ tham khảo qua tag `legacy-v1` (`git show legacy-v1:<path>`).
 > Ngôn ngữ UI & thông báo lỗi: **tiếng Việt**. Code, tên biến, enum: tiếng Anh.

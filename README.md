@@ -1,4 +1,4 @@
-# MarketFlow v2 — Hệ Thống Quản Lý Chiến Dịch Marketing Có Tích Hợp AI
+# MarketFlow — Hệ Thống Quản Lý Chiến Dịch Marketing Có Tích Hợp AI
 
 > **Dự án môn học**: Ứng dụng trí tuệ nhân tạo (AIA331) — Mã số đề tài: 80300  
 > **Trường**: Trường Đại học Công nghệ Thông tin & Truyền thông — Đại học Thái Nguyên  
@@ -7,9 +7,9 @@
 
 ---
 
-## 1. Giới thiệu Hệ thống (Scope v2)
+## 1. Giới thiệu Hệ thống 
 
-MarketFlow v2 là giải pháp quản lý chiến dịch tiếp thị số tinh gọn, trung thực và an toàn dành riêng cho các doanh nghiệp vừa và nhỏ (SME) tại Việt Nam. Hệ thống kết hợp chặt chẽ giữa các nghiệp vụ quản trị tiếp thị cốt lõi và Trợ lý AI hội thoại hiện đại:
+MarketFlow là giải pháp quản lý chiến dịch tiếp thị số tinh gọn, trung thực và an toàn dành riêng cho các doanh nghiệp vừa và nhỏ (SME) tại Việt Nam. Hệ thống kết hợp chặt chẽ giữa các nghiệp vụ quản trị tiếp thị cốt lõi và Trợ lý AI hội thoại hiện đại:
 
 - **Quản lý Chiến dịch & Đa kênh**: Quản lý mục tiêu, tiến độ, ngân sách tổng và phân bổ ngân sách cho 7 kênh tiếp thị chuẩn: Facebook, TikTok, Instagram, Zalo OA, Email, Google Ads, Website.
 - **Quy trình Kiểm duyệt Nội dung Chặt chẽ**: Áp dụng máy trạng thái (`DRAFT` → `PENDING_REVIEW` → `APPROVED` / `REJECTED` → `PUBLISHED`). Tách bạch quyền hạn giữa người tạo và người duyệt; người quản lý không được tự duyệt bài viết của chính mình (`CANNOT_REVIEW_OWN`).

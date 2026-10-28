@@ -1,7 +1,7 @@
 # Kế Hoạch & Danh Mục Ca Kiểm Thử (Testing Guide & Test Catalogue)
 
 > Học phần: Ứng dụng trí tuệ nhân tạo (AIA331)  
-> Hệ thống: MarketFlow v2  
+> Hệ thống: MarketFlow  
 > Ngày cập nhật số liệu: 27/10/2026  
 > Căn cứ kỹ thuật: `backend/tests/`, `ai-runner/tests/`, `frontend/`, `scripts/evaluate_assistant.py`  
 

@@ -1,12 +1,12 @@
 # Báo Cáo Thực Nghiệm P0 Spike — AI Runtime & OpenCode Integration
 
-Tài liệu này ghi lại toàn bộ kết quả đo lường thực nghiệm, phân tích bảo mật, so sánh mô hình và các quyết định kỹ thuật cho phân hệ AI Runtime của hệ thống **MarketFlow v2**.
+Tài liệu này ghi lại toàn bộ kết quả đo lường thực nghiệm, phân tích bảo mật, so sánh mô hình và các quyết định kỹ thuật cho phân hệ AI Runtime của hệ thống **MarketFlow**.
 
 ---
 
 ## 1. Bối cảnh & Mục tiêu Spike
 
-Trong kiến trúc MarketFlow v2, hệ thống sử dụng **OpenCode CLI** kết nối với các mô hình miễn phí thông qua hạ tầng **OpenCode Zen**. Toàn bộ hệ thống chạy trên máy chủ VPS thực tế:
+Trong kiến trúc MarketFlow, hệ thống sử dụng **OpenCode CLI** kết nối với các mô hình miễn phí thông qua hạ tầng **OpenCode Zen**. Toàn bộ hệ thống chạy trên máy chủ VPS thực tế:
 - **Cấu hình phần cứng**: 2 vCPU, 2 GiB RAM, 40 GiB NVMe.
 - **Hệ điều hành**: Ubuntu 24.04 LTS (Kernel Linux x86_64).
 - **Mục tiêu**:
