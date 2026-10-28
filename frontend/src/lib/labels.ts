@@ -27,6 +27,76 @@ export const GOAL_LABEL: Record<CampaignGoal, string> = {
   SALES: 'Tăng doanh số',
 };
 
+export const GOAL_TONE: Record<CampaignGoal, Tone> = {
+  AWARENESS: 'info',
+  TRAFFIC: 'accent',
+  LEADS: 'warning',
+  SALES: 'success',
+};
+
+export interface GoalKpiMeta {
+  primaryMetricKey: 'views' | 'clicks' | 'conversions';
+  primaryKpiLabel: string;
+  secondaryKpiLabel: string;
+  contentDirection: string;
+  defaultCta: string;
+}
+
+/**
+ * Định hướng KPI trọng tâm và góc tiếp cận nội dung bám sát từng Mục tiêu chiến dịch (CampaignGoal).
+ */
+export const GOAL_KPI_META: Record<CampaignGoal, GoalKpiMeta> = {
+  AWARENESS: {
+    primaryMetricKey: 'views',
+    primaryKpiLabel: 'Lượt xem (Views) & độ phủ',
+    secondaryKpiLabel: 'Chi phí mỗi 1.000 lượt hiển thị (CPM)',
+    contentDirection:
+      'Tập trung kể câu chuyện sản phẩm, nêu bật điểm khác biệt và hình ảnh bắt mắt để mở rộng độ nhận biết thương hiệu.',
+    defaultCta: 'Khám phá câu chuyện thương hiệu',
+  },
+  TRAFFIC: {
+    primaryMetricKey: 'clicks',
+    primaryKpiLabel: 'Lượt nhấp (Clicks) & Tỷ lệ nhấp (CTR)',
+    secondaryKpiLabel: 'Chi phí mỗi lượt nhấp (CPC)',
+    contentDirection:
+      'Mở đầu bằng câu hỏi hoặc lợi ích trực diện, dẫn dắt người đọc nhấp vào liên kết để xem chi tiết trên trang đích.',
+    defaultCta: 'Xem chi tiết tại trang sản phẩm',
+  },
+  LEADS: {
+    primaryMetricKey: 'conversions',
+    primaryKpiLabel: 'Lượt đăng ký (Conversions) & Tỷ lệ chuyển đổi (CVR)',
+    secondaryKpiLabel: 'Chi phí mỗi khách hàng tiềm năng (CPA)',
+    contentDirection:
+      'Nhấn mạnh giá trị thực tế khách hàng nhận được (vé tham dự, buổi thử mẫu, ưu đãi thành viên) để khuyến khích để lại thông tin.',
+    defaultCta: 'Đăng ký giữ chỗ ngay hôm nay',
+  },
+  SALES: {
+    primaryMetricKey: 'conversions',
+    primaryKpiLabel: 'Đơn hàng chuyển đổi (Conversions) & CVR',
+    secondaryKpiLabel: 'Chi phí trên mỗi đơn hàng (CPA)',
+    contentDirection:
+      'Nêu rõ sản phẩm chủ lực, mức ưu đãi hiện hành, cam kết chất lượng và thúc đẩy hành động đặt mua ngay.',
+    defaultCta: 'Đặt mua ngay để nhận ưu đãi',
+  },
+};
+
+export function buildGoalContentDraft(campaign: {
+  name: string;
+  goal: CampaignGoal;
+  objective: string;
+  product: string;
+  target_audience: string;
+  key_message?: string | null;
+}): { title: string; body: string; cta: string } {
+  const meta = GOAL_KPI_META[campaign.goal];
+  const coreMsg = campaign.key_message ? `\n\nThông điệp chủ đạo: "${campaign.key_message}"` : '';
+  return {
+    title: `[${GOAL_LABEL[campaign.goal]}] ${campaign.product} — ${campaign.name}`,
+    body: `Dành cho: ${campaign.target_audience}\nSản phẩm trọng tâm: ${campaign.product}${coreMsg}\n\nĐiểm nhấn nội dung (${GOAL_LABEL[campaign.goal]}):\n- ${meta.contentDirection}\n- Bám sát mục tiêu chiến dịch: ${campaign.objective}\n- Lợi ích nổi bật dành cho khách hàng khi trải nghiệm ${campaign.product}.`,
+    cta: meta.defaultCta,
+  };
+}
+
 export const CAMPAIGN_STATUS_LABEL: Record<CampaignStatus, string> = {
   PLANNED: 'Lên kế hoạch',
   ACTIVE: 'Đang chạy',

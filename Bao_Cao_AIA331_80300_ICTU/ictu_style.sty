@@ -16,6 +16,15 @@
 \setlength{\textfloatsep}{6pt plus 2pt minus 2pt}
 \setlength{\abovedisplayskip}{5pt}
 \setlength{\belowdisplayskip}{5pt}
+\renewcommand{\topfraction}{0.92}
+\renewcommand{\bottomfraction}{0.85}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.85}
+\makeatletter
+\setlength{\@fptop}{0pt}
+\setlength{\@fpsep}{10pt}
+\setlength{\@fpbot}{0pt plus 1fil}
+\makeatother
 \raggedbottom
 
 \usepackage{graphicx}
@@ -99,8 +108,8 @@
  \addcontentsline{toc}{chapter}{#1}%
  \fi
  \chaptermark{#1}%
- \addtocontents{lof}{\protect\addvspace{4\p@}}%
- \addtocontents{lot}{\protect\addvspace{4\p@}}%
+ \addtocontents{lof}{\protect\addvspace{1\p@}}%
+ \addtocontents{lot}{\protect\addvspace{1\p@}}%
  \if@twocolumn
  \@topnewpage[\@makechapterhead{#2}]%
  \else

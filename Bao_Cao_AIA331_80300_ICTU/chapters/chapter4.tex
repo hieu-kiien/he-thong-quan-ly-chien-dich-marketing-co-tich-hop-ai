@@ -2,11 +2,11 @@
 
 \section{Quan điểm thiết kế kiến trúc tổng thể}
 
-Kiến trúc hệ thống MarketFlow AI được thiết kế theo mô hình phân tầng hướng dịch vụ (Layered Service-Oriented Architecture), kết hợp các nguyên lý Clean Architecture và Domain-Driven Design (DDD). Việc tách bạch rõ ràng giữa tầng Giao diện (Presentation Layer), tầng Điều hướng API (API Routing Layer), tầng Nghiệp vụ cốt lõi (Domain Service Layer), tầng Truy xuất dữ liệu (Data Access Layer) và tầng Tích hợp ngoại vi (AI Integration Adapter) bảo đảm hệ thống có tính mở cao, dễ bảo trì và có thể kiểm thử độc lập từng thành phần.
+Kiến trúc hệ thống MarketFlow AI được thiết kế theo mô hình phân tầng hướng dịch vụ (Layered Service-Oriented Architecture), kết hợp tách biệt dịch vụ thực thi tác tử AI (\texttt{ai-runner}) với máy chủ nghiệp vụ và công cụ ngữ cảnh (\texttt{backend}). Việc phân định rõ ràng giữa tầng Giao diện (React 18 SPA), tầng Định tuyến REST API (\texttt{/api/v1/*}), tầng Công cụ nội bộ FastMCP (\texttt{/mcp}), tầng Truy xuất dữ liệu (SQLAlchemy 2.0 ORM) và tầng Điều phối Tác tử (\texttt{ai-runner} + OpenCode CLI) bảo đảm hệ thống vừa an toàn, vừa có thể kiểm thử độc lập từng thành phần.
 
 Hệ thống được mô hình hóa theo chuẩn C4 Container tại Hình~\ref{fig:container}.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \input{figures/container.tex}
 \caption{Sơ đồ kiến trúc Container và luồng dữ liệu hệ thống}
@@ -15,145 +15,162 @@ Hệ thống được mô hình hóa theo chuẩn C4 Container tại Hình~\ref{
 
 \section{Các khối thành phần và phân định trách nhiệm}
 
-Máy chủ ứng dụng FastAPI được cấu trúc thành các module chức năng độc lập trong thư mục \texttt{backend/app/api/v1/}, mỗi module chịu trách nhiệm thực thi một ranh giới nghiệp vụ cụ thể được mô tả trong Bảng~\ref{tab:components}.
+Máy chủ ứng dụng FastAPI được cấu trúc thành các mô-đun chức năng độc lập trong thư mục \texttt{backend/app/api/v1/} và \texttt{backend/app/assistant/}, mỗi mô-đun chịu trách nhiệm thực thi một ranh giới nghiệp vụ cụ thể được mô tả trong Bảng~\ref{tab:components}.
 
-\begin{table}[H]
+\begin{table}[!htbp]
 \centering
 \small
-\caption{Phân định trách nhiệm của các module trong hệ thống}
+\caption{Phân định trách nhiệm của các mô-đun trong hệ thống}
 \label{tab:components}
-\begin{tabularx}{\textwidth}{|L{3.2cm}|Y|L{2.8cm}|}
+\begin{tabularx}{\textwidth}{|L{3.3cm}|Y|L{2.6cm}|}
 \hline
-\thead{Module backend} & \thead{Trách nhiệm kỹ thuật và nghiệp vụ} & \thead{Yêu cầu đáp ứng}\\
+\thead{Mô-đun backend} & \thead{Trách nhiệm kỹ thuật và nghiệp vụ} & \thead{Yêu cầu đáp ứng}\\
 \hline
-\texttt{auth.py} \& \texttt{security.py} & Quản lý phiên xác thực JWT, băm mật khẩu bằng thuật toán Bcrypt, kiểm tra trạng thái kích hoạt tài khoản (\texttt{user.status == 'ACTIVE'}) và phân quyền vai trò. & FR01, FR02, NFR01\\
+\texttt{auth.py}, \texttt{users.py} \& \texttt{security.py} & Quản lý phiên đăng nhập JWT (\texttt{HS256}) kèm \texttt{token\_version}, cấp phát \texttt{Run-Token} ngắn hạn (10 phút) cho AI, băm mật khẩu Bcrypt, kiểm soát 2 vai trò (\texttt{MANAGER}, \texttt{MARKETER}) và trạng thái \texttt{is\_active}. & FR01, FR02, NFR01\\
 \hline
-\texttt{campaigns.py} & Xử lý vòng đời chiến dịch; xác thực khoảng thời gian (\texttt{start\_date} $\le$ \texttt{end\_date}); kiểm tra ngân sách hợp lệ; kiểm soát phân quyền mức bản ghi theo \texttt{owner\_id} và \texttt{CampaignMember}. & FR04, FR05, NFR01\\
+\texttt{channels.py} \& \texttt{brand.py} & Quản lý 7 nhóm kênh tiếp thị (\texttt{FACEBOOK}, \texttt{INSTAGRAM}, \texttt{TIKTOK}, \texttt{ZALO\_OA}, \texttt{EMAIL}, \texttt{GOOGLE\_ADS}, \texttt{WEBSITE}), hồ sơ thương hiệu (\texttt{brand\_profile}) và bộ quét từ khóa cấm (\texttt{banned\_keywords}). & FR03, NFR02\\
 \hline
-\texttt{contents.py} & Quản lý máy trạng thái nội dung HITL; cấm tạo/sửa trực tiếp trạng thái duyệt; điều phối quy trình gửi duyệt (\texttt{/submit}), phê duyệt (\texttt{/approve}), từ chối (\texttt{/reject}) và xuất bản (\texttt{/publish}); tự động hạ cấp về \texttt{AI\_DRAFT} khi nội dung đã duyệt bị sửa đổi. & FR06, FR07, FR14\\
+\texttt{campaigns.py} & Quản lý vòng đời chiến dịch gắn với sản phẩm (\texttt{product}), đối tượng mục tiêu, ngân sách (\texttt{budget >= 0}), thời gian (\texttt{start\_date <= end\_date}), phân bổ kênh (\texttt{campaign\_channels}) và kiểm soát quyền sở hữu (\texttt{owner\_id}). & FR04, FR05, NFR01\\
 \hline
-\texttt{schedules.py} & Quản lý lịch phát hành bài viết; kiểm tra điều kiện tiên quyết (chỉ lập lịch cho nội dung \texttt{APPROVED}); xử lý múi giờ quốc tế; ngăn ngừa xung đột thời gian phát hành. & FR08, NFR02\\
+\texttt{contents.py} \& \texttt{notifications.py} & Quản lý máy trạng thái nội dung HITL (\texttt{DRAFT} $\rightarrow$ \texttt{PENDING\_REVIEW} $\rightarrow$ \texttt{APPROVED}/\texttt{REJECTED} $\rightarrow$ \texttt{PUBLISHED}); quét từ khóa cấm khi gửi duyệt; chặn tự duyệt (\texttt{CANNOT\_REVIEW\_OWN}); khóa xóa bài đã duyệt (\texttt{CONTENT\_LOCKED}); tạo thông báo tự động. & FR06, FR07, FR14\\
 \hline
-\texttt{metrics.py} & Quản lý chỉ số hiệu quả đa kênh theo bộ ba duy nhất (\texttt{campaign}, \texttt{channel}, \texttt{date}); tính toán tự động các chỉ số tài chính (CTR, CPC, CPA, ROI) với cơ chế bảo vệ chia cho 0; tổng hợp dữ liệu bảng điều khiển (Dashboard) phân quyền theo người dùng. & FR09, FR10, NFR03\\
+\texttt{schedules.py} & Quản lý lịch xuất bản (\texttt{schedules}); kiểm tra điều kiện nội dung hợp lệ và nằm trong thời gian chiến dịch; tự động chuyển \texttt{DONE} khi xuất bản. & FR08, NFR02\\
 \hline
-\texttt{ai.py} \& \texttt{ai\_service.py} & Cổng giao tiếp AI đa tác vụ; kiểm soát phạm vi truy cập dữ liệu trước khi sinh prompt; điều phối gọi Google Gemini API; tự động kích hoạt Smart Fallback khi gặp sự cố; lưu trữ nhật ký kiểm toán vào \texttt{ai\_logs}. & FR11--FR14, NFR05\\
+\texttt{metrics.py} \& \texttt{stats.py} & Ghi nhận chỉ số theo bộ ba duy nhất (\texttt{campaign\_id}, \texttt{channel\_id}, \texttt{metric\_date}); nhập CSV 2 bước (\texttt{import/preview}, \texttt{import/commit}); tính toán CTR, CVR, CPC, CPA, CPM và tiến độ giải ngân ngân sách (\texttt{used\_pct}). & FR09, FR10, NFR03\\
+\hline
+\texttt{assistant/*} (\texttt{router.py}, \texttt{chat\_service.py}, \texttt{mcp\_server.py}, \texttt{tools.py}, \texttt{actions\_service.py}) & Quản lý luồng hội thoại (\texttt{ai\_threads}, \texttt{ai\_messages}), truyền phát SSE thời gian thực tới \texttt{ai-runner}, cung cấp 14 công cụ FastMCP tại \texttt{/mcp} và thực thi cơ chế phê duyệt thẻ đề xuất \texttt{ai\_actions} (\texttt{PROPOSED} $\rightarrow$ \texttt{EXECUTED}/\texttt{REJECTED}). & FR11--FR14, NFR05\\
 \hline
 \end{tabularx}
 \end{table}
 
-\section{Thiết kế mô hình dữ liệu quan hệ (ERD)}
+\section{Thiết kế mô hình dữ liệu quan hệ 14 bảng (ERD)}
 
-Mô hình dữ liệu được thiết kế tuân thủ dạng chuẩn 3 (3NF), bảo đảm tính toàn vẹn dữ liệu, tối ưu hóa tốc độ truy vấn và loại bỏ hiện tượng dư thừa thông tin.
+Mô hình dữ liệu được thiết kế tuân thủ dạng chuẩn 3 (3NF) gồm 14 bảng quan hệ, quản lý đồng bộ bằng SQLAlchemy 2.0 ORM và Alembic migrations (\texttt{backend/alembic/versions/}).
 
-\subsection{Mô hình dữ liệu hạt nhân (Core ERD)}
-Hình~\ref{fig:erd-core} thể hiện các thực thể nghiệp vụ trung tâm và các mối quan hệ quan trọng.
+\subsection{Mô hình dữ liệu hạt nhân và thương hiệu (Core \& Brand ERD)}
+Hình~\ref{fig:erd-core} thể hiện 7 bảng hạt nhân quản lý nhân sự, thương hiệu, kênh, chiến dịch và nội dung.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \input{figures/erd-core.tex}
-\caption{Mô hình dữ liệu hạt nhân của MarketFlow AI}
+\caption{Mô hình dữ liệu hạt nhân và thương hiệu (7 bảng trung tâm)}
 \label{fig:erd-core}
 \end{figure}
 
-\subsection{Mô hình các bảng vận hành và nhật ký kiểm toán (Operations ERD)}
-Hình~\ref{fig:erd-ops} thể hiện các bảng phụ trợ phục vụ quy trình phân công, phê duyệt, lập lịch, số liệu hiệu quả và kiểm toán AI.
+\subsection{Mô hình các bảng vận hành, kiểm duyệt và Trợ lý AI (Operations \& AI ERD)}
+Hình~\ref{fig:erd-ops} thể hiện 7 bảng vận hành phục vụ kiểm duyệt nội dung, lập lịch, chỉ số hiệu quả, thông báo và lưu vết hội thoại/đề xuất AI.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \input{figures/erd-ops.tex}
-\caption{Mô hình các bảng vận hành và liên kết khóa ngoại}
+\caption{Mô hình các bảng vận hành, kiểm duyệt HITL và Trợ lý AI (7 bảng)}
 \label{fig:erd-ops}
 \end{figure}
 
-\subsection{Từ điển dữ liệu và các ràng buộc toàn vẹn}
-Bảng~\ref{tab:data-dictionary} đặc tả chi tiết cấu trúc các bảng dữ liệu, khóa chính, khóa ngoại và ràng buộc toàn vẹn đã được hiện thực hóa trong SQLite và SQLAlchemy.
+\subsection{Từ điển dữ liệu và các ràng buộc toàn vẹn (14 bảng)}
+Bảng~\ref{tab:data-dictionary} đặc tả chi tiết cấu trúc toàn bộ 14 bảng dữ liệu, khóa chính, khóa ngoại và ràng buộc toàn vẹn trong hệ thống.
 
-\begin{table}[H]
-\centering
-\footnotesize
-\renewcommand{\arraystretch}{1.04}
-\caption{Từ điển dữ liệu và các ràng buộc toàn vẹn}\label{tab:data-dictionary}
-\begin{tabularx}{\textwidth}{|L{3.6cm}|L{2.4cm}|L{2.8cm}|Y|}
+\begin{small}
+\begin{longtable}{|L{3.1cm}|L{2.3cm}|L{2.8cm}|L{5.5cm}|}
+\caption{Từ điển dữ liệu 14 bảng và các ràng buộc toàn vẹn}\label{tab:data-dictionary}\\
 \hline
 \thead{Tên bảng} & \thead{Mục đích} & \thead{Cơ chế khóa} & \thead{Ràng buộc và quy tắc nghiệp vụ}\\
 \hline
-\texttt{users} & Quản lý tài khoản & PK: \texttt{id} & \texttt{email} duy nhất (Unique); \texttt{role} thuộc \{MANAGER, MARKETER\}; \texttt{status} thuộc \{ACTIVE, INACTIVE\}; mật khẩu lưu dạng hash Bcrypt.\\
+\endfirsthead
 \hline
-\texttt{product\_categories} & Danh mục ngành hàng & PK: \texttt{id} & \texttt{name} duy nhất; bảo vệ toàn vẹn danh mục.\\
+\thead{Tên bảng} & \thead{Mục đích} & \thead{Cơ chế khóa} & \thead{Ràng buộc và quy tắc nghiệp vụ}\\
 \hline
-\texttt{products} & Sản phẩm & PK: \texttt{id}; FK: \texttt{category\_id} & Khóa ngoại liên kết danh mục; giá tiền không âm (\texttt{price} $\ge$ 0).\\
+\endhead
 \hline
-\texttt{marketing\_channels} & Kênh truyền thông & PK: \texttt{id} & \texttt{code} duy nhất thuộc \{FACEBOOK, EMAIL, GOOGLE\_ADS, TIKTOK\}.\\
+\endfoot
 \hline
-\texttt{campaigns} & Chiến dịch tiếp thị & PK: \texttt{id}; FK: \texttt{product\_id}, \texttt{owner\_id} & \texttt{budget} $\ge$ 0; \texttt{start\_date} $\le$ \texttt{end\_date}; xóa cascade các nội dung và chỉ số liên quan.\\
+\endlastfoot
+\texttt{users} & Tài khoản nhân sự & PK: \texttt{id} & \texttt{email} Unique; \texttt{role} $\in$ \{\texttt{MANAGER}, \texttt{MARKETER}\}; \texttt{is\_active} boolean; \texttt{token\_version} int; mật khẩu băm Bcrypt.\\
 \hline
-\texttt{campaign\_members} & Phân công nhân sự & PK kép: (\texttt{campaign\_id}, \texttt{user\_id}) & Khóa chính phức hợp ngăn ngừa gán trùng lặp một nhân viên vào cùng chiến dịch.\\
+\texttt{channels} & Kênh tiếp thị & PK: \texttt{id} & \texttt{code} Unique (\texttt{FACEBOOK}, \texttt{INSTAGRAM}, \texttt{TIKTOK}, \texttt{ZALO\_OA}, \texttt{EMAIL}, \texttt{GOOGLE\_ADS}, \texttt{WEBSITE}); lưu \texttt{name}, \texttt{format\_rules}.\\
 \hline
-\texttt{marketing\_contents} & Nội dung truyền thông & PK: \texttt{id}; FK: \texttt{campaign\_id}, \texttt{channel\_id}, \texttt{creator\_id} & \texttt{status} tuân thủ máy trạng thái; cờ \texttt{is\_ai\_generated} xác định nguồn gốc.\\
+\texttt{brand\_profile} & Hồ sơ thương hiệu & PK: \texttt{id} & Bảng đơn bản ghi (\texttt{id=1}) lưu \texttt{brand\_name}, \texttt{description}, \texttt{tone\_of\_voice}, \texttt{target\_audience}, \texttt{guidelines}.\\
 \hline
-\texttt{content\_reviews} & Nhật ký kiểm duyệt & PK: \texttt{id}; FK: \texttt{content\_id}, \texttt{reviewer\_id} & Ghi nhận quyết định (APPROVED/REJECTED), lý do duyệt và mốc thời gian bất biến.\\
+\texttt{banned\_keywords} & Từ khóa cấm & PK: \texttt{id} & \texttt{keyword} Unique, \texttt{note}; dùng để quét tự động khi gửi duyệt và trong công cụ MCP \texttt{check\_banned\_keywords}.\\
 \hline
-\texttt{marketing\_schedules} & Lịch xuất bản & PK: \texttt{id}; FK: \texttt{content\_id} & Chỉ tạo cho nội dung \texttt{APPROVED}; lưu trữ múi giờ quốc tế (\texttt{timezone}).\\
+\texttt{campaigns} & Chiến dịch tiếp thị & PK: \texttt{id}; FK: \texttt{owner\_id} & Lưu \texttt{product}, \texttt{target\_audience}, \texttt{goal}, \texttt{budget >= 0}, \texttt{start\_date <= end\_date}; \texttt{status} $\in$ \{\texttt{PLANNED}, \texttt{ACTIVE}, \texttt{PAUSED}, \texttt{COMPLETED}, \texttt{CANCELLED}\}.\\
 \hline
-\texttt{campaign\_metrics} & Chỉ số định lượng kênh & PK: \texttt{id}; FK: \texttt{campaign\_id}, \texttt{channel\_id} & Ràng buộc Unique phức hợp (\texttt{campaign\_id}, \texttt{channel\_id}, \texttt{metric\_date}); các chỉ số views, clicks, conversions, cost, revenue không âm.\\
+\texttt{campaign\_channels} & Phân bổ ngân sách kênh & PK kép: (\texttt{campaign\_id}, \texttt{channel\_id}) & FK tới \texttt{campaigns} và \texttt{channels}; lưu \texttt{planned\_budget >= 0}.\\
 \hline
-\texttt{ai\_logs} & Nhật ký kiểm toán AI & PK: \texttt{id}; FK: \texttt{user\_id} & Ghi nhận \texttt{task\_type}, \texttt{model\_provider}, \texttt{model\_name}, \texttt{latency\_ms}, \texttt{status}, cờ \texttt{is\_fallback}.\\
+\texttt{contents} & Nội dung truyền thông & PK: \texttt{id}; FK: \texttt{campaign\_id}, \texttt{channel\_id}, \texttt{created\_by}, \texttt{ai\_message\_id} & \texttt{status} $\in$ \{\texttt{DRAFT}, \texttt{PENDING\_REVIEW}, \texttt{APPROVED}, \texttt{REJECTED}, \texttt{PUBLISHED}\}; \texttt{origin} $\in$ \{\texttt{MANUAL}, \texttt{AI}\}.\\
 \hline
-\end{tabularx}
-\end{table}
+\texttt{content\_reviews} & Nhật ký kiểm duyệt & PK: \texttt{id}; FK: \texttt{content\_id}, \texttt{reviewer\_id} & Lưu \texttt{decision} $\in$ \{\texttt{APPROVED}, \texttt{REJECTED}\}, \texttt{comment} và thời gian \texttt{created\_at}.\\
+\hline
+\texttt{schedules} & Lịch xuất bản & PK: \texttt{id}; FK: \texttt{content\_id}, \texttt{assignee\_id} & Lưu \texttt{scheduled\_at}, \texttt{note}; \texttt{status} $\in$ \{\texttt{PLANNED}, \texttt{DONE}, \texttt{CANCELLED}\}.\\
+\hline
+\texttt{metrics} & Chỉ số hiệu quả ngày & PK: \texttt{id}; FK: \texttt{campaign\_id}, \texttt{channel\_id}, \texttt{entered\_by} & Unique (\texttt{campaign\_id}, \texttt{channel\_id}, \texttt{metric\_date}); đảm bảo \texttt{views >= clicks >= conversions >= 0}, \texttt{cost >= 0}, \texttt{source} $\in$ \{\texttt{MANUAL}, \texttt{CSV}, \texttt{SEED}\}.\\
+\hline
+\texttt{notifications} & Thông báo nội bộ & PK: \texttt{id}; FK: \texttt{user\_id} & Thông báo tự động khi nội dung được gửi duyệt, phê duyệt hoặc từ chối; lưu \texttt{type}, \texttt{message}, \texttt{link}, \texttt{is\_read}.\\
+\hline
+\texttt{ai\_threads} & Luồng hội thoại AI & PK: \texttt{id}; FK: \texttt{user\_id}, \texttt{campaign\_id} & Quản lý phiên hội thoại của từng người dùng; có thể ghim ngữ cảnh một chiến dịch cụ thể (\texttt{pinned}).\\
+\hline
+\texttt{ai\_messages} & Tin nhắn \& công cụ AI & PK: \texttt{id}; FK: \texttt{thread\_id} & \texttt{role} $\in$ \{\texttt{USER}, \texttt{ASSISTANT}\}; lưu \texttt{content}, \texttt{parts\_json}, \texttt{status}, \texttt{latency\_ms}, \texttt{model}.\\
+\hline
+\texttt{ai\_actions} & Đề xuất hành động AI & PK: \texttt{id}; FK: \texttt{thread\_id}, \texttt{message\_id}, \texttt{user\_id} & \texttt{tool} $\in$ 5 công cụ đề xuất; \texttt{status} $\in$ \{\texttt{PROPOSED}, \texttt{EXECUTED}, \texttt{REJECTED}, \texttt{FAILED}\}; lưu \texttt{args\_json} và \texttt{result\_json}.\\
+\hline
+\end{longtable}
+\end{small}
 
-\section{Thiết kế Prompt Engine và Kiểm soát ngữ cảnh an toàn}
+\section{Thiết kế Công cụ FastMCP (\texttt{/mcp}) và Tiến hóa System Prompt (\texttt{v1}--\texttt{v4})}
 
-Luồng tương tác với mô hình trí tuệ nhân tạo được quản lý tập trung thông qua Động cơ Xây dựng Chỉ dẫn (Prompt Engine) và Dịch vụ Điều phối Trí tuệ Nhân tạo (AI Service) theo quy trình khép kín tại Hình~\ref{fig:ai-pipeline}.
+Luồng tương tác giữa trình duyệt, Backend, dịch vụ \texttt{ai-runner}, tiến trình \texttt{opencode run} và máy chủ nội bộ FastMCP được thiết kế theo kiến trúc khép kín tại Hình~\ref{fig:ai-pipeline}.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \input{figures/ai-pipeline.tex}
-\caption{Quy trình xử lý yêu cầu AI với Prompt Engine và Smart Fallback}
+\caption{Kiến trúc luồng xử lý Trợ lý AI qua \texttt{ai-runner}, OpenCode CLI, FastMCP (\texttt{/mcp}) và cơ chế \textit{Proposal-Only}}
 \label{fig:ai-pipeline}
 \end{figure}
 
-\subsection{Nguyên tắc lọc sạch ngữ cảnh (Context Whitelisting)}
-Để tuân thủ tiêu chuẩn an toàn dữ liệu, hệ thống áp dụng kỹ thuật Whitelisting nghiêm ngặt:
-\begin{itemize}
- \item \textbf{Dữ liệu cho phép đưa vào Prompt}: Tên sản phẩm, mô tả tính năng, mục tiêu chiến dịch, đối tượng khách hàng mục tiêu, giọng văn (tone of voice), và mảng dữ liệu chỉ số chiến dịch đã được lọc theo quyền của người dùng.
- \item \textbf{Dữ liệu tuyệt đối cấm đưa vào Prompt}: Thông tin nhận dạng cá nhân (PII), mật khẩu, token JWT, mã băm, khóa API, số dư tài khoản ngân hàng hoặc dữ liệu của các chiến dịch khác ngoài phạm vi được phân công.
-\end{itemize}
+\subsection{Đặc tả 14 công cụ FastMCP (9 Read Tools + 5 Proposal Tools)}
+Mô-đun \texttt{backend/app/assistant/tools.py} và \texttt{mcp\_server.py} công bố đúng 14 công cụ chuẩn MCP, phân tách nghiêm ngặt giữa nhóm đọc dữ liệu và nhóm tạo thẻ đề xuất (Bảng~\ref{tab:ai-schemas}).
 
-\subsection{Đặc tả hợp đồng dữ liệu chuẩn hóa (Data Contract Specification)}
-Toàn bộ mẫu prompt được tách khỏi mã nguồn Python và quản lý tại \texttt{backend/\allowbreak prompts/\allowbreak prompts.json} với 3 phiên bản (\texttt{v1}, \texttt{v2}, \texttt{v3}). Prompt Engine thiết lập hợp đồng dữ liệu đầu ra qua Pydantic v2 nhằm kiểm tra cấu trúc JSON trước khi chuyển sang tầng ứng dụng (Bảng~\ref{tab:ai-schemas}).
-
-\begin{table}[H]
+\begin{table}[!htbp]
 \centering
-\small
-\renewcommand{\arraystretch}{1.06}
-\caption{Đặc tả hợp đồng dữ liệu Pydantic Schema cho các tác vụ AI}
+\footnotesize
+\renewcommand{\arraystretch}{1.05}
+\caption{Đặc tả 14 công cụ FastMCP và cơ chế kiểm soát \textit{Proposal-Only}}
 \label{tab:ai-schemas}
-\begin{tabularx}{\textwidth}{|C{2.1cm}|L{2.8cm}|L{3.2cm}|Y|}
+\begin{tabularx}{\textwidth}{|L{1.9cm}|L{4.3cm}|Y|}
 \hline
-\thead{Tác vụ} & \thead{Trường dữ liệu} & \thead{Kiểu dữ liệu} & \thead{Ý nghĩa nghiệp vụ \& Ràng buộc}\\
+\thead{Phân nhóm} & \thead{Tên công cụ MCP} & \thead{Chức năng nghiệp vụ và Ràng buộc an toàn}\\
 \hline
-\multirow{3}{*}{\textbf{IDEA}} & \texttt{campaign\_name} & \texttt{str} & Tên chiến dịch ngữ cảnh mục tiêu.\\
-\cline{2-4}
-& \texttt{ideas} & \texttt{List[IdeaItem]} & Danh sách đúng 5 góc tiếp cận ý tưởng.\\
-\cline{2-4}
-& \texttt{ideas[i]} & \texttt{Dict[str, str]} & Gồm 3 khóa: \texttt{angle}, \texttt{concept}, \texttt{target\_hook}.\\
+\multirow{5}{1.9cm}{\textbf{9 Công cụ Đọc (Read-Only)}} & \texttt{list\_campaigns}, \texttt{get\_campaign} & Tra cứu danh sách chiến dịch và chi tiết chiến dịch (ngân sách, kênh phân bổ, số lượng nội dung, tổng KPI).\\
+\cline{2-3}
+& \texttt{get\_stats} & Tính toán tổng quan KPI (views, clicks, conversions, cost, CTR, CVR, CPC, CPA, CPM), xu hướng ngày và tiến độ ngân sách (\texttt{used\_pct}).\\
+\cline{2-3}
+& \texttt{list\_contents}, \texttt{get\_content} & Lọc và đọc chi tiết bài viết tiếp thị kèm lịch sử phê duyệt (\texttt{content\_reviews}).\\
+\cline{2-3}
+& \texttt{list\_schedules}, \texttt{list\_channels} & Tra cứu lịch xuất bản theo khoảng thời gian và danh sách các kênh đang hoạt động.\\
+\cline{2-3}
+& \texttt{get\_brand\_profile}, \texttt{check\_banned\_keywords} & Đọc hồ sơ thương hiệu (\texttt{brand\_profile}) và quét văn bản đối chiếu danh sách từ khóa cấm (\texttt{banned\_keywords}).\\
 \hline
-\multirow{3}{*}{\textbf{DRAFT}} & \texttt{channel} & \texttt{ChannelEnum} & Kênh truyền thông mục tiêu (Facebook, TikTok, Email).\\
-\cline{2-4}
-& \texttt{title, body} & \texttt{str} & Tiêu đề và thân bài viết theo giới hạn ký tự kênh.\\
-\cline{2-4}
-& \texttt{cta} & \texttt{str} & Lời kêu gọi hành động cụ thể (\texttt{CTA}).\\
-\hline
-\multirow{2}{*}{\textbf{SUMMARY}} & \texttt{kpi\_overview} & \texttt{Dict[str, float]} & Tổng hợp số học: views, clicks, cost, revenue, ROI.\\
-\cline{2-4}
-& \texttt{insights, recs} & \texttt{List[str]} & Nhận định bám sát số liệu đã lưu và đề xuất cải thiện.\\
+\multirow{5}{1.9cm}{\textbf{5 Công cụ Đề xuất (Proposal-Only)}} & \texttt{propose\_content\_drafts} & Tạo thẻ đề xuất \texttt{ai\_action} (\texttt{PROPOSED}) chứa 1--5 bản nháp nội dung; khi người dùng bấm \textit{Xác nhận}, tạo bản ghi \texttt{contents} với \texttt{origin=AI}.\\
+\cline{2-3}
+& \texttt{propose\_campaign} & Tạo thẻ đề xuất khởi tạo chiến dịch mới kèm phân bổ ngân sách kênh; khi xác nhận tạo chiến dịch ở trạng thái \texttt{PLANNED}.\\
+\cline{2-3}
+& \texttt{propose\_campaign\_update} & Tạo thẻ đề xuất cập nhật mục tiêu, ngân sách hoặc trạng thái của một chiến dịch hiện có.\\
+\cline{2-3}
+& \texttt{propose\_schedule} & Tạo thẻ đề xuất lịch xuất bản cho nội dung đã duyệt (\texttt{APPROVED}).\\
+\cline{2-3}
+& \texttt{propose\_metrics} & Tạo thẻ đề xuất ghi nhận chỉ số hiệu quả ngày sau khi kiểm tra bất biến \texttt{views >= clicks >= conversions}.\\
 \hline
 \end{tabularx}
 \end{table}
 
-\subsection{Cơ chế dự phòng xác định (Smart Fallback)}
-Khi gặp sự cố kết nối LLM hoặc quá thời gian chờ, hệ thống kích hoạt hàm \texttt{\_generate\_\allowbreak fallback}: (1) Ý tưởng và bản nháp được tạo theo khung mẫu gắn với sản phẩm và kênh đã chọn; (2) Tóm tắt chỉ số tính toán trực tiếp từ mảng metrics hiện có, không suy diễn ngoài dữ liệu; (3) Gắn cờ \texttt{is\_fallback = True}, ghi vào \texttt{ai\_logs} và hiển thị cảnh báo rõ trên giao diện.
+\subsection{Quá trình tiến hóa System Prompt qua 4 giai đoạn tối ưu hóa}
+Chỉ dẫn hệ thống của tác tử AI được lưu trữ độc lập tại thư mục \texttt{deploy/opencode/prompts/} và gắn với cấu hình \texttt{deploy/opencode/agent/marketflow.md} qua 4 giai đoạn cải tiến:
+\begin{itemize}[noitemsep,topsep=2pt]
+ \item \textbf{Giai đoạn 1 -- Bản Cơ sở (Zero-shot Baseline)}: Chỉ định danh vai trò trợ lý marketing tiếng Việt; mô hình đôi khi tự bịa số liệu giả định hoặc viết kịch bản vượt giới hạn ký tự của kênh.
+ \item \textbf{Giai đoạn 2 -- Bản Rào chắn (Guardrails \& Grounding)}: Bổ sung quy tắc chỉ đề xuất (\textit{Proposal-Only}) và chống bịa số liệu; tuy nhiên cảnh báo an toàn quá dài (\textit{disclaimer bloat}) khiến văn bản sinh ra vượt giới hạn ký tự trên Facebook và TikTok.
+ \item \textbf{Giai đoạn 3 -- Bản Chuẩn hóa KPI \& Kênh (KPI Formula \& Channel Rules)}: Chuẩn hóa công thức tính CTR, CVR, CPC, CPA, CPM và cấu trúc đầu ra theo từng kênh truyền thông.
+ \item \textbf{Giai đoạn 4 -- Bản Production (Few-shot + Khóa độ dài kênh + Chống Prompt Injection)}: Loại bỏ lời rào đón thừa, khóa chặt giới hạn ký tự từng kênh, bắt buộc 100\% thao tác ghi đi qua công cụ \texttt{propose\_*} và từ chối mọi yêu cầu vượt quyền.
+\end{itemize}
 
 \section{Kết luận chương}
-Chương 4 đã trình bày thiết kế kiến trúc phân tầng, mô hình dữ liệu quan hệ và cơ chế tương tác với mô hình ngôn ngữ lớn qua Prompt Engine, làm cơ sở cho việc hiện thực hóa ở Chương 5.
+Chương 4 đã trình bày thiết kế kiến trúc phân tầng, mô hình dữ liệu quan hệ 14 bảng và cơ chế tương tác với tác tử AI qua 14 công cụ FastMCP cùng quy trình tiến hóa System Prompt qua 4 giai đoạn, làm cơ sở vững chắc cho việc hiện thực hóa ở Chương 5.

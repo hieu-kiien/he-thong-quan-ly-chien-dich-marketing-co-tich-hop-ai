@@ -1,19 +1,17 @@
-# Research pack — báo cáo AIA331 
+# Research Pack — Báo cáo Học thuật AIA331 (Đề tài 80300 — MarketFlow AI)
 
-Đây là bộ hồ sơ đi cùng snapshot báo cáo , được giữ để truy vết tài liệu học thuật. Nó không phải baseline sản phẩm hoặc bộ bằng chứng CI hiện tại.
+Đây là bộ hồ sơ truy vết học thuật và bằng chứng thực nghiệm đi kèm báo cáo chính thức `Bao_Cao_AIA331_80300_ICTU.pdf`, đã được đồng bộ 100% với kiến trúc hệ thống đang vận hành thực tế.
 
-## Nội dung
+## Nội dung hồ sơ
 
-- project-research-plan.md: câu hỏi, phạm vi và kế hoạch nghiên cứu tại thời điểm lập báo cáo.
-- source-inventory.csv: danh mục nguồn được sử dụng.
-- evidence-ledger.csv: claim, nguồn và trạng thái bằng chứng.
-- related-work-matrix.csv: so sánh tài liệu tham khảo.
-- requirements-traceability.csv: ánh xạ yêu cầu tới thiết kế/implementation/test theo b?o c?o.
-- quality-attribute-scenarios.csv: kịch bản thuộc tính chất lượng.
-- evaluation-plan.md: kế hoạch/định nghĩa đánh giá.
-- visual-coverage-map.csv: mục đích và nguồn của hình.
-- reproducibility-manifest.yaml: môi trường và quy trình tái lập đã ghi cho phiên bản báo cáo.
+- `project-research-plan.md`: Câu hỏi nghiên cứu, phạm vi kiến trúc hệ thống (14 bảng, `ai-runner` + FastMCP `/mcp`) và kết quả nghiệm thu.
+- `source-inventory.csv`: Danh mục nguồn tiêu chuẩn và tài liệu kỹ thuật được sử dụng.
+- `evidence-ledger.csv`: Sổ cái truy vết các tuyên bố kỹ thuật (claims), tệp bằng chứng thực tế và trạng thái kiểm chứng (`TESTED` / `MEASURED`).
+- `related-work-matrix.csv`: Đối sánh tài liệu tham khảo và các nền tảng quản trị chiến dịch.
+- `requirements-traceability.csv`: Ma trận truy xuất nguồn gốc (RTM) ánh xạ 14 yêu cầu chức năng (`FR01`–`FR14`) và 6 yêu cầu phi chức năng (`NFR01`–`NFR06`) tới mã nguồn và 151 ca kiểm thử tự động.
+- `quality-attribute-scenarios.csv`: Kịch bản thuộc tính chất lượng theo chuẩn ISO/IEC 25010.
+- `evaluation-plan.md`: Phương pháp và kết quả đánh giá định lượng 4 giai đoạn tối ưu hóa System Prompt trên 8 kịch bản (`scripts/evaluate_assistant.py`).
+- `visual-coverage-map.csv`: Ánh xạ mục đích và tệp nguồn TikZ của 10 sơ đồ kiến trúc/ERD/luồng dữ liệu.
+- `reproducibility-manifest.yaml`: Thông số môi trường, phiên bản mô hình, tập dữ liệu seed và các lệnh chạy kiểm chứng tái lập.
 
-Các trạng thái trong CSV phản ánh bằng chứng ở thời điểm và cần được kiểm tra lại trước khi dùng cho tuyên bố hiện tại. Không hiểu một tỷ lệ traceability trong snapshot là chứng minh mọi yêu cầu hiện vẫn hoạt động.
-
-Nguồn hiện hành: [docs/README.md](../../docs/README.md), [docs/ROADMAP.md](../../docs/ROADMAP.md), [docs/TESTING.md](../../docs/TESTING.md). PDF là artifact; LaTeX và research pack là nguồn có thể biên tập.
+Nguồn tài liệu kỹ thuật đối chiếu trực tiếp: [`docs/REQUIREMENTS_AND_DESIGN.md`](../../docs/REQUIREMENTS_AND_DESIGN.md), [`docs/TESTING.md`](../../docs/TESTING.md), [`docs/AI_ASSISTANT.md`](../../docs/AI_ASSISTANT.md), [`docs/AI_ETHICS_AND_PRIVACY.md`](../../docs/AI_ETHICS_AND_PRIVACY.md), [`docs/AI_IN_SDLC.md`](../../docs/AI_IN_SDLC.md), [`docs/DEPLOYMENT-VPS.md`](../../docs/DEPLOYMENT-VPS.md).

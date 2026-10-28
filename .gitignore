@@ -88,3 +88,6 @@ frontend/tsc-errors.txt
 **/*.pre_sprint_backup
 backend/backend/
 **/.e2e/
+!slides/*.png
+!Bao_Cao_AIA331_80300_ICTU/*.png
+*.zip

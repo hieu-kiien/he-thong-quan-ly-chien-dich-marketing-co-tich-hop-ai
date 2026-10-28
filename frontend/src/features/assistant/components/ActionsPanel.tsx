@@ -43,12 +43,12 @@ export function ActionsPanel({
       aria-label="Panel đề xuất và bản nháp"
     >
       {/* Header của panel */}
-      <div className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface/80 px-4 backdrop-blur-xs">
-        <div className="flex items-center gap-2">
-          <Layers className="h-4 w-4 text-ai" aria-hidden />
-          <h2 className="text-sm font-semibold text-fg">Đề xuất & bản nháp</h2>
+      <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-surface/80 px-4 backdrop-blur-xs">
+        <div className="flex min-w-0 items-center gap-2">
+          <Layers className="h-4 w-4 shrink-0 text-ai" aria-hidden />
+          <h2 className="truncate whitespace-nowrap text-sm font-semibold text-fg">Đề xuất & bản nháp</h2>
           {proposedCount > 0 && (
-            <Badge tone="warning">
+            <Badge tone="warning" className="shrink-0 whitespace-nowrap">
               {proposedCount} chờ xác nhận
             </Badge>
           )}
@@ -58,7 +58,7 @@ export function ActionsPanel({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1.5 text-fg-subtle hover:bg-subtle hover:text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="shrink-0 rounded-md p-1.5 text-fg-subtle hover:bg-subtle hover:text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             title="Đóng panel"
             aria-label="Đóng panel"
           >
@@ -79,7 +79,7 @@ export function ActionsPanel({
         ) : (
           actions.map((act) => (
             <ActionCardRouter
-              key={act.id}
+              key={`${act.id}-${act.updated_at}`}
               action={act}
               onConfirm={onConfirmAction}
               onReject={onRejectAction}

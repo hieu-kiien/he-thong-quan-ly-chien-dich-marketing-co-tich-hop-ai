@@ -218,14 +218,14 @@ export function ModelSelector({ compact = false }: { compact?: boolean }) {
           type="button"
           {...props}
           className={cn(
-            'inline-flex items-center gap-1.5 rounded-lg border border-border bg-subtle/60 px-2.5 py-1 text-xs font-medium text-fg transition-colors hover:border-border-strong hover:bg-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+            'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border bg-subtle/60 px-2.5 py-1 text-xs font-medium text-fg transition-colors hover:border-border-strong hover:bg-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-accent',
             compact && 'px-2 py-1 text-[11px]',
           )}
           title={`Mô hình đang chọn: ${selectedModel.label} (${selectedModel.provider})`}
         >
           <Cpu className="h-3.5 w-3.5 shrink-0 text-ai" aria-hidden />
-          <span className="max-w-[130px] truncate sm:max-w-[165px]">{selectedModel.shortLabel}</span>
-          <span className="hidden rounded bg-ai-soft px-1.5 py-0.5 text-[10px] font-semibold text-ai md:inline">
+          <span className="max-w-[125px] truncate sm:max-w-[155px]">{selectedModel.shortLabel}</span>
+          <span className="hidden shrink-0 whitespace-nowrap rounded bg-ai-soft px-1.5 py-0.5 text-[10px] font-semibold text-ai xl:inline">
             {selectedModel.provider}
           </span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 text-fg-subtle" aria-hidden />

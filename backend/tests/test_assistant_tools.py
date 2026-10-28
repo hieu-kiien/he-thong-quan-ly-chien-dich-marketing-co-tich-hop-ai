@@ -323,3 +323,81 @@ def test_tool_validations(tool_context: ToolContext, sample_campaign: Campaign, 
                 ]
             ),
         )
+
+    # Garbled / control-character body rejected
+    with pytest.raises(ValidationFailed):
+        tool_drafts.handler(
+            ctx,
+            ProposeContentDraftsArgs(
+                items=[
+                    ProposeContentDraftItem(
+                        channel_code="FACEBOOK",
+                        title="Bài lỗi ký tự",
+                        body="\x01\x01\rf\ri",
+                    )
+                ]
+            ),
+        )
+
+
+def test_propose_content_drafts_resilience_and_dedup(
+    tool_context: ToolContext,
+    sample_campaign: Campaign,
+    db: Session,
+):
+    ctx = tool_context
+    tool_drafts = registry.get("propose_content_drafts")
+    assert tool_drafts is not None
+
+    # 1. Omit campaign_id (resolved from ctx.thread.campaign_id), omit cta (extracted from body),
+    # and strip control characters from title/body
+    tiktok_item = ProposeContentDraftItem.model_validate(
+        {
+            "channel_code": "tiktok",
+            "title": "Kịch bản TikTok 30s",
+            "body": "[Hook 0-3s] Giới thiệu nền tảng MarketFlow.\n[CTA 25-30s] Truy cập ngay!",
+        }
+    )
+    assert tiktok_item.channel_code == "TIKTOK"
+    assert tiktok_item.content_type == ContentType.VIDEO_SCRIPT
+
+    args1 = ProposeContentDraftsArgs.model_validate(
+        {
+            "items": [
+                {
+                    "channel_code": "INSTAGRAM",
+                    "title": "\x01Trải nghiệm nền tảng số MarketFlow",
+                    "body": "Khám phá giải pháp quản lý chiến dịch đa kênh dành cho SME.\n👉 Đăng ký trải nghiệm miễn phí ngay tại website!",
+                }
+            ]
+        }
+    )
+    res1 = tool_drafts.handler(ctx, args1)
+    assert res1["status"] == "PROPOSED"
+    act1_id = res1["action_id"]
+    act1 = db.get(AiAction, act1_id)
+    assert act1 is not None
+    saved_item = act1.args_json["items"][0]
+    assert saved_item["campaign_id"] == sample_campaign.id
+    assert saved_item["content_type"] == "SOCIAL_POST"
+    assert "\x01" not in saved_item["title"]
+    assert saved_item["cta"] == "Đăng ký trải nghiệm miễn phí ngay tại website!"
+
+    # 2. Calling propose_content_drafts a second time in the same message updates the existing PROPOSED action in-place
+    args2 = ProposeContentDraftsArgs.model_validate(
+        {
+            "items": [
+                {
+                    "channel_code": "FACEBOOK",
+                    "title": "Bài đăng Facebook chính thức đã hoàn thiện",
+                    "body": "Nội dung bài đăng Facebook đầy đủ, rõ ràng, chuẩn quy cách truyền thông.",
+                    "cta": "Trải nghiệm ngay hôm nay",
+                }
+            ]
+        }
+    )
+    res2 = tool_drafts.handler(ctx, args2)
+    assert res2["action_id"] == act1_id
+    db.refresh(act1)
+    assert act1.args_json["items"][0]["channel_code"] == "FACEBOOK"
+    assert act1.args_json["items"][0]["cta"] == "Trải nghiệm ngay hôm nay"

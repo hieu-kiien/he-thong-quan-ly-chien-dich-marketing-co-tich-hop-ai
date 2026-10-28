@@ -115,19 +115,28 @@ export function MessageItem({
     );
   }
 
-  // Tách parts_json
-  const toolParts: AiToolCallPart[] = [];
+  // Tách parts_json (ẩn các lượt gọi công cụ bị lỗi nếu công cụ đó đã gọi lại thành công ngay trong cùng lượt)
+  const rawToolParts: AiToolCallPart[] = [];
   const actionParts: AiActionPart[] = [];
+  const seenActionIds = new Set<number>();
 
   if (Array.isArray(message.parts_json)) {
     for (const part of message.parts_json) {
       if (part.type === 'tool_call') {
-        toolParts.push(part);
-      } else if (part.type === 'action') {
+        rawToolParts.push(part);
+      } else if (part.type === 'action' && !seenActionIds.has(part.action_id)) {
+        seenActionIds.add(part.action_id);
         actionParts.push(part);
       }
     }
   }
+
+  const succeededToolNames = new Set(
+    rawToolParts.filter((t) => t.status === 'done').map((t) => t.name),
+  );
+  const toolParts = rawToolParts.filter(
+    (t) => !(t.status === 'error' && succeededToolNames.has(t.name)),
+  );
 
   const hasError = message.status === 'ERROR' || Boolean(message.error_code);
   const errorMessageText = getAiErrorMessage(message.error_code);

@@ -1,6 +1,11 @@
 \chapter*{CAM KẾT VỀ NỘI DUNG BÁO CÁO}
 \addcontentsline{toc}{chapter}{CAM KẾT VỀ NỘI DUNG BÁO CÁO}
 
-Đây là tài liệu phân tích và thiết kế cho toàn bộ dự án AIA331. Tại thời điểm lập tài liệu, nhóm chưa bắt đầu xây dựng mã nguồn ứng dụng. Vì vậy, các nội dung về giao diện, kiến trúc, cơ sở dữ liệu, chức năng AI và kiểm thử được trình bày dưới dạng thiết kế hoặc kế hoạch thực hiện.
+Báo cáo học thuật này phản ánh trung thực, chính xác và toàn diện kết quả nghiên cứu, phân tích thiết kế, hiện thực hóa mã nguồn và kiểm thử thực nghiệm của dự án \textbf{MarketFlow AI} (Mã đề tài: 80300 -- Học phần AIA331: Ứng dụng AI trong phát triển phần mềm).
 
-Những kết quả như hệ thống đã chạy, mô hình AI đã được đánh giá, hiệu năng đã đo hoặc chức năng đã kiểm thử chỉ được đưa vào báo cáo sau khi có chương trình, dữ liệu và kết quả chạy tương ứng. Việc ghi rõ giới hạn này nhằm giúp người đọc phân biệt giữa điều nhóm đã nghiên cứu, điều nhóm đề xuất xây dựng và điều chưa thể kết luận ở thời điểm nộp tài liệu.
+Nhóm thực hiện cam kết tuân thủ nghiêm ngặt quy tắc liêm chính học thuật (\textit{Rule 0 -- Không bịa đặt số liệu}):
+\begin{itemize}[noitemsep,topsep=4pt]
+ \item Toàn bộ kiến trúc cơ sở dữ liệu (14 bảng), hệ thống điểm cuối REST API, máy chủ nội bộ FastMCP (\texttt{/mcp} với 14 công cụ), dịch vụ \texttt{ai-runner} và giao diện người dùng React 18 + TypeScript trình bày trong báo cáo đều đã được hiện thực hóa hoàn chỉnh trong kho mã nguồn của dự án và triển khai thực tế tại địa chỉ \url{https://marketing.kienhieu.id.vn}.
+ \item Toàn bộ số liệu kiểm thử tự động (\textbf{151 ca kiểm thử}: 104 Backend Pytest, 18 AI-Runner Pytest, 29 Playwright E2E) và kết quả đánh giá định lượng qua 4 giai đoạn tối ưu hóa System Prompt (trên 8 kịch bản đánh giá thông qua kịch bản \texttt{scripts/evaluate\_assistant.py} và nhật ký thực thi \texttt{docs/eval/transcripts.json}) đều được trích xuất trực tiếp từ kết quả chạy chương trình thực tế, có thể tái lập độc lập bằng một dòng lệnh.
+ \item Việc ứng dụng các công cụ AI hỗ trợ trong vòng đời phát triển phần mềm (SDLC) được ghi nhật ký minh bạch, đối chiếu rõ ràng các lỗi do AI sinh ra và biện pháp kỹ thuật mà nhóm đã can thiệp để khắc phục.
+\end{itemize}

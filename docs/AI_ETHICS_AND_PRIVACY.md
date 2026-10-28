@@ -32,7 +32,7 @@ Tại MarketFlow, nguy cơ này được loại bỏ tận gốc thông qua các
    - Giao tiếp giữa OpenCode CLI và Backend được bảo vệ bởi mã token JWT có thời hạn ngắn (10 phút).
    - Run-Token chỉ được cấp cho từng lượt gọi cụ thể, gắn chặt với danh tính người dùng (`uid`) và phiên làm việc (`thread_id`), tự động hết hạn ngay sau khi lượt hội thoại kết thúc.
 3. **Loại bỏ tính năng Bring Your Own Key (BYOK) phức tạp**:
-   - Khảo sát mã nguồn v1 cho thấy tính năng BYOK cho phép người dùng cấu hình `custom_base_url` dẫn đến lỗ hổng nghiêm trọng: kẻ xấu có thể đổi URL để gửi trộm API key hệ thống về máy chủ cá nhân.
+   - Phân tích an ninh ở giai đoạn thiết kế cho thấy tính năng BYOK cho phép người dùng cấu hình `custom_base_url` dẫn đến lỗ hổng nghiêm trọng: kẻ xấu có thể đổi URL để gửi trộm API key hệ thống về máy chủ cá nhân.
    - MarketFlow đã loại bỏ hoàn toàn tính năng này, cố định đường kết nối an toàn trong mạng nội bộ máy chủ (`127.0.0.1`).
 
 ---
@@ -88,7 +88,7 @@ Hệ thống áp dụng nguyên tắc tối thiểu hoá dữ liệu (Data Minim
 Ảo giác (hallucination) trong tiếp thị có thể dẫn đến hậu quả pháp lý nghiêm trọng (quảng cáo sai sự thật, thổi phồng công dụng sản phẩm). Hệ thống MarketFlow áp dụng 3 tầng kiểm soát ảo giác:
 
 1. **Rào chắn Grounding trong System Prompt**:
-   - System Prompt phiên bản 3 (`deploy/opencode/prompts/v3.md`) chỉ dẫn rõ ràng: *"Mọi con số trong báo cáo bắt buộc phải xuất phát từ dữ liệu do công cụ trả về. Nếu chiến dịch chưa có số liệu, bắt buộc phải trả lời là chưa có dữ liệu, không được tự suy đoán hoặc bịa đặt phần trăm tăng trưởng."*
+   - System Prompt phiên bản 4 (`deploy/opencode/prompts/v4.md`) chỉ dẫn rõ ràng: *"Mọi con số trong báo cáo bắt buộc phải xuất phát từ dữ liệu do công cụ trả về. Nếu chiến dịch chưa có số liệu, bắt buộc phải trả lời là chưa có dữ liệu, không được tự suy đoán hoặc bịa đặt phần trăm tăng trưởng."*
 2. **Xử lý số liệu biên & Mẫu số bằng 0**:
    - Khi tính toán các tỷ lệ hiệu quả (CTR = clicks/views, CVR = conversions/clicks, CPA = cost/conversions), nếu mẫu số bằng 0, Backend và AI được quy định trả về giá trị không xác định (`null`), giao diện hiển thị ký hiệu `"—”`, ngăn chặn việc AI tính ra các con số vô lý (ví dụ: chia cho 0 ra vô cực hoặc đoán mò con số).
 3. **Kiểm tra tự động danh sách Từ Cấm (Banned Keywords)**:

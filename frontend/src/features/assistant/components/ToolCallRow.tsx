@@ -78,7 +78,7 @@ export function ToolCallRow({
         className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-muted/40 focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
         aria-expanded={isOpen}
       >
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           {renderStatusIcon()}
           <span className="shrink-0 text-fg-subtle">
             {isQuery ? (
@@ -87,15 +87,15 @@ export function ToolCallRow({
               <Wrench className="h-3.5 w-3.5" aria-hidden />
             )}
           </span>
-          <span className="font-medium text-fg">{toolLabel}</span>
+          <span className="shrink-0 whitespace-nowrap font-medium text-fg">{toolLabel}</span>
           {summary && (
-            <span className="truncate text-fg-muted" title={summary}>
+            <span className="min-w-0 truncate text-fg-muted" title={summary}>
               — {summary}
             </span>
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5 text-fg-subtle">
+        <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-fg-subtle">
           <span className="text-[11px]">
             {status === 'running'
               ? 'Đang thực thi'

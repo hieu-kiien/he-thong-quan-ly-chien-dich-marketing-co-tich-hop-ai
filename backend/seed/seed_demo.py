@@ -32,6 +32,9 @@ from app.core.database import Base, SessionLocal, engine, utcnow
 from app.core.security import hash_password
 from app.core.timeutil import today_vn
 from app.models import (
+    AiAction,
+    AiMessage,
+    AiThread,
     BannedKeyword,
     BrandProfile,
     Campaign,
@@ -58,7 +61,7 @@ from app.models.enums import (
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Seed demo data for MarketFlow v2")
+    parser = argparse.ArgumentParser(description="Seed demo data for MarketFlow")
     parser.add_argument("--force", action="store_true", help="Bắt buộc chạy kể cả trên production")
     parser.add_argument("--reset", action="store_true", help="Xoá sạch dữ liệu cũ trước khi nạp")
     return parser.parse_args()
@@ -81,6 +84,9 @@ def seed_demo_data(reset: bool = False) -> None:
             db.execute(delete(Schedule))
             db.execute(delete(ContentReview))
             db.execute(delete(Content))
+            db.execute(delete(AiAction))
+            db.execute(delete(AiMessage))
+            db.execute(delete(AiThread))
             db.execute(delete(Metric))
             db.execute(delete(CampaignChannel))
             db.execute(delete(Campaign))
@@ -321,52 +327,77 @@ def seed_demo_data(reset: bool = False) -> None:
         camp_coldbrew = created_campaigns[0]
         camp_autum = created_campaigns[1]
         camp_workshop = created_campaigns[2]
+        camp_loyalty = created_campaigns[3]
+        camp_opening = created_campaigns[4]
 
         # 5. Contents across statuses (DRAFT, PENDING_REVIEW, APPROVED, REJECTED, PUBLISHED)
-        print("5. Tạo nội dung với đủ trạng thái duyệt...")
+        # Bám sát chặt chẽ mục tiêu (Goal), sản phẩm (Product) và thông điệp cốt lõi (Key Message) của cả 5 chiến dịch
+        print("5. Tạo 18 nội dung bám sát mục tiêu của từng chiến dịch với đủ trạng thái duyệt...")
         content_specs = [
-            # 1. PUBLISHED
+            # --- CHIẾN DỊCH 1: Cold Brew (Mục tiêu: SALES - Tăng doanh số) ---
+            # 0. PUBLISHED
             {
                 "campaign": camp_coldbrew,
                 "channel": channels["FACEBOOK"],
                 "content_type": ContentType.SOCIAL_POST,
                 "title": "Bí quyết giữ trọn hương vị Cold Brew suốt 18 tiếng",
-                "body": "Bạn có biết tại sao Cold Brew tại An Nam lại có vị ngọt hậu tự nhiên mà không cần thêm đường?\n\nĐó là nhờ phương pháp ủ lạnh chậm 18 tiếng ở nhiệt độ 4°C với hạt Robusta Đắk Lắk hái chín cây 100%. Vị đậm đà nhưng êm dịu, không gắt họng.\n\nĐặt ngay hôm nay để nhận ưu đãi dùng thử 3 chai chỉ 145.000đ!",
+                "body": "Bạn có biết tại sao Cold Brew tại An Nam lại có vị ngọt hậu tự nhiên mà không cần thêm đường?\n\nĐó là nhờ phương pháp ủ lạnh chậm 18 tiếng ở nhiệt độ 4°C với hạt Robusta & Arabica hái chín cây. Vị đậm đà nhưng êm dịu, không gắt họng.\n\nĐặt ngay Bộ 3 chai Cold Brew An Nam 250ml hôm nay để nhận ưu đãi dùng thử chỉ 145.000đ!",
                 "cta": "Nhắn tin đặt giao ngay",
                 "status": ContentStatus.PUBLISHED,
                 "origin": ContentOrigin.MANUAL,
                 "created_by": marketer1,
-                "published_url": "https://facebook.com/annamexample/posts/101",
+                "published_url": "https://facebook.com/annamcoffee/posts/coldbrew-18h",
                 "published_at": utcnow() - timedelta(days=10),
                 "published_by": manager,
+                "review_decision": ReviewDecision.APPROVED,
+                "review_comment": "Bài viết bám sát mục tiêu Tăng doanh số và thông điệp ủ lạnh 18 tiếng. Duyệt đăng.",
+                "reviewer": manager,
             },
-            # 2. APPROVED
+            # 1. APPROVED
             {
                 "campaign": camp_coldbrew,
                 "channel": channels["INSTAGRAM"],
                 "content_type": ContentType.SOCIAL_POST,
                 "title": "Visual 3 sắc màu Cold Brew An Nam đón tuần mới",
-                "body": "3 chai — 3 cá tính:\n- Đen nguyên bản cho ngày cần tập trung tối đa.\n- Cam vàng tươi mát cho buổi chiều sảng khoái.\n- Hạnh nhân béo nhẹ cho buổi sáng thư thả.\n\nBạn chọn hương vị nào cho thứ Hai năng suất?",
-                "cta": "Xem thêm tại link trên bio",
+                "body": "3 chai — 3 cá tính cho tuần làm việc hiệu suất:\n- Nguyên bản đậm sâu cho buổi sáng cần tập trung.\n- Cam vàng thanh mát cho buổi chiều sảng khoái.\n- Hạnh nhân béo nhẹ cho ngày làm việc thư thả.\n\nCà phê ủ lạnh 18 tiếng — Tỉnh táo mượt mà, sẵn sàng ngày mới.",
+                "cta": "Đặt mua combo 3 chai tại bio",
                 "status": ContentStatus.APPROVED,
+                "origin": ContentOrigin.MANUAL,
                 "created_by": marketer1,
                 "review_decision": ReviewDecision.APPROVED,
-                "review_comment": "Nội dung chuẩn brand guideline, hình ảnh phối màu rất tốt. Đã duyệt.",
+                "review_comment": "Nội dung chuẩn quy định kênh Instagram, hình ảnh phối màu ấm áp. Đã duyệt.",
                 "reviewer": manager,
             },
-            # 3. PENDING_REVIEW
+            # 2. PENDING_REVIEW (by marketer1 -> Manager có thể duyệt ngay khi demo)
             {
                 "campaign": camp_coldbrew,
                 "channel": channels["TIKTOK"],
                 "content_type": ContentType.VIDEO_SCRIPT,
                 "title": "Kịch bản TikTok: Thử thách 1 ngày làm việc cùng Cold Brew",
-                "body": "[0-3s Hook] Dân văn phòng 8 tiếng ngồi máy tính thì uống gì để không say cà phê?\n[3-15s Body] Cùng mình unbox set Cold Brew đóng chai của An Nam. Chai thuỷ tinh chắc chắn, rót ra đá nghe tiếng kêu cực đã tai.\n[15-30s Review] Vị êm ru, hậu ngọt tự nhiên, không bị chua gắt.\n[30-45s CTA] Bấm vào giỏ hàng góc trái nhận ngay mã giảm giá 20k cho đơn đầu tiên!",
-                "cta": "Bấm vào giỏ hàng đặt thử ngay",
+                "body": "[0-3s Hook] Dân văn phòng 8 tiếng ngồi máy tính thì uống gì để tỉnh táo mượt mà không lo say cà phê?\n[3-15s Body] Cùng mình khui Bộ 3 chai Cold Brew An Nam 250ml. Chai thuỷ tinh cầm chắc tay, rót ra đá viên nghe tiếng leng keng cực cuốn.\n[15-30s Điểm nhấn] Ủ lạnh đủ 18 tiếng nên hậu vị ngọt thanh tự nhiên của cam vàng và hạnh nhân.\n[30-45s CTA] Bấm vào giỏ hàng góc trái nhận ngay ưu đãi đặt mua combo 3 vị giao nhanh trong 2 giờ!",
+                "cta": "Bấm giỏ hàng đặt thử ngay",
                 "status": ContentStatus.PENDING_REVIEW,
                 "origin": ContentOrigin.MANUAL,
                 "created_by": marketer1,
             },
-            # 4. REJECTED
+            # 3. APPROVED (AI origin)
+            {
+                "campaign": camp_coldbrew,
+                "channel": channels["FACEBOOK"],
+                "content_type": ContentType.AD_COPY,
+                "title": "Ưu đãi Combo 3 chai Cold Brew giao nhanh tận bàn làm việc",
+                "body": "Cơn buồn ngủ lúc 2 giờ chiều làm chậm tiến độ của bạn?\n\nBộ 3 chai Cold Brew An Nam 250ml (Nguyên bản - Cam vàng - Hạnh nhân) được ủ lạnh 18 tiếng giúp giữ trọn hương thơm tự nhiên, tiếp thêm sự tỉnh táo mượt mà cho cả tuần làm việc.\n\nƯu đãi tuần này: Giảm ngay 25.000đ và miễn phí giao hàng nội thành cho đơn từ 2 combo.",
+                "cta": "Đặt mua nhận ưu đãi ngay",
+                "status": ContentStatus.APPROVED,
+                "origin": ContentOrigin.AI,
+                "created_by": marketer1,
+                "review_decision": ReviewDecision.APPROVED,
+                "review_comment": "Bản nháp từ Trợ lý AI nêu rõ ưu đãi và CTA đặt hàng sát mục tiêu SALES.",
+                "reviewer": manager,
+            },
+
+            # --- CHIẾN DỊCH 2: Mùa Thu Cầu Đất (Mục tiêu: TRAFFIC - Tăng lượt truy cập) ---
+            # 4. REJECTED (Vi phạm từ cấm)
             {
                 "campaign": camp_autum,
                 "channel": channels["FACEBOOK"],
@@ -378,19 +409,215 @@ def seed_demo_data(reset: bool = False) -> None:
                 "origin": ContentOrigin.MANUAL,
                 "created_by": marketer2,
                 "review_decision": ReviewDecision.REJECTED,
-                "review_comment": "Bài viết vi phạm từ cấm ('rẻ nhất', 'cam kết 100%', 'vĩnh viễn') và không đúng giọng điệu lịch thiệp của An Nam. Vui lòng sửa lại toàn bộ.",
+                "review_comment": "Bài viết vi phạm từ cấm ('rẻ nhất', 'cam kết 100%', 'vĩnh viễn') và sai lệch thông điệp mùa thu Cầu Đất. Yêu cầu viết lại.",
                 "reviewer": manager,
             },
-            # 5. DRAFT
+            # 5. PUBLISHED
+            {
+                "campaign": camp_autum,
+                "channel": channels["WEBSITE"],
+                "content_type": ContentType.OTHER,
+                "title": "Hành trình hạt Arabica Cầu Đất từ sương mù 1.650m đến tách cà phê sáng",
+                "body": "Ở độ cao 1.650m so với mực nước biển, vùng nguyên liệu Cầu Đất (Đà Lạt) quanh năm mây phủ là cái nôi của những trái Arabica chín đỏ mọng.\n\nBài viết trên Blog An Nam dẫn bạn đi qua quy trình thu hái chọn lọc từng trái chín, sơ chế ướt (Washed) và rang mộc chuẩn xác để giữ lại hương hoa trắng cùng vị chua thanh tựa táo xanh.\n\nKhám phá trọn vẹn câu chuyện nông trại và bảng hướng dẫn pha Pour-over tại trang chuyên đề Mùa Thu Cầu Đất.",
+                "cta": "Đọc trọn bài viết trên Website An Nam",
+                "status": ContentStatus.PUBLISHED,
+                "origin": ContentOrigin.MANUAL,
+                "created_by": marketer2,
+                "published_url": "https://annamcoffee.vn/blog/mua-thu-cau-dat-arabica",
+                "published_at": utcnow() - timedelta(days=14),
+                "published_by": manager,
+                "review_decision": ReviewDecision.APPROVED,
+                "review_comment": "Bài chuẩn SEO kéo lượt truy cập về website rất tốt.",
+                "reviewer": manager,
+            },
+            # 6. APPROVED
+            {
+                "campaign": camp_autum,
+                "channel": channels["INSTAGRAM"],
+                "content_type": ContentType.SOCIAL_POST,
+                "title": "Chạm vào mùa thu Đà Lạt qua từng giọt Arabica Cầu Đất thơm hương hoa quả",
+                "body": "Một góc nắng thu dịu nhẹ tại không gian An Nam cùng bình Pour-over Arabica Cầu Đất vừa chiết xuất.\n\nHương thơm dịu của vỏ cam chín, chút ngọt thanh của mật ong rừng Tây Nguyên khiến buổi sáng cuối tuần thêm trọn vẹn.\n\nXem bản đồ các cơ sở trải nghiệm và thực đơn Mùa Thu tại đường dẫn trên trang cá nhân.",
+                "cta": "Khám phá thực đơn Mùa Thu tại bio",
+                "status": ContentStatus.APPROVED,
+                "origin": ContentOrigin.AI,
+                "created_by": marketer2,
+                "review_decision": ReviewDecision.APPROVED,
+                "review_comment": "Đúng tông giọng ấm áp và dẫn link tăng lượt truy cập.",
+                "reviewer": manager,
+            },
+            # 7. PENDING_REVIEW (by marketer2)
+            {
+                "campaign": camp_autum,
+                "channel": channels["FACEBOOK"],
+                "content_type": ContentType.SOCIAL_POST,
+                "title": "Gợi ý 3 cách pha hạt Arabica Cầu Đất rang mộc thơm chuẩn vị tại nhà",
+                "body": "Nhiều bạn hỏi An Nam làm sao để pha túi hạt Arabica Cầu Đất tại nhà mà vẫn dậy hương hoa quả tự nhiên như ngoài quán?\n\nTrong bài hướng dẫn mới trên Website, Barista trưởng của An Nam đã chia sẻ chi tiết tỷ lệ nước, nhiệt độ 92°C và cỡ xay cho cả 3 dụng cụ: V60, AeroPress và Cold Brew.\n\nNhấp vào liên kết bên dưới để xem bảng thông số chi tiết nhé!",
+                "cta": "Xem hướng dẫn pha chế trên Website",
+                "status": ContentStatus.PENDING_REVIEW,
+                "origin": ContentOrigin.MANUAL,
+                "created_by": marketer2,
+            },
+
+            # --- CHIẾN DỊCH 3: Workshop Rang & Cupping (Mục tiêu: LEADS - Thu khách hàng tiềm năng) ---
+            # 8. DRAFT
             {
                 "campaign": camp_workshop,
                 "channel": channels["EMAIL"],
                 "content_type": ContentType.EMAIL,
                 "title": "[Thư Mời] Trải nghiệm giác quan cùng Xưởng Rang An Nam",
-                "body": "Chào bạn,\n\nBạn đã bao giờ tự tay ngửi hạt cà phê vừa rang xong và phân biệt được nốt hương hoa quả với hương chocolate chưa?\n\nCuối tuần này, Trưởng xưởng rang An Nam thân mời bạn tham gia buổi Cupping thân mật tại số 12 Võ Thị Sáu...",
+                "body": "Chào bạn,\n\nBạn đã bao giờ tự tay ngửi hạt cà phê vừa rang xong và phân biệt được 8 tầng hương vị cà phê Tây Nguyên từ hoa trắng, cam chanh đến sô-cô-la đen chưa?\n\nCuối tuần này, Trưởng xưởng rang An Nam thân mời bạn tham gia buổi Workshop Rang & Cupping thân mật. Chỉ 20 suất mỗi buổi để đảm bảo trải nghiệm thực hành trực tiếp.",
                 "cta": "Đăng ký giữ chỗ Workshop",
                 "status": ContentStatus.DRAFT,
+                "origin": ContentOrigin.MANUAL,
                 "created_by": manager,
+            },
+            # 9. APPROVED
+            {
+                "campaign": camp_workshop,
+                "channel": channels["FACEBOOK"],
+                "content_type": ContentType.AD_COPY,
+                "title": "Mở cổng đăng ký Workshop Cupping: Tự tay nếm 8 tầng hương vị cà phê Tây Nguyên",
+                "body": "Dành cho người yêu cà phê thủ công và các Barista muốn nâng cao cảm quan mùi vị:\n\n- Thực hành quan sát biến đổi hạt trên máy rang mẫu.\n- Trải nghiệm quy trình Cupping tiêu chuẩn SCA cùng 6 mẫu hạt Đắk Lắk & Cầu Đất.\n- Tặng kèm 01 túi hạt Arabica 150g tự phối trộn mang về.\n\nPhí tham dự: 299.000đ/người. Điền biểu mẫu đăng ký để giữ suất cuối tuần này!",
+                "cta": "Điền thông tin đăng ký tham dự",
+                "status": ContentStatus.APPROVED,
+                "origin": ContentOrigin.AI,
+                "created_by": marketer1,
+                "review_decision": ReviewDecision.APPROVED,
+                "review_comment": "Nêu rõ quyền lợi người tham dự, bám sát mục tiêu thu 100 đăng ký.",
+                "reviewer": manager,
+            },
+            # 10. PENDING_REVIEW (by manager -> Dùng để demo quy tắc Bốn Mắt chặn tự duyệt bài chính mình!)
+            {
+                "campaign": camp_workshop,
+                "channel": channels["WEBSITE"],
+                "content_type": ContentType.OTHER,
+                "title": "Trang đích đăng ký Workshop Rang & Cupping Cà Phê Cuối Tuần",
+                "body": "Tự tay nếm và hiểu 8 tầng hương vị cà phê Tây Nguyên trong buổi trải nghiệm 120 phút tại Xưởng Rang An Nam.\n\nNội dung chương trình:\n1. Tìm hiểu nguồn gốc hạt cà phê Đắk Lắk và Cầu Đất.\n2. Thực hành ngửi hương khô (Fragrance) và hương ướt (Aroma).\n3. Thử nếm đối chiếu 6 mẻ rang mộc.\n\nĐể lại Họ tên và Số điện thoại bên dưới để bộ phận điều phối gửi mã vé xác nhận.",
+                "cta": "Gửi thông tin giữ vé ngay",
+                "status": ContentStatus.PENDING_REVIEW,
+                "origin": ContentOrigin.MANUAL,
+                "created_by": manager,
+            },
+
+            # --- CHIẾN DỊCH 4: Chăm Sóc Khách Thân Thiết (Mục tiêu: AWARENESS - Nhận diện thương hiệu) ---
+            # 11. PUBLISHED
+            {
+                "campaign": camp_loyalty,
+                "channel": channels["ZALO_OA"],
+                "content_type": ContentType.SOCIAL_POST,
+                "title": "Đặc quyền Hội viên An Nam Club: Tích điểm đổi Ly giữ nhiệt vỏ tre",
+                "body": "Uống cà phê ngon, sống xanh cùng An Nam!\n\nMỗi ly cà phê bạn thưởng thức tại hệ thống An Nam đều được tích lũy điểm thưởng trên Zalo OA. Khi đạt 15 điểm, bạn có thể đổi ngay 01 Ly giữ nhiệt vỏ tre khắc tên riêng — cùng An Nam giảm thiểu ly nhựa dùng một lần.",
+                "cta": "Mở thẻ hội viên trên Zalo OA",
+                "status": ContentStatus.PUBLISHED,
+                "origin": ContentOrigin.MANUAL,
+                "created_by": marketer1,
+                "published_url": "https://zalo.me/annamcoffee/posts/loyalty-bamboo-cup",
+                "published_at": utcnow() - timedelta(days=30),
+                "published_by": manager,
+                "review_decision": ReviewDecision.APPROVED,
+                "review_comment": "Thông điệp sống xanh truyền cảm hứng tốt cho tệp khách hàng thân thiết.",
+                "reviewer": manager,
+            },
+            # 12. PUBLISHED
+            {
+                "campaign": camp_loyalty,
+                "channel": channels["EMAIL"],
+                "content_type": ContentType.EMAIL,
+                "title": "Cảm ơn bạn đã đồng hành cùng hành trình cà phê bền vững An Nam",
+                "body": "Chào hội viên thân thiết của An Nam,\n\nNhờ sự ủng hộ của bạn trong suốt thời gian qua, cộng đồng An Nam Club đã giảm thiểu hơn 12.000 chiếc cốc nhựa dùng một lần thông qua chương trình mang bình cá nhân tới quán.\n\nHãy tiếp tục kiểm tra điểm tích lũy của bạn để nhận chiếc Ly giữ nhiệt tre phiên bản giới hạn mùa này nhé.",
+                "cta": "Kiểm tra điểm tích lũy của bạn",
+                "status": ContentStatus.PUBLISHED,
+                "origin": ContentOrigin.AI,
+                "created_by": marketer1,
+                "published_url": "https://annamcoffee.vn/newsletter/cam-on-hoi-vien-song-xanh",
+                "published_at": utcnow() - timedelta(days=22),
+                "published_by": manager,
+                "review_decision": ReviewDecision.APPROVED,
+                "review_comment": "Email chăm sóc hội viên rất ấm áp, đúng hướng dẫn thương hiệu.",
+                "reviewer": manager,
+            },
+            # 13. APPROVED
+            {
+                "campaign": camp_loyalty,
+                "channel": channels["ZALO_OA"],
+                "content_type": ContentType.AD_COPY,
+                "title": "Nhắc lịch đổi điểm thưởng nhận Ly giữ nhiệt tre An Nam Club",
+                "body": "Tin nhắn dành riêng cho Hội viên An Nam Member:\n\nĐợt quà tặng Ly giữ nhiệt vỏ tre thủ công vẫn đang chờ bạn tại quầy trải nghiệm. Đừng quên xuất trình mã QR Hội viên trên Zalo OA trong lần ghé quán tiếp theo để nhân viên gửi tặng món quà xanh từ An Nam.",
+                "cta": "Xem mã QR Hội viên ngay",
+                "status": ContentStatus.APPROVED,
+                "origin": ContentOrigin.MANUAL,
+                "created_by": marketer2,
+                "review_decision": ReviewDecision.APPROVED,
+                "review_comment": "Ngắn gọn, chuẩn định dạng broadcast Zalo OA.",
+                "reviewer": manager,
+            },
+
+            # --- CHIẾN DỊCH 5: Mừng Khai Trương Chi Nhánh Quận 1 (Mục tiêu: SALES - Tăng doanh số) ---
+            # 14. PUBLISHED
+            {
+                "campaign": camp_opening,
+                "channel": channels["FACEBOOK"],
+                "content_type": ContentType.SOCIAL_POST,
+                "title": "Chính thức khai trương An Nam Quận 1 — Ưu đãi Mua 1 Tặng 1 tuần lễ đầu",
+                "body": "An Nam đã đến Quận 1 — Mời bạn ghé chơi nhận ưu đãi nhân đôi!\n\nKhông gian mới tại đường Nguyễn Huệ mang trọn hương cà phê rang mộc Tây Nguyên giữa lòng trung tâm thành phố. Trong tuần lễ khai trương, An Nam gửi tặng ưu đãi Mua 1 Tặng 1 cho toàn bộ menu thức uống pha máy và pha thủ công.",
+                "cta": "Lấy mã ưu đãi Mua 1 Tặng 1",
+                "status": ContentStatus.PUBLISHED,
+                "origin": ContentOrigin.MANUAL,
+                "created_by": marketer2,
+                "published_url": "https://facebook.com/annamcoffee/posts/khai-truong-quan-1",
+                "published_at": utcnow() - timedelta(days=75),
+                "published_by": manager,
+                "review_decision": ReviewDecision.APPROVED,
+                "review_comment": "Bài thông báo khai trương rõ ràng, thu hút khách hàng ghé quán.",
+                "reviewer": manager,
+            },
+            # 15. PUBLISHED
+            {
+                "campaign": camp_opening,
+                "channel": channels["TIKTOK"],
+                "content_type": ContentType.VIDEO_SCRIPT,
+                "title": "Check-in góc ban công nhìn xuống phố đi bộ tại An Nam Nguyễn Huệ",
+                "body": "[0-3s Hook] Một góc ban công ngập nắng ngay phố đi bộ Nguyễn Huệ vừa mới mở cửa!\n[3-15s Cảnh quay] Không gian gỗ ấm cúng, mùi cà phê rang mới thơm phức từ quầy bar thủ công.\n[15-30s Ưu đãi] Đặc biệt tuần lễ khai trương đang áp dụng Mua 1 Tặng 1 toàn bộ menu pha máy và Cold Brew.\n[30-45s CTA] Rủ ngay đồng nghiệp ghé số 88 Nguyễn Huệ thưởng thức nhé!",
+                "cta": "Lưu địa chỉ ghé quán ngay",
+                "status": ContentStatus.PUBLISHED,
+                "origin": ContentOrigin.AI,
+                "created_by": marketer2,
+                "published_url": "https://tiktok.com/@annamcoffee/video/khai-truong-nguyen-hue",
+                "published_at": utcnow() - timedelta(days=70),
+                "published_by": manager,
+                "review_decision": ReviewDecision.APPROVED,
+                "review_comment": "Kịch bản video ngắn gọn, bắt mắt.",
+                "reviewer": manager,
+            },
+            # 16. PUBLISHED
+            {
+                "campaign": camp_opening,
+                "channel": channels["GOOGLE_ADS"],
+                "content_type": ContentType.AD_COPY,
+                "title": "Cà Phê Đặc Sản Quận 1 | An Nam Nguyễn Huệ Mua 1 Tặng 1",
+                "body": "Trải nghiệm cà phê rang mộc 100% Đắk Lắk & Cầu Đất ngay trung tâm Quận 1. Không gian yên tĩnh làm việc, ưu đãi Mua 1 Tặng 1 mừng khai trương.",
+                "cta": "Xem chỉ đường & nhận ưu đãi",
+                "status": ContentStatus.PUBLISHED,
+                "origin": ContentOrigin.MANUAL,
+                "created_by": marketer2,
+                "published_url": "https://annamcoffee.vn/chi-nhanh-quan-1",
+                "published_at": utcnow() - timedelta(days=68),
+                "published_by": manager,
+                "review_decision": ReviewDecision.APPROVED,
+                "review_comment": "Đúng chuẩn giới hạn từ khoá Google Tìm Kiếm.",
+                "reviewer": manager,
+            },
+            # 17. DRAFT
+            {
+                "campaign": camp_opening,
+                "channel": channels["FACEBOOK"],
+                "content_type": ContentType.SOCIAL_POST,
+                "title": "Nhìn lại 3.200 ly cà phê đầu tiên tại An Nam chi nhánh Quận 1",
+                "body": "Khép lại tháng khai trương rực rỡ tại con đường Nguyễn Huệ, đội ngũ Barista An Nam vô cùng biết ơn khi được đón tiếp hơn 3.200 lượt khách ghé thăm và thưởng thức cà phê nguyên bản.",
+                "cta": "Xem album ảnh tháng khai trương",
+                "status": ContentStatus.DRAFT,
+                "origin": ContentOrigin.MANUAL,
+                "created_by": marketer2,
             },
         ]
 
@@ -431,16 +658,30 @@ def seed_demo_data(reset: bool = False) -> None:
                     db.flush()
             created_contents.append(content)
 
-        # 6. Schedules
-        print("6. Tạo lịch đăng bài...")
+        # 6. Schedules (Trải đều quá khứ, HÔM NAY và các ngày sắp tới để Lịch đăng bài & Dashboard sống động)
+        print("6. Tạo 12 lịch đăng bài cho các chiến dịch...")
         now = utcnow()
         schedules_spec = [
-            (created_contents[0], now - timedelta(days=10), ScheduleStatus.DONE, marketer1.id, "Đã đăng theo đúng khung giờ trưa"),
-            (created_contents[1], now + timedelta(days=1, hours=2), ScheduleStatus.PLANNED, marketer1.id, "Đăng kèm 3 ảnh carousel"),
-            (created_contents[2], now + timedelta(days=3, hours=5), ScheduleStatus.PLANNED, marketer1.id, "Chờ video hoàn thiện và duyệt kịch bản"),
+            # Đã hoàn thành trong quá khứ
+            (created_contents[0], now - timedelta(days=10), ScheduleStatus.DONE, marketer1.id, "Đã đăng khung giờ trưa 11:30 trên Fanpage"),
+            (created_contents[5], now - timedelta(days=14), ScheduleStatus.DONE, marketer2.id, "Đã xuất bản bài chuẩn SEO trên Blog An Nam"),
+            (created_contents[11], now - timedelta(days=30), ScheduleStatus.DONE, marketer1.id, "Đã gửi tin nhắn Broadcast Zalo OA"),
+            (created_contents[12], now - timedelta(days=22), ScheduleStatus.DONE, marketer1.id, "Đã gửi bản tin Email cho 4.500 hội viên"),
+            (created_contents[14], now - timedelta(days=75), ScheduleStatus.DONE, marketer2.id, "Bài mở màn tuần lễ khai trương Quận 1"),
+            (created_contents[15], now - timedelta(days=70), ScheduleStatus.DONE, marketer2.id, "Video TikTok check-in ban công Nguyễn Huệ"),
+            # Lịch đăng HÔM NAY (để Dashboard hiển thị schedules_today > 0)
+            (created_contents[1], now + timedelta(hours=2), ScheduleStatus.PLANNED, marketer1.id, "Đăng kèm bộ 3 ảnh sản phẩm Cold Brew"),
+            (created_contents[3], now + timedelta(hours=4), ScheduleStatus.PLANNED, marketer1.id, "Bật bài quảng cáo ưu đãi combo văn phòng"),
+            # Lịch đăng những ngày tới trong tháng
+            (created_contents[6], now + timedelta(days=1, hours=3), ScheduleStatus.PLANNED, marketer2.id, "Đăng Reels Pour-over Arabica Cầu Đất"),
+            (created_contents[2], now + timedelta(days=2, hours=5), ScheduleStatus.PLANNED, marketer1.id, "Chờ duyệt kịch bản TikTok Cold Brew"),
+            (created_contents[9], now + timedelta(days=4, hours=2), ScheduleStatus.PLANNED, marketer1.id, "Mở form đăng ký Workshop Cupping cuối tuần"),
+            (created_contents[13], now + timedelta(days=6, hours=1), ScheduleStatus.CANCELLED, marketer2.id, "Tạm hoãn chờ cập nhật số lượng ly tre tồn kho"),
         ]
         for c, dt, st, assignee, note in schedules_spec:
-            sched = db.execute(select(Schedule).where(Schedule.content_id == c.id)).scalar_one_or_none()
+            sched = db.execute(
+                select(Schedule).where(Schedule.content_id == c.id, Schedule.note == note)
+            ).scalar_one_or_none()
             if sched is None:
                 db.add(
                     Schedule(
@@ -449,80 +690,93 @@ def seed_demo_data(reset: bool = False) -> None:
                         status=st,
                         assignee_id=assignee,
                         note=note,
-                        done_at=now - timedelta(days=10) if st == ScheduleStatus.DONE else None,
+                        done_at=dt if st == ScheduleStatus.DONE else None,
                     )
                 )
 
-        # 7. Metrics (30-45 days of daily data, source=SEED)
-        print("7. Tạo số liệu hiệu quả 40 ngày (source=SEED)...")
-        # Generates metrics for camp_coldbrew on FACEBOOK and INSTAGRAM for the past 40 days
+        # 7. Metrics (Số liệu đa chiến dịch, đa kênh trong 45 ngày, source=SEED)
+        print("7. Tạo số liệu hiệu quả cho toàn bộ 5 chiến dịch trên cả 7 kênh (source=SEED)...")
         import random
         random.seed(42)  # Deterministic realistic numbers
 
-        base_date = today - timedelta(days=40)
+        def upsert_seed_metric(
+            camp_obj: Campaign,
+            ch_obj: Channel,
+            m_date,
+            views_range: tuple[int, int],
+            ctr_range: tuple[float, float],
+            cvr_range: tuple[float, float],
+            cpc_range: tuple[int, int],
+            entered_user_id: int,
+        ) -> int:
+            views_val = random.randint(*views_range)
+            clicks_val = max(1, int(views_val * random.uniform(*ctr_range)))
+            conv_val = max(0, int(clicks_val * random.uniform(*cvr_range)))
+            cost_val = Decimal(int(clicks_val * random.uniform(*cpc_range)))
+            existing = db.execute(
+                select(Metric).where(
+                    Metric.campaign_id == camp_obj.id,
+                    Metric.channel_id == ch_obj.id,
+                    Metric.metric_date == m_date,
+                )
+            ).scalar_one_or_none()
+            if existing is None:
+                db.add(
+                    Metric(
+                        campaign_id=camp_obj.id,
+                        channel_id=ch_obj.id,
+                        metric_date=m_date,
+                        views=views_val,
+                        clicks=clicks_val,
+                        conversions=conv_val,
+                        cost=cost_val,
+                        source=MetricSource.SEED,
+                        entered_by=entered_user_id,
+                        import_batch="seed_demo_annam",
+                    )
+                )
+                return 1
+            return 0
+
         metrics_count = 0
+
+        # Chiến dịch 1: Cold Brew (ACTIVE - 41 ngày gần nhất trên FACEBOOK, INSTAGRAM, TIKTOK)
+        base_cb = today - timedelta(days=40)
         for i in range(41):
-            m_date = base_date + timedelta(days=i)
+            d = base_cb + timedelta(days=i)
+            metrics_count += upsert_seed_metric(camp_coldbrew, channels["FACEBOOK"], d, (1100, 2600), (0.038, 0.068), (0.055, 0.115), (2400, 3600), marketer1.id)
+            metrics_count += upsert_seed_metric(camp_coldbrew, channels["INSTAGRAM"], d, (800, 1900), (0.030, 0.055), (0.045, 0.095), (2600, 3900), marketer1.id)
+            metrics_count += upsert_seed_metric(camp_coldbrew, channels["TIKTOK"], d, (1800, 4200), (0.025, 0.048), (0.040, 0.085), (1800, 2900), marketer1.id)
 
-            # Cold Brew on Facebook
-            views_fb = random.randint(800, 2500)
-            clicks_fb = int(views_fb * random.uniform(0.03, 0.07))
-            conv_fb = int(clicks_fb * random.uniform(0.04, 0.12))
-            cost_fb = Decimal(int(clicks_fb * random.uniform(2800, 4500)))
+        # Chiến dịch 2: Mùa Thu Cầu Đất (ACTIVE - 25 ngày gần nhất trên FACEBOOK, INSTAGRAM, WEBSITE)
+        base_aut = today - timedelta(days=24)
+        for i in range(25):
+            d = base_aut + timedelta(days=i)
+            metrics_count += upsert_seed_metric(camp_autum, channels["FACEBOOK"], d, (950, 2200), (0.045, 0.082), (0.030, 0.065), (2100, 3200), marketer2.id)
+            metrics_count += upsert_seed_metric(camp_autum, channels["INSTAGRAM"], d, (850, 1950), (0.040, 0.072), (0.028, 0.060), (2300, 3400), marketer2.id)
+            metrics_count += upsert_seed_metric(camp_autum, channels["WEBSITE"], d, (450, 1100), (0.065, 0.120), (0.040, 0.085), (1500, 2300), marketer2.id)
 
-            existing_m = db.execute(
-                select(Metric).where(
-                    Metric.campaign_id == camp_coldbrew.id,
-                    Metric.channel_id == channels["FACEBOOK"].id,
-                    Metric.metric_date == m_date,
-                )
-            ).scalar_one_or_none()
-            if existing_m is None:
-                db.add(
-                    Metric(
-                        campaign_id=camp_coldbrew.id,
-                        channel_id=channels["FACEBOOK"].id,
-                        metric_date=m_date,
-                        views=views_fb,
-                        clicks=clicks_fb,
-                        conversions=conv_fb,
-                        cost=cost_fb,
-                        source=MetricSource.SEED,
-                        entered_by=marketer1.id,
-                        import_batch="seed_demo_v2",
-                    )
-                )
-                metrics_count += 1
+        # Chiến dịch 3: Workshop Cupping (PLANNED - 5 ngày chạy thử nghiệm thu hút đăng ký sớm trên FACEBOOK & EMAIL)
+        base_ws = today - timedelta(days=4)
+        for i in range(5):
+            d = base_ws + timedelta(days=i)
+            metrics_count += upsert_seed_metric(camp_workshop, channels["FACEBOOK"], d, (600, 1200), (0.042, 0.075), (0.080, 0.150), (2200, 3100), manager.id)
+            metrics_count += upsert_seed_metric(camp_workshop, channels["EMAIL"], d, (400, 850), (0.085, 0.140), (0.100, 0.180), (900, 1500), manager.id)
 
-            # Cold Brew on Instagram
-            views_ig = random.randint(600, 1800)
-            clicks_ig = int(views_ig * random.uniform(0.025, 0.06))
-            conv_ig = int(clicks_ig * random.uniform(0.03, 0.09))
-            cost_ig = Decimal(int(clicks_ig * random.uniform(3200, 5200)))
+        # Chiến dịch 4: Chăm Sóc Khách Thân Thiết (PAUSED - 30 ngày hoạt động trên ZALO_OA, EMAIL)
+        base_loy = today - timedelta(days=45)
+        for i in range(30):
+            d = base_loy + timedelta(days=i)
+            metrics_count += upsert_seed_metric(camp_loyalty, channels["ZALO_OA"], d, (1200, 2500), (0.055, 0.095), (0.060, 0.110), (1600, 2500), marketer1.id)
+            metrics_count += upsert_seed_metric(camp_loyalty, channels["EMAIL"], d, (900, 1800), (0.065, 0.115), (0.050, 0.095), (1200, 2000), marketer1.id)
 
-            existing_m_ig = db.execute(
-                select(Metric).where(
-                    Metric.campaign_id == camp_coldbrew.id,
-                    Metric.channel_id == channels["INSTAGRAM"].id,
-                    Metric.metric_date == m_date,
-                )
-            ).scalar_one_or_none()
-            if existing_m_ig is None:
-                db.add(
-                    Metric(
-                        campaign_id=camp_coldbrew.id,
-                        channel_id=channels["INSTAGRAM"].id,
-                        metric_date=m_date,
-                        views=views_ig,
-                        clicks=clicks_ig,
-                        conversions=conv_ig,
-                        cost=cost_ig,
-                        source=MetricSource.SEED,
-                        entered_by=marketer1.id,
-                        import_batch="seed_demo_v2",
-                    )
-                )
-                metrics_count += 1
+        # Chiến dịch 5: Mừng Khai Trương Quận 1 (COMPLETED - 30 ngày cao điểm trên FACEBOOK, TIKTOK, GOOGLE_ADS)
+        base_open = today - timedelta(days=80)
+        for i in range(30):
+            d = base_open + timedelta(days=i)
+            metrics_count += upsert_seed_metric(camp_opening, channels["FACEBOOK"], d, (1600, 3500), (0.045, 0.080), (0.065, 0.125), (2500, 3800), marketer2.id)
+            metrics_count += upsert_seed_metric(camp_opening, channels["TIKTOK"], d, (2400, 5200), (0.032, 0.060), (0.050, 0.095), (1900, 2900), marketer2.id)
+            metrics_count += upsert_seed_metric(camp_opening, channels["GOOGLE_ADS"], d, (700, 1500), (0.060, 0.110), (0.080, 0.145), (2800, 4200), marketer2.id)
 
         # 8. Notifications
         print("8. Tạo thông báo mẫu...")
@@ -535,6 +789,13 @@ def seed_demo_data(reset: bool = False) -> None:
                 False,
             ),
             (
+                manager.id,
+                "CONTENT_SUBMITTED",
+                f'{marketer2.full_name} gửi duyệt bài đăng "{created_contents[7].title}"',
+                f"/contents/{created_contents[7].id}",
+                False,
+            ),
+            (
                 marketer1.id,
                 "CONTENT_APPROVED",
                 f'Quản lý {manager.full_name} đã duyệt nội dung "{created_contents[1].title}"',
@@ -544,8 +805,8 @@ def seed_demo_data(reset: bool = False) -> None:
             (
                 marketer2.id,
                 "CONTENT_REJECTED",
-                f'Nội dung "{created_contents[3].title}" bị từ chối duyệt: vi phạm từ cấm',
-                f"/contents/{created_contents[3].id}",
+                f'Nội dung "{created_contents[4].title}" bị từ chối duyệt: vi phạm từ cấm',
+                f"/contents/{created_contents[4].id}",
                 False,
             ),
         ]
@@ -570,7 +831,7 @@ def seed_demo_data(reset: bool = False) -> None:
 def main() -> None:
     args = parse_args()
     check_environment(args.force)
-    print("Bắt đầu nạp dữ liệu mẫu MarketFlow v2...")
+    print("Bắt đầu nạp dữ liệu mẫu MarketFlow...")
     seed_demo_data(reset=args.reset)
 
 

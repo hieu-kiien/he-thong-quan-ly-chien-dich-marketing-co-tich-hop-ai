@@ -2,39 +2,38 @@
 
 \section{Tổng kết thành quả đạt được}
 
-Đề tài \textbf{“Hệ thống quản lý chiến dịch marketing có tích hợp AI (MarketFlow AI)”} đã hoàn thành đầy đủ các mục tiêu nghiên cứu và hiện thực hóa phần mềm đặt ra cho học phần AIA331. Dự án đã chuyển giao thành một hệ thống phần mềm hoàn chỉnh, vận hành ổn định trên nền tảng FastAPI, React 18, SQLite và Docker, đồng thời vượt qua các bài kiểm định thực nghiệm tự động.
+Đề tài \textbf{``Hệ thống quản lý chiến dịch marketing có tích hợp AI (MarketFlow AI)''} (Mã đề tài: 80300) đã hoàn thành trọn vẹn các mục tiêu nghiên cứu, thiết kế, hiện thực hóa phần mềm và triển khai thực tế đặt ra cho học phần AIA331. Hệ thống hiện đang vận hành ổn định trên môi trường Production VPS tại địa chỉ \url{https://marketing.kienhieu.id.vn} và vượt qua toàn bộ các bài kiểm định tự động.
 
 Các thành quả cốt lõi đạt được bao gồm:
 \begin{enumerate}[noitemsep,topsep=2pt]
- \item \textbf{Hiện thực hóa trọn vẹn quy trình quản trị tiếp thị}: Xây dựng thành công hệ thống quản lý tập trung từ mục tiêu chiến dịch, danh mục sản phẩm, phân bổ ngân sách, sáng tạo nội dung đa kênh đến thu thập chỉ số hiệu quả (views, clicks, conversions, cost, revenue) và tự động tính toán các chỉ số kinh doanh then chốt (CTR, CPC, CPA, ROI).
- \item \textbf{Kiến trúc bảo mật đa tầng và kiểm soát phân quyền mức bản ghi (Record-level NFR01)}: Ngăn chặn hiệu quả lỗ hổng leo quyền ngang IDOR. Marketer chỉ được thao tác trong phạm vi các chiến dịch mà mình là chủ sở hữu hoặc được chỉ định thành viên (\texttt{CampaignMember}). Đồng bộ kiểm tra trạng thái tài khoản kích hoạt (\texttt{user.status == 'ACTIVE'}) tại mọi ranh giới bảo mật.
- \item \textbf{Máy trạng thái duyệt nội dung Human-in-the-loop (HITL) chống can thiệp}: Thiết lập chu trình kiểm duyệt nghiêm ngặt \texttt{DRAFT / AI\_DRAFT} $\rightarrow$ \texttt{IN\_REVIEW} $\rightarrow$ \texttt{APPROVED / REJECTED} $\rightarrow$ \texttt{PUBLISHED}. Chặn tuyệt đối việc tạo bài viết trực tiếp ở trạng thái phê duyệt; tự động hạ cấp trạng thái về \texttt{AI\_DRAFT} nếu bài viết đã duyệt bị chỉnh sửa nội dung.
- \item \textbf{Tích hợp AI đa nhà cung cấp, bảo mật khóa BYOK và khử ảo giác (De-hallucination Engine)}: Hỗ trợ linh hoạt Google Gemini, OpenAI, Claude, OpenRouter, Ollama cùng kho khóa mã hóa Fernet AES-128; tách biệt cấu hình Prompt ngoài mã nguồn; cơ chế Smart Fallback bảo đảm dịch vụ hoạt động liên tục và bám sát số liệu thực tế.
- \item \textbf{Hệ thống kiểm thử tự động toàn diện}: Xây dựng và thực thi 205 ca kiểm thử tự động (\texttt{pytest}) bao phủ từ đơn vị, tích hợp đến kiểm thử đối kháng (Adversarial Tests) đạt tỷ lệ vượt qua 100\%, 0 lỗi và 0 cảnh báo.
- \item \textbf{Đánh giá định lượng minh bạch}: Đo lường thực chứng tỷ lệ hợp lệ Schema đạt 100\%, Grounding Score đạt 95.8\%, độ trễ trung vị P50 ở mức 1.52 giây, và chi phí thực tế 0 VNĐ trên nền tảng Google AI Studio Free Tier.
+ \item \textbf{Hiện thực hóa hoàn chỉnh hệ thống quản trị tiếp thị trên lược đồ CSDL 14 bảng}: Quản lý xuyên suốt từ nhân sự, hồ sơ thương hiệu (\texttt{brand\_profile}), từ khóa cấm (\texttt{banned\_keywords}), 7 loại kênh truyền thông, chiến dịch (\texttt{campaigns}) và phân bổ ngân sách (\texttt{campaign\_channels}) đến nội dung, lịch xuất bản, chỉ số hiệu quả (nhập tay \& CSV 2 bước) và thống kê KPI (CTR, CVR, CPC, CPA, CPM, \texttt{used\_pct}).
+ \item \textbf{Kiến trúc phân quyền RBAC kết hợp kiểm soát quyền sở hữu và chống tự duyệt}: Bảo vệ chặt chẽ phạm vi dữ liệu theo \texttt{owner\_id} cho vai trò \texttt{MARKETER}, đồng thời áp dụng quy tắc \texttt{CANNOT\_REVIEW\_OWN} ngăn chặn người dùng (kể cả \texttt{MANAGER}) tự phê duyệt bài viết do chính mình soạn thảo.
+ \item \textbf{Máy trạng thái duyệt nội dung HITL 5 trạng thái}: Chu trình \texttt{DRAFT} $\rightarrow$ \texttt{PENDING\_REVIEW} $\rightarrow$ \texttt{APPROVED}/\texttt{REJECTED} $\rightarrow$ \texttt{PUBLISHED} tích hợp tự động quét từ khóa cấm khi gửi duyệt, tự động thu hồi phê duyệt khi sửa bài và khóa xóa đối với nội dung đã duyệt (\texttt{CONTENT\_LOCKED}).
+ \item \textbf{Kiến trúc AI Tác tử có kiểm soát qua \texttt{ai-runner} và FastMCP (\texttt{/mcp})}: Cô lập tiến trình \texttt{opencode run} dưới tài khoản phi đặc quyền \texttt{mfai}, xác thực qua \texttt{Run-Token} JWT ngắn hạn (10 phút), cung cấp 14 công cụ MCP (9 Read + 5 Propose) và bắt buộc mọi thao tác ghi của AI đi qua thẻ đề xuất \texttt{ai\_actions} (\texttt{PROPOSED}) chờ con người bấm \textit{Xác nhận}.
+ \item \textbf{Độ tin cậy đa nhà cung cấp (13 mô hình LLM) và Đánh giá định lượng minh bạch}: Hỗ trợ 13 mô hình trên 5 nền tảng với cơ chế tự động chuyển đổi dự phòng; đánh giá thực nghiệm 4 giai đoạn tối ưu hóa System Prompt đạt tỷ lệ vượt qua 87,5\% (7/8 kịch bản ở bản Production); kiểm thử tự động 151 ca kiểm thử (104 Backend + 18 AI-Runner + 29 Playwright E2E) đạt 100\% Pass.
 \end{enumerate}
 
 \section{Đánh giá khách quan các giới hạn kỹ thuật đã biết}
 
-Nhằm duy trì tính trung thực học thuật và định vị đúng ranh giới của giải pháp kỹ thuật, nhóm thẳng thắn ghi nhận các điểm giới hạn đã biết (Known Limitations) trong Bảng~\ref{tab:known-limitations}.
+Nhằm duy trì tính trung thực học thuật (\textit{Rule 0}) và định vị đúng ranh giới của giải pháp kỹ thuật hiện tại, nhóm thẳng thắn ghi nhận các điểm giới hạn đã biết (\textit{Known Limitations}) trong Bảng~\ref{tab:known-limitations}.
 
-\begin{table}[H]
+\begin{table}[!htbp]
 \centering
 \footnotesize
 \renewcommand{\arraystretch}{1.04}
 \caption{Đánh giá khách quan các giới hạn kỹ thuật đã biết và phương án nâng cấp}
 \label{tab:known-limitations}
-\begin{tabularx}{\textwidth}{|L{3.0cm}|Y|Y|}
+\begin{tabularx}{\textwidth}{|L{3.1cm}|Y|Y|}
 \hline
 \thead{Hạng mục} & \thead{Hiện trạng và giới hạn kỹ thuật} & \thead{Tác động và giải pháp trong tương lai}\\
 \hline
-Hệ quản trị CSDL & Hệ thống sử dụng SQLite với WAL mode. Rất tối ưu cho quy mô nhóm nội bộ (5--20 tài khoản, hàng chục nghìn bản ghi), nhưng sẽ gặp hiện tượng nút thắt cổ chai khi có hàng trăm yêu cầu ghi đồng thời. & Cần chuyển đổi sang PostgreSQL phân tán kết hợp PgBouncer để tối ưu Connection Pooling khi mở rộng quy mô toàn doanh nghiệp.\\
+Xử lý tuần tự tại \texttt{ai-runner} (\texttt{RUNNER\_}\allowbreak\texttt{CONCURRENCY=1}) & Do mỗi tiến trình \texttt{opencode run} tiêu thụ $\sim$490 MB RSS trên VPS 2,5 GB RAM, dịch vụ \texttt{ai-runner} được giới hạn xử lý tuần tự từng lượt gọi AI qua hàng đợi FIFO. & Khi có nhiều người dùng gửi tin nhắn AI cùng lúc, các yêu cầu sau phải chờ trong hàng đợi. Giải pháp: nâng cấp RAM máy chủ hoặc chuyển sang gọi trực tiếp SDK nhẹ khi mở rộng quy mô lớn.\\
 \hline
-Tích hợp mạng xã hội & Hệ thống mới quản lý lịch đăng và nội dung phê duyệt ở phạm vi nội bộ; chưa trực tiếp gọi Webhook phát hành bài viết lên Facebook API hay Google Ads API thật do yêu cầu tài khoản doanh nghiệp xác minh chính thức. & Xây dựng adapter kết nối OAuth 2.0 và tích hợp SDK chính thức của Meta Marketing API và Google Ads API trong giai đoạn thương mại hóa.\\
+Độ trễ của các mô hình miễn phí khi gọi chuỗi công cụ MCP & Một lượt hội thoại gọi liên tiếp 2--3 công cụ MCP qua các cổng miễn phí mất khoảng 20--110 giây tùy tải của nhà cung cấp. & Đã giảm thiểu bằng luồng SSE hiển thị tiến trình thời gian thực và hỗ trợ chuyển đổi sang các mô hình tốc độ cao trên Groq LPU.\\
 \hline
-Bộ nhớ đệm (Caching) & Chưa tích hợp tầng lưu trữ đệm phân tán (Redis). Các truy vấn báo cáo và kết quả sinh nội dung tương đồng vẫn phải xử lý lại từ đầu. & Bổ sung Redis Cache cho tầng đọc Dashboard và lưu đệm kết quả prompt phổ biến để giảm độ trễ xuống dưới 10ms.\\
+Tích hợp xuất bản mạng xã hội thủ công ở bước cuối & Hệ thống quản lý trọn vẹn quy trình duyệt nội bộ và lập lịch, nhưng bước xuất bản cuối cùng sử dụng xác nhận liên kết (\texttt{/mark-published} kèm \texttt{published\_url}) thay vì tự động đẩy qua Graph API/TikTok API. & Tích hợp OAuth 2.0 và Webhook chính thức của Meta Marketing API / TikTok Business API khi triển khai cho doanh nghiệp có tài khoản đối tác đã xác minh.\\
 \hline
-Khả năng đa phương thức & Hệ thống hiện tập trung tối ưu hóa xử lý văn bản (text) và số liệu định lượng (metrics); chưa hỗ trợ phân tích hình ảnh/banner hoặc video tiếp thị. & Tận dụng năng lực đa phương thức (Multimodal) của Google Gemini để tự động đánh giá và chấm điểm chất lượng hình ảnh banner quảng cáo.\\
+Đa phương thức (Hình ảnh / Video) & Hệ thống hiện tập trung quản lý văn bản tiếp thị (tiêu đề, thân bài, CTA, hashtags) và số liệu định lượng; chưa sinh hoặc chấm điểm trực tiếp tệp ảnh/video quảng cáo. & Mở rộng công cụ MCP kết nối các mô hình thị giác máy tính (Multimodal) để kiểm duyệt chữ trên banner quảng cáo.\\
 \hline
 \end{tabularx}
 \end{table}
@@ -43,11 +42,11 @@ Khả năng đa phương thức & Hệ thống hiện tập trung tối ưu hóa
 
 Từ các giới hạn đã được nhận diện, nhóm xác lập lộ trình kỹ thuật cho các giai đoạn tiếp theo:
 \begin{enumerate}[noitemsep,topsep=2pt]
- \item \textbf{Giai đoạn 1 (Hạ tầng \& Caching)}: Chuyển đổi sang PostgreSQL 16 phân tán và tích hợp Redis Cache nhằm tối ưu hóa thời gian đọc Dashboard xuống dưới 10ms.
- \item \textbf{Giai đoạn 2 (Tự động hóa phát hành)}: Đăng ký định danh doanh nghiệp chính thức với Meta và Google để kết nối trực tiếp Webhook phát hành nội dung \texttt{APPROVED}.
- \item \textbf{Giai đoạn 3 (Nâng cấp AI đa phương thức)}: Tận dụng Gemini Multimodal phân tích chất lượng ảnh banner và tự động kiểm tra vi phạm chính sách hiển thị.
+ \item \textbf{Giai đoạn 1 (Tối ưu hóa tốc độ tác tử)}: Kết hợp bộ nhớ đệm ngữ cảnh cho các công cụ đọc cố định (như \texttt{get\_brand\_profile}, \texttt{list\_channels}) nhằm giảm số vòng gọi công cụ MCP trong mỗi lượt hội thoại.
+ \item \textbf{Giai đoạn 2 (Tự động hóa xuất bản và đồng bộ số liệu)}: Kết nối trực tiếp API quảng cáo của Meta và Google để tự động đồng bộ chỉ số hiệu quả hàng đêm thay cho thao tác nhập CSV.
+ \item \textbf{Giai đoạn 3 (Kiểm duyệt đa phương thức)}: Bổ sung khả năng kiểm tra quy chuẩn thương hiệu trên hình ảnh và video ngắn trước khi phê duyệt.
 \end{enumerate}
 
 \section{Lời kết}
 
-Dự án MarketFlow AI là minh chứng thực tế khẳng định trí tuệ nhân tạo (Google Gemini), khi vận hành trong kiến trúc chuẩn mực và quy trình Human-in-the-loop kiên cố, hoàn toàn có thể trở thành đòn bẩy năng suất vượt trội cho doanh nghiệp mà không phát sinh rủi ro sai lệch dữ liệu.
+Dự án MarketFlow AI là minh chứng thực tế khẳng định trí tuệ nhân tạo tác tử (Agentic AI qua giao thức MCP), khi vận hành trong kiến trúc phân tách an toàn và quy trình \textit{Human-in-the-Loop} (\textit{Proposal-Only}) kiên cố, hoàn toàn có thể trở thành đòn bẩy năng suất thiết thực cho đội ngũ tiếp thị mà vẫn bảo toàn tuyệt đối tính chính xác và trách nhiệm giải trình của dữ liệu doanh nghiệp.

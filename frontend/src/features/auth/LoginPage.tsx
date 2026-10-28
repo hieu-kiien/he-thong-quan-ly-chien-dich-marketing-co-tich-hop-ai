@@ -239,7 +239,7 @@ export default function LoginPage() {
             </h1>
             <p className="text-xs text-stone-500">
               {isRegisterMode
-                ? 'Tạo tài khoản Nhân viên Marketing để bắt đầu soạn thảo và làm việc cùng Trợ lý AI'
+                ? 'Tạo tài khoản Quản lý Marketing để thiết lập thương hiệu, khởi tạo chiến dịch và cấp tài khoản cho nhân viên'
                 : 'Truy cập hệ thống quản lý chiến dịch, nội dung và Trợ lý AI'}
             </p>
           </div>
@@ -416,9 +416,9 @@ export default function LoginPage() {
 
                 <div className="p-3 rounded-xl bg-stone-50 border border-stone-200/90 text-xs text-stone-600 leading-relaxed">
                   <span className="font-bold text-[#121316] block mb-0.5">
-                    Vai trò mặc định: Nhân viên Marketing (Marketer)
+                    Vai trò mặc định: Quản lý Marketing (Manager)
                   </span>
-                  Tài khoản mới có thể xem chiến dịch, soạn thảo nội dung, gửi duyệt và làm việc trực tiếp với Trợ lý AI. Quản lý có thể nâng quyền trong mục Cài đặt → Người dùng.
+                  Tài khoản đăng ký mới được cấp quyền Quản lý để thiết lập hồ sơ thương hiệu, khởi tạo chiến dịch và trực tiếp tạo tài khoản cho Nhân viên Marketing trong mục Cài đặt → Người dùng.
                 </div>
               </>
             )}

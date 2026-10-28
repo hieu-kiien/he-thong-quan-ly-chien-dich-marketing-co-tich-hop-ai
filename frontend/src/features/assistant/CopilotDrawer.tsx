@@ -282,33 +282,33 @@ export function CopilotDrawer() {
       </div>
 
       {/* Thanh chuyển tab Hội thoại / Đề xuất */}
-      <div className="flex shrink-0 items-center justify-between border-b border-border bg-surface/60 px-3 py-1.5">
-        <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-surface/60 px-3 py-1.5">
+        <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
             onClick={() => setCopilotState({ activeTab: 'chat' })}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+              'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
               state.activeTab === 'chat'
                 ? 'bg-surface text-fg shadow-xs ring-1 ring-border'
                 : 'text-fg-muted hover:text-fg',
             )}
           >
-            <MessageSquareText className="h-3.5 w-3.5 text-ai" aria-hidden />
+            <MessageSquareText className="h-3.5 w-3.5 shrink-0 text-ai" aria-hidden />
             <span>Hội thoại</span>
           </button>
           <button
             type="button"
             onClick={() => setCopilotState({ activeTab: 'actions' })}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+              'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
               state.activeTab === 'actions'
                 ? 'bg-surface text-fg shadow-xs ring-1 ring-border'
                 : 'text-fg-muted hover:text-fg',
             )}
           >
-            <Layers className="h-3.5 w-3.5 text-ai" aria-hidden />
-            <span>Đề xuất & bản nháp</span>
+            <Layers className="h-3.5 w-3.5 shrink-0 text-ai" aria-hidden />
+            <span>Đề xuất</span>
             {proposedCount > 0 && <Badge tone="warning">{proposedCount}</Badge>}
           </button>
         </div>
@@ -330,7 +330,7 @@ export function CopilotDrawer() {
               campaignName: found?.campaign?.name,
             });
           }}
-          className="max-w-[135px] truncate rounded border border-border bg-surface px-1.5 py-1 text-[11px] text-fg-muted focus:outline-none"
+          className="min-w-0 max-w-[130px] truncate rounded border border-border bg-surface px-1.5 py-1 text-[11px] text-fg-muted focus:outline-none"
         >
           <option value="">+ Phiên mới</option>
           {threads.map((t: AiThread) => (
@@ -351,7 +351,7 @@ export function CopilotDrawer() {
           ) : (
             actions.map((act) => (
               <ActionCardRouter
-                key={act.id}
+                key={`${act.id}-${act.updated_at}`}
                 action={act}
                 onConfirm={async (id, editedArgs) => {
                   await confirmActionMutation.mutateAsync({ id, args: editedArgs });

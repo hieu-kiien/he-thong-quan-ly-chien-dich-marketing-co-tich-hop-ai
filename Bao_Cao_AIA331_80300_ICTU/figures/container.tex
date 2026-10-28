@@ -28,64 +28,64 @@
  draw=black!80,
  fill=white,
  rounded corners=4pt,
- minimum width=3.4cm,
+ minimum width=3.5cm,
  minimum height=1.55cm,
  align=center,
  dashed,
  line width=0.8pt,
- text width=3.2cm,
+ text width=3.3cm,
  inner sep=3pt
  },
  rel/.style={-{Latex[length=2.2mm]},draw=black,line width=0.75pt},
  lab/.style={font=\sffamily\scriptsize,fill=white,inner sep=1.5pt,align=center,text=black}
 ]
 
-\draw[draw=black!65,fill=black!1,rounded corners=5pt,line width=0.85pt] (0.0,-3.1) rectangle (10.9,2.85);
-\node[font=\sffamily\bfseries\footnotesize,text=black] at (5.45,2.50) {RANH GIỚI HỆ THỐNG MARKETFLOW AI};
+\draw[draw=black!65,fill=black!1,rounded corners=5pt,line width=0.85pt] (0.0,-3.25) rectangle (11.2,3.45);
+\node[font=\sffamily\bfseries\footnotesize,text=black] at (5.6,3.05) {RANH GIỚI HỆ THỐNG MARKETFLOW (TRÊN MÁY CHỦ / DOCKER)};
 
-\node[container] (web) at (2.45, 1.05) {
- \textbf{Giao diện Web (SPA)}\\[2pt]
- {\scriptsize React 18, TS, Tailwind CSS}\\
- {\scriptsize Dashboard, chiến dịch, duyệt bài}
+\node[container] (web) at (2.5, 0.95) {
+ \textbf{Giao diện Web (React SPA)}\\[2pt]
+ {\scriptsize React 18, TypeScript, Tailwind}\\
+ {\scriptsize Dashboard, Copilot Drawer, SSE}
 };
 
-\node[db_box] (db) at (8.45, 1.05) {
- \textbf{Cơ sở Dữ liệu}\\[2pt]
- {\scriptsize SQLite WAL / PostgreSQL 16}\\
- {\scriptsize Chiến dịch, nội dung, chỉ số, AI log}
+\node[db_box] (db) at (8.6, 0.95) {
+ \textbf{Cơ sở Dữ liệu (14 Bảng)}\\[2pt]
+ {\scriptsize PostgreSQL 16 / SQLite WAL}\\
+ {\scriptsize Chiến dịch, nội dung, KPI, AI}
 };
 
-\node[container] (api) at (2.45, -1.95) {
- \textbf{Máy chủ API Backend}\\[2pt]
- {\scriptsize FastAPI, Python, SQLAlchemy}\\
- {\scriptsize REST API, xác thực JWT, RBAC}
+\node[container] (api) at (2.5, -1.95) {
+ \textbf{FastAPI Backend (:8000)}\\[2pt]
+ {\scriptsize REST API (/api/v1/*), RBAC}\\
+ {\scriptsize \& FastMCP Server (/mcp)}
 };
 
-\node[container] (ai) at (8.45, -1.95) {
- \textbf{Động cơ Điều phối AI}\\[2pt]
- {\scriptsize Prompt Engine \& Smart Fallback}\\
- {\scriptsize Kiểm định JSON, quét tuân thủ}
+\node[container] (ai) at (8.6, -1.95) {
+ \textbf{Dịch vụ AI Runner (:8100)}\\[2pt]
+ {\scriptsize Hàng đợi FIFO (Concurrency=1)}\\
+ {\scriptsize \& OpenCode CLI Subprocess}
 };
 
-\node[ext] (ext_soc) at (13.9, 1.05) {
- \textbf{Kênh Xuất bản}\\[2pt]
- {\scriptsize Facebook, TikTok, Email}\\
- {\scriptsize Tiếp nhận lịch đăng}
+\node[ext] (ext_soc) at (14.2, 0.95) {
+ \textbf{Kênh Tiếp thị}\\[2pt]
+ {\scriptsize FB, TikTok, IG, Email, Web}\\
+ {\scriptsize Xác nhận URL đã đăng}
 };
 
-\node[ext] (ext_ai) at (13.9, -1.95) {
- \textbf{Dịch vụ AI Ngoài}\\[2pt]
- {\scriptsize Gemini, GPT, Ollama}\\
- {\scriptsize Xử lý suy luận LLM}
+\node[ext] (ext_ai) at (14.2, -1.95) {
+ \textbf{5 Nền tảng LLM (13 Models)}\\[2pt]
+ {\scriptsize OpenCode Free, Groq LPU}\\
+ {\scriptsize OpenRouter, Google Gemini}
 };
 
-\draw[rel] (web) -- node[lab,left=2pt]{HTTPS / REST} (api);
-\draw[rel] (api) -- node[lab,above=2pt]{Điều phối AI} (ai);
-\draw[rel] (api.north east) -- node[lab,sloped,above=1pt,pos=0.55]{SQL ORM} (db.south west);
-\draw[rel] (ai.north) -- node[lab,right=2pt]{Ghi ai\_logs} (db.south);
+\draw[rel] (web.south) -- node[lab,left=2pt]{HTTPS / SSE} (api.north);
+\draw[rel] (api.east) -- node[lab,above=2pt]{POST /run} (ai.west);
+\draw[rel] (ai.south west) to[bend left=16] node[lab,below=1pt]{MCP /mcp (Run-Token)} (api.south east);
+\draw[rel] (api.north east) -- node[lab,sloped,above=1pt,pos=0.52]{SQLAlchemy 2.0} (db.south west);
 
-\draw[rel] (ai.east) -- node[lab,above=2pt]{HTTPS / JSON} (ext_ai.west);
-\draw[rel] (db.east) -- node[lab,above=2pt]{Xuất bản} (ext_soc.west);
+\draw[rel] (ai.east) -- node[lab,above=2pt]{Suy luận LLM} (ext_ai.west);
+\draw[rel] (web.north) -- (2.5, 2.30) -- node[lab,above=1pt,pos=0.55]{Đăng bài đã duyệt \& gắn URL (/mark-published)} (14.2, 2.30) -- (ext_soc.north);
 
 \end{tikzpicture}%
 }

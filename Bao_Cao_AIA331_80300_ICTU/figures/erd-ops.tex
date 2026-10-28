@@ -28,71 +28,68 @@
  \textbf{PK} id : INTEGER\\
  \textbf{FK} content\_id : INT\\
  \textbf{FK} reviewer\_id : INT\\
- decision : VARCHAR(20)\\
- reason : TEXT\\
- reviewed\_at : TIMESTAMP\\
+ decision : APPROVED | \mbox{REJECTED}\\
+ comment : TEXT\\
+ created\_at : TIMESTAMPTZ\\
 };
 
 \matrix (contents) [entity,row 1/.style={header_core}] at (7.6, 2.3) {
- marketing\_contents (Bảng lõi)\\
+ contents (Bảng lõi nội dung)\\
  \textbf{PK} id : INTEGER\\
- \textbf{FK} campaign\_id : INT\\
- \textbf{FK} channel\_id : INT\\
- status : VARCHAR(20)\\
- title, body : TEXT\\
+ \textbf{FK} campaign\_id, channel\_id : INT\\
+ status : DRAFT..PUBLISHED\\
+ origin : MANUAL | AI\\
+ published\_url : VARCHAR\\
 };
 
 \matrix (schedules) [entity,row 1/.style={header}] at (13.1, 2.3) {
- marketing\_schedules (Lịch đăng)\\
+ schedules (Lịch đăng bài)\\
  \textbf{PK} id : INTEGER\\
  \textbf{FK} content\_id : INT\\
- scheduled\_at : TIMESTAMP\\
- timezone : VARCHAR(50)\\
- status : VARCHAR(20)\\
+ \textbf{FK} assignee\_id : INT\\
+ scheduled\_at : TIMESTAMPTZ\\
+ status : PLANNED | DONE | CANCELLED\\
 };
 
-\matrix (members) [entity,row 1/.style={header}] at (2.1, -1.4) {
- campaign\_members (Phân công)\\
- \textbf{PK, FK} campaign\_id : INT\\
- \textbf{PK, FK} user\_id : INT\\
- role : VARCHAR(30)\\
- assigned\_at : TIMESTAMP\\
-};
-
-\matrix (campaigns) [entity,row 1/.style={header_core}] at (7.6, -1.4) {
- campaigns (Bảng lõi)\\
- \textbf{PK} id : INTEGER\\
- \textbf{FK} product\_id : INT\\
- title : VARCHAR(200)\\
- budget : NUMERIC(15,2)\\
-};
-
-\matrix (metrics) [entity,row 1/.style={header}] at (13.1, -1.4) {
- campaign\_metrics (Chỉ số)\\
- \textbf{PK} id : INTEGER\\
- \textbf{FK} campaign\_id : INT\\
- \textbf{FK} channel\_id : INT\\
- metric\_date : DATE\\
- views, clicks : INT\\
- cost, rev : NUMERIC(12,2)\\
-};
-
-\matrix (ailogs) [entity, anchor=north, row 1/.style={header}] at ([yshift=-1.2cm]campaigns.south) {
- ai\_logs (Nhật ký kiểm toán AI)\\
+\matrix (threads) [entity,row 1/.style={header}] at (2.1, -1.5) {
+ ai\_threads \& notifications\\
  \textbf{PK} id : INTEGER\\
  \textbf{FK} user\_id, campaign\_id : INT\\
- provider, model : TEXT\\
- prompt\_version : TEXT\\
- status : VARCHAR(20)\\
- latency\_ms, tokens\_used : INT\\
- created\_at : TIMESTAMP\\
+ title : VARCHAR(200)\\
+ opencode\_session\_id : \mbox{VARCHAR}\\
+ last\_message\_at : \mbox{TIMESTAMPTZ}\\
+};
+
+\matrix (campaigns) [entity,row 1/.style={header_core}] at (7.6, -1.5) {
+ campaigns (Bảng lõi chiến dịch)\\
+ \textbf{PK} id : INTEGER\\
+ \textbf{FK} owner\_id : INT\\
+ name : VARCHAR(200)\\
+ budget : NUMERIC(14,2)\\
+};
+
+\matrix (metrics) [entity,row 1/.style={header}] at (13.1, -1.5) {
+ metrics (Số liệu KPI ngày)\\
+ \textbf{PK} id : INTEGER\\
+ \textbf{FK} campaign\_id, channel\_id : INT\\
+ metric\_date : DATE\\
+ views, clicks, conversions : INT\\
+ cost : NUMERIC(14,2), source : ENUM\\
+};
+
+\matrix (aiactions) [entity, anchor=north, row 1/.style={header}] at ([yshift=-1.1cm]campaigns.south) {
+ ai\_messages \& ai\_actions (Kiểm toán Hội thoại \& Đề xuất AI)\\
+ \textbf{PK} id : INT; \textbf{FK} thread\_id, message\_id, user\_id : INT\\
+ tool : \mbox{propose\_content\_drafts} | \mbox{propose\_campaign}...\\
+ status : \mbox{PROPOSED} | \mbox{EXECUTED} | \mbox{REJECTED} | \mbox{FAILED}\\
+ model : VARCHAR(100); \mbox{latency\_ms} : INT\\
 };
 
 \draw[rel] (contents) -- node[card,above=1pt,pos=0.5]{1..*} (reviews);
 \draw[rel] (contents) -- node[card,above=1pt,pos=0.5]{1..*} (schedules);
-\draw[rel] (campaigns) -- node[card,above=1pt,pos=0.5]{1..*} (members);
+\draw[rel] (campaigns) -- node[card,above=1pt,pos=0.5]{1..*} (threads);
 \draw[rel] (campaigns) -- node[card,above=1pt,pos=0.5]{1..*} (metrics);
-\draw[rel] (campaigns.south) -- node[card,right=2pt,pos=0.5]{1..*} (ailogs.north);
+\draw[rel] (threads.south) |- node[card,left=2pt,pos=0.35]{1..*} (aiactions.west);
 
 \end{tikzpicture}%
 }

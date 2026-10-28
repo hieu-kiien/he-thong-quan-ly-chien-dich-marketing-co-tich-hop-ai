@@ -18,10 +18,10 @@ interface OverlayBaseProps {
 }
 
 export interface DialogProps extends OverlayBaseProps {
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
-const dialogSizes = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-3xl' };
+const dialogSizes = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-3xl', xl: 'max-w-5xl' };
 
 /** Hộp thoại modal: role=dialog, focus trap, Esc để đóng. */
 export function Dialog({ open, onClose, title, description, children, footer, size = 'md', dismissable = true }: DialogProps) {

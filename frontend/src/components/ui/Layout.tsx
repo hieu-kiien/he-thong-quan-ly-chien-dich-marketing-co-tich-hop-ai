@@ -64,33 +64,21 @@ export function PageHeader({ title, description, actions, back, meta }: PageHead
     }
   }, []);
 
-  if (slot) {
+  if (slot && !back) {
     return (
       <>
         {createPortal(
           <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              {back && (
-                <Link
-                  to={back.to}
-                  className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border border-border bg-subtle/70 px-2.5 text-xs font-medium text-fg-muted transition-colors hover:border-border-strong hover:bg-subtle hover:text-fg"
-                  title={`Quay lại ${back.label}`}
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-                  <span>{back.label}</span>
-                </Link>
-              )}
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="truncate text-base font-bold tracking-tight text-fg sm:text-[1.0625rem]">
-                    {title}
-                  </h1>
-                  {meta && <div className="flex flex-wrap items-center gap-1.5">{meta}</div>}
-                </div>
-                {description && (
-                  <div className="mt-0.5 truncate text-xs text-fg-muted">{description}</div>
-                )}
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="truncate text-base font-bold tracking-tight text-fg sm:text-[1.0625rem]">
+                  {title}
+                </h1>
+                {meta && <div className="flex shrink-0 flex-wrap items-center gap-1.5">{meta}</div>}
               </div>
+              {description && (
+                <div className="mt-0.5 truncate text-xs text-fg-muted">{description}</div>
+              )}
             </div>
             {actions && (
               <div className="hidden shrink-0 items-center gap-2 xl:flex">{actions}</div>
@@ -108,27 +96,49 @@ export function PageHeader({ title, description, actions, back, meta }: PageHead
   }
 
   return (
-    <div className="mb-5 border-b border-border/70 pb-4">
-      {back && (
-        <Link
-          to={back.to}
-          className="mb-2 inline-flex items-center gap-1 rounded text-[0.8125rem] font-medium text-fg-muted hover:text-accent"
-        >
-          <ChevronLeft className="h-4 w-4" aria-hidden />
-          {back.label}
-        </Link>
-      )}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-bold tracking-tight text-fg">{title}</h1>
+    <>
+      {slot && back &&
+        createPortal(
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            <Link
+              to={back.to}
+              className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border border-border bg-subtle/70 px-2.5 text-xs font-medium text-fg-muted transition-colors hover:border-border-strong hover:bg-subtle hover:text-fg"
+              title={`Quay lại ${back.label}`}
+            >
+              <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+              <span>{back.label}</span>
+            </Link>
+            <span className="text-fg-subtle" aria-hidden>
+              /
+            </span>
+            <span className="truncate text-xs font-medium text-fg-muted">Chi tiết</span>
+          </div>,
+          slot,
+        )}
+      <div className="mb-5 rounded-xl border border-border/80 bg-surface px-5 py-4 shadow-2xs">
+        {!slot && back && (
+          <Link
+            to={back.to}
+            className="mb-2 inline-flex items-center gap-1 rounded text-[0.8125rem] font-medium text-fg-muted hover:text-accent"
+          >
+            <ChevronLeft className="h-4 w-4" aria-hidden />
+            {back.label}
+          </Link>
+        )}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="text-lg font-bold tracking-tight text-fg sm:text-xl leading-snug">
+                {title}
+              </h1>
+              {meta && <div className="flex flex-wrap items-center gap-2">{meta}</div>}
+            </div>
+            {description && <div className="mt-2 text-xs text-fg-muted sm:text-sm">{description}</div>}
           </div>
-          {description && <div className="mt-1 text-sm text-fg-muted">{description}</div>}
-          {meta && <div className="mt-2 flex flex-wrap items-center gap-2">{meta}</div>}
+          {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
         </div>
-        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
-    </div>
+    </>
   );
 }
 

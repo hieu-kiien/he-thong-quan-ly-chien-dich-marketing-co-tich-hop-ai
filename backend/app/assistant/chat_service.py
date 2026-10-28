@@ -200,7 +200,7 @@ def _snapshot_lines(db: Session, user: User, thread: AiThread) -> list[str]:
         except NotFound:
             return lines
         lines.append(
-            f"- Chiến dịch #{camp.id} '{camp.name}': mục tiêu {camp.goal}, trạng thái {camp.status}, "
+            f"- Chiến dịch đang chọn #{camp.id} '{camp.name}': mục tiêu {camp.goal}, trạng thái {camp.status}, "
             f"{camp.start_date:%d/%m/%Y} - {camp.end_date:%d/%m/%Y}, ngân sách {_fmt_money(camp.budget)}"
         )
         lines.append(f"  - Mục tiêu chi tiết: {camp.objective[:300]}")
@@ -208,6 +208,11 @@ def _snapshot_lines(db: Session, user: User, thread: AiThread) -> list[str]:
         lines.append(f"  - Sản phẩm: {camp.product[:300]}")
         if camp.key_message:
             lines.append(f"  - Thông điệp chính: {camp.key_message[:300]}")
+        lines.append(
+            f"  - Lưu ý ngữ cảnh chiến dịch: Mọi nội dung và hashtag phải bám sát đúng sản phẩm '{camp.product[:120]}' "
+            f"và chiến dịch #{camp.id} '{camp.name[:120]}' (không gán nhầm tên thương hiệu hoặc hashtag của ngành hàng khác). "
+            f"Khi gọi công cụ propose_content_drafts, truyền campaign_id={camp.id} và điền đầy đủ channel_code, content_type, title, body, cta (chỉ gọi 1 lần duy nhất cho toàn bộ bản nháp)."
+        )
         channels = ", ".join(
             f"{c.code} (dự kiến {_fmt_money(c.planned_budget)})" for c in camp.channels
         )
@@ -247,36 +252,44 @@ def build_prompt(db: Session, user: User, thread: AiThread, user_content: str) -
     today = today_vn()
     lines.append(f"- Hôm nay: {today:%d/%m/%Y} (Múi giờ Asia/Ho_Chi_Minh)")
 
-    first_turn_of_session = not thread.opencode_session_id
-    if first_turn_of_session:
-        # Lượt đầu của phiên OpenCode: gửi ảnh chụp dữ liệu; các lượt sau phiên đã nhớ ngữ cảnh.
+    # Lượt đầu (chưa có session): đính kèm ảnh chụp đầy đủ để AI trả lời ngay không cần gọi tool đọc.
+    # Các lượt sau trong cùng session: chỉ nhắc gọn định danh chiến dịch + sản phẩm + kênh để tiết kiệm token
+    # nhưng vẫn đủ ngữ cảnh nếu cần chuyển sang mô hình dự phòng.
+    if not thread.opencode_session_id:
         lines.extend(_snapshot_lines(db, user, thread))
         lines.append(
             f"- Ảnh chụp dữ liệu trên lấy lúc {datetime.now(VN_TZ):%H:%M %d/%m/%Y} (giờ Việt Nam); dùng ngay nếu đủ, "
             "chỉ gọi công cụ khi cần dữ liệu khác hoặc mới hơn."
         )
     elif thread.campaign_id:
-        lines.append(f"- Chiến dịch gắn với phiên: #{thread.campaign_id}")
+        try:
+            camp = campaign_service.get_campaign(db, user, thread.campaign_id)
+            ch_list = ", ".join(c.code for c in camp.channels)
+            lines.append(
+                f"- Chiến dịch gắn với phiên: #{camp.id} '{camp.name}' (sản phẩm: {camp.product[:120]}, kênh: {ch_list}) "
+                f"— truyền campaign_id={camp.id} khi gọi propose_content_drafts."
+            )
+        except NotFound:
+            lines.append(f"- Chiến dịch gắn với phiên: #{thread.campaign_id}")
 
     # Kênh tiếp thị đang kích hoạt
     active_channels = channel_service.list_channels(db, user, include_inactive=False)
     ch_codes = ", ".join(c.code for c in active_channels)
     lines.append(f"- Các kênh tiếp thị đang hoạt động: {ch_codes}")
 
-    # Nếu phiên mới hoặc chưa có session id, đưa tóm tắt ngắn các lượt trước (nếu có)
-    if not thread.opencode_session_id:
-        prev_messages = list(
-            db.execute(
-                select(AiMessage)
-                .where(AiMessage.thread_id == thread.id, AiMessage.status == AiMessageStatus.COMPLETE)
-                .order_by(AiMessage.id.asc())
-            ).scalars()
-        )
-        if prev_messages:
-            lines.append("\n[LỊCH SỬ HỘI THOẠI TRƯỚC ĐÓ]")
-            for m in prev_messages[-6:]:
-                role_label = "Người dùng" if m.role == AiMessageRole.USER else "Trợ lý AI"
-                lines.append(f"{role_label}: {m.content[:300]}")
+    # Đưa tóm tắt ngắn các lượt trước (nếu có) để giữ mạch hội thoại khi đổi mô hình dự phòng
+    prev_messages = list(
+        db.execute(
+            select(AiMessage)
+            .where(AiMessage.thread_id == thread.id, AiMessage.status == AiMessageStatus.COMPLETE)
+            .order_by(AiMessage.id.asc())
+        ).scalars()
+    )
+    if prev_messages:
+        lines.append("\n[LỊCH SỬ HỘI THOẠI TRƯỚC ĐÓ]")
+        for m in prev_messages[-6:]:
+            role_label = "Người dùng" if m.role == AiMessageRole.USER else "Trợ lý AI"
+            lines.append(f"{role_label}: {m.content[:300]}")
 
     lines.append("\n[YÊU CẦU CỦA NGƯỜI DÙNG]")
     lines.append(user_content)
@@ -553,12 +566,11 @@ async def start_turn(
             if not force and (now_mono - last_db_flush_at) < 1.2:
                 return
             last_db_flush_at = now_mono
-            with contextlib.suppress(Exception):
-                with get_db_context() as db_p:
-                    m = db_p.get(AiMessage, assistant_msg_id)
-                    if m and m.status == AiMessageStatus.STREAMING:
-                        m.content = content_snapshot
-                        db_p.commit()
+            with contextlib.suppress(Exception), get_db_context() as db_p:
+                m = db_p.get(AiMessage, assistant_msg_id)
+                if m and m.status == AiMessageStatus.STREAMING:
+                    m.content = content_snapshot
+                    db_p.commit()
 
         try:
             stream = r.stream_run(

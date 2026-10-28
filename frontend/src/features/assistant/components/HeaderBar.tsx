@@ -68,20 +68,20 @@ export function HeaderBar({
   const lastError = status?.last_error;
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-4 shadow-xs">
+    <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-surface px-4 shadow-xs">
       {/* Vùng bên trái: Nút mở sidebar + Tiêu đề phiên + Chip chiến dịch */}
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-2.5">
         <button
           type="button"
           onClick={onToggleSidebar}
-          className="rounded-md p-1.5 text-fg-subtle hover:bg-subtle hover:text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="shrink-0 rounded-md p-1.5 text-fg-subtle hover:bg-subtle hover:text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           title="Đóng / mở danh sách phiên"
           aria-label="Đóng mở danh sách phiên"
         >
           <Menu className="h-4 w-4" aria-hidden />
         </button>
 
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           {currentThread ? (
             isEditingTitle ? (
               <input
@@ -91,17 +91,20 @@ export function HeaderBar({
                 onBlur={handleSaveTitle}
                 onKeyDown={handleKeyDown}
                 autoFocus
-                className="max-w-[200px] rounded border border-accent bg-surface px-2 py-0.5 text-sm font-semibold text-fg sm:max-w-[320px] focus:outline-none"
+                className="w-full max-w-[280px] rounded border border-accent bg-surface px-2 py-0.5 text-sm font-semibold text-fg focus:outline-none"
               />
             ) : (
-              <div className="group flex items-center gap-1.5">
-                <h1 className="max-w-[180px] truncate text-sm font-semibold text-fg sm:max-w-[300px] lg:max-w-[450px]">
+              <div className="group flex min-w-0 items-center gap-1">
+                <h1
+                  className="min-w-0 truncate text-sm font-semibold text-fg"
+                  title={currentThread.title || 'Phiên mới'}
+                >
                   {currentThread.title || 'Phiên mới'}
                 </h1>
                 <button
                   type="button"
                   onClick={handleStartEdit}
-                  className="rounded p-1 text-fg-subtle opacity-0 transition-opacity hover:bg-subtle hover:text-fg group-hover:opacity-100 focus:opacity-100"
+                  className="shrink-0 rounded p-1 text-fg-subtle opacity-0 transition-opacity hover:bg-subtle hover:text-fg group-hover:opacity-100 focus:opacity-100"
                   title="Đổi tên phiên"
                   aria-label="Đổi tên phiên"
                 >
@@ -110,27 +113,27 @@ export function HeaderBar({
               </div>
             )
           ) : (
-            <h1 className="text-sm font-semibold text-fg">Phiên làm việc mới</h1>
+            <h1 className="truncate text-sm font-semibold text-fg">Phiên làm việc mới</h1>
           )}
 
           {currentThread?.campaign && (
             <Link
               to={`/campaigns/${currentThread.campaign.id}`}
-              className="hidden items-center gap-1 rounded-md border border-accent/30 bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-soft-fg hover:underline sm:inline-flex"
-              title="Xem chiến dịch được gắn"
+              className="hidden shrink-0 items-center gap-1 rounded-md border border-accent/30 bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-soft-fg hover:underline md:inline-flex"
+              title={`Chiến dịch: ${currentThread.campaign.name}`}
             >
-              <Megaphone className="h-3 w-3" aria-hidden />
-              <span className="max-w-[150px] truncate">{currentThread.campaign.name}</span>
+              <Megaphone className="h-3 w-3 shrink-0" aria-hidden />
+              <span className="max-w-[140px] truncate">{currentThread.campaign.name}</span>
             </Link>
           )}
         </div>
       </div>
 
       {/* Vùng bên phải: Chọn mô hình AI + Trạng thái AI dot + Nút mở Actions panel */}
-      <div className="flex items-center gap-2.5">
+      <div className="flex shrink-0 items-center gap-2">
         {/* Nhãn mô phỏng (chỉ hiện khi DEV và VITE_ASSISTANT_SIMULATOR=true) */}
         {import.meta.env.DEV && isSimulatorActive && (
-          <span className="hidden rounded border border-warning/40 bg-warning-soft px-2 py-0.5 text-[11px] font-medium text-warning-soft-fg md:inline-block">
+          <span className="hidden shrink-0 whitespace-nowrap rounded border border-warning/40 bg-warning-soft px-2 py-0.5 text-[11px] font-medium text-warning-soft-fg lg:inline-block">
             Mô phỏng (chỉ dùng khi phát triển)
           </span>
         )}
@@ -144,12 +147,12 @@ export function HeaderBar({
             <button
               type="button"
               {...props}
-              className="flex items-center gap-1.5 rounded-full px-2 py-1 text-xs text-fg-subtle hover:bg-subtle focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-1 text-xs text-fg-subtle hover:bg-subtle focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
               aria-label="Trạng thái hệ thống AI"
             >
               <span
                 className={cn(
-                  'h-2 w-2 rounded-full',
+                  'h-2 w-2 shrink-0 rounded-full',
                   !isAvailable
                     ? 'bg-danger'
                     : queueLength > 0
@@ -157,7 +160,7 @@ export function HeaderBar({
                       : 'bg-success',
                 )}
               />
-              <span className="hidden text-[11px] text-fg-muted sm:inline">
+              <span className="hidden whitespace-nowrap text-[11px] text-fg-muted xl:inline">
                 {!isAvailable ? 'AI lỗi' : queueLength > 0 ? `Hàng đợi (${queueLength})` : 'AI sẵn sàng'}
               </span>
             </button>
@@ -205,7 +208,7 @@ export function HeaderBar({
           type="button"
           onClick={onToggleActionsPanel}
           className={cn(
-            'relative flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+            'relative flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent',
             isActionsPanelOpen
               ? 'border-accent/40 bg-accent-soft text-accent-soft-fg'
               : 'border-border bg-surface text-fg hover:bg-subtle',
@@ -213,7 +216,7 @@ export function HeaderBar({
           title="Đề xuất & bản nháp"
           aria-label="Đề xuất & bản nháp"
         >
-          <Layers className="h-3.5 w-3.5" aria-hidden />
+          <Layers className="h-3.5 w-3.5 shrink-0" aria-hidden />
           <span className="hidden sm:inline">Đề xuất</span>
           {proposedCount > 0 && (
             <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-warning px-1 text-[10px] font-bold text-white">

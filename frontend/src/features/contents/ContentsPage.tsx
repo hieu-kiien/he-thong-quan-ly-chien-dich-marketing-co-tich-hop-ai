@@ -37,7 +37,11 @@ import { formatDate } from '@/lib/format';
 import {
   CONTENT_STATUS_LABEL,
   CONTENT_TYPE_LABEL,
+  GOAL_KPI_META,
+  GOAL_LABEL,
+  GOAL_TONE,
   ORIGIN_LABEL,
+  buildGoalContentDraft,
 } from '@/lib/labels';
 import type {
   Content,
@@ -135,8 +139,15 @@ export default function ContentsPage() {
   });
 
   // Available channels for the selected campaign
+  const campaignsMap = new Map((campaignsListQ.data?.items ?? []).map((c) => [c.id, c]));
   const selectedCampaignChannels =
     campaignsListQ.data?.items.find((c) => c.id === Number(newCampaignId))?.channels ?? [];
+  const selectedCampaignDetailQ = useQuery({
+    queryKey: ['campaigns', Number(newCampaignId)],
+    queryFn: () => campaignsApi.get(Number(newCampaignId)),
+    enabled: isCreating && Boolean(newCampaignId),
+  });
+  const selectedChannelRule = (channelsQ.data ?? []).find((ch) => ch.id === Number(newChannelId));
 
   return (
     <PageContainer>
@@ -323,14 +334,23 @@ export default function ContentsPage() {
                           {item.title}
                         </Link>
                       </TD>
-                      <TD className="min-w-[160px] max-w-[220px]">
-                        <Link
-                          to={`/campaigns/${item.campaign_id}`}
-                          className="line-clamp-1 text-xs text-fg-muted hover:underline"
-                          title={item.campaign.name}
-                        >
-                          {item.campaign.name}
-                        </Link>
+                      <TD className="min-w-[180px] max-w-[240px]">
+                        <div className="space-y-1">
+                          <Link
+                            to={`/campaigns/${item.campaign_id}`}
+                            className="line-clamp-1 text-xs font-medium text-fg hover:underline"
+                            title={item.campaign.name}
+                          >
+                            {item.campaign.name}
+                          </Link>
+                          {campaignsMap.get(item.campaign_id) && (
+                            <div>
+                              <Badge tone={GOAL_TONE[campaignsMap.get(item.campaign_id)!.goal]}>
+                                {GOAL_LABEL[campaignsMap.get(item.campaign_id)!.goal]}
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
                       </TD>
                       <TD className="whitespace-nowrap">
                         <Badge tone="neutral">
@@ -448,7 +468,10 @@ export default function ContentsPage() {
                   }}
                   options={[
                     { value: '', label: 'Chọn chiến dịch...' },
-                    ...(campaignsListQ.data?.items ?? []).map((c) => ({ value: String(c.id), label: c.name })),
+                    ...(campaignsListQ.data?.items ?? []).map((c) => ({
+                      value: String(c.id),
+                      label: `${c.name} (${GOAL_LABEL[c.goal]})`,
+                    })),
                   ]}
                 />
               )}
@@ -471,6 +494,51 @@ export default function ContentsPage() {
               )}
             </FormField>
           </div>
+
+          {selectedCampaignDetailQ.data && (
+            <div className="rounded-md border border-border bg-subtle/60 p-3 text-xs space-y-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-fg">Định hướng chiến dịch:</span>
+                  <Badge tone={GOAL_TONE[selectedCampaignDetailQ.data.goal]}>
+                    {GOAL_LABEL[selectedCampaignDetailQ.data.goal]}
+                  </Badge>
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const draft = buildGoalContentDraft(selectedCampaignDetailQ.data!);
+                    setNewTitle(draft.title);
+                    setNewBody(draft.body);
+                    setNewCta(draft.cta);
+                  }}
+                >
+                  Điền khung sườn theo mục tiêu
+                </Button>
+              </div>
+              <p className="text-fg-muted">
+                <strong className="text-fg">Chỉ tiêu:</strong> {selectedCampaignDetailQ.data.objective} ·{' '}
+                <strong className="text-fg">Sản phẩm:</strong> {selectedCampaignDetailQ.data.product}
+              </p>
+              {selectedCampaignDetailQ.data.key_message && (
+                <p className="text-fg-muted">
+                  <strong className="text-fg">Thông điệp cốt lõi:</strong> &ldquo;{selectedCampaignDetailQ.data.key_message}&rdquo;
+                </p>
+              )}
+              <p className="text-fg-muted">
+                <strong className="text-fg">Gợi ý triển khai:</strong>{' '}
+                {GOAL_KPI_META[selectedCampaignDetailQ.data.goal].contentDirection}
+              </p>
+              {selectedChannelRule?.format_rules && (
+                <p className="text-fg-muted">
+                  <strong className="text-fg">Quy chuẩn kênh ({selectedChannelRule.name}):</strong>{' '}
+                  {selectedChannelRule.format_rules}
+                </p>
+              )}
+            </div>
+          )}
 
           <FormField label="Định dạng nội dung" required>
             {(p) => (

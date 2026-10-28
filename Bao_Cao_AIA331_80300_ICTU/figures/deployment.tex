@@ -1,3 +1,4 @@
+\resizebox{0.98\textwidth}{!}{%
 \begin{tikzpicture}[
  font=\sffamily\footnotesize,
  >=Latex,
@@ -5,62 +6,63 @@
  draw=black,
  fill=white,
  rounded corners=4pt,
- minimum width=3.7cm,
- minimum height=1.75cm,
+ minimum width=3.8cm,
+ minimum height=1.70cm,
  align=center,
  line width=0.85pt,
- text width=3.5cm,
+ text width=3.6cm,
  inner sep=4pt
  },
  cloud_box/.style={
  draw=black!80,
  fill=black!3,
  rounded corners=4pt,
- minimum width=3.4cm,
- minimum height=1.65cm,
+ minimum width=3.6cm,
+ minimum height=1.70cm,
  align=center,
  line width=0.8pt,
  dashed,
- text width=3.2cm,
+ text width=3.4cm,
  inner sep=4pt
  },
  rel/.style={draw=black,line width=0.75pt,-{Latex[length=2.2mm]}},
- comm/.style={font=\sffamily\scriptsize,fill=white,inner sep=1.5pt,text=black,align=center}
+ comm/.style={font=\sffamily\scriptsize,inner sep=1.5pt,text=black,align=center}
 ]
 
-\node[node_box] (client) at (1.9, 0) {
- \textbf{Máy trạm Người dùng}\\[2pt]
- {\scriptsize Trình duyệt Web}\\
- {\scriptsize Giao diện React 18 SPA}
+\node[node_box] (client) at (1.9, 1.55) {
+ \textbf{Trình duyệt Người dùng}\\[2pt]
+ {\scriptsize React 18 SPA}\\
+ {\scriptsize marketing.kienhieu.id.vn}
 };
 
-\node[node_box] (server) at (7.0, 1.5) {
- \textbf{Máy chủ Ứng dụng}\\[2pt]
- {\scriptsize Docker / Linux}\\
- {\scriptsize Nginx \& FastAPI (Python)}
+\node[node_box] (server) at (8.0, 1.55) {
+ \textbf{VPS Ubuntu 24.04 LTS}\\[2pt]
+ {\scriptsize Nginx (:8080, chặn /mcp)}\\
+ {\scriptsize \& FastAPI (:8000, user marketflow)}
 };
 
-\node[node_box] (database) at (7.0, -1.5) {
- \textbf{Hệ quản trị CSDL}\\[2pt]
- {\scriptsize Lưu trữ quan hệ}\\
- {\scriptsize PostgreSQL 16 / SQLite WAL}
+\node[node_box] (database) at (8.0, -1.65) {
+ \textbf{PostgreSQL 16 (:5432)}\\[2pt]
+ {\scriptsize CSDL marketflow (14 bảng)}\\
+ {\scriptsize \& Sao lưu tự động hàng ngày}
 };
 
-\node[cloud_box] (ai_cloud) at (12.1, 1.5) {
- \textbf{Dịch vụ AI (LLM)}\\[2pt]
- {\scriptsize Gemini / OpenAI / Ollama}\\
- {\scriptsize Xử lý prompt, trả JSON}
+\node[cloud_box] (runner) at (14.0, 1.55) {
+ \textbf{AI Runner (:8100)}\\[2pt]
+ {\scriptsize User mfai, \mbox{MemoryMax=896M}}\\
+ {\scriptsize OpenCode CLI (Concurrency=1)}
 };
 
-\node[cloud_box] (soc_cloud) at (12.1, -1.5) {
- \textbf{Kênh Truyền thông}\\[2pt]
- {\scriptsize Facebook / TikTok / Email}\\
- {\scriptsize Tiếp nhận bài đã duyệt}
+\node[cloud_box] (ai_cloud) at (14.0, -1.65) {
+ \textbf{5 Nền tảng LLM (13 Models)}\\[2pt]
+ {\scriptsize OpenCode Free, Groq LPU}\\
+ {\scriptsize OpenRouter, Google Gemini}
 };
 
-\draw[rel] (client.east) -- node[comm,above,sloped]{HTTPS} (server.west);
-\draw[rel] (server.south) -- node[comm,right=2pt]{SQL / TCP} (database.north);
-\draw[rel] (server.east) -- node[comm,above=2pt]{HTTPS / JSON} (ai_cloud.west);
-\draw[rel] (server.south east) -- node[comm,above,sloped]{REST API} (soc_cloud.north west);
+\draw[rel] (client.east) -- node[comm,above=2pt]{Cloudflare Tunnel\\{\tiny (HTTPS / SSE)}} (server.west);
+\draw[rel] (server.south) -- node[comm,right=3pt]{SQLAlchemy 2.0} (database.north);
+\draw[rel] (server.east) -- node[comm,above=2pt]{POST /run\\{\tiny \& MCP /mcp}} (runner.west);
+\draw[rel] (runner.south) -- node[comm,right=3pt]{HTTPS Stream} (ai_cloud.north);
 
-\end{tikzpicture}
+\end{tikzpicture}%
+}

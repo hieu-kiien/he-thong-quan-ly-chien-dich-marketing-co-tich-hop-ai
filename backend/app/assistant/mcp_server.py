@@ -165,8 +165,16 @@ async def _execute_tool(ctx: Context, tool_name: str, raw_args: dict[str, Any]) 
                 },
             )
 
-            # 5. Lưu lại part trong message.parts_json
-            current_parts = list(message.parts_json or [])
+            # 5. Lưu lại part trong message.parts_json (loại bỏ lượt thử lỗi trước đó của cùng tool hoặc gộp nếu gọi trùng write tool)
+            current_parts = [
+                p
+                for p in list(message.parts_json or [])
+                if not (
+                    p.get("type") == "tool_call"
+                    and p.get("name") == tool_name
+                    and (p.get("status") == "error" or tool_def.is_write)
+                )
+            ]
             current_parts.append({
                 "type": "tool_call",
                 "id": call_id,
@@ -176,10 +184,12 @@ async def _execute_tool(ctx: Context, tool_name: str, raw_args: dict[str, Any]) 
                 "summary": summary,
             })
             if tool_def.is_write and "action_id" in result:
-                current_parts.append({
-                    "type": "action",
-                    "action_id": result["action_id"],
-                })
+                act_id = result["action_id"]
+                if not any(p.get("type") == "action" and p.get("action_id") == act_id for p in current_parts):
+                    current_parts.append({
+                        "type": "action",
+                        "action_id": act_id,
+                    })
             message.parts_json = current_parts
             db.commit()
 
@@ -290,9 +300,16 @@ async def check_banned_keywords(ctx: Context, text: str) -> dict[str, Any]:
     return await _execute_tool(ctx, "check_banned_keywords", {"text": text})
 
 
-@mcp_server.tool(name="propose_content_drafts", description="Tạo đề xuất soạn thảo nhiều bản nháp nội dung (bài đăng, email...). Chỉ tạo đề xuất chờ người dùng xác nhận.")
-async def propose_content_drafts(ctx: Context, items: list[dict[str, Any]]) -> dict[str, Any]:
-    return await _execute_tool(ctx, "propose_content_drafts", {"items": items})
+@mcp_server.tool(name="propose_content_drafts", description="Tạo đề xuất soạn thảo nhiều bản nháp nội dung (bài đăng, kịch bản video, email...). Chỉ tạo đề xuất chờ người dùng xác nhận.")
+async def propose_content_drafts(
+    ctx: Context,
+    items: list[dict[str, Any]],
+    campaign_id: int | None = None,
+) -> dict[str, Any]:
+    raw: dict[str, Any] = {"items": items}
+    if campaign_id is not None:
+        raw["campaign_id"] = campaign_id
+    return await _execute_tool(ctx, "propose_content_drafts", raw)
 
 
 @mcp_server.tool(name="propose_campaign", description="Tạo đề xuất một chiến dịch tiếp thị mới với mục tiêu, ngân sách và các kênh phân bổ. Chỉ tạo đề xuất chờ người dùng xác nhận.")
@@ -327,7 +344,7 @@ async def propose_campaign(
 @mcp_server.tool(name="propose_campaign_update", description="Tạo đề xuất chỉnh sửa thông tin hoặc phân bổ kênh của chiến dịch hiện có. Chỉ tạo đề xuất chờ người dùng xác nhận.")
 async def propose_campaign_update(
     ctx: Context,
-    campaign_id: int,
+    campaign_id: int | None = None,
     name: str | None = None,
     goal: str | None = None,
     objective: str | None = None,
@@ -369,5 +386,12 @@ async def propose_schedule(
 
 
 @mcp_server.tool(name="propose_metrics", description="Tạo đề xuất nhập hoặc cập nhật số liệu hiệu quả (views, clicks, conversions, cost) từ bảng dữ liệu người dùng cung cấp. Chỉ tạo đề xuất chờ người dùng xác nhận.")
-async def propose_metrics(ctx: Context, rows: list[dict[str, Any]]) -> dict[str, Any]:
-    return await _execute_tool(ctx, "propose_metrics", {"rows": rows})
+async def propose_metrics(
+    ctx: Context,
+    rows: list[dict[str, Any]],
+    campaign_id: int | None = None,
+) -> dict[str, Any]:
+    raw: dict[str, Any] = {"rows": rows}
+    if campaign_id is not None:
+        raw["campaign_id"] = campaign_id
+    return await _execute_tool(ctx, "propose_metrics", raw)

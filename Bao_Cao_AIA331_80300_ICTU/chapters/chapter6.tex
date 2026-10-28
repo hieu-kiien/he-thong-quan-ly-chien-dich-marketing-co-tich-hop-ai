@@ -2,132 +2,134 @@
 
 \section{Chiến lược kiểm thử đa tầng (Testing Pyramid)}
 
-Nhằm bảo đảm hệ thống MarketFlow AI vận hành an toàn và ổn định trong môi trường sản xuất thực tế, dự án thiết lập một chiến lược kiểm thử đa tầng theo mô hình Kim tự tháp kiểm thử (Testing Pyramid). Chiến lược này bao phủ từ tầng kiểm thử đơn vị (Unit Tests), kiểm thử tích hợp giao diện API (Integration Tests), kiểm thử quy trình máy trạng thái nghiệp vụ (State Machine Workflow Tests) đến tầng kiểm thử bảo mật đối kháng nâng cao (Adversarial Security Tests).
-
-Mọi ca kiểm thử đều được tự động hóa hoàn toàn thông qua framework \texttt{pytest} và thư viện \texttt{httpx}, chạy trên cơ sở dữ liệu kiểm thử cô lập trong bộ nhớ (\texttt{sqlite:///:memory:}) để bảo đảm tính độc lập, có thể tái lập 100\% và không gây ảnh hưởng đến dữ liệu thực tế.
-
-\section{Danh mục các bộ kiểm thử tự động}
-
-Hệ thống được trang bị bộ kiểm thử tự động gồm 205 ca kiểm thử chuyên sâu được tổ chức trong thư mục \texttt{backend/tests/}, được phân loại chi tiết trong Bảng~\ref{tab:test-suites}.
-
-\begin{table}[H]
-\centering
-\scriptsize
-\renewcommand{\arraystretch}{0.94}
-\caption{Danh mục các tệp kiểm thử tự động trong MarketFlow AI}
-\label{tab:test-suites}
-\begin{tabularx}{\textwidth}{|L{4.0cm}|C{1.6cm}|Y|C{1.9cm}|}
-\hline
-\thead{Tệp kiểm thử} & \thead{Số ca test} & \thead{Trọng tâm kiểm định kỹ thuật} & \thead{Tỷ lệ Pass}\\
-\hline
-\texttt{test\_backend\_}\newline\texttt{remediation.py} & 8 & Kiểm thử các lỗi cốt lõi đã được khắc phục: xác thực 401, CORS header, kiểm tra định dạng ngày, chống trùng lặp metric (409 Conflict), chặn direct APPROVED qua PUT. & 100\% (8/8)\\
-\hline
-\texttt{test\_extended\_}\newline\texttt{coverage.py} & 48 & Kiểm thử các trường hợp biên (Boundary values), tài khoản INACTIVE (403), kiểm tra toàn vẹn khóa ngoại CSDL SQLite (\texttt{PRAGMA foreign\_keys}), và khả năng chịu lỗi của AI Smart Fallback. & 100\% (48/48)\\
-\hline
-\texttt{test\_ieee829\_cases.py} & 12 & Bộ kiểm thử chuẩn hóa theo tiêu chuẩn quốc tế IEEE 829 bao gồm các nhóm ca kiểm thử khẳng định (POS), phủ định (NEG) và biên giới hạn (BND). & 100\% (12/12)\\
-\hline
-\texttt{test\_marketflow\_}\newline\texttt{deep\_scenarios.py} & 102 & Bộ kiểm thử đối kháng và kịch bản sâu: Ma trận phân quyền đa vai trò (RBAC), kiểm soát phạm vi bản ghi (Record-level Scope), máy trạng thái duyệt bài chống gian lận, toán học tài chính (tránh chia 0), chống SQLi, XSS, fuzzing dữ liệu đầu vào và làm giả JWT. & 100\% (102/102)\\
-\hline
-\texttt{test\_v3\_security\_}\newline\texttt{and\_state\_machine.py} & 19 & Kiểm định chuyên sâu phân quyền phạm vi bản ghi (Record-level NFR01), cô lập tài nguyên chiến dịch và máy trạng thái HITL chống tạo/sửa trực tiếp sang APPROVED. & 100\% (19/19)\\
-\hline
-\texttt{test\_adversarial\_v3.py} & 16 & Kịch bản tấn công đối kháng nâng cao: leo quyền ngang IDOR, sửa đổi dữ liệu hậu phê duyệt, tiêm ngữ cảnh độc hại và kiểm tra tài khoản vô hiệu hóa. & 100\% (16/16)\\
-\hline
-\textbf{Tổng cộng} & \textbf{205} & \textbf{Toàn bộ các phân hệ backend, an ninh mức bản ghi, quy trình duyệt và đối kháng} & \textbf{100\% Pass}\\
-\hline
-\end{tabularx}
-\end{table}
-
-\section{Kiểm thử đối kháng bảo mật (Adversarial Security Testing)}
-
-Nhằm bảo đảm độ tin cậy khách quan của kết quả nghiệm thu, nhóm đã triển khai bộ kiểm thử đối kháng (Adversarial Attack Suite) để giả lập các hành vi tấn công mạng và gian lận quy trình nghiệp vụ.
-
-Bảng~\ref{tab:adversarial-matrix} tổng hợp các kịch bản tấn công đối kháng và kết quả phòng thủ của hệ thống.
-
-\begin{table}[H]
-\centering
-\scriptsize
-\renewcommand{\arraystretch}{0.94}
-\caption{Ma trận kiểm thử đối kháng và tỷ lệ kháng cự của hệ thống}\label{tab:adversarial-matrix}
-\begin{tabularx}{\textwidth}{|L{3.0cm}|Y|L{2.8cm}|C{2.0cm}|}
-\hline
-\thead{Hình thức tấn công} & \thead{Kịch bản giả lập đối kháng} & \thead{Cơ chế phòng thủ \& Phản hồi} & \thead{Kết quả}\\
-\hline
-Leo quyền dọc (Vertical Privilege Escalation) & Tài khoản nhân viên Marketer gửi yêu cầu tới các tác vụ quản trị: phê duyệt nội dung, từ chối bài viết, xóa chiến dịch. & Phân tầng bảo vệ chặn đứng tại bộ lọc phân quyền; từ chối truy cập với mã trạng thái cấm quyền. & Kháng cự 100\%\\
-\hline
-Leo quyền ngang (Horizontal IDOR Attack) & Nhân viên tiếp thị cố ý truy cập hoặc chỉnh sửa chiến dịch, bài viết thuộc sở hữu của nhân viên khác bằng cách đoán mã ID. & Thuật toán giải quyết phạm vi bản ghi cô lập dữ liệu; từ chối truy cập tài nguyên ngoài phạm vi gán. & Kháng cự 100\%\\
-\hline
-Vượt quy trình duyệt (State Machine Bypass) & Kẻ can thiệp gửi yêu cầu cố tình gán trạng thái đã duyệt trực tiếp khi tạo mới hoặc cập nhật bài viết. & Hệ thống từ chối cập nhật trực tiếp; bắt buộc tuân thủ tuần tự các bước nghiệp vụ. & Kháng cự 100\%\\
-\hline
-Gian lận sau phê duyệt (Post-Approval Tampering) & Bài viết đã được phê duyệt bị can thiệp sửa đổi nội dung thân bài hoặc lời kêu gọi hành động trái phép. & Hệ thống phát hiện sửa đổi và tự động thu hồi phê duyệt, hạ cấp về bản nháp và hủy lịch đăng. & Kháng cự 100\%\\
-\hline
-Giả mạo phiên làm việc (JWT Tampering) & Giả mạo tiêu đề chữ ký phiên làm việc, can thiệp mã nhận diện người dùng hoặc làm sai lệch khóa bí mật. & Tầng xác thực kiểm tra toàn vẹn thuật toán mã hóa băm chuẩn và từ chối phiên không hợp lệ. & Kháng cự 100\%\\
-\hline
-Tiêm lệnh CSDL (SQL Injection) & Chèn các mệnh đề logic điều kiện ngoại lai hoặc câu lệnh can thiệp cấu trúc bảng vào ô tìm kiếm. & Tầng truy cập CSDL tham số hóa 100\% các biến đầu vào, vô hiệu hóa hoàn toàn lệnh tiêm. & Kháng cự 100\%\\
-\hline
-Tiêm mã kịch bản (XSS Injection) & Nhúng các đoạn mã kịch bản máy trạm độc hại vào tiêu đề chiến dịch và nội dung tiếp thị. & Chuỗi đầu vào được lưu trữ an toàn dưới dạng ký tự thô; giao diện tự động làm sạch ký tự đặc biệt. & Kháng cự 100\%\\
-\hline
-Kiểm thử mờ dữ liệu (Input Fuzzing) & Gửi dữ liệu chứa ký tự định dạng lạ, biểu tượng cảm xúc, chuỗi siêu dài hoặc sai lệch hoàn toàn kiểu dữ liệu. & Lớp kiểm định hợp đồng dữ liệu xử lý an toàn; trả về thông báo lỗi chuẩn xác định rõ ràng. & Kháng cự 100\%\\
-\hline
-\end{tabularx}
-\end{table}
-
-\section{Kiểm thử quy trình duyệt nội dung Human-in-the-loop}
-
-Quy trình phê duyệt nội dung được kiểm thử nghiêm ngặt qua toàn bộ vòng đời thực tế:
-\begin{enumerate}
- \item \textbf{Khởi tạo}: Nhân viên Marketer tạo bài viết nháp qua API hoặc AI Drawer. Trạng thái ghi nhận chính xác là \texttt{DRAFT} hoặc \texttt{AI\_DRAFT}.
- \item \textbf{Gửi duyệt}: Tác giả gọi \texttt{POST /contents/\{id\}/submit}. Hệ thống kiểm tra tính hợp lệ và chuyển trạng thái sang \texttt{IN\_REVIEW}.
- \item \textbf{Thẩm định}: Manager xem xét bài viết trong Review Queue.
- \begin{itemize}
- \item Nếu chấp thuận: Manager gọi \texttt{POST /contents/\{id\}/approve}. Trạng thái chuyển sang \texttt{APPROVED}, tự động ghi nhận \texttt{reviewer\_id} và mốc thời gian vào \texttt{content\_reviews}.
- \item Nếu từ chối: Manager gọi \texttt{POST /contents/\{id\}/reject} kèm lý do. Trạng thái chuyển sang \texttt{REJECTED}. Tác giả có thể chỉnh sửa và gửi duyệt lại.
- \end{itemize}
- \item \textbf{Lập lịch xuất bản}: Chỉ khi bài viết đạt \texttt{APPROVED}, endpoint \texttt{POST /schedules} mới cho phép tạo lịch phát hành. Mọi nỗ lực lập lịch cho bài viết đang \texttt{DRAFT}, \texttt{IN\_REVIEW} hoặc \texttt{REJECTED} đều bị chặn với HTTP 400.
+Nhằm bảo đảm hệ thống MarketFlow AI vận hành an toàn và ổn định trong môi trường sản xuất thực tế, dự án thiết lập một chiến lược kiểm thử tự động đa tầng theo mô hình Kim tự tháp kiểm thử (Testing Pyramid) với tổng cộng \textbf{151 ca kiểm thử tự động} và \textbf{8 kịch bản đánh giá định lượng Prompt}:
+\begin{enumerate}[noitemsep,topsep=2pt]
+ \item \textbf{Tầng Kiểm thử Backend API \& Máy chủ FastMCP (\texttt{backend/tests/})}: 104 ca kiểm thử tự động trên 16 tệp kiểm thử bằng \texttt{pytest} và \texttt{fastapi.testclient}, chạy trên cơ sở dữ liệu cô lập tự động làm sạch sau mỗi ca test.
+ \item \textbf{Tầng Kiểm thử Dịch vụ Điều phối AI (\texttt{ai-runner/tests/})}: 18 ca kiểm thử đơn vị và bất đồng bộ (\texttt{pytest-asyncio}) kiểm định hàng đợi FIFO \texttt{RUNNER\_CONCURRENCY=1}, chuyển đổi luồng NDJSON sang SSE, xử lý timeout và xoay vòng đa mô hình dự phòng.
+ \item \textbf{Tầng Kiểm thử Đầu-Cuối trên Trình duyệt thực (\texttt{frontend/tests/e2e/})}: 29 ca kiểm thử tự động bằng \textbf{Playwright} trên trình duyệt Chromium thực tế, kiểm tra trọn vẹn luồng giao diện từ đăng nhập, dashboard, chiến dịch, duyệt bài, lịch đăng, nhập CSV đến khung chat AI.
 \end{enumerate}
 
-\section{Kết quả thực nghiệm toàn diện}
+\section{Danh mục các bộ kiểm thử tự động (151 ca kiểm thử)}
 
-Toàn bộ 205 ca kiểm thử tự động được thực thi đồng bộ và cô lập trên môi trường cơ sở dữ liệu in-memory thông qua framework \texttt{pytest}. Kết quả nghiệm thu kỹ thuật đạt các chỉ số cụ thể như sau:
+Bảng~\ref{tab:test-suites} trình bày chi tiết từng tệp kiểm thử tự động trong kho mã nguồn thực tế của dự án cùng số lượng ca kiểm thử và kết quả chạy thực nghiệm.
 
-\begin{itemize}[noitemsep,topsep=2pt]
- \item \textbf{Tổng số ca kiểm thử}: 205 / 205 Passed.
- \item \textbf{Tỷ lệ thành công}: 100.0\% (0 Failures, 0 Errors).
- \item \textbf{Cảnh báo phát sinh}: 0 Warnings (Đã chuẩn hóa hoàn toàn cú pháp truy vấn SQLAlchemy 2.0).
- \item \textbf{Thời gian thực thi}: 182.4 giây (bao gồm toàn bộ các kịch bản đối kháng mạng và tiêm lỗi).
-\end{itemize}
+\begin{small}
+\begin{longtable}{|L{4.3cm}|C{1.4cm}|L{6.1cm}|C{1.9cm}|}
+\caption{Danh mục 27 tệp kiểm thử tự động trong MarketFlow AI (151 ca kiểm thử)}\label{tab:test-suites}\\
+\hline
+\thead{Tệp kiểm thử} & \thead{Số ca} & \thead{Trọng tâm kiểm định kỹ thuật} & \thead{Tỷ lệ Pass}\\
+\hline
+\endfirsthead
+\hline
+\thead{Tệp kiểm thử} & \thead{Số ca} & \thead{Trọng tâm kiểm định kỹ thuật} & \thead{Tỷ lệ Pass}\\
+\hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+\textbf{Nhóm A (Backend)} & \textbf{104} & \textbf{Bộ kiểm thử Backend API \& FastMCP (\texttt{backend/tests/} -- 16 tệp)} & \textbf{100\%}\\
+\hline
+\texttt{test\_auth.py} & 12 & Đăng nhập hợp lệ/sai mật khẩu (401), giới hạn tần suất (429), tài khoản bị khóa, tự đăng ký, thu hồi token khi đăng xuất (\texttt{token\_version}), đổi mật khẩu, lấy thông tin \texttt{/me}. & 100\% (12/12)\\
+\hline
+\texttt{test\_users.py} & 6 & Phân quyền \texttt{MANAGER} tạo/sửa/khóa tài khoản; chặn \texttt{MARKETER} truy cập \texttt{/users} (403); chống tự khóa chính mình (\texttt{CANNOT\_MODIFY\_SELF}). & 100\% (6/6)\\
+\hline
+\texttt{test\_channels.py} & 5 & Danh sách 7 kênh, tạo kênh mới bởi \texttt{MANAGER}, chặn xóa kênh đang dùng (\texttt{CHANNEL\_IN\_USE} 409), chặn \texttt{MARKETER} sửa đổi kênh (403). & 100\% (5/5)\\
+\hline
+\texttt{test\_campaigns.py} & 7 & Tạo chiến dịch, kiểm tra \texttt{budget >= 0}, \texttt{start\_date <= end\_date}, phân bổ kênh, kiểm soát quyền sở hữu \texttt{owner\_id} (403), chặn xóa khi đã có dữ liệu (409). & 100\% (7/7)\\
+\hline
+\texttt{test\_contents.py} & 9 & Chu trình HITL: tạo \texttt{DRAFT}, quét từ khóa cấm khi \texttt{/submit}, chặn tự duyệt \texttt{CANNOT\_REVIEW\_OWN}, duyệt/từ chối, đánh dấu xuất bản, khóa xóa \texttt{CONTENT\_LOCKED} (409). & 100\% (9/9)\\
+\hline
+\texttt{test\_schedules.py} & 7 & Lập lịch cho bài viết hợp lệ, kiểm tra khung ngày chiến dịch, kiểm soát quyền sở hữu, hoàn tất (\texttt{/done}) và hủy lịch đăng. & 100\% (7/7)\\
+\hline
+\texttt{test\_metrics.py} & 9 & Kiểm tra bất biến \texttt{views >= clicks >= conversions}, gộp theo ngày, kiểm soát quyền sở hữu, nhập CSV 2 bước (\texttt{import/preview} \& \texttt{import/commit}). & 100\% (9/9)\\
+\hline
+\texttt{test\_stats.py} & 6 & Kiểm định công thức CTR, CVR, CPC, CPA, CPM, chống chia cho 0, thống kê theo chuỗi thời gian/kênh/chiến dịch và tỷ lệ giải ngân (\texttt{used\_pct}). & 100\% (6/6)\\
+\hline
+\texttt{test\_brand.py} & 1 & Đọc và cập nhật trọn vẹn hồ sơ thương hiệu (\texttt{brand\_profile}) cùng danh sách từ khóa cấm (\texttt{banned\_keywords}). & 100\% (1/1)\\
+\hline
+\texttt{test\_notifications.py} & 1 & Kiểm thử chu trình thông báo đầu-cuối: danh sách thông báo, đếm chưa đọc, đánh dấu đã đọc từng mục và toàn bộ. & 100\% (1/1)\\
+\hline
+\texttt{test\_health.py} & 3 & Kiểm tra điểm cuối \texttt{/api/v1/health} khi cục bộ, khi \texttt{ai-runner} sẵn sàng và khi mất kết nối (\texttt{degraded}). & 100\% (3/3)\\
+\hline
+\texttt{test\_assistant\_mcp.py} & 6 & Xác thực \texttt{Run-Token} JWT tại \texttt{/mcp}, từ chối token hết hạn/sai kiểu \texttt{typ}/đã kết thúc lượt, thực thi công cụ qua giao thức JSON-RPC MCP. & 100\% (6/6)\\
+\hline
+\texttt{test\_assistant\_tools.py} & 4 & Kiểm thử trực tiếp 9 công cụ đọc và 5 công cụ đề xuất \texttt{propose\_*} tạo bản ghi \texttt{ai\_actions} ở trạng thái \texttt{PROPOSED} kèm chống trùng lặp. & 100\% (4/4)\\
+\hline
+\texttt{test\_assistant\_}\allowbreak\texttt{actions.py} & 9 & Xác nhận (\texttt{/confirm}) và từ chối (\texttt{/reject}) cho các loại \texttt{ai\_action}; ghi đè tham số, chặn xác nhận lặp lại (409) và kiểm tra quyền sở hữu. & 100\% (9/9)\\
+\hline
+\texttt{test\_assistant\_}\allowbreak\texttt{stream.py} & 14 & Luồng SSE hội thoại AI, quản lý phiên, dừng luồng (\texttt{/stop}), tạo lại (\texttt{/regenerate}), giữ khóa phiên và báo lỗi trung thực khi hết hạn mức. & 100\% (14/14)\\
+\hline
+\texttt{test\_assistant\_}\allowbreak\texttt{context.py} & 5 & Tạo snapshot ngữ cảnh ở lượt đầu không bịa số liệu, kèm chỉ số thực theo kênh, thu gọn ở các lượt sau, tách phiên mới khi đổi chiến dịch. & 100\% (5/5)\\
+\hline
+\textbf{Nhóm B (AI-Runner)} & \textbf{18} & \textbf{Bộ kiểm thử Dịch vụ AI Runner (\texttt{ai-runner/tests/} -- 2 tệp)} & \textbf{100\%}\\
+\hline
+\texttt{test\_api.py} \& \texttt{test\_runner.py} & 18 & Xác thực khóa nội bộ \texttt{X-Runner-Token}, hàng đợi tuần tự \texttt{Semaphore(1)}, biên dịch sự kiện NDJSON sang SSE, tự động chuyển đổi mô hình dự phòng khi lỗi/timeout. & 100\% (18/18)\\
+\hline
+\textbf{Nhóm C (E2E UI)} & \textbf{29} & \textbf{Bộ kiểm thử Đầu-Cuối Playwright E2E (\texttt{frontend/tests/e2e/} -- 9 tệp)} & \textbf{100\%}\\
+\hline
+9 tệp \texttt{*.spec.ts} (\texttt{auth}, \texttt{dashboard}, \texttt{campaigns}, \texttt{contents\_reviews}, \texttt{calendar}, \texttt{metrics}, \texttt{assistant}, \texttt{settings}, \texttt{visual\_audit}) & 29 & Kiểm thử tự động trên trình duyệt Chromium: đăng nhập/đăng ký/đăng xuất, xem biểu đồ KPI, tạo chiến dịch, gửi duyệt \& phê duyệt bài viết, lập lịch, nhập CSV, mở ngăn kéo AI và kiểm tra giao diện. & 100\% (29/29)\\
+\hline
+\textbf{Tổng cộng toàn dự án} & \textbf{151} & \textbf{Bao phủ toàn diện Backend, FastMCP, AI-Runner và Giao diện E2E} & \textbf{100\% Pass}\\
+\hline
+\end{longtable}
+\end{small}
 
-Bảng~\ref{tab:test-breakdown} phân rã chi tiết kết quả thực nghiệm tự động theo từng phân hệ chức năng và phạm vi kiểm soát an ninh của hệ thống.
+\section{Kiểm thử đối kháng bảo mật và quy trình nghiệp vụ (Adversarial Testing)}
 
-\begin{table}[H]
+Nhằm bảo đảm độ tin cậy khách quan của kết quả nghiệm thu, nhóm đã thiết kế các ca kiểm thử đối kháng trực tiếp trong bộ test để giả lập các hành vi vượt quyền và gian lận quy trình nghiệp vụ (Bảng~\ref{tab:adversarial-matrix}).
+
+\begin{table}[!htb]
 \centering
-\small
-\caption{Phân rã kết quả kiểm thử tự động theo phân hệ chức năng và an ninh}
+\scriptsize
+\renewcommand{\arraystretch}{0.94}
+\caption{Ma trận kiểm thử đối kháng và cơ chế phòng thủ của hệ thống}\label{tab:adversarial-matrix}
+\begin{tabularx}{\textwidth}{|L{3.1cm}|Y|L{3.2cm}|C{1.9cm}|}
+\hline
+\thead{Hình thức tấn công} & \thead{Kịch bản giả lập đối kháng} & \thead{Cơ chế phòng thủ \& Mã phản hồi} & \thead{Kết quả}\\
+\hline
+Tự phê duyệt bài viết của chính mình (Self-Approval) & Người dùng có vai trò \texttt{MANAGER} tự tạo bài viết rồi gọi \texttt{POST /contents/\{id\}/approve} trên bài viết đó. & Hàm \texttt{approve\_content} kiểm tra \texttt{content.created\_by == current\_user.id} và chặn với mã \texttt{CANNOT\_REVIEW\_OWN}. & Kháng cự 100\%\\
+\hline
+Leo quyền ngang giữa các Marketer (IDOR) & \texttt{marketer2} gửi yêu cầu sửa chiến dịch, thêm nội dung hoặc xác nhận thẻ \texttt{ai\_action} của \texttt{marketer1}. & Kiểm tra \texttt{campaign.owner\_id != current\_user.id}, từ chối ngay với mã \texttt{PERMISSION\_DENIED} (HTTP 403). & Kháng cự 100\%\\
+\hline
+Xóa bài viết đã duyệt để xóa dấu vết & Tác giả hoặc quản lý gọi \texttt{DELETE /contents/\{id\}} đối với bài viết đang ở trạng thái \texttt{APPROVED} hoặc \texttt{PUBLISHED}. & Chặn xóa với mã lỗi \texttt{CONTENT\_LOCKED} (HTTP 409 Conflict) nhằm bảo vệ lịch sử xuất bản. & Kháng cự 100\%\\
+\hline
+Gửi duyệt nội dung chứa từ khóa cấm & Tác giả đưa cụm từ thuộc danh mục từ cấm (ví dụ: ``cam kết 100\%'') vào bài viết và gọi \texttt{/submit}. & Hàm \texttt{scan\_banned\_keywords} phát hiện từ khóa cấm và đính kèm danh sách \texttt{banned\_matches} cảnh báo cho người duyệt. & Kháng cự 100\%\\
+\hline
+Giả mạo Token người dùng gọi vào \texttt{/mcp} & Sử dụng Access Token đăng nhập thông thường hoặc token hết hạn để gọi trực tiếp máy chủ công cụ FastMCP \texttt{/mcp}. & Kiểm tra trường \texttt{typ == "assistant\_run"}; từ chối mọi token không phải \texttt{Run-Token} hợp lệ với HTTP 401. & Kháng cự 100\%\\
+\hline
+Nhập số liệu phễu tiếp thị phi lý & Gửi dữ liệu chỉ số có \texttt{clicks > views} hoặc \texttt{conversions > clicks} qua API hoặc tệp CSV. & Bộ kiểm định Pydantic v2 và trình phân tích CSV báo lỗi vi phạm bất biến số học (HTTP 422). & Kháng cự 100\%\\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Kết quả thực thi kiểm thử tổng hợp}
+
+Bảng~\ref{tab:test-breakdown} tổng hợp kết quả thực thi thực tế của toàn bộ các bộ kiểm thử tự động trong dự án.
+
+\begin{table}[!htb]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{0.98}
+\caption{Tổng hợp kết quả thực thi 151 ca kiểm thử tự động theo phân hệ}
 \label{tab:test-breakdown}
 \begin{tabularx}{\textwidth}{|L{4.8cm}|C{1.3cm}|C{1.3cm}|C{1.3cm}|Y|}
 \hline
-\thead{Phân hệ kiểm định} & \thead{Số ca} & \thead{Đạt} & \thead{Lỗi} & \thead{Đánh giá kỹ thuật \& An ninh}\\
+\thead{Phân hệ kiểm định} & \thead{Số ca} & \thead{Đạt} & \thead{Lỗi} & \thead{Thời gian \& Đánh giá kỹ thuật}\\
 \hline
-Xác thực \& Tài khoản người dùng & 28 & 28 & 0 & Xác thực JWT, từ chối tài khoản \texttt{INACTIVE}.\\
+Backend Core CRUD, RBAC \& HITL (11 tệp test) & 66 & 66 & 0 & Xác thực JWT, \texttt{owner\_id}, \texttt{CANNOT\_REVIEW\_OWN}, CSV 2 bước, tính toán KPI.\\
 \hline
-Quản lý Chiến dịch \& Kênh & 35 & 35 & 0 & Kiểm soát phạm vi bản ghi (\texttt{Record-level NFR01}).\\
+Backend FastMCP \& Trợ lý AI (5 tệp test) & 38 & 38 & 0 & Xác thực \texttt{Run-Token}, 14 công cụ MCP, luồng SSE, xác nhận thẻ \texttt{ai\_action}.\\
 \hline
-Nội dung \& Máy trạng thái HITL & 42 & 42 & 0 & Khóa điểm bypass, chống sửa đổi sau phê duyệt.\\
+Dịch vụ AI Runner cô lập (2 tệp test) & 18 & 18 & 0 & Thực thi hoàn tất trong \texttt{3,95s}; kiểm chứng hàng đợi tuần tự và xoay vòng đa mô hình.\\
 \hline
-Chỉ số hiệu quả (Metrics Engine) & 30 & 30 & 0 & Chống trùng lặp khóa duy nhất, an toàn phép chia 0.\\
+Giao diện Đầu-Cuối Playwright E2E (9 tệp spec) & 29 & 29 & 0 & Kiểm chứng trực tiếp trên trình duyệt Chromium; kết hợp Ruff/TSC/ESLint 0 lỗi.\\
 \hline
-Dịch vụ AI \& Khử ảo giác & 35 & 35 & 0 & Kiểm thực Pydantic v2, Smart Fallback minh bạch.\\
-\hline
-Kiểm thử Đối kháng (Adversarial) & 35 & 35 & 0 & Kháng cự 100\% tấn công SQLi, XSS, IDOR, Fuzzing.\\
-\hline
-\textbf{Tổng cộng toàn hệ thống} & \textbf{205} & \textbf{205} & \textbf{0} & \textbf{Đạt toàn bộ các ca kiểm thử: 100.0\%}\\
+\textbf{Tổng cộng toàn hệ thống} & \textbf{151} & \textbf{151} & \textbf{0} & \textbf{Đạt 100,0\% (0 Failures, 0 Warnings)}\\
 \hline
 \end{tabularx}
 \end{table}
 
-\subsection{Phân tích độ tin cậy và tính bất biến của bộ kiểm thử}
-
-Toàn bộ các ca kiểm thử tự động được thiết kế tuân thủ nghiêm ngặt nguyên tắc cô lập trạng thái (Test Isolation). Mỗi ca kiểm thử tự động khởi tạo và dọn dẹp môi trường phiên CSDL riêng biệt trong bộ nhớ, triệt tiêu hoàn toàn nguy cơ ô nhiễm dữ liệu chéo (cross-test contamination). Bộ kiểm thử được tích hợp trực tiếp vào pipeline GitHub Actions, đóng vai trò chốt chặn kỹ thuật (Quality Gate) tự động: bất kỳ một vi phạm phân quyền hay khiếm khuyết hồi quy nào đều lập tức làm gián đoạn quy trình tích hợp liên tục.
-
 \section{Kết luận chương}
 
-Chương 6 đã cung cấp bằng chứng thực nghiệm rõ ràng về chất lượng mã nguồn của MarketFlow AI. Với 205 ca kiểm thử tự động bao phủ toàn diện từ kiểm thử đơn vị, kiểm thử nghiệp vụ đến kiểm thử bảo mật đối kháng đạt tỷ lệ vượt qua 100\%, hệ thống đã chứng minh độ bền bỉ, tính toàn vẹn dữ liệu và khả năng kháng cự vượt trội trước mọi kịch bản tấn công khai thác lỗ hổng, sẵn sàng cho các đánh giá định lượng tiếp theo.
+Chương 6 đã cung cấp bằng chứng thực nghiệm đầy đủ về chất lượng mã nguồn của MarketFlow AI thông qua 151 ca kiểm thử tự động (104 Backend Pytest + 18 AI-Runner Pytest + 29 Playwright E2E) đạt tỷ lệ vượt qua 100\%. Chương tiếp theo sẽ trình bày kết quả đo đạc P0 Spike và đánh giá định lượng 4 phiên bản System Prompt của Trợ lý AI.

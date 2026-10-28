@@ -383,8 +383,9 @@ class Runner:
                             model,
                             models[next_non_opencode],
                         )
-                        if state.session_id:
-                            session_id = state.session_id
+                        # Start a clean session on the fallback provider so the failed attempt's
+                        # stored user message is not duplicated (which would double input tokens).
+                        session_id = None
                         index = next_non_opencode
                         continue
                 elif (
@@ -393,8 +394,9 @@ class Runner:
                 ):
                     if model:
                         self.model_cooldown_until[model] = time.monotonic() + 60.0
-                    if state.session_id:
-                        session_id = state.session_id
+                    # Reset session_id so the next model does not inherit duplicate user prompts
+                    # from the failed attempt in OpenCode's session DB.
+                    session_id = None
                     log.info(
                         "run %s: model %s failed (%s); falling back to %s",
                         handle.run_id,

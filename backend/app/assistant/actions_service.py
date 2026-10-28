@@ -24,7 +24,7 @@ from app.core.errors import (
     ValidationFailed,
 )
 from app.core.timeutil import now_utc
-from app.models.ai import AiAction
+from app.models.ai import AiAction, AiThread
 from app.models.enums import AiActionStatus, ContentOrigin, MetricSource
 from app.models.metric import Metric
 from app.models.user import User
@@ -99,10 +99,15 @@ def confirm(
             validated = ProposeContentDraftsArgs.model_validate(merged_args)
             pending_items: list[ContentCreate] = []
             draft_items: list[ContentCreate] = []
+            thread_obj = db.get(AiThread, action.thread_id) if action.thread_id else None
+            thread_cid = thread_obj.campaign_id if thread_obj else None
             for it in validated.items:
+                resolved_cid = it.campaign_id or validated.campaign_id or thread_cid
+                if not resolved_cid:
+                    raise ValidationFailed(fields={"campaign_id": "Thiếu ID chiến dịch (campaign_id)"})
                 ch = channel_service.resolve_channel(db, None, it.channel_code)
                 c_in = ContentCreate(
-                    campaign_id=it.campaign_id,
+                    campaign_id=resolved_cid,
                     channel_id=ch.id,
                     content_type=it.content_type,
                     title=it.title,

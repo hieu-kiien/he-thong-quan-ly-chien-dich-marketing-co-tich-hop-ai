@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.assistant.context import ToolContext
 from app.core.errors import ValidationFailed
@@ -96,9 +97,38 @@ class CheckBannedKeywordsArgs(BaseModel):
 
 # --- Input Models cho Write Tools (Propose) -----------------------------------
 
+_CTRL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]+")
+
+
+def _clean_ai_text(val: Any) -> str:
+    if val is None:
+        return ""
+    s = str(val).replace("\r\n", "\n").replace("\r", "\n")
+    s = _CTRL_CHARS_RE.sub("", s)
+    return s.strip()
+
+
+def _extract_fallback_cta(body: str, channel_code: str) -> str | None:
+    if not body:
+        return None
+    # Tìm dòng bắt đầu bằng 👉 hoặc [CTA...]
+    for line in reversed(body.splitlines()):
+        stripped = line.strip()
+        if stripped.startswith("👉"):
+            cleaned = stripped.lstrip("👉").strip()
+            if cleaned:
+                return cleaned[:120]
+    m = re.search(r"\[CTA[^\]]*\][^\n]*\n+(?:[-•*]\s*)?(?:Lời thoại:\s*)?[\"“]?([^\"\n”]+)", body, flags=re.IGNORECASE)
+    if m:
+        return m.group(1).strip()[:120]
+    if channel_code.upper() == "TIKTOK":
+        return "Nhấn vào link ở phần tiểu sử (Bio) để trải nghiệm ngay!"
+    return "Tìm hiểu chi tiết và đăng ký ngay hôm nay!"
+
+
 class ProposeContentDraftItem(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    campaign_id: int = Field(..., description="ID chiến dịch")
+    campaign_id: int | None = Field(default=None, description="ID chiến dịch (nếu để trống sẽ tự lấy theo chiến dịch đang gắn với phiên chat)")
     channel_code: str = Field(..., description="Mã kênh (FACEBOOK, INSTAGRAM, TIKTOK, ZALO_OA, EMAIL, GOOGLE_ADS, WEBSITE)")
     content_type: ContentType = Field(default=ContentType.SOCIAL_POST, description="Loại nội dung: SOCIAL_POST, EMAIL, AD_COPY, VIDEO_SCRIPT, OTHER")
     title: str = Field(..., description="Tiêu đề bài đăng hoặc chủ đề email")
@@ -106,9 +136,43 @@ class ProposeContentDraftItem(BaseModel):
     cta: str | None = Field(default=None, description="Lời kêu gọi hành động (Call to action)")
     status: str = Field(default="PENDING_REVIEW", description="Trạng thái: PENDING_REVIEW (mặc định) hoặc DRAFT")
 
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_draft_item(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        d = dict(data)
+        if not d.get("channel_code") and d.get("channel"):
+            d["channel_code"] = str(d["channel"]).upper().strip()
+        elif isinstance(d.get("channel_code"), str):
+            d["channel_code"] = d["channel_code"].upper().strip()
+
+        if "title" in d:
+            d["title"] = _clean_ai_text(d["title"])
+        if "body" in d:
+            d["body"] = _clean_ai_text(d["body"])
+
+        raw_cta = d.get("cta") or d.get("call_to_action") or d.get("cta_text")
+        cleaned_cta = _clean_ai_text(raw_cta) if raw_cta else ""
+        if not cleaned_cta and d.get("body"):
+            cleaned_cta = _extract_fallback_cta(d["body"], str(d.get("channel_code") or "")) or ""
+        d["cta"] = cleaned_cta or None
+
+        ch_code = str(d.get("channel_code") or "").upper()
+        c_type = d.get("content_type")
+        if not c_type or c_type == "SOCIAL_POST" or c_type == ContentType.SOCIAL_POST:
+            if ch_code == "TIKTOK":
+                d["content_type"] = ContentType.VIDEO_SCRIPT
+            elif ch_code == "EMAIL":
+                d["content_type"] = ContentType.EMAIL
+            elif ch_code == "GOOGLE_ADS":
+                d["content_type"] = ContentType.AD_COPY
+        return d
+
 
 class ProposeContentDraftsArgs(BaseModel):
     model_config = ConfigDict(extra="ignore")
+    campaign_id: int | None = Field(default=None, description="ID chiến dịch mặc định cho các bản nháp")
     items: list[ProposeContentDraftItem] = Field(..., min_length=1, max_length=20, description="Danh sách các bản nháp nội dung đề xuất")
 
 
@@ -134,7 +198,7 @@ class ProposeCampaignArgs(BaseModel):
 
 class ProposeCampaignUpdateArgs(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    campaign_id: int = Field(..., description="ID chiến dịch cần chỉnh sửa")
+    campaign_id: int | None = Field(default=None, description="ID chiến dịch cần chỉnh sửa (tự động lấy theo phiên nếu để trống)")
     name: str | None = Field(default=None, description="Tên chiến dịch mới")
     goal: CampaignGoal | None = Field(default=None, description="Mục tiêu mới")
     objective: str | None = Field(default=None, description="Mục tiêu cụ thể mới")
@@ -157,7 +221,7 @@ class ProposeScheduleArgs(BaseModel):
 
 class ProposeMetricRowItem(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    campaign_id: int = Field(..., description="ID chiến dịch")
+    campaign_id: int | None = Field(default=None, description="ID chiến dịch (tự động lấy theo phiên nếu để trống)")
     channel_code: str = Field(..., description="Mã kênh")
     metric_date: date = Field(..., description="Ngày ghi nhận số liệu (YYYY-MM-DD)")
     views: int = Field(default=0, ge=0, description="Lượt xem / tiếp cận")
@@ -168,6 +232,7 @@ class ProposeMetricRowItem(BaseModel):
 
 class ProposeMetricsArgs(BaseModel):
     model_config = ConfigDict(extra="ignore")
+    campaign_id: int | None = Field(default=None, description="ID chiến dịch mặc định")
     rows: list[ProposeMetricRowItem] = Field(..., min_length=1, max_length=100, description="Danh sách các dòng số liệu cần nhập/cập nhật")
 
 
@@ -494,6 +559,16 @@ def handle_check_banned_keywords(ctx: ToolContext, args: CheckBannedKeywordsArgs
 def handle_propose_content_drafts(ctx: ToolContext, args: ProposeContentDraftsArgs) -> dict[str, Any]:
     banned_notes: list[str] = []
     for idx, item in enumerate(args.items):
+        resolved_cid = item.campaign_id or args.campaign_id or ctx.thread.campaign_id
+        if not resolved_cid:
+            raise ValidationFailed(fields={f"items.{idx}.campaign_id": "Thiếu ID chiến dịch (campaign_id)"})
+        item.campaign_id = resolved_cid
+
+        if len(re.findall(r"[A-Za-zÀ-ỹ0-9]", item.body)) < 15:
+            raise ValidationFailed(
+                fields={f"items.{idx}.body": "Nội dung bài viết quá ngắn hoặc bị lỗi ký tự, vui lòng truyền văn bản tiếng Việt hoàn chỉnh"}
+            )
+
         camp = campaign_service.find_campaign_for_reference(ctx.db, item.campaign_id, field=f"items.{idx}.campaign_id")
         if camp.status in campaign_service.CLOSED_STATUSES:
             raise ValidationFailed(fields={f"items.{idx}.campaign_id": f"Chiến dịch '{camp.name}' đã đóng"})
@@ -512,18 +587,37 @@ def handle_propose_content_drafts(ctx: ToolContext, args: ProposeContentDraftsAr
     if banned_notes:
         summary += f" (Lưu ý: {'; '.join(banned_notes)})"
 
-    action = AiAction(
-        thread_id=ctx.thread.id,
-        message_id=ctx.message.id,
-        user_id=ctx.user.id,
-        tool="propose_content_drafts",
-        args_json=args.model_dump(mode="json"),
-        summary=summary,
-        status=AiActionStatus.PROPOSED,
+    # Nếu trong cùng một lượt trả lời (message_id) AI gọi lại propose_content_drafts để sửa bản nháp,
+    # cập nhật trực tiếp bản đề xuất đang chờ thay vì tạo nhiều thẻ trùng lặp.
+    existing_action = (
+        ctx.db.query(AiAction)
+        .filter(
+            AiAction.message_id == ctx.message.id,
+            AiAction.tool == "propose_content_drafts",
+            AiAction.status == AiActionStatus.PROPOSED,
+        )
+        .order_by(AiAction.id.desc())
+        .first()
     )
-    ctx.db.add(action)
-    ctx.db.commit()
-    ctx.db.refresh(action)
+    if existing_action is not None:
+        existing_action.args_json = args.model_dump(mode="json")
+        existing_action.summary = summary
+        ctx.db.commit()
+        ctx.db.refresh(existing_action)
+        action = existing_action
+    else:
+        action = AiAction(
+            thread_id=ctx.thread.id,
+            message_id=ctx.message.id,
+            user_id=ctx.user.id,
+            tool="propose_content_drafts",
+            args_json=args.model_dump(mode="json"),
+            summary=summary,
+            status=AiActionStatus.PROPOSED,
+        )
+        ctx.db.add(action)
+        ctx.db.commit()
+        ctx.db.refresh(action)
 
     return {
         "action_id": action.id,
@@ -568,6 +662,10 @@ def handle_propose_campaign(ctx: ToolContext, args: ProposeCampaignArgs) -> dict
 
 
 def handle_propose_campaign_update(ctx: ToolContext, args: ProposeCampaignUpdateArgs) -> dict[str, Any]:
+    resolved_cid = args.campaign_id or ctx.thread.campaign_id
+    if not resolved_cid:
+        raise ValidationFailed(fields={"campaign_id": "Thiếu ID chiến dịch cần chỉnh sửa"})
+    args.campaign_id = resolved_cid
     camp = campaign_service.get_campaign_orm(ctx.db, args.campaign_id)
     if args.start_date or args.end_date:
         s = args.start_date or camp.start_date
@@ -638,6 +736,10 @@ def handle_propose_schedule(ctx: ToolContext, args: ProposeScheduleArgs) -> dict
 
 def handle_propose_metrics(ctx: ToolContext, args: ProposeMetricsArgs) -> dict[str, Any]:
     for idx, row in enumerate(args.rows):
+        resolved_cid = row.campaign_id or args.campaign_id or ctx.thread.campaign_id
+        if not resolved_cid:
+            raise ValidationFailed(fields={f"rows.{idx}.campaign_id": "Thiếu ID chiến dịch (campaign_id)"})
+        row.campaign_id = resolved_cid
         camp = campaign_service.find_campaign_for_reference(ctx.db, row.campaign_id, field=f"rows.{idx}.campaign_id")
         ch = channel_service.resolve_channel(ctx.db, None, row.channel_code, field=f"rows.{idx}.channel_code")
         if ch.id not in campaign_service.campaign_channel_ids(camp):

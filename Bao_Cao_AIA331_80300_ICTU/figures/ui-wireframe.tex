@@ -1,95 +1,144 @@
-\resizebox{0.98\textwidth}{!}{%
+\resizebox{0.99\textwidth}{!}{%
 \begin{tikzpicture}[
  font=\sffamily\scriptsize,
  >=Latex,
- frame/.style={draw=black!80,fill=white,rounded corners=3pt,line width=0.8pt},
- panel/.style={draw=black!65,fill=white,rounded corners=2pt},
- card/.style={draw=black!60,fill=black!3,rounded corners=2pt},
- btn/.style={draw=black!85,fill=black!6,rounded corners=2pt,inner sep=3pt,font=\sffamily\bfseries\scriptsize},
- btn_dark/.style={draw=black,fill=black!16,text=black,rounded corners=2pt,inner sep=3pt,font=\sffamily\bfseries\scriptsize}
+ card/.style={draw=black!45,fill=white,rounded corners=3pt,line width=0.6pt},
+ btn/.style={draw=black!65,fill=white,rounded corners=2.5pt,inner sep=2.2pt,font=\sffamily\bfseries\tiny},
+ btn_blue/.style={draw=blue!75!black,fill=blue!65!black,text=white,rounded corners=2.5pt,inner sep=2.2pt,font=\sffamily\bfseries\tiny}
 ]
 
-\draw[draw=black!85,fill=white,rounded corners=4pt,line width=0.9pt] (0, 0) rectangle (16.0, 8.6);
+% Khung trình duyệt tổng thể
+\draw[draw=black!80,fill=black!3,rounded corners=4pt,line width=0.9pt] (0, 0) rectangle (16.6, 9.2);
 
-\draw[draw=black!85,fill=black!10,rounded corners=3pt] (0, 7.80) rectangle (16.0, 8.6);
-\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=west] at (0.35, 8.20) {KHÔNG GIAN LÀM VIỆC 3 CỘT (SPLIT-PANE WORKSPACE) -- MARKETFLOW};
-\node[font=\sffamily\scriptsize,text=black,anchor=east] at (15.65, 8.20) {Tài khoản: Vũ Hiếu Kiên (Quản lý)};
+% Cột trái: Dark Sidebar (#121316) đúng chuẩn giao diện thực tế
+\draw[draw=black!90,fill=black!88,rounded corners=3pt] (0.12, 0.12) rectangle (2.65, 9.08);
+\draw[draw=blue!70!black,fill=blue!65!black,rounded corners=2pt] (0.28, 8.42) rectangle (0.68, 8.82);
+\node[font=\sffamily\bfseries\scriptsize,text=white] at (0.48, 8.62) {M};
+\node[font=\sffamily\bfseries\scriptsize,text=white,anchor=west] at (0.76, 8.62) {MarketFlow};
 
-\draw[frame] (0.25, 0.25) rectangle (3.45, 7.55);
-\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=west] at (0.45, 7.15) {ĐIỀU HƯỚNG CHÍNH};
-\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 6.60) {1. Tổng quan};
-\node[anchor=west,font=\sffamily\bfseries\scriptsize] at (0.45, 6.08) {2. Chiến dịch};
-\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 5.56) {3. Nội dung \& Duyệt bài};
-\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 5.04) {4. Lịch xuất bản};
-\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 4.52) {5. Số liệu \& Báo cáo KPI};
-\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 4.00) {6. Trợ lý Marketing AI};
-\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 3.48) {7. Tài sản thương hiệu};
-\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 2.96) {8. Nhật ký hệ thống};
-\draw[draw=black!35,line width=0.5pt] (0.45, 2.50) -- (3.25, 2.50);
-\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 2.05) {Giao diện: Soft Daylight};
-\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 1.55) {Backend: FastAPI};
-\node[anchor=west,font=\sffamily\scriptsize] at (0.45, 1.05) {AI: Đa mô hình tự động};
+% Mục đang chọn: Tổng quan
+\draw[draw=blue!70!black,fill=blue!65!black,rounded corners=2.5pt] (0.24, 7.62) rectangle (2.53, 8.08);
+\node[font=\sffamily\bfseries\scriptsize,text=white,anchor=west] at (0.38, 7.85) {Tổng quan};
 
-\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=west] at (3.70, 7.25) {Chiến dịch: Khuyến mãi Mùa Hè 2026};
-\node[btn,anchor=east] at (12.40, 7.25) {Xuất báo cáo Excel};
-\node[btn_dark,anchor=east] at (15.75, 7.25) {+ Tạo chiến dịch mới};
+% Các mục điều hướng chính thực tế
+\node[font=\sffamily\scriptsize,text=white!85,anchor=west] at (0.38, 7.25) {Chiến dịch};
+\node[font=\sffamily\scriptsize,text=white!85,anchor=west] at (0.38, 6.70) {Nội dung};
+\node[font=\sffamily\scriptsize,text=white!85,anchor=west] at (0.38, 6.15) {Duyệt nội dung};
+\draw[draw=orange!80!black,fill=orange!80!black,rounded corners=2pt] (2.18, 6.00) rectangle (2.46, 6.30);
+\node[font=\sffamily\bfseries\tiny,text=white] at (2.32, 6.15) {1};
+\node[font=\sffamily\scriptsize,text=white!85,anchor=west] at (0.38, 5.60) {Lịch đăng};
+\node[font=\sffamily\scriptsize,text=white!85,anchor=west] at (0.38, 5.05) {Trợ lý AI};
 
-\node[card, minimum width=2.75cm, minimum height=1.10cm, align=left, inner sep=4pt] at (5.10, 6.25) {
- {\scriptsize Tổng ngân sách}\\[2pt]
- \textbf{\scriptsize 48M / 60M VNĐ}
-};
+% Đáy Sidebar: Cài đặt & Thu gọn menu
+\draw[draw=white!20,line width=0.4pt] (0.26, 1.25) -- (2.50, 1.25);
+\node[font=\sffamily\scriptsize,text=white!80,anchor=west] at (0.38, 0.88) {Cài đặt};
+\node[font=\sffamily\tiny,text=white!60,anchor=west] at (0.38, 0.42) {Thu gọn menu};
 
-\node[card, minimum width=2.75cm, minimum height=1.10cm, align=left, inner sep=4pt] at (8.10, 6.25) {
- {\scriptsize Chi phí / Chuyển đổi}\\[2pt]
- \textbf{\scriptsize 95.000đ (CPA)}
-};
+% Thanh Header trên cùng
+\draw[draw=black!30,fill=white,rounded corners=2pt] (2.78, 8.20) rectangle (16.45, 9.08);
+\node[font=\sffamily\bfseries\footnotesize,text=black,anchor=west] at (2.95, 8.76) {Tổng quan marketing};
+\draw[draw=orange!60!black,fill=orange!15,rounded corners=2pt] (6.45, 8.60) rectangle (7.65, 8.90);
+\node[font=\sffamily\bfseries\tiny,text=orange!70!black] at (7.05, 8.75) {Dữ liệu mẫu};
+\node[font=\sffamily\tiny,text=black!65,anchor=west] at (2.95, 8.40) {Hiệu quả và chi phí chiến dịch tổng hợp từ số liệu đã nhập hoặc import.};
 
-\node[card, minimum width=2.75cm, minimum height=1.10cm, align=left, inner sep=4pt] at (11.10, 6.25) {
- {\scriptsize Lượt hiển thị}\\[2pt]
- \textbf{\scriptsize 124.500 lượt}
-};
+\node[btn] at (8.85, 8.72) {Xuất Excel};
+\node[btn_blue] at (10.75, 8.72) {Báo cáo AI chuyên sâu};
+\node[btn] at (13.00, 8.72) {Trợ lý AI (CTRL+K)};
+\node[font=\sffamily\bfseries\tiny,text=black,anchor=east] at (16.32, 8.76) {Nguyễn Văn Quản Lý};
+\node[font=\sffamily\tiny,text=black!60,anchor=east] at (16.32, 8.42) {Quản lý (MANAGER)};
 
-\node[card, minimum width=2.75cm, minimum height=1.10cm, align=left, inner sep=4pt] at (14.20, 6.25) {
- {\scriptsize Tỷ lệ nhấp (CTR)}\\[2pt]
- \textbf{\scriptsize 3.42\% (+0.6\%)}
-};
+% Thanh bộ lọc (Khoảng thời gian + Chiến dịch + Kênh)
+\draw[draw=black!30,fill=white,rounded corners=2.5pt] (2.78, 6.95) rectangle (16.45, 8.05);
+\node[font=\sffamily\tiny,text=black!75,anchor=west] at (2.95, 7.75) {Khoảng thời gian: \quad \textbf{7 ngày qua} \quad \textbf{30 ngày qua} \quad \textbf{Tháng này} \quad \textbf{Toàn thời gian}};
+\draw[draw=black!35,fill=black!2,rounded corners=2pt] (12.30, 7.56) rectangle (16.28, 7.92);
+\node[font=\sffamily\tiny,text=black!75] at (14.29, 7.74) {Mọi thời gian \quad | \quad dd/mm/yyyy -- dd/mm/yyyy};
 
-\draw[panel] (3.70, 0.25) rectangle (9.65, 5.45);
-\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=west] at (3.90, 5.10) {BẢNG DỮ LIỆU CHIẾN DỊCH \& NỘI DUNG};
-\draw[draw=black!35,line width=0.5pt] (3.70, 4.82) -- (9.65, 4.82);
+\draw[draw=black!35,fill=white,rounded corners=2pt] (2.95, 7.06) rectangle (9.50, 7.42);
+\node[font=\sffamily\tiny,text=black!85,anchor=west] at (3.10, 7.24) {Tất cả chiến dịch};
+\draw[draw=black!35,fill=white,rounded corners=2pt] (9.70, 7.06) rectangle (16.28, 7.42);
+\node[font=\sffamily\tiny,text=black!85,anchor=west] at (9.85, 7.24) {Tất cả kênh triển khai};
 
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.5cm] at (3.90, 4.42) {\textbf{1. Ưu đãi giải nhiệt mùa hè}};
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.5cm] at (3.90, 4.02) {Kênh: Facebook -- Trạng thái: Chờ duyệt};
-\draw[draw=black!20,line width=0.4pt] (3.90, 3.70) -- (9.45, 3.70);
+% Hàng 4 Thẻ KPI có Sparkline (Khớp đúng số liệu trên giao diện thực tế)
+% Card 1: Views
+\draw[card,draw=blue!60!black,line width=0.75pt] (2.78, 5.25) rectangle (6.05, 6.80);
+\node[font=\sffamily\tiny,text=black!70,anchor=west] at (2.92, 6.52) {Lượt hiển thị (Views)};
+\node[font=\sffamily\bfseries\small,text=black,anchor=west] at (2.92, 6.02) {114.019};
+\draw[blue!75!black,line width=0.8pt] (5.05,5.92) -- (5.18,6.08) -- (5.30,5.95) -- (5.42,6.12) -- (5.55,5.98) -- (5.68,6.15) -- (5.85,6.02);
+\node[font=\sffamily\tiny,text=black!65,anchor=west] at (2.92, 5.50) {CPM: \textbf{173.902 ₫}};
 
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.5cm] at (3.90, 3.32) {\textbf{2. Kịch bản video ngắn máy lọc ProAir}};
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.5cm] at (3.90, 2.92) {Kênh: TikTok -- Trạng thái: Bản nháp AI};
-\draw[draw=black!20,line width=0.4pt] (3.90, 2.60) -- (9.45, 2.60);
+% Card 2: Clicks
+\draw[card] (6.22, 5.25) rectangle (9.50, 6.80);
+\node[font=\sffamily\tiny,text=black!70,anchor=west] at (6.36, 6.52) {Lượt bấm (Clicks)};
+\node[font=\sffamily\bfseries\small,text=black,anchor=west] at (6.36, 6.02) {5.182};
+\draw[blue!75!black,line width=0.8pt] (8.50,5.95) -- (8.62,6.05) -- (8.75,5.92) -- (8.88,6.10) -- (9.02,5.96) -- (9.15,6.08) -- (9.30,5.98);
+\node[font=\sffamily\tiny,text=black!65,anchor=west] at (6.36, 5.50) {CTR: \textbf{4,54\%} \quad CPC: \textbf{3.826 ₫}};
 
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.5cm] at (3.90, 2.22) {\textbf{3. Thư điện tử chăm sóc khách hàng}};
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.5cm] at (3.90, 1.82) {Kênh: Email -- Trạng thái: Đã phê duyệt};
-\draw[draw=black!20,line width=0.4pt] (3.90, 1.50) -- (9.45, 1.50);
+% Card 3: Conversions
+\draw[card] (9.67, 5.25) rectangle (12.95, 6.80);
+\node[font=\sffamily\tiny,text=black!70,anchor=west] at (9.81, 6.52) {Chuyển đổi (Conversions)};
+\node[font=\sffamily\bfseries\small,text=black,anchor=west] at (9.81, 6.02) {314};
+\draw[teal!75!black,line width=0.8pt] (11.95,5.92) -- (12.08,6.06) -- (12.20,5.94) -- (12.32,6.12) -- (12.45,5.98) -- (12.58,6.10) -- (12.75,6.00);
+\node[font=\sffamily\tiny,text=black!65,anchor=west] at (9.81, 5.50) {CVR: \textbf{6,06\%} \quad CPA: \textbf{63.147 ₫}};
 
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.5cm] at (3.90, 1.10) {\textbf{4. Bài giới thiệu màng lọc HEPA 3 lớp}};
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.5cm] at (3.90, 0.70) {Kênh: Zalo OA -- Trạng thái: Đã lên lịch};
+% Card 4: Cost / Budget
+\draw[card] (13.12, 5.25) rectangle (16.45, 6.80);
+\node[font=\sffamily\tiny,text=black!70,anchor=west] at (13.26, 6.52) {Tổng chi phí / Ngân sách};
+\node[font=\sffamily\bfseries\small,text=black,anchor=west] at (13.26, 6.02) {19.828.186 ₫};
+\node[font=\sffamily\tiny,text=black!65,anchor=west] at (13.26, 5.62) {Ngân sách: 170.000.000 ₫ \quad \textbf{11,7\%}};
+\draw[draw=black!20,fill=black!10,rounded corners=1pt] (13.26, 5.36) rectangle (16.28, 5.46);
+\draw[draw=orange!80!black,fill=orange!80!black,rounded corners=1pt] (13.26, 5.36) rectangle (13.75, 5.46);
 
-\draw[panel,fill=black!2] (9.90, 0.25) rectangle (15.75, 5.45);
-\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=west] at (10.10, 5.10) {KHUNG TÁC VỤ AI (CONTEXTUAL AI PANEL)};
-\draw[draw=black!35,line width=0.5pt] (9.90, 4.82) -- (15.75, 4.82);
+% Hàng 2 Thẻ tác vụ nhanh (Nội dung chờ duyệt & Lịch đăng hôm nay)
+\draw[card] (2.78, 4.25) rectangle (9.50, 5.08);
+\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=west] at (3.00, 4.78) {Nội dung chờ duyệt};
+\node[font=\sffamily\tiny,text=black!65,anchor=west] at (3.00, 4.48) {Có 1 nội dung đang cần xem xét phê duyệt (HITL)};
+\node[btn,anchor=east] at (9.32, 4.66) {Xem danh sách $\rightarrow$};
 
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.4cm] at (10.10, 4.42) {Chiến dịch: Mùa Hè 2026 | Kênh: Facebook};
-\node[font=\sffamily\scriptsize,anchor=west,text width=5.4cm] at (10.10, 4.02) {Kiểm tra Brand Kit: Hợp lệ (0 từ cấm)};
+\draw[card] (9.67, 4.25) rectangle (16.45, 5.08);
+\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=west] at (9.89, 4.78) {Lịch đăng hôm nay};
+\node[font=\sffamily\tiny,text=black!65,anchor=west] at (9.89, 4.48) {Có 1 bài viết dự kiến đăng trong ngày};
+\node[btn,anchor=east] at (16.27, 4.66) {Mở lịch đăng $\rightarrow$};
 
-\draw[draw=black!50,fill=white,rounded corners=2pt] (10.10, 1.32) rectangle (15.55, 3.72);
-\node[font=\sffamily\scriptsize,anchor=north west,text width=5.1cm] at (10.25, 3.58) {\textbf{Đề xuất bản nháp AI (\#42):}};
-\node[font=\sffamily\scriptsize,anchor=north west,text width=5.1cm] at (10.25, 3.10) {
- \textit{``Không khí sạch cho cả gia đình! Khám phá máy lọc ProAir màng HEPA 3 lớp.''}
-};
-\node[font=\sffamily\scriptsize,anchor=south west,text width=5.1cm] at (10.25, 1.45) {Trạng thái: PROPOSED | Chờ xác nhận};
+% Khu vực dưới: Biểu đồ Xu hướng tăng trưởng (trái) + Ngăn kéo Trợ lý AI CTRL+K (phải)
+\draw[card] (2.78, 0.15) rectangle (11.45, 4.08);
+\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=west] at (2.95, 3.80) {Xu hướng tăng trưởng};
+\node[font=\sffamily\tiny,text=black!60,anchor=west] at (2.95, 3.38) {Theo dõi biến động các chỉ số chính của chiến dịch theo ngày, tuần hoặc tháng.};
+\node[btn_blue] at (7.55, 3.80) {Lượt xem};
+\node[btn] at (8.68, 3.80) {Lượt bấm};
+\node[btn] at (9.88, 3.80) {Chuyển đổi};
+\node[btn] at (10.92, 3.80) {Chi phí};
 
-\node[btn_dark,anchor=west] at (10.10, 0.75) {Áp dụng vào bảng};
-\node[btn,anchor=west] at (12.60, 0.75) {Chỉnh sửa};
-\node[btn,anchor=east] at (15.55, 0.75) {Huỷ bỏ};
+% Vẽ lưới và đường biểu đồ miền (Area Chart) giống thực tế
+\draw[draw=black!15,dashed,line width=0.4pt] (3.35, 2.85) -- (11.20, 2.85);
+\draw[draw=black!15,dashed,line width=0.4pt] (3.35, 2.15) -- (11.20, 2.15);
+\draw[draw=black!15,dashed,line width=0.4pt] (3.35, 1.45) -- (11.20, 1.45);
+\draw[draw=black!25,line width=0.5pt] (3.35, 0.75) -- (11.20, 0.75);
+\node[font=\sffamily\tiny,text=black!55,anchor=east] at (3.30, 2.85) {4.500};
+\node[font=\sffamily\tiny,text=black!55,anchor=east] at (3.30, 2.15) {3.000};
+\node[font=\sffamily\tiny,text=black!55,anchor=east] at (3.30, 1.45) {1.500};
+\node[font=\sffamily\tiny,text=black!55,anchor=east] at (3.30, 0.75) {0};
+
+\fill[blue!12] (3.40,0.75) -- (3.40,2.10) -- (4.05,2.55) -- (4.70,2.30) -- (5.35,1.65) -- (6.00,2.65) -- (6.65,2.40) -- (7.30,1.85) -- (7.95,2.70) -- (8.60,2.25) -- (9.25,2.80) -- (9.90,2.05) -- (10.55,2.35) -- (11.15,1.60) -- (11.15,0.75) -- cycle;
+\draw[blue!75!black,line width=1.0pt] (3.40,2.10) -- (4.05,2.55) -- (4.70,2.30) -- (5.35,1.65) -- (6.00,2.65) -- (6.65,2.40) -- (7.30,1.85) -- (7.95,2.70) -- (8.60,2.25) -- (9.25,2.80) -- (9.90,2.05) -- (10.55,2.35) -- (11.15,1.60);
+\node[font=\sffamily\tiny,text=black!55] at (4.10, 0.42) {15/09/2026};
+\node[font=\sffamily\tiny,text=black!55] at (6.40, 0.42) {27/09/2026};
+\node[font=\sffamily\tiny,text=black!55] at (8.70, 0.42) {09/10/2026};
+\node[font=\sffamily\tiny,text=black!55] at (10.70, 0.42) {24/10/2026};
+
+% Bên phải: Ngăn kéo Trợ lý AI (AssistantDrawer.tsx)
+\draw[card,fill=black!2,draw=black!65] (11.62, 0.15) rectangle (16.45, 4.08);
+\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=west] at (11.80, 3.76) {Trợ lý AI (MCP Copilot)};
+\node[btn,anchor=east] at (16.28, 3.76) {13 Models $\triangledown$};
+\draw[draw=black!30,line width=0.4pt] (11.62, 3.45) -- (16.45, 3.45);
+
+\node[font=\sffamily\tiny,text=black!75,anchor=west] at (11.80, 3.16) {Công cụ MCP: \texttt{get\_brand\_profile}, \texttt{get\_stats}};
+\draw[draw=black!50,fill=white,rounded corners=2pt] (11.80, 1.05) rectangle (16.28, 2.90);
+\node[font=\sffamily\bfseries\tiny,text=black,anchor=north west] at (11.92, 2.78) {Thẻ đề xuất: propose\_content\_drafts};
+\node[font=\sffamily\tiny,text=black!80,anchor=north west,text width=4.2cm] at (11.92, 2.40) {\textit{``Khám phá chiến dịch mới đúng chuẩn giọng văn thương hiệu, 0 từ cấm.''}};
+\node[font=\sffamily\bfseries\tiny,text=blue!70!black,anchor=south west] at (11.92, 1.15) {Trạng thái: PROPOSED (Chờ xác nhận)};
+
+\node[btn_blue,anchor=west] at (11.80, 0.55) {Xác nhận tạo bản nháp};
+\node[btn,anchor=east] at (16.28, 0.55) {Từ chối};
 
 \end{tikzpicture}%
 }

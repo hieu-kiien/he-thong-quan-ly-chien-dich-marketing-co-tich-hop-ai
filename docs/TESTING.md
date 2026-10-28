@@ -88,13 +88,13 @@ Các số liệu ghi nhận trực tiếp từ các lệnh thực thi trong hệ
 
 | Phân hệ / Bộ kiểm thử | Công cụ | Số lượng kiểm thử | Kết quả thực tế | Thời gian thực thi |
 |---|---|---|---|---|
-| **ai-runner** | Pytest 9.1.0 | 17 test cases | **17 / 17 PASSED** | 3.94 giây |
+| **ai-runner** | Pytest 9.1.0 | 18 test cases | **18 / 18 PASSED** | 3.95 giây |
 | **Frontend Typecheck** | `tsc --noEmit` | Toàn bộ `src/**/*.ts(x)` | **0 lỗi (Exit Code 0)** | 8.87 giây |
 | **Frontend Lint** | ESLint 9 | 100+ component & hooks | **0 cảnh báo (0 warnings)** | 7.35 giây |
 | **Frontend Production Build** | Vite 5.4.21 | 2.788 modules | **Thành công (`dist/index.html`)** | 11.63 giây |
 | **Frontend Playwright E2E** | Playwright 1.63.0 | 29 test cases | **29 / 29 PASSED** | 1.4 phút |
 | **AI Prompt Evaluation** | `evaluate_assistant.py` | 8 ca kiểm thử định lượng | **Thực nghiệm VPS (26/10/2026): V4 đạt 7 / 8 ca (87.5%)**<br>(V1: 6/8, V2: 5/8, V3: 6/8, V4: 7/8 trên `opencode/big-pickle`)<br>Live turn: **109s**, 2 tool calls (`list_campaigns` + `propose_content_drafts`), khớp 100% CSDL<br>Minh chứng: [`transcripts.json`](file:///c:/Users/hieuk/Desktop/Ứng%20Dụng%20AI/docs/eval/transcripts.json), [`REAL_EVAL_REPORT.md`](file:///c:/Users/hieuk/Desktop/Ứng%20Dụng%20AI/docs/eval/REAL_EVAL_REPORT.md), [`live_turn_20261026.md`](file:///c:/Users/hieuk/Desktop/Ứng%20Dụng%20AI/docs/eval/live_turn_20261026.md)<br>Dry-run (Harness Self-Test): **8 / 8 PASSED (100%)** | Chạy thật VPS: ~120s<br>Chấm lại: 0.12s |
-| **Backend Full Test Suite** | Pytest 9.1.0 | 101 test cases | **101 / 101 PASSED** | 51 giây |
+| **Backend Full Test Suite** | Pytest 9.1.0 | 104 test cases | **104 / 104 PASSED** | 50.89 giây |
 
 ---
 
@@ -212,7 +212,7 @@ Bộ kiểm thử gồm các test case tự động (`test_api.py` và `test_run
 
 ### 3.10. Phân hệ Trợ lý AI Backend (`backend/tests/test_assistant_*.py`)
 
-Bao gồm 21 ca kiểm thử chuyên sâu cho tầng Trợ lý AI của Backend:
+Bao gồm 38 ca kiểm thử chuyên sâu cho tầng Trợ lý AI của Backend (`test_assistant_actions.py`: 9, `test_assistant_context.py`: 5, `test_assistant_mcp.py`: 6, `test_assistant_stream.py`: 14, `test_assistant_tools.py`: 4):
 1. **`test_assistant_actions.py` (6 tests)**:
    - Liệt kê danh sách đề xuất (`GET /assistant/actions`).
    - Lọc theo `thread_id` và `status`.
@@ -241,11 +241,11 @@ Bao gồm 21 ca kiểm thử chuyên sâu cho tầng Trợ lý AI của Backend:
 
 ### 3.11. Phân hệ Kiểm thử Tích hợp Đầu-Cuối E2E (`frontend/tests/e2e/*.spec.ts`)
 
-Bộ kiểm thử tích hợp đầu-cuối tự động gồm **28 ca kiểm thử E2E** thực thi trên trình duyệt Chromium Headless qua Playwright (`playwright.config.ts`, `npm run test:e2e`):
+Bộ kiểm thử tích hợp đầu-cuối tự động gồm **29 ca kiểm thử E2E** thực thi trên trình duyệt Chromium Headless qua Playwright (`playwright.config.ts`, `npm run test:e2e`):
 
 | Tệp kiểm thử | Số ca | Luồng nghiệp vụ kiểm thử | Kết quả thực tế (27/10/2026) |
 |---|---|---|---|
-| `auth.spec.ts` | 4 | Đăng nhập sai mật khẩu (báo lỗi tiếng Việt), Đăng nhập Quản lý (MANAGER) & Đăng xuất, Đăng nhập Nhân viên (MARKETER - ẩn menu duyệt), Cơ chế Rate Limit đăng nhập sai 5 lần chặn HTTP 429 | **4 / 4 PASSED** (8.0s) |
+| `auth.spec.ts` | 5 | Đăng nhập sai mật khẩu (báo lỗi tiếng Việt), Đăng nhập Quản lý (MANAGER) & Đăng xuất, Đăng nhập Nhân viên (MARKETER - ẩn menu duyệt), Cơ chế Rate Limit đăng nhập sai 5 lần chặn HTTP 429, Đăng ký tài khoản mới và tự động đăng nhập | **5 / 5 PASSED** (8.0s) |
 | `dashboard.spec.ts` | 4 | Kiểm tra đối soát số liệu tổng quan với API, nhãn Dữ liệu mẫu SEED (CONTRACT §0), Giao diện Responsive 768px, Đổi giao diện Sáng / Tối (Dark Mode), Chuông thông báo & Đánh dấu đã đọc | **4 / 4 PASSED** (8.7s) |
 | `campaigns.spec.ts` | 4 | Danh sách & bộ lọc/tìm kiếm chiến dịch, Tạo chiến dịch với kiểm tra hợp lệ ngày kết thúc >= ngày bắt đầu, Chi tiết 3 tab chiến dịch, Chặn xoá chiến dịch đã phát sinh dữ liệu (409 Conflict) | **4 / 4 PASSED** (11.7s) |
 | `metrics.spec.ts` | 2 | Nhập số liệu thủ công với ràng buộc Clicks <= Views và Conversions <= Clicks, Xem trước Preview và Commit tệp CSV `sample_ads_report.csv` | **2 / 2 PASSED** (6.1s) |
@@ -259,7 +259,7 @@ Bộ kiểm thử tích hợp đầu-cuối tự động gồm **28 ca kiểm th
 
 ## 4. Ghi Chú Kỹ Thuật & Báo Cáo Chất Lượng Mã Nguồn
 
-1. **Kết quả kiểm thử Backend**: Toàn bộ kiểm thử tự động đã vượt qua (**101 / 101 tests PASSED** trong 51 giây, lệnh python -m pytest -q).
+1. **Kết quả kiểm thử Backend**: Toàn bộ kiểm thử tự động đã vượt qua (**104 / 104 tests PASSED** trong 51 giây, lệnh python -m pytest -q).
 2. **Linter Ruff Backend**: Tầng ứng dụng và kiểm thử (`backend/app/`, `backend/tests/`) đạt chuẩn 100% không có lỗi (`All checks passed!`).
 3. **Frontend Quality Gates**:
    - `npm run typecheck`: **0 lỗi** TypeScript Strict Mode.

@@ -42,7 +42,7 @@ import {
   TH,
   TD,
 } from '@/components/ui';
-import { contentsApi, schedulesApi } from '@/lib/api/endpoints';
+import { campaignsApi, contentsApi, schedulesApi } from '@/lib/api/endpoints';
 import { useAuth } from '@/lib/auth';
 import {
   canEditContent,
@@ -51,10 +51,13 @@ import {
   reviewBlockReason,
   canMarkPublished,
 } from '@/lib/permissions';
-import { useDocumentTitle } from '@/lib/hooks';
+import { useChannels, useDocumentTitle } from '@/lib/hooks';
 import { formatDateTime } from '@/lib/format';
 import {
   CONTENT_TYPE_LABEL,
+  GOAL_KPI_META,
+  GOAL_LABEL,
+  GOAL_TONE,
   ORIGIN_LABEL,
   REVIEW_DECISION_LABEL,
 } from '@/lib/labels';
@@ -118,6 +121,14 @@ export default function ContentDetailPage() {
     queryFn: () => contentsApi.reviews(contentId),
     enabled: !!contentId,
   });
+
+  const campaignDetailQ = useQuery({
+    queryKey: ['campaigns', content?.campaign_id],
+    queryFn: () => campaignsApi.get(content!.campaign_id),
+    enabled: Boolean(content?.campaign_id),
+  });
+
+  const channelsQ = useChannels();
 
   const schedulesQ = useQuery({
     queryKey: ['schedules', { campaign_id: content?.campaign_id }],
@@ -602,6 +613,65 @@ export default function ContentDetailPage() {
 
         {/* Sidebar: Details & Review History (1 col) */}
         <div className="space-y-6">
+          {campaignDetailQ.data && (
+            <Card>
+              <CardHeader
+                title="Đối chiếu Định hướng Chiến dịch"
+                actions={
+                  <Badge tone={GOAL_TONE[campaignDetailQ.data.goal]}>
+                    {GOAL_LABEL[campaignDetailQ.data.goal]}
+                  </Badge>
+                }
+              />
+              <CardBody className="space-y-3 text-xs">
+                <div>
+                  <span className="text-fg-muted">Thuộc chiến dịch:</span>
+                  <div className="mt-0.5">
+                    <Link
+                      to={`/campaigns/${campaignDetailQ.data.id}`}
+                      className="font-semibold text-fg hover:text-accent hover:underline"
+                    >
+                      {campaignDetailQ.data.name}
+                    </Link>
+                  </div>
+                </div>
+                <div>
+                  <span className="text-fg-muted">Chỉ tiêu định lượng:</span>
+                  <p className="mt-0.5 font-medium text-fg">{campaignDetailQ.data.objective}</p>
+                </div>
+                <div>
+                  <span className="text-fg-muted">Sản phẩm & Đối tượng:</span>
+                  <p className="mt-0.5 text-fg">
+                    {campaignDetailQ.data.product} — <span className="text-fg-muted">{campaignDetailQ.data.target_audience}</span>
+                  </p>
+                </div>
+                {campaignDetailQ.data.key_message && (
+                  <div>
+                    <span className="text-fg-muted">Thông điệp cốt lõi cần truyền tải:</span>
+                    <p className="mt-0.5 rounded bg-subtle p-2 font-medium text-fg">
+                      &ldquo;{campaignDetailQ.data.key_message}&rdquo;
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <span className="text-fg-muted">Định hướng theo mục tiêu ({GOAL_LABEL[campaignDetailQ.data.goal]}):</span>
+                  <p className="mt-0.5 text-fg-muted">
+                    {GOAL_KPI_META[campaignDetailQ.data.goal].contentDirection}
+                  </p>
+                </div>
+                {(() => {
+                  const chRule = (channelsQ.data ?? []).find((ch) => ch.id === content.channel_id);
+                  return chRule?.format_rules ? (
+                    <div className="border-t border-border pt-2">
+                      <span className="text-fg-muted">Quy chuẩn kênh ({chRule.name}):</span>
+                      <p className="mt-0.5 text-fg-muted">{chRule.format_rules}</p>
+                    </div>
+                  ) : null;
+                })()}
+              </CardBody>
+            </Card>
+          )}
+
           <Card>
             <CardHeader title="Thông tin chi tiết" />
             <CardBody className="space-y-3 text-xs">

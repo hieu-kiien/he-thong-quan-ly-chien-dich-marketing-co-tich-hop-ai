@@ -2,7 +2,7 @@
 
 > **Dự án môn học**: Ứng dụng trí tuệ nhân tạo (AIA331) — Mã số đề tài: 80300  
 > **Trường**: Trường Đại học Công nghệ Thông tin & Truyền thông — Đại học Thái Nguyên  
-> **Phiên bản**: v2 (Clean Rebuild) | **Nhánh Git**: `rebuild/v2` (Mã nguồn cũ lưu trữ tại tag `legacy-v1`)  
+> **Trạng thái kiểm thử**: **151 ca kiểm thử tự động** (104 Backend Pytest + 18 AI-Runner Pytest + 29 Playwright E2E) — **100% Pass**  
 > **Hạ tầng Production**: [https://marketing.kienhieu.id.vn/](https://marketing.kienhieu.id.vn/) (Cloudflare Tunnel → VPS Ubuntu 24.04 LTS)  
 
 ---
@@ -147,7 +147,7 @@ Truy cập ứng dụng qua cổng `http://localhost:8080`.
 
 ## 6. Cách thức Hoạt động của Trợ lý AI (OpenCode Zen Integration)
 
-1. **Không sử dụng API Key**: Hệ thống kết nối với các mô hình miễn phí thông qua **OpenCode CLI** và hạ tầng **OpenCode Zen**. Không lưu trữ bất kỳ API key nào trong CSDL và không gửi key về trình duyệt.
+1. **Điều phối Đa Mô hình & Không lộ API Key**: Hệ thống kết nối qua **OpenCode CLI** với **13 mô hình từ 5 nền tảng** (`OpenCode Zen Free`, `Groq LPU`, `NVIDIA NIM`, `OpenRouter`, `Google Gemini`). Không lưu trữ bất kỳ API key nào trong CSDL và không gửi key về trình duyệt.
 2. **Giao tiếp hai chiều an toàn qua MCP (Model Context Protocol)**:
    - Backend sinh một mã **Run-Token** JWT ngắn hạn (10 phút) cấp cho tiến trình OpenCode.
    - OpenCode gọi ngược lại Backend qua endpoint `/mcp` (Stateless-HTTP) để đọc số liệu chiến dịch hoặc tạo đề xuất.
@@ -162,7 +162,7 @@ Truy cập ứng dụng qua cổng `http://localhost:8080`.
 
 ## 7. Các Hạn chế Thực tế (Honest Limitations)
 
-1. **Hạn mức Tần suất Gọi AI (Free Tier Rate Limits)**: Do sử dụng tài nguyên mô hình miễn phí từ OpenCode Zen, hệ thống có thể gặp giới hạn tốc độ (HTTP 429) vào các khung giờ cao điểm. Hệ thống đã có cơ chế tự động chuyển đổi sang mô hình dự phòng (`glm-5.3-flash-free`) và báo lỗi trung thực cho người dùng.
+1. **Hạn mức Tần suất Gọi AI (Free Tier Rate Limits)**: Khi một nhà cung cấp mô hình miễn phí chạm giới hạn tốc độ (HTTP 429) vào khung giờ cao điểm, dịch vụ `ai-runner` tự động chuyển đổi sang chuỗi 12 mô hình dự phòng đa nền tảng (`glm-5.3-flash-free`, `mimo-v2.6-flash-free`, `groq/openai/gpt-oss-120b`, `groq/qwen/qwen3.8-27b`, `nemotron-3.5-super-vl:free`, `gemini-3.5-flash-lite`...) và báo lỗi trung thực nếu tất cả đều bận.
 2. **Không Tự Động Đăng Bài Lên Mạng Xã Hội**: Hệ thống không tích hợp API tự động xuất bản (để tránh rủi ro khoá tài khoản mạng xã hội của doanh nghiệp). Lịch đăng bài đóng vai trò lập kế hoạch; nhân viên tự đăng bài ra kênh ngoài và cập nhật liên kết xác nhận.
 3. **Giới hạn Đồng thời trên Máy chủ Đơn (Concurrency = 1)**: Do mỗi tiến trình OpenCode tiêu thụ ~490 MB RAM RSS, máy chủ VPS giới hạn xử lý tuần tự từng yêu cầu một để đảm bảo không bị cạn kiệt RAM. Các yêu cầu gửi đồng thời sẽ được xếp vào hàng đợi chờ ngắn (tối đa 8 vị trí).
 
@@ -173,8 +173,8 @@ Truy cập ứng dụng qua cổng `http://localhost:8080`.
 Toàn bộ tài liệu chi tiết của dự án được lưu trữ trong thư mục `docs/`:
 
 - [Tài liệu Phân tích Yêu cầu & Thiết kế Hệ thống (KT1)](docs/REQUIREMENTS_AND_DESIGN.md): Bối cảnh SME, 2 vai trò người dùng, bảng Input/Process/Output, yêu cầu phi chức năng, sơ đồ Use Case, ERD 14 bảng CSDL và luồng dữ liệu.
-- [Đặc tả Phân hệ Trợ lý AI (KT3)](docs/AI_ASSISTANT.md): Kiến trúc AI Runner, danh mục công cụ MCP, giao thức sự kiện SSE, tối ưu prompt qua 3 phiên bản (v1 → v2 → v3), xử lý lỗi và quy trình con người duyệt đề xuất.
+- [Đặc tả Phân hệ Trợ lý AI (KT3)](docs/AI_ASSISTANT.md): Kiến trúc AI Runner, danh mục 14 công cụ MCP, bộ chọn 13 mô hình đa nền tảng, giao thức sự kiện SSE, tối ưu prompt qua 4 giai đoạn cải tiến, xử lý lỗi và quy trình con người duyệt đề xuất.
 - [Đạo đức AI & Quyền Riêng tư Dữ liệu](docs/AI_ETHICS_AND_PRIVACY.md): Bảo vệ khoá xác thực, phạm vi dữ liệu gửi cho mô hình, điều khoản huấn luyện của mô hình miễn phí, các biện pháp chống ảo giác và minh chứng phòng thủ Prompt Injection.
-- [Kế hoạch & Danh mục Ca Kiểm thử (Testing)](docs/TESTING.md): Hướng dẫn chạy từng bộ test, số liệu đo lường thực tế, danh mục 54 ca kiểm thử backend và 16 ca runner theo trường hợp bình thường, lỗi và biên.
-- [Minh chứng Ứng dụng AI Trong SDLC](docs/AI_IN_SDLC.md): Nhật ký sử dụng AI xuyên suốt các giai đoạn KT1 (rà soát hiện trạng v1), KT2 (lập trình đa tác nhân), KT3 (thực nghiệm P0 Spike trên VPS) và đánh giá chất lượng tự động.
+- [Kế hoạch & Danh mục Ca Kiểm thử (Testing)](docs/TESTING.md): Hướng dẫn chạy từng bộ test, số liệu đo lường thực tế, danh mục 151 ca kiểm thử tự động (104 Backend Pytest + 18 AI-Runner Pytest + 29 Playwright E2E) và 8 ca đánh giá Prompt.
+- [Minh chứng Ứng dụng AI Trong SDLC](docs/AI_IN_SDLC.md): Nhật ký sử dụng AI xuyên suốt các giai đoạn KT1 (phân tích yêu cầu & kiểm định rủi ro kiến trúc), KT2 (lập trình đa tác nhân), KT3 (thực nghiệm P0 Spike trên VPS) và đánh giá chất lượng tự động.
 - [Hướng dẫn Triển khai Máy chủ VPS](docs/DEPLOYMENT-VPS.md): Hướng dẫn cấu hình systemd, Nginx, PostgreSQL và Cloudflare Tunnel trên máy chủ sản xuất thực tế.

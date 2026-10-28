@@ -1,66 +1,28 @@
-# Kế hoạch nghiên cứu và thiết kế dự án
+# Kế hoạch nghiên cứu, thiết kế và nghiệm thu dự án (MarketFlow AI)
 
 ## 1. Nhận diện dự án
 
-- Tên dự án: Hệ thống quản lý chiến dịch marketing có tích hợp AI
-- Học phần: Ứng dụng trí tuệ nhân tạo - AIA331
-- Mã dự án: 80300
+- Tên dự án: Hệ thống quản lý chiến dịch marketing có tích hợp AI (MarketFlow AI)
+- Học phần: Ứng dụng trí tuệ nhân tạo - AIA331 (Mã đề tài: 80300)
 - Đơn vị: Trường Đại học Công nghệ Thông tin và Truyền thông, Đại học Thái Nguyên
 - Nhóm: 25; Vũ Hiếu Kiên DTC245200244; Nguyễn Hải Đăng DTC245120051
-- Giảng viên: TS. Nguyễn Tuấn Anh
-- Mốc tài liệu: baseline phân tích và thiết kế trước khi triển khai
-- Ranh giới đóng góp: thiết kế nghiệp vụ, kiến trúc, dữ liệu, AI workflow, kiểm thử và kế hoạch đánh giá; chưa có mã nguồn ứng dụng
+- Giảng viên hướng dẫn: TS. Nguyễn Tuấn Anh
+- Trạng thái hiện tại: **Đã hoàn thành 100% mã nguồn Full-stack, vượt qua 151 ca kiểm thử tự động và vận hành thực tế trên Production VPS (`https://marketing.kienhieu.id.vn`)**
 
-## 2. Bài toán
+## 2. Bài toán và Kiến trúc giải pháp
 
-- Stakeholder chính: Manager marketing, Marketer, người duyệt nội dung và giảng viên/assessor.
-- Nỗi đau hiện tại: thông tin campaign, kênh, nội dung, lịch đăng, ngân sách và metrics thường rời rạc; tạo nội dung và tổng hợp kết quả tốn thời gian.
-- Ý nghĩa: cần một workflow nhất quán để quản lý campaign và dùng AI như trợ lý có giới hạn, có nguồn context và có người chịu trách nhiệm duyệt.
-- Phạm vi: authentication/RBAC, campaign/product/channel/content/schedule/metrics, dashboard và ba tác vụ AI là idea, draft và summary.
-- Loại trừ: tự publish ra nền tảng bên ngoài, tối ưu ngân sách tự động, dự đoán doanh thu, huấn luyện model riêng và kết luận hiệu quả marketing thật khi chưa có dữ liệu thật.
+- **Các vai trò người dùng**: `MANAGER` (quản trị nhân sự, kênh, Brand Kit, quản lý chiến dịch toàn cục, phê duyệt nội dung HITL, giám sát KPI), `MARKETER` (vận hành chiến dịch sở hữu `owner_id`, soạn nội dung, gọi Trợ lý AI, nhập chỉ số).
+- **Lược đồ CSDL 14 bảng**: `users`, `channels`, `brand_profile`, `banned_keywords`, `campaigns`, `campaign_channels`, `contents`, `content_reviews`, `schedules`, `metrics`, `notifications`, `ai_threads`, `ai_messages`, `ai_actions`.
+- **Kiến trúc Trợ lý AI có kiểm soát**: Dịch vụ `ai-runner` (`:8100`) cô lập tiến trình `opencode run` dưới tài khoản `mfai` (`RUNNER_CONCURRENCY=1`, `MemoryMax=896M`), gọi ngược vào máy chủ công cụ nội bộ FastMCP (`/mcp`) của Backend bằng mã thông báo `Run-Token` JWT ngắn hạn (10 phút).
+- **14 Công cụ MCP (9 Read + 5 Propose)**: Mọi thao tác ghi của AI bắt buộc đi qua 5 công cụ `propose_*` tạo thẻ đề xuất `ai_action = PROPOSED` chờ người dùng bấm *Xác nhận* (`EXECUTED`) hoặc *Từ chối* (`REJECTED`).
 
-## 3. Câu hỏi kỹ thuật
+## 3. Kết quả nghiệm thu theo mục tiêu
 
-1. Làm thế nào thiết kế một workflow quản lý marketing có thể theo dõi được dữ liệu, trạng thái, quyền và approval thay vì chỉ là CRUD rời rạc?
-2. Làm thế nào giới hạn AI bằng context whitelist, output schema, warning và human review để đánh giá được usefulness mà không biến output ngôn ngữ thành sự thật không kiểm chứng?
-3. Làm thế nào nối requirements, kiến trúc, schema, test, evaluation và evidence thành một chuỗi mà giảng viên có thể kiểm tra lại?
-
-## 4. Mục tiêu và tiêu chí thành công
-
-| Mục tiêu | Chỉ số/bằng chứng | Tiêu chí |
+| Mục tiêu | Bằng chứng thực nghiệm trong dự án | Trạng thái |
 |---|---|---|
-| Quản lý nghiệp vụ cốt lõi | use case, API, CRUD test | campaign, content, schedule, metrics có đường đi đầy đủ và quyền rõ |
-| Bảo toàn dữ liệu | ERD, FK, CHECK, negative test | không tạo record mồ côi; state và KPI có rule xác định |
-| Dùng AI có kiểm soát | prompt contract, parser, failure matrix | output sai/timeout/thiếu context không trở thành nội dung hợp lệ |
-| Human-in-the-loop | state machine, review log, demo | AI chỉ tạo draft; người có quyền mới approve/schedule |
-| Chất lượng sản phẩm | test matrix, usability checklist, performance protocol | có cả test dương, test âm và kế hoạch đo, không chỉ screenshot |
-| Tái lập | README, seed, manifest, commit | một người khác có thể dựng lại hoặc thấy rõ blocker |
-
-## 5. Kế hoạch nghiên cứu
-
-- Nguồn miền và học thuật: marketing analytics, AI trong marketing, human-AI interaction.
-- Hệ thống tham chiếu: tài liệu analytics/campaign của các nền tảng marketing phổ biến; chỉ dùng để học workflow và giới hạn, không sao chép nhận diện thương hiệu hay tuyên bố benchmark.
-- Chuẩn và hướng dẫn: ISO/IEC/IEEE 29148 cho requirements, ISO/IEC/IEEE 42010 cho architecture description, ISO/IEC 25010 cho quality, C4 cho architecture views, NIST AI RMF/GenAI Profile cho risk và governance.
-- Chuẩn báo cáo: hướng dẫn dissertation/capstone của Cambridge và CMU được dùng để phân biệt implementation với evaluation, nêu mục tiêu, thiết kế, bằng chứng và giới hạn.
-- Bằng chứng dự án: hai ảnh đề tài/yêu cầu do người dùng cung cấp, source LaTeX, DDL thiết kế, figures vector và ledger.
-
-## 6. Kế hoạch thiết kế và đánh giá
-
-- Thiết kế: context/use case, requirements, C4 container, logical/physical ERD, state machine, sequence AI approval, wireframe, deployment target.
-- Kiểm thử: unit/domain/API/UI/integration, negative permission, data integrity, parser contract và fault injection.
-- Đánh giá AI: bộ case cố định, ít nhất ba vòng so sánh prompt/model khi implementation cho phép; schema validity, grounding, usefulness, warnings, edit rate, latency.
-- Tái lập: khóa input, seed, prompt version, provider/model/date, lệnh chạy và output gốc.
-
-## 7. Rủi ro và unknown
-
-| Item | Risk/unknown | Verification action | Status |
-|---|---|---|---|
-| Runtime | chưa có code nên chưa biết lỗi tích hợp | triển khai theo S0--S6, test mỗi lát | UNKNOWN |
-| Provider | API/model, quota và chi phí chưa chọn | adapter, mock, log provider/model, so sánh có kiểm soát | UNKNOWN |
-| Data | chưa có dữ liệu marketing thật | dùng seed rõ nguồn; không suy ra hiệu quả thật | UNKNOWN |
-| Scale | SQLite chỉ là lựa chọn prototype | ADR và load test; giữ repository boundary | PROPOSED |
-| UX | wireframe chưa phải usability evidence | task-based test và ghi nhận lỗi thao tác | PLANNED |
-
-## 8. Quy tắc bằng chứng
-
-Mọi câu trong báo cáo phải được phân loại bằng một trong các trạng thái: EXISTING, DESIGNED, PROPOSED, PLANNED, TESTED, MEASURED, VALIDATED hoặc UNKNOWN. Không dùng từ đã triển khai/đã đạt/đã chứng minh nếu chưa có artifact runtime tương ứng.
+| Quản lý nghiệp vụ cốt lõi 14 bảng | 104 ca kiểm thử Backend Pytest (`backend/tests/test_*.py`) đạt 100% Pass | `TESTED` |
+| Phân quyền RBAC & Chống tự duyệt | Kiểm tra `owner_id` và chặn tự duyệt bài của chính mình (`CANNOT_REVIEW_OWN`) | `TESTED` |
+| Máy trạng thái HITL & Từ khóa cấm | `DRAFT` -> `PENDING_REVIEW` -> `APPROVED`/`REJECTED` -> `PUBLISHED`, khóa xóa `CONTENT_LOCKED` | `TESTED` |
+| Điều phối AI & Dự phòng 13 mô hình | 18 ca kiểm thử `ai-runner/tests/` Pass 100%, hỗ trợ 13 mô hình trên 5 nền tảng | `TESTED` |
+| Đánh giá định lượng 4 giai đoạn Prompt | `scripts/evaluate_assistant.py` trên 8 kịch bản: Bản 1: 75%, Bản 2: 62.5%, Bản 3: 75%, Bản 4: 87.5% (7/8) | `MEASURED` |
+| Kiểm thử giao diện E2E & Triển khai VPS | 29 ca kiểm thử Playwright E2E trên Chromium Pass 100%; vận hành tại `https://marketing.kienhieu.id.vn` | `TESTED` |

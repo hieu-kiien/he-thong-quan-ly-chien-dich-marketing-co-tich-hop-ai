@@ -2,9 +2,9 @@
 
 \section{Phân tích tác nhân và mục tiêu nghiệp vụ}
 
-Hệ thống MarketFlow AI được thiết kế xoay quanh hai nhóm tác nhân con người chính (Manager và Marketer) cùng hai thực thể ngoại vi (Nhà cung cấp dịch vụ AI và Nền tảng phân phối nội dung), được định nghĩa trong Bảng~\ref{tab:actors}.
+Hệ thống MarketFlow AI được thiết kế xoay quanh hai nhóm tác nhân con người (\texttt{MANAGER}, \texttt{MARKETER}) cùng hai thực thể kỹ thuật/ngoại vi (Dịch vụ \texttt{ai-runner} + FastMCP và Kênh truyền thông phát hành), được định nghĩa trong Bảng~\ref{tab:actors}.
 
-\begin{table}[H]
+\begin{table}[!htbp]
 \centering
 \small
 \caption{Tác nhân, mục tiêu và ranh giới quyền hạn trong hệ thống}
@@ -13,18 +13,18 @@ Hệ thống MarketFlow AI được thiết kế xoay quanh hai nhóm tác nhân
 \hline
 \thead{Tác nhân} & \thead{Mục tiêu nghiệp vụ} & \thead{Ranh giới quyền hạn}\\
 \hline
-Quản lý Marketing (Manager) & Thiết lập chiến dịch, duyệt ngân sách, phân công thành viên, thẩm định và phê duyệt nội dung, xem báo cáo tổng thể toàn doanh nghiệp. & Quyền quản trị toàn hệ thống; có quyền duyệt/từ chối (\texttt{/approve}, \texttt{/reject}); không được can thiệp sửa đổi nhật ký kiểm toán bất biến.\\
+Người quản lý (\texttt{MANAGER}) & Quản trị tài khoản nhân sự (\texttt{/api/v1/users}), cấu hình hồ sơ thương hiệu (\texttt{brand\_profile}), từ khóa cấm (\texttt{banned\_keywords}), danh mục 7 kênh; thiết lập chiến dịch, thẩm định và phê duyệt nội dung tiếp thị, giám sát báo cáo KPI toàn doanh nghiệp. & Toàn quyền trên toàn hệ thống; có quyền phê duyệt/từ chối (\texttt{/approve}, \texttt{/reject}) đối với nội dung của người khác (\texttt{created\_by != current\_user.id}, chặn tự duyệt qua \texttt{CANNOT\_REVIEW\_OWN}).\\
 \hline
-Nhân viên Marketing (Marketer) & Sáng tạo ý tưởng, gọi AI trợ lý soạn thảo bản nháp, biên tập nội dung, gửi yêu cầu duyệt, nhập số liệu chiến dịch được giao. & Chỉ thao tác trong phạm vi các chiến dịch được phân công (Record-level Scope); tuyệt đối không có quyền tự phê duyệt bài viết của chính mình.\\
+Nhân viên Marketing (\texttt{MARKETER}) & Khởi tạo chiến dịch được giao, gọi Trợ lý AI hỗ trợ ý tưởng/soạn bản nháp, biên tập nội dung, gửi duyệt, lập lịch và nhập số liệu thực tế. & Chỉ được sửa/xóa chiến dịch, nội dung, lịch đăng và nhập số liệu trên chiến dịch do chính mình sở hữu (\texttt{owner\_id == current\_user.id}); không có quyền phê duyệt bài viết.\\
 \hline
-Dịch vụ Google Gemini AI & Nhận ngữ cảnh dữ liệu chọn lọc, sinh gợi ý ý tưởng, soạn nháp và tóm tắt chỉ số theo JSON Schema quy chuẩn. & Thực thể tính toán thụ động; không có quyền truy cập trực tiếp CSDL; kết quả luôn mang tính khuyến nghị và gắn cờ \texttt{is\_ai\_generated = True}.\\
+Dịch vụ \texttt{ai-runner} \& FastMCP & Nhận yêu cầu hội thoại kèm \texttt{Run-Token} JWT, truy vấn dữ liệu qua 9 công cụ đọc và tạo thẻ đề xuất qua 5 công cụ \texttt{propose\_*}. & Thực thi dưới quyền của người dùng đang đăng nhập; không có quyền ghi thẳng vào các bảng nghiệp vụ cốt lõi; mọi đề xuất luôn mang trạng thái \texttt{PROPOSED}.\\
 \hline
-Kênh truyền thông & Tiếp nhận lịch đăng và nội dung đã được phê duyệt chính thức để chuẩn bị xuất bản. & Đứng sau rào chắn kiểm duyệt; chỉ tiếp nhận nội dung có trạng thái \texttt{APPROVED} và lịch biểu hợp lệ.\\
+Kênh truyền thông & Tiếp nhận lịch đăng và nội dung đã được phê duyệt để xuất bản và ghi nhận liên kết (\texttt{published\_url}). & Đứng sau rào chắn kiểm duyệt; chỉ tiếp nhận nội dung có trạng thái \texttt{APPROVED} hoặc \texttt{PUBLISHED}.\\
 \hline
 \end{tabularx}
 \end{table}
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \input{figures/usecase.tex}
 \caption{Sơ đồ ca sử dụng chính của hệ thống MarketFlow AI}
@@ -54,125 +54,100 @@ Hệ thống hiện thực hóa trọn vẹn 14 yêu cầu chức năng cốt l�
 \hline
 \endlastfoot
 
-FR01 & Xác thực & Đăng nhập bằng email và mật khẩu; cấp phát JWT token an toàn. & Đăng nhập thành công cấp Bearer token; sai mật khẩu trả 401 Unauthorized; mã hóa Bcrypt. & TESTED\\
+FR01 & Xác thực \& Đăng ký & Đăng nhập và tự đăng ký không gian làm việc (\texttt{/register}, mặc định gán quyền \texttt{MANAGER}); cấp phát Bearer JWT token kèm \texttt{token\_version}. & Đăng ký/đăng nhập thành công cấp JWT (\texttt{HS256}); sai mật khẩu trả 401; hỗ trợ đổi mật khẩu và thu hồi token khi đăng xuất (\texttt{test\_auth.py}: 12/12 Pass). & TESTED\\
 \hline
-FR02 & Phân quyền & Backend kiểm tra vai trò ở các thao tác nhạy cảm. & Manager được duyệt bài/xóa chiến dịch; Marketer bị từ chối 403 Forbidden; tài khoản bị khóa bị chặn ngay lập tức. & TESTED\\
+FR02 & Phân quyền \& Nhân sự & Kiểm soát 2 vai trò quản lý (\texttt{MANAGER}) và nhân viên (\texttt{MARKETER}); Quản lý cấp tài khoản cho nhân viên tại \texttt{Cài đặt -> Người dùng}. & \texttt{MANAGER} thêm/khóa tài khoản nhân viên qua \texttt{/api/v1/users}; \texttt{MARKETER} bị chặn 403 ở các điểm cuối quản trị (\texttt{test\_users.py}: 6/6 Pass). & TESTED\\
 \hline
-FR03 & Dữ liệu nền & Quản lý danh mục ngành hàng, sản phẩm và kênh tiếp thị. & Đầy đủ CRUD; ràng buộc khóa ngoại ngăn chặn xóa danh mục khi còn sản phẩm tham chiếu. & IMPLEMENTED\\
+FR03 & Kênh \& Brand Kit & Quản lý 7 loại kênh tiếp thị, hồ sơ thương hiệu (\texttt{brand\_profile}) và từ khóa cấm (\texttt{banned\_keywords}). & CRUD kênh và từ khóa cấm; hàm \texttt{scan\_banned\_keywords} quét từ khóa không phân biệt hoa thường (\texttt{test\_channels.py}: 5/5, \texttt{test\_brand.py}: 1/1 Pass). & TESTED\\
 \hline
-FR04 & Chiến dịch & Tạo và quản lý chiến dịch với mục tiêu, ngân sách, thời gian. & Kiểm tra ngân sách không âm; ràng buộc ngày \texttt{start\_date} $\le$ \texttt{end\_date}; chống SQL injection. & TESTED\\
+FR04 & Chiến dịch & Tạo và quản lý chiến dịch với sản phẩm (\texttt{product}), đối tượng, mục tiêu, ngân sách, thời gian. & Kiểm tra \texttt{budget >= 0}, \texttt{start\_date <= end\_date}; kiểm soát quyền sở hữu \texttt{owner\_id} (\texttt{test\_campaigns.py}: 7/7 Pass). & TESTED\\
 \hline
-FR05 & Phân công & Quản lý thành viên tham gia chiến dịch (\texttt{CampaignMember}). & Hỗ trợ phân công nhiều thành viên vào chiến dịch; ngăn chặn trùng lặp thành viên; xác lập phạm vi quyền. & TESTED\\
+FR05 & Phân bổ kênh & Gán kênh truyền thông và phân bổ ngân sách thành phần cho từng chiến dịch (\texttt{campaign\_channels}). & Đảm bảo tổng ngân sách phân bổ kênh không vượt ngân sách tổng; ràng buộc khóa chính kép (\texttt{campaign\_id}, \texttt{channel\_id}). & TESTED\\
 \hline
-FR06 & Soạn nội dung & Tạo bản nháp nội dung gắn với chiến dịch, kênh và tác giả. & Nội dung khởi tạo mang trạng thái \texttt{DRAFT} hoặc \texttt{AI\_DRAFT}; kiểm tra khóa ngoại chiến dịch/kênh. & TESTED\\
+FR06 & Soạn nội dung & Tạo bản nháp nội dung gắn với chiến dịch, kênh, người tạo (\texttt{created\_by}) và nguồn gốc (\texttt{MANUAL}/\texttt{AI}). & Nội dung khởi tạo ở trạng thái \texttt{DRAFT}; lưu vết \texttt{origin} và \texttt{ai\_message\_id} nếu xác nhận từ đề xuất AI (\texttt{test\_contents.py}). & TESTED\\
 \hline
-FR07 & Duyệt nội dung & Quy trình phê duyệt Human-in-the-loop qua các endpoint chuyên biệt. & Gửi duyệt (\texttt{/submit}), phê duyệt (\texttt{/approve}), từ chối (\texttt{/reject}); cấm tự duyệt; tự động reset khi sửa. & TESTED\\
+FR07 & Duyệt nội dung HITL & Quy trình phê duyệt: gửi duyệt (\texttt{/submit}), duyệt (\texttt{/approve}), từ chối (\texttt{/reject}), xuất bản (\texttt{/mark-published}). & Tự động quét từ khóa cấm khi \texttt{/submit}; chặn tự duyệt (\texttt{CANNOT\_REVIEW\_OWN}); khóa xóa khi đã duyệt (\texttt{CONTENT\_LOCKED}) (\texttt{test\_contents.py}: 9/9 Pass). & TESTED\\
 \hline
-FR08 & Lập lịch & Tạo, sửa và hủy lịch xuất bản cho nội dung đã duyệt. & Chỉ cho phép lên lịch đối với bài viết \texttt{APPROVED}; hỗ trợ múi giờ quốc tế; trạng thái đồng bộ \texttt{SCHEDULED}. & TESTED\\
+FR08 & Lập lịch & Tạo, cập nhật, hoàn tất (\texttt{/done}) và hủy lịch xuất bản (\texttt{schedules}) cho nội dung hợp lệ. & Kiểm tra nội dung hợp lệ và thời gian nằm trong khung ngày chiến dịch (\texttt{test\_schedules.py}: 7/7 Pass). & TESTED\\
 \hline
-FR09 & Chỉ số kênh & Nhập views, clicks, conversions, cost và revenue theo ngày/kênh. & Bộ ba (\texttt{campaign}, \texttt{channel}, \texttt{date}) duy nhất; tự động tính toán KPI: CTR, CPC, CPA, ROI; chống chia cho 0. & TESTED\\
+FR09 & Chỉ số \& CSV & Ghi nhận \texttt{views}, \texttt{clicks}, \texttt{conversions}, \texttt{cost} theo ngày/kênh (nhập tay hoặc CSV 2 bước). & Kiểm tra phễu \texttt{views >= clicks >= conversions}; xem trước CSV (\texttt{import/preview}) và lưu (\texttt{import/commit}); tính CTR, CVR, CPC, CPA, CPM (\texttt{test\_metrics.py}: 9/9 Pass). & TESTED\\
 \hline
-FR10 & Báo cáo & Lọc, tìm kiếm chiến dịch và xem dashboard số liệu đa chiều. & Lọc đa tiêu chí theo kênh, thời gian; tổng hợp số liệu chính xác; Marketer chỉ xem số liệu chiến dịch của mình. & TESTED\\
+FR10 & Thống kê \& Báo cáo & Bảng điều khiển tổng hợp KPI, chuỗi thời gian, cơ cấu kênh/chiến dịch và tiến độ giải ngân (\texttt{used\_pct}). & Cung cấp 4 điểm cuối \texttt{/stats/overview}, \texttt{/timeseries}, \texttt{/by-channel}, \texttt{/by-campaign} chính xác tuyệt đối (\texttt{test\_stats.py}: 6/6 Pass). & TESTED\\
 \hline
-FR11 & AI Ý tưởng & Gợi ý 3 góc tiếp cận ý tưởng dựa trên mục tiêu và sản phẩm. & Trả về cấu trúc JSON gồm angle, concept, hook; schema valid 100\%; Smart Fallback kích hoạt khi mất mạng. & MEASURED\\
+FR11 & AI Ý tưởng \& Chiến dịch & Đề xuất ý tưởng chiến dịch và cập nhật chiến dịch qua công cụ MCP \texttt{propose\_campaign*}. & AI gọi \texttt{get\_brand\_profile}, \texttt{list\_channels} và tạo thẻ \texttt{ai\_action = PROPOSED} chờ người dùng bấm \textit{Xác nhận} (\texttt{test\_assistant\_actions.py}: 9/9 Pass). & MEASURED\\
 \hline
-FR12 & AI Soạn nháp & Tạo caption/email theo định dạng chuẩn của từng kênh. & Sinh tiêu đề, nội dung, lời kêu gọi (CTA); gắn cờ nguồn gốc AI; chuyển tiếp mượt mà sang Review Queue. & MEASURED\\
+FR12 & AI Soạn nháp & Soạn bản nháp đa kênh qua công cụ MCP \texttt{propose\_content\_drafts} có kiểm tra từ khóa cấm. & Bắt buộc gọi \texttt{check\_banned\_keywords} trước khi đề xuất; khi xác nhận tạo bản ghi \texttt{contents} với \texttt{origin=AI} (\texttt{test\_assistant\_tools.py}: 4/4 Pass). & MEASURED\\
 \hline
-FR13 & AI Tóm tắt & Tóm tắt hiệu quả và khuyến nghị cải tiến từ metrics thực tế. & Grounding score >95\%; khử ảo giác tuyệt đối trong Fallback (chỉ diễn giải số liệu có trong context). & MEASURED\\
+FR13 & AI Phân tích số liệu & Truy vấn số liệu thực qua \texttt{get\_stats}, \texttt{get\_campaign} để tóm tắt hiệu quả và đề xuất lịch/chỉ số. & Khử ảo giác nhờ truy vấn trực tiếp CSDL qua MCP; phiên bản Prompt \texttt{v4} đạt 7/8 (87,5\%) trên bộ đánh giá tự động (\texttt{test\_assistant\_mcp.py}: 6/6 Pass). & MEASURED\\
 \hline
-FR14 & Kiểm toán & Ghi nhận audit log cho các thao tác duyệt và lần gọi AI. & Bảng \texttt{content\_reviews} lưu lý do duyệt; bảng \texttt{ai\_logs} lưu chi tiết model, latency, tokens và cờ fallback. & TESTED\\
+FR14 & Nhật ký \& Thông báo & Lưu lịch sử duyệt (\texttt{content\_reviews}), thông báo (\texttt{notifications}) và nhật ký hội thoại/hành động AI. & Tự động gửi thông báo khi gửi duyệt/duyệt/từ chối; lưu trọn vẹn \texttt{ai\_threads}, \texttt{ai\_messages}, \texttt{ai\_actions} (\texttt{test\_notifications.py}: 1/1, \texttt{test\_assistant\_stream.py}: 14/14 Pass). & TESTED\\
 \end{longtable}
 \end{small}
 
 \section{Danh mục yêu cầu chất lượng (NFR)}
 
-Hệ thống tuân thủ 6 yêu cầu phi chức năng (NFR01--NFR06) đạt tiêu chuẩn công nghiệp:
+Hệ thống tuân thủ 6 yêu cầu phi chức năng (NFR01--NFR06) đã được kiểm chứng thực nghiệm:
 \begin{itemize}
- \item \textbf{NFR01 (Kiểm soát truy cập đa tầng)}: Kết hợp RBAC và kiểm soát phạm vi bản ghi (Record-level Scope). Loại bỏ hoàn toàn nguy cơ rò rỉ dữ liệu chéo giữa các nhân viên tiếp thị.
- \item \textbf{NFR02 (Toàn vẹn dữ liệu và giao dịch)}: SQLite kích hoạt \texttt{PRAGMA foreign\_keys = ON}, ràng buộc chỉ số không âm, bảo toàn tính nguyên tử (Atomicity) qua SQLAlchemy transactions.
- \item \textbf{NFR03 (Hiệu năng phản hồi)}: Thời gian phản hồi của các API nghiệp vụ CRUD đạt P50 $<$ 15ms, P95 $<$ 45ms. Độ trễ AI Smart Fallback $<$ 50ms.
- \item \textbf{NFR04 (Tính khả dụng và phục hồi giao diện)}: Giao diện web hỗ trợ đầy đủ ba trạng thái tương tác: loading skeleton, empty state thông minh, và toast thông báo tức thời.
- \item \textbf{NFR05 (Khả năng chịu lỗi dịch vụ AI)}: Tự động bắt lỗi timeout (sau 10 giây), lỗi quota hoặc lỗi sai lệch JSON Schema từ nhà cung cấp mô hình để chuyển hướng an toàn sang Smart Fallback mà không gây gián đoạn phiên làm việc của người dùng.
- \item \textbf{NFR06 (Khả năng tái lập và tự động hóa)}: Cung cấp đầy đủ cấu hình Docker, script khởi tạo seed dữ liệu mẫu và pipeline GitHub Actions xác minh toàn diện mọi thay đổi.
+ \item \textbf{NFR01 (Kiểm soát truy cập đa tầng và chống xung đột lợi ích)}: Kết hợp RBAC 2 vai trò (\texttt{MANAGER}, \texttt{MARKETER}), kiểm soát quyền sở hữu mức bản ghi (\texttt{owner\_id}) và quy tắc chống tự duyệt (\texttt{CANNOT\_REVIEW\_OWN}).
+ \item \textbf{NFR02 (Toàn vẹn dữ liệu và giao dịch)}: Ràng buộc khóa ngoại, kiểm tra bất biến số học phễu tiếp thị (\texttt{views >= clicks >= conversions >= 0}) và khóa xóa nội dung đã duyệt (\texttt{CONTENT\_LOCKED}).
+ \item \textbf{NFR03 (Hiệu năng và giới hạn tài nguyên)}: Các điểm cuối REST API nghiệp vụ phản hồi trung bình dưới 30ms; dịch vụ \texttt{ai-runner} giới hạn hàng đợi tuần tự \texttt{RUNNER\_CONCURRENCY=1} và trần bộ nhớ \texttt{MemoryMax=896M} dựa trên kết quả đo P0 Spike (\texttt{\~{}490 MB RSS}).
+ \item \textbf{NFR04 (Trải nghiệm giao diện và truyền phát SSE)}: Giao diện tiếng Việt chuẩn hóa, truyền phát sự kiện hội thoại AI theo thời gian thực qua SSE, hiển thị trực quan thẻ công cụ và thẻ đề xuất.
+ \item \textbf{NFR05 (Khả năng chịu lỗi và đa nhà cung cấp AI)}: Hỗ trợ 13 mô hình LLM trên 5 nền tảng với cơ chế tự động chuyển đổi dự phòng (failover); khi \texttt{ai-runner} ngoại tuyến, hệ thống báo lỗi chuẩn hóa mà không ảnh hưởng đến toàn bộ chức năng CRUD.
+ \item \textbf{NFR06 (Khả năng tái lập và kiểm thử tự động)}: Đóng gói Docker Compose, kịch bản tạo dữ liệu mẫu \texttt{seed\_demo.py} và 151 ca kiểm thử tự động (Pytest + Playwright E2E) vượt qua 100\%.
 \end{itemize}
 
-\section{Kiến trúc phân quyền RBAC và Kiểm soát mức bản ghi (Record-level NFR01)}
+\section{Kiến trúc phân quyền RBAC và Kiểm soát mức bản ghi}
 
-Một trong những trọng tâm quan trọng nhất trong kiến trúc an ninh của MarketFlow AI là việc siết chặt phân quyền mức bản ghi (Record-level Authorization), khắc phục hoàn toàn lỗ hổng IDOR (Insecure Direct Object Reference).
+Một trong những trọng tâm quan trọng nhất trong kiến trúc an ninh của MarketFlow AI là việc siết chặt phân quyền mức bản ghi và tách biệt quyền phê duyệt, được minh họa trong Hình~\ref{fig:auth-sequence}.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \input{figures/approval-sequence.tex}
-\caption{Quy trình phân quyền và kiểm soát phạm vi bản ghi khi xử lý yêu cầu}
+\caption{Quy trình gửi duyệt, phê duyệt HITL và kiểm soát phân quyền}
 \label{fig:auth-sequence}
 \end{figure}
 
-\subsection{Cơ chế đồng bộ trạng thái tài khoản người dùng}
-Trong module xác thực \texttt{backend/app/core/security.py} và \texttt{backend/app/api/deps.py}, hàm phụ thuộc \texttt{get\_current\_user} và lớp \texttt{RoleChecker} không chỉ kiểm tra tính hợp lệ của chữ ký điện tử JWT mà còn bắt buộc truy vấn trạng thái thực của người dùng trong cơ sở dữ liệu:
-\begin{equation}
-\text{Allowed} \iff (\text{Token Valid}) \land (\text{User.status} == \text{'ACTIVE'}) \land (\text{Role} \in \text{AllowedRoles})
-\end{equation}
-Nếu tài khoản bị vô hiệu hóa (\texttt{user.status == 'INACTIVE'}), hệ thống lập tức từ chối yêu cầu với mã lỗi HTTP 403 Forbidden, bất kể token JWT vẫn còn trong thời hạn hiệu lực.
-
-\subsection{Thuật toán giải quyết phạm vi bản ghi (Record Scope Resolution)}
-Đối với vai trò Marketer, quyền thao tác trên các thực thể được xác định nghiêm ngặt theo thuật toán sau:
+\subsection{Cơ chế xác thực kép: User JWT và Ephemeral Run-Token JWT}
+Trong mô-đun \texttt{backend/app/core/security.py} và \texttt{backend/app/api/deps.py}, hệ thống vận hành hai loại mã thông báo JWT tách biệt:
 \begin{enumerate}
- \item \textbf{Đối với Chiến dịch (Campaign)}:
- \begin{itemize}
- \item Manager: Có quyền xem, tạo, chỉnh sửa và xóa mọi chiến dịch trong hệ thống.
- \item Marketer: Chỉ được xem và cập nhật các chiến dịch mà mình là người tạo lập (\texttt{campaign.owner\_id == current\_user.id}) hoặc được chỉ định là thành viên thông qua bảng liên kết \texttt{CampaignMember} (\texttt{campaign\_members.user\_id == current\_user.id}). Mọi yêu cầu truy cập chiến dịch ngoài phạm vi đều bị chặn với HTTP 403 hoặc HTTP 404 (để che giấu sự tồn tại của tài nguyên). Thao tác xóa chiến dịch bị cấm hoàn toàn đối với Marketer.
- \end{itemize}
- \item \textbf{Đối với Nội dung tiếp thị (MarketingContent)}:
- \begin{itemize}
- \item Marketer chỉ được tạo bài viết mới gắn với chiến dịch mà mình có quyền phụ trách.
- \item Khi xem danh sách hoặc chỉnh sửa nội dung, backend tự động lọc hoặc kiểm tra quan hệ sở hữu của chiến dịch chứa nội dung đó. Marketer không thể đọc hay can thiệp vào bài viết thuộc chiến dịch của đồng nghiệp khác.
- \end{itemize}
- \item \textbf{Đối với Chỉ số hiệu quả (Metrics) và Bảng điều khiển (Dashboard)}:
- \begin{itemize}
- \item Khi Marketer truy cập \texttt{GET /metrics/dashboard}, hệ thống tự động chèn mệnh đề lọc \texttt{campaign\_id.in\_(allowed\_campaign\_ids)}, bảo đảm người dùng chỉ nhìn thấy số liệu tổng hợp trong phạm vi được phân công.
- \end{itemize}
- \item \textbf{Đối với Ngữ cảnh AI (AI Context Gate)}:
- \begin{itemize}
- \item Khi gọi các endpoint AI (\texttt{/ai/ideas}, \texttt{/ai/draft}, \texttt{/ai/summary}), hệ thống kiểm tra quyền của Marketer trên \texttt{campaign\_id} mục tiêu trước khi nạp dữ liệu vào Prompt Engine, triệt tiêu nguy cơ trích xuất thông tin chiến dịch của người khác qua AI.
- \end{itemize}
+ \item \textbf{Access Token cho người dùng (\texttt{token\_version})}: Khi người dùng gọi API, hàm \texttt{get\_current\_user} giải mã token, truy vấn bảng \texttt{users} và xác nhận \texttt{user.is\_active == True} cùng \texttt{token\_version} khớp với CSDL. Nếu tài khoản bị khóa hoặc đã đăng xuất, yêu cầu bị từ chối ngay lập tức.
+ \item \textbf{Run-Token tạm thời cho tiến trình AI (\texttt{typ="assistant\_run"})}: Khi khởi chạy lượt hội thoại, hàm \texttt{create\_run\_token} sinh một JWT có hiệu lực đúng 10 phút mang theo \texttt{uid=user.id} và \texttt{thread\_id}. Máy chủ FastMCP tại \texttt{/mcp} giải mã token này trong mỗi lần gọi công cụ để áp dụng đúng phạm vi quyền của người dùng đang chat.
+\end{enumerate}
+
+\subsection{Quy tắc kiểm soát quyền sở hữu (\texttt{owner\_id}) và chống tự duyệt (\texttt{CANNOT\_REVIEW\_OWN})}
+\begin{enumerate}
+ \item \textbf{Quyền sở hữu Chiến dịch (\texttt{owner\_id})}: Trong \texttt{backend/app/services/campaign\_service.py}, \texttt{MARKETER} chỉ được phép chỉnh sửa, xóa, thêm nội dung, lập lịch hoặc nhập số liệu trên chiến dịch mà \texttt{campaign.owner\_id == current\_user.id}. Mọi nỗ lực can thiệp vào chiến dịch của người khác đều bị từ chối với mã lỗi HTTP 403 (\texttt{PERMISSION\_DENIED}).
+ \item \textbf{Quy tắc chống tự duyệt (\texttt{CANNOT\_REVIEW\_OWN})}: Trong \texttt{backend/app/services/content\_service.py}, ngay cả khi người dùng có vai trò \texttt{MANAGER}, nếu họ là người tạo ra bài viết (\texttt{content.created\_by == current\_user.id}), hệ thống sẽ chặn thao tác \texttt{POST /contents/\{id\}/approve} hoặc \texttt{/reject} với mã lỗi \texttt{CANNOT\_REVIEW\_OWN}. Quy tắc này đảm bảo nguyên tắc ``bốn mắt'' (\textit{four-eyes principle}) trong kiểm duyệt truyền thông.
 \end{enumerate}
 
 \section{Máy trạng thái duyệt nội dung Human-in-the-loop (HITL State Machine)}
 
-Để bảo đảm tính toàn vẹn của nội dung truyền thông doanh nghiệp, vòng đời của mỗi bài viết tiếp thị tuân thủ một máy trạng thái hữu hạn (Finite State Machine) nghiêm ngặt được mô tả tại Hình~\ref{fig:content-state}.
+Để bảo đảm tính toàn vẹn của nội dung truyền thông doanh nghiệp, vòng đời của mỗi bài viết tiếp thị tuân thủ một máy trạng thái hữu hạn (Finite State Machine) nghiêm ngặt gồm 5 trạng thái được mô tả tại Hình~\ref{fig:content-state}.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \input{figures/content-state.tex}
 \caption{Máy trạng thái duyệt nội dung Human-in-the-loop}
 \label{fig:content-state}
 \end{figure}
 
-\subsection{Các trạng thái hợp lệ}
+\subsection{Các trạng thái và thuộc tính nguồn gốc}
 \begin{itemize}
- \item \texttt{DRAFT}: Bản nháp do người dùng tự soạn thảo thủ công.
- \item \texttt{AI\_DRAFT}: Bản nháp do AI sinh ra, cần sự rà soát chỉnh sửa của con người.
- \item \texttt{IN\_REVIEW}: Bài viết đã được hoàn thiện và gửi lên hàng đợi phê duyệt (Review Queue).
- \item \texttt{APPROVED}: Bài viết đã được cấp quản lý (Manager) thẩm định và chính thức phê duyệt.
- \item \texttt{REJECTED}: Bài viết bị từ chối phê duyệt (kèm lý do giải thích minh bạch).
- \item \texttt{PUBLISHED}: Bài viết đã được phát hành lên kênh truyền thông theo lịch đăng.
+ \item \texttt{DRAFT}: Bản nháp mới khởi tạo (có thuộc tính \texttt{origin = MANUAL} nếu soạn tay, hoặc \texttt{origin = AI} kèm \texttt{ai\_message\_id} nếu được xác nhận từ thẻ đề xuất của Trợ lý AI).
+ \item \texttt{PENDING\_REVIEW}: Bài viết đã được tác giả gửi lên hàng đợi phê duyệt qua \texttt{POST /contents/\{id\}/submit}.
+ \item \texttt{APPROVED}: Bài viết đã được một \texttt{MANAGER} khác thẩm định và phê duyệt qua \texttt{POST /contents/\{id\}/approve}.
+ \item \texttt{REJECTED}: Bài viết bị từ chối qua \texttt{POST /contents/\{id\}/reject} (bắt buộc kèm lý do phản hồi trong \texttt{content\_reviews.comment}).
+ \item \texttt{PUBLISHED}: Bài viết đã được xác nhận xuất bản qua \texttt{POST /contents/\{id\}/mark-published} kèm đường dẫn \texttt{published\_url}.
 \end{itemize}
 
-\subsection{Quy tắc chống gian lận và can thiệp ngoài luồng (Anti-Tampering Rules)}
-Nhằm triệt tiêu hoàn toàn khả năng người dùng vượt quyền hoặc bỏ qua khâu kiểm duyệt, hệ thống áp dụng các rào chắn kỹ thuật ở tầng sâu:
+\subsection{Các rào chắn toàn vẹn quy trình (Workflow Guardrails)}
 \begin{enumerate}
- \item \textbf{Cấm tạo bài viết trực tiếp ở trạng thái duyệt}: Endpoint \texttt{POST /contents} tuyệt đối không chấp nhận tham số trạng thái \texttt{APPROVED} hoặc \texttt{PUBLISHED}. Mọi nội dung tạo mới chỉ có thể bắt đầu ở \texttt{DRAFT} hoặc \texttt{AI\_DRAFT}.
- \item \textbf{Cấm sửa đổi trực tiếp trạng thái qua API cập nhật}: Endpoint \texttt{PUT /contents/\{id\}} từ chối mọi nỗ lực gán trường \texttt{status} sang \texttt{APPROVED} hoặc \texttt{PUBLISHED} với mã lỗi HTTP 400 Bad Request.
- \item \textbf{Endpoint nghiệp vụ chuyên biệt}: Việc thay đổi trạng thái bắt buộc phải thông qua các endpoint chuyên trách:
- \begin{itemize}
- \item \texttt{POST /contents/\{id\}/submit}: Chuyển từ \texttt{DRAFT} / \texttt{AI\_DRAFT} / \texttt{REJECTED} sang \texttt{IN\_REVIEW} (bất kỳ tác giả nào có quyền trên nội dung đều gọi được).
- \item \texttt{POST /contents/\{id\}/approve}: Chỉ cho phép vai trò Manager gọi trên các bài viết đang ở \texttt{IN\_REVIEW}. Tự động ghi nhận thông tin người duyệt và mốc thời gian vào bảng kiểm toán.
- \item \texttt{POST /contents/\{id\}/reject}: Chỉ cho phép vai trò Manager gọi trên các bài viết đang ở \texttt{IN\_REVIEW}, bắt buộc truyền tham số lý do (\texttt{review\_notes}).
- \item \texttt{POST /contents/\{id\}/publish}: Chỉ cho phép xuất bản bài viết đang ở trạng thái \texttt{APPROVED}.
- \end{itemize}
- \item \textbf{Cơ chế tự động thu hồi phê duyệt khi nội dung bị sửa đổi (Approval Invalidation)}: Nếu một bài viết đã ở trạng thái \texttt{APPROVED} nhưng sau đó bị người dùng chỉnh sửa tiêu đề (\texttt{title}), nội dung (\texttt{body}) hoặc lời kêu gọi (\texttt{cta}) qua \texttt{PUT /contents/\{id\}}, hệ thống tự động hạ trạng thái bài viết về \texttt{AI\_DRAFT} và yêu cầu phải trải qua toàn bộ quy trình gửi duyệt lại từ đầu. Quy tắc này loại bỏ hoàn toàn kịch bản gian lận: phê duyệt một nội dung lành tính rồi sau đó bí mật thay đổi thành nội dung vi phạm chính sách.
+ \item \textbf{Tự động quét từ khóa cấm khi gửi duyệt}: Khi gọi \texttt{POST /contents/\{id\}/submit}, hệ thống tự động đối chiếu tiêu đề, nội dung và CTA với bảng \texttt{banned\_keywords}. Nếu phát hiện từ khóa vi phạm, hệ thống chuyển trạng thái sang \texttt{PENDING\_REVIEW} và trả kèm danh sách \texttt{banned\_matches} cảnh báo cụ thể để Người quản lý xem xét.
+ \item \textbf{Tự động thu hồi phê duyệt khi sửa nội dung đã duyệt}: Nếu một bài viết đang ở trạng thái \texttt{APPROVED} hoặc \texttt{REJECTED} bị chỉnh sửa nội dung, hệ thống tự động đưa trạng thái về lại \texttt{DRAFT}, buộc phải gửi duyệt lại từ đầu.
+ \item \textbf{Khóa xóa đối với nội dung đã duyệt hoặc đã xuất bản (\texttt{CONTENT\_LOCKED})}: Điểm cuối \texttt{DELETE /contents/\{id\}} từ chối xóa mọi bản ghi có trạng thái \texttt{APPROVED} hoặc \texttt{PUBLISHED} với mã lỗi HTTP 409 Conflict (\texttt{CONTENT\_LOCKED}), bảo vệ toàn vẹn lịch sử kiểm toán và dữ liệu xuất bản.
+ \item \textbf{Đồng bộ tự động với Lịch xuất bản (\texttt{schedules})}: Khi bài viết chuyển sang \texttt{PUBLISHED} qua \texttt{/mark-published}, các lịch đăng đang ở trạng thái \texttt{PLANNED} gắn với bài viết đó sẽ tự động được cập nhật sang \texttt{DONE}.
 \end{enumerate}
 
 \section{Kết luận chương}
 
-Chương 3 đã hoàn thiện phân tích chi tiết toàn bộ các yêu cầu nghiệp vụ của MarketFlow AI. Sự kết hợp chặt chẽ giữa Ma trận phân quyền RBAC, cơ chế kiểm soát phạm vi bản ghi (Record-level Scope NFR01) và Máy trạng thái duyệt nội dung khép kín (HITL State Machine) đã thiết lập nên một kiến trúc bảo mật đa tầng, ngăn chặn mọi hành vi leo quyền hoặc can thiệp dữ liệu trái phép. Chương tiếp theo sẽ trình bày thiết kế kiến trúc tổng thể, mô hình dữ liệu và Prompt Engine của hệ thống.
+Chương 3 đã hoàn thiện phân tích chi tiết toàn bộ các yêu cầu nghiệp vụ và phi chức năng của MarketFlow AI. Sự kết hợp chặt chẽ giữa RBAC 2 vai trò (\texttt{MANAGER}, \texttt{MARKETER}), kiểm soát quyền sở hữu (\texttt{owner\_id}), quy tắc chống tự duyệt (\texttt{CANNOT\_REVIEW\_OWN}) và máy trạng thái duyệt nội dung HITL 5 trạng thái đã thiết lập nên một kiến trúc bảo mật đa tầng vững chắc. Chương tiếp theo sẽ trình bày thiết kế kiến trúc tổng thể, lược đồ CSDL 14 bảng và thiết kế 14 công cụ MCP của hệ thống.

@@ -22,68 +22,66 @@
  card/.style={font=\sffamily\bfseries\scriptsize,text=black,fill=white,inner sep=1.5pt}
 ]
 
-\matrix (cats) [entity,row 1/.style={header}] at (2.1, 2.1) {
- product\_categories (Nhóm SP)\\
+\matrix (brand) [entity,row 1/.style={header}] at (2.1, 2.3) {
+ brand\_profile \& banned\_keywords\\
  \textbf{PK} id : INTEGER\\
+ brand\_name, tone\_of\_voice : TEXT\\
+ target\_audience, guidelines : TEXT\\
+ keyword (UK), note : TEXT\\
+};
+
+\matrix (channels) [entity,row 1/.style={header}] at (7.6, 2.3) {
+ channels (7 Kênh tiếp thị)\\
+ \textbf{PK} id : INTEGER\\
+ code (UK) : VARCHAR(40)\\
  name : VARCHAR(100)\\
- description : TEXT\\
+ char\_limit, rules\_json : JSON\\
+ is\_active : BOOLEAN\\
 };
 
-\matrix (products) [entity,row 1/.style={header}] at (7.6, 2.1) {
- products (Sản phẩm)\\
+\matrix (camp_chan) [entity,row 1/.style={header}] at (13.1, 2.3) {
+ campaign\_channels (Phân bổ)\\
  \textbf{PK} id : INTEGER\\
- \textbf{FK} category\_id : INT\\
- name : VARCHAR(150)\\
- price : NUMERIC(12,2)\\
- status : VARCHAR(20)\\
-};
-
-\matrix (channels) [entity,row 1/.style={header}] at (13.1, 2.1) {
- marketing\_channels (Kênh)\\
- \textbf{PK} id : INTEGER\\
- name : VARCHAR(80)\\
- code : VARCHAR(30)\\
- format\_rules : JSON\\
- status : VARCHAR(20)\\
+ \textbf{FK} campaign\_id : INT\\
+ \textbf{FK} channel\_id : INT\\
+ planned\_budget : \mbox{NUMERIC(14,2)}\\
+ \textbf{UK} (campaign\_id, channel\_id)\\
 };
 
 \matrix (users) [entity,row 1/.style={header}] at (2.1, -2.6) {
- users (Tài khoản)\\
+ users (Tài khoản \& Vai trò)\\
  \textbf{PK} id : INTEGER\\
- email : VARCHAR(120)\\
- password\_hash : TEXT\\
- role : VARCHAR(20)\\
- status : VARCHAR(20)\\
+ email (UK) : VARCHAR(255)\\
+ password\_hash : \mbox{VARCHAR(255)}\\
+ role : MANAGER | MARKETER\\
+ is\_active, token\_version : INT\\
 };
 
 \matrix (campaigns) [entity,row 1/.style={header}] at (7.6, -2.6) {
  campaigns (Chiến dịch)\\
  \textbf{PK} id : INTEGER\\
- \textbf{FK} product\_id : INT\\
  \textbf{FK} owner\_id : INT\\
- title : VARCHAR(200)\\
- objective : TEXT\\
- budget : NUMERIC(15,2)\\
+ name, product : VARCHAR\\
+ goal, status : VARCHAR(30)\\
+ budget : NUMERIC(14,2)\\
  start\_date, end\_date : DATE\\
- status : VARCHAR(20)\\
 };
 
 \matrix (contents) [entity,row 1/.style={header}] at (13.1, -2.6) {
- marketing\_contents (Nội dung)\\
+ contents (Nội dung tiếp thị)\\
  \textbf{PK} id : INTEGER\\
- \textbf{FK} campaign\_id : INTEGER\\
- \textbf{FK} channel\_id : INTEGER\\
- \textbf{FK} created\_by : INTEGER\\
- title : VARCHAR(200)\\
- status : VARCHAR(20)\\
- body, prompt : TEXT\\
+ \textbf{FK} campaign\_id, channel\_id : INT\\
+ \textbf{FK} created\_by, ai\_message\_id : INT\\
+ title, body, cta : TEXT\\
+ status : DRAFT..PUBLISHED\\
+ origin : MANUAL | AI\\
 };
 
-\draw[rel] (cats) -- node[card,above=1pt,pos=0.5]{1..*} (products);
-\draw[rel] (products) -- node[card,right=2pt,pos=0.5]{1..*} (campaigns);
+\draw[rel] (channels) -- node[card,above=1pt,pos=0.5]{1..*} (camp_chan);
+\draw[rel] (campaigns.north east) -- node[card,sloped,above=1pt,pos=0.28]{1..*} (camp_chan.south west);
 \draw[rel] (users) -- node[card,above=1pt,pos=0.5]{1..*} (campaigns);
 \draw[rel] (campaigns) -- node[card,above=1pt,pos=0.5]{1..*} (contents);
-\draw[rel] (channels) -- node[card,right=2pt,pos=0.5]{1..*} (contents);
+\draw[rel] (channels.south east) -- node[card,sloped,above=1pt,pos=0.72]{1..*} (contents.north west);
 
 \end{tikzpicture}%
 }

@@ -101,7 +101,7 @@ def test_register_success_and_validation(client: TestClient, manager_user: User)
     assert weak.status_code == 422
     assert weak.json()["detail"]["code"] == "VALIDATION_ERROR"
 
-    # Successful registration defaults to MARKETER and issues JWT
+    # Successful registration defaults to MANAGER and issues JWT
     resp = client.post(
         "/api/v1/auth/register",
         json={"email": "NewUser@MarketFlow.vn", "full_name": "Nguyễn Văn Mới", "password": "NewUser@123"},
@@ -111,7 +111,7 @@ def test_register_success_and_validation(client: TestClient, manager_user: User)
     assert "access_token" in data
     assert data["user"]["email"] == "newuser@marketflow.vn"
     assert data["user"]["full_name"] == "Nguyễn Văn Mới"
-    assert data["user"]["role"] == "MARKETER"
+    assert data["user"]["role"] == "MANAGER"
 
     # Duplicate email rejected (409)
     dup = client.post(

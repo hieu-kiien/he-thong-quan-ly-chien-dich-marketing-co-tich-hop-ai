@@ -54,8 +54,11 @@ import { formatDate, formatDateTime, formatMoney, formatNumber, formatPct, forma
 import {
   CONTENT_STATUS_LABEL,
   CONTENT_TYPE_LABEL,
+  GOAL_KPI_META,
   GOAL_LABEL,
+  GOAL_TONE,
   ORIGIN_LABEL,
+  buildGoalContentDraft,
 } from '@/lib/labels';
 import type {
   CampaignInput,
@@ -441,25 +444,40 @@ export default function CampaignDetailPage() {
         <TabPanel tabKey="info" className="mt-6 space-y-6">
           {/* Key Metric Summary Cards */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card>
+            <Card className={GOAL_KPI_META[campaign.goal].primaryMetricKey === 'views' ? 'border-accent/40 ring-1 ring-accent/20' : ''}>
               <CardBody>
-                <p className="text-xs text-fg-muted">Lượt hiển thị (Views)</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-fg-muted">Lượt hiển thị (Views)</p>
+                  {GOAL_KPI_META[campaign.goal].primaryMetricKey === 'views' && (
+                    <Badge tone="accent">KPI trọng tâm</Badge>
+                  )}
+                </div>
                 <p className="mt-1 text-2xl font-semibold text-fg">{formatNumber(campaign.stats.views)}</p>
                 <div className="mt-2 text-xs text-fg-muted">CTR: {formatRate(campaign.stats.ctr)}</div>
               </CardBody>
             </Card>
 
-            <Card>
+            <Card className={GOAL_KPI_META[campaign.goal].primaryMetricKey === 'clicks' ? 'border-accent/40 ring-1 ring-accent/20' : ''}>
               <CardBody>
-                <p className="text-xs text-fg-muted">Lượt bấm (Clicks)</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-fg-muted">Lượt bấm (Clicks)</p>
+                  {GOAL_KPI_META[campaign.goal].primaryMetricKey === 'clicks' && (
+                    <Badge tone="accent">KPI trọng tâm</Badge>
+                  )}
+                </div>
                 <p className="mt-1 text-2xl font-semibold text-fg">{formatNumber(campaign.stats.clicks)}</p>
                 <div className="mt-2 text-xs text-fg-muted">CPC: {formatMoney(campaign.stats.cpc)}</div>
               </CardBody>
             </Card>
 
-            <Card>
+            <Card className={GOAL_KPI_META[campaign.goal].primaryMetricKey === 'conversions' ? 'border-accent/40 ring-1 ring-accent/20' : ''}>
               <CardBody>
-                <p className="text-xs text-fg-muted">Chuyển đổi (Conversions)</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-fg-muted">Chuyển đổi (Conversions)</p>
+                  {GOAL_KPI_META[campaign.goal].primaryMetricKey === 'conversions' && (
+                    <Badge tone="accent">KPI trọng tâm</Badge>
+                  )}
+                </div>
                 <p className="mt-1 text-2xl font-semibold text-fg">{formatNumber(campaign.stats.conversions)}</p>
                 <div className="mt-2 text-xs text-fg-muted">CVR: {formatRate(campaign.stats.cvr)}</div>
               </CardBody>
@@ -487,11 +505,25 @@ export default function CampaignDetailPage() {
           {/* Campaign Strategy & Details */}
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
-              <CardHeader title="Mục tiêu & Sản phẩm" />
+              <CardHeader
+                title="Mục tiêu & Sản phẩm"
+                actions={
+                  <Badge tone={GOAL_TONE[campaign.goal]}>{GOAL_LABEL[campaign.goal]}</Badge>
+                }
+              />
               <CardBody className="space-y-4 text-sm">
+                <div className="rounded-md border border-border bg-subtle/60 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-fg-muted">Thước đo KPI trọng tâm theo mục tiêu</span>
+                    <span className="text-xs font-semibold text-fg">{GOAL_KPI_META[campaign.goal].primaryKpiLabel}</span>
+                  </div>
+                  <p className="mt-1.5 text-xs text-fg-muted">
+                    {GOAL_KPI_META[campaign.goal].contentDirection}
+                  </p>
+                </div>
                 <div>
-                  <h4 className="text-xs font-medium text-fg-muted">Mục tiêu chiến dịch</h4>
-                  <p className="mt-1 text-fg whitespace-pre-line">{campaign.objective || '—'}</p>
+                  <h4 className="text-xs font-medium text-fg-muted">Mục tiêu cụ thể (Chỉ tiêu định lượng)</h4>
+                  <p className="mt-1 font-medium text-fg whitespace-pre-line">{campaign.objective || '—'}</p>
                 </div>
                 <div>
                   <h4 className="text-xs font-medium text-fg-muted">Sản phẩm / Dịch vụ</h4>
@@ -612,13 +644,23 @@ export default function CampaignDetailPage() {
           {/* Contents Section */}
           <Card>
             <CardHeader
-              title="Danh sách nội dung"
-              description="Các bài đăng, email, kịch bản quảng cáo gắn liền với chiến dịch."
+              title="Danh sách nội dung bám sát chiến dịch"
+              description={`Mục tiêu: ${GOAL_LABEL[campaign.goal]} · Sản phẩm: ${campaign.product}${campaign.key_message ? ` · Thông điệp: "${campaign.key_message}"` : ''}`}
               actions={
-                <Button variant="primary" size="sm" onClick={() => setIsCreatingContent(true)}>
-                  <Plus className="h-4 w-4" />
-                  Soạn nội dung mới
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => navigate(`/assistant?campaign_id=${campaign.id}`)}
+                  >
+                    <Sparkles className="h-4 w-4 text-accent" />
+                    Trợ lý AI soạn theo mục tiêu
+                  </Button>
+                  <Button variant="primary" size="sm" onClick={() => setIsCreatingContent(true)}>
+                    <Plus className="h-4 w-4" />
+                    Soạn nội dung mới
+                  </Button>
+                </div>
               }
             />
             {contentsQ.isLoading ? (
@@ -1031,6 +1073,38 @@ export default function CampaignDetailPage() {
           className="space-y-4"
         >
           {contentFormError && <Callout tone="danger">{contentFormError}</Callout>}
+          <div className="rounded-md border border-border bg-subtle/60 p-3 text-xs space-y-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-fg">Định hướng chiến dịch:</span>
+                <Badge tone={GOAL_TONE[campaign.goal]}>{GOAL_LABEL[campaign.goal]}</Badge>
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  const draft = buildGoalContentDraft(campaign);
+                  setNewContentTitle(draft.title);
+                  setNewContentBody(draft.body);
+                  setNewContentCta(draft.cta);
+                }}
+              >
+                Điền khung sườn theo mục tiêu
+              </Button>
+            </div>
+            <p className="text-fg-muted">
+              <strong className="text-fg">Chỉ tiêu:</strong> {campaign.objective} · <strong className="text-fg">Sản phẩm:</strong> {campaign.product}
+            </p>
+            {campaign.key_message && (
+              <p className="text-fg-muted">
+                <strong className="text-fg">Thông điệp cốt lõi:</strong> &ldquo;{campaign.key_message}&rdquo;
+              </p>
+            )}
+            <p className="text-fg-muted">
+              <strong className="text-fg">Gợi ý triển khai:</strong> {GOAL_KPI_META[campaign.goal].contentDirection}
+            </p>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField label="Kênh triển khai" required>
               {(p) => (
@@ -1331,7 +1405,7 @@ export default function CampaignDetailPage() {
           setCsvError(null);
         }}
         title="Nhập số liệu từ tệp CSV"
-        size="lg"
+        size="xl"
       >
         <div className="space-y-4">
           <p className="text-sm text-fg-muted">
@@ -1339,17 +1413,26 @@ export default function CampaignDetailPage() {
           </p>
 
           <div className="flex items-center gap-3">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  handlePreviewCsv(file);
-                }
-              }}
-              className="text-sm text-fg"
-            />
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-subtle px-3.5 py-1.5 text-xs font-medium text-fg transition-colors hover:bg-border/60">
+              <Upload className="h-3.5 w-3.5 text-fg-muted" />
+              <span>Chọn tệp báo cáo (.csv)</span>
+              <input
+                type="file"
+                accept=".csv"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    handlePreviewCsv(file);
+                  }
+                }}
+                className="sr-only"
+              />
+            </label>
+            {csvPreview && (
+              <span className="text-xs font-medium text-fg-muted">
+                Đã nạp dữ liệu kiểm tra ({csvPreview.summary.total} dòng)
+              </span>
+            )}
             {csvLoading && <span className="text-xs text-fg-muted">Đang xử lý tệp...</span>}
           </div>
 
@@ -1395,33 +1478,35 @@ export default function CampaignDetailPage() {
                 </div>
               )}
 
-              <div className="max-h-64 overflow-y-auto rounded border border-border text-xs">
+              <div className="max-h-64 overflow-x-auto overflow-y-auto rounded border border-border text-xs">
                 <Table>
                   <THead>
                     <TR>
-                      <TH>Dòng</TH>
-                      <TH>Ngày</TH>
-                      <TH>Chiến dịch</TH>
-                      <TH>Kênh</TH>
-                      <TH className="text-right">Views</TH>
-                      <TH className="text-right">Clicks</TH>
-                      <TH className="text-right">Chuyển đổi</TH>
-                      <TH className="text-right">Chi phí</TH>
-                      <TH>Thao tác</TH>
+                      <TH className="whitespace-nowrap">Dòng</TH>
+                      <TH className="whitespace-nowrap">Ngày</TH>
+                      <TH className="min-w-[230px]">Chiến dịch</TH>
+                      <TH className="whitespace-nowrap">Kênh</TH>
+                      <TH className="whitespace-nowrap text-right">Views</TH>
+                      <TH className="whitespace-nowrap text-right">Clicks</TH>
+                      <TH className="whitespace-nowrap text-right">Chuyển đổi</TH>
+                      <TH className="whitespace-nowrap text-right">Chi phí</TH>
+                      <TH className="whitespace-nowrap">Thao tác</TH>
                     </TR>
                   </THead>
                   <TBody>
                     {csvPreview.rows.slice(0, 50).map((r) => (
                       <TR key={r.row}>
-                        <TD>{r.row}</TD>
-                        <TD>{formatDate(r.metric_date)}</TD>
-                        <TD>{r.campaign_name}</TD>
-                        <TD>{r.channel_code}</TD>
-                        <TD className="text-right">{formatNumber(r.views)}</TD>
-                        <TD className="text-right">{formatNumber(r.clicks)}</TD>
-                        <TD className="text-right">{formatNumber(r.conversions)}</TD>
-                        <TD className="text-right">{formatMoney(r.cost)}</TD>
-                        <TD>{r.exists ? 'Cập nhật' : 'Thêm mới'}</TD>
+                        <TD className="whitespace-nowrap">{r.row}</TD>
+                        <TD className="whitespace-nowrap">{formatDate(r.metric_date)}</TD>
+                        <TD className="min-w-[230px] font-medium text-fg">{r.campaign_name}</TD>
+                        <TD className="whitespace-nowrap">
+                          <Badge tone="neutral">{r.channel_code}</Badge>
+                        </TD>
+                        <TD className="whitespace-nowrap text-right tabular-nums">{formatNumber(r.views)}</TD>
+                        <TD className="whitespace-nowrap text-right tabular-nums">{formatNumber(r.clicks)}</TD>
+                        <TD className="whitespace-nowrap text-right tabular-nums">{formatNumber(r.conversions)}</TD>
+                        <TD className="whitespace-nowrap text-right font-medium tabular-nums">{formatMoney(r.cost)}</TD>
+                        <TD className="whitespace-nowrap">{r.exists ? 'Cập nhật' : 'Thêm mới'}</TD>
                       </TR>
                     ))}
                   </TBody>

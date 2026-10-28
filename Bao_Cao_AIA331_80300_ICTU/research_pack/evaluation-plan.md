@@ -1,38 +1,31 @@
-# Kế hoạch đánh giá
+# Kế hoạch và Kết quả Đánh giá Thực nghiệm (MarketFlow AI)
 
-## Mục tiêu
+## 1. Mục tiêu đánh giá
 
-Đánh giá riêng ba lớp: tính đúng của nghiệp vụ, chất lượng có kiểm soát của AI và khả năng tái lập. Không gộp chúng thành một điểm cảm tính.
+Đánh giá độc lập và có thể tái lập bằng dòng lệnh trên ba phương diện:
+1. **Độ tin cậy nghiệp vụ và phân quyền**: Thông qua 151 ca kiểm thử tự động (104 Backend Pytest + 18 AI-Runner Pytest + 29 Playwright E2E).
+2. **Chất lượng điều phối công cụ MCP và tuân thủ *Proposal-Only* của AI**: Thông qua bộ đánh giá định lượng `scripts/evaluate_assistant.py` trên 8 kịch bản nghiệp vụ (`scripts/eval_cases.json`: `TC01 content_ideas`..`TC08 proposal_claim_trap`) đối với 4 giai đoạn tối ưu hóa System Prompt (`deploy/opencode/prompts/`).
+3. **Định cỡ tài nguyên và khả năng chịu lỗi**: Thông qua khảo sát thực nghiệm P0 Spike trên máy chủ mục tiêu và kiểm thử tiêm lỗi đa mô hình.
 
-## Đối tượng và fixture
+## 2. Kết quả đánh giá 4 giai đoạn tối ưu hóa System Prompt
 
-Tạo một bộ fixture nhỏ, có version, gồm:
+Lệnh tái lập:
+```bash
+python scripts/evaluate_assistant.py --all-versions --transcripts docs/eval/transcripts.json
+```
 
-- ít nhất hai user với role Manager và Marketer;
-- hai product, ba channel, hai campaign ở các trạng thái khác nhau;
-- content ở DRAFT, AI_DRAFT, IN_REVIEW, APPROVED và REJECTED;
-- metrics theo ngày/kênh, gồm một case views bằng 0 và một case clicks bằng 0;
-- AI cases cho idea, draft và summary; mỗi case có context được phép và context cố ý bị loại.
+| Giai đoạn Prompt | Đặc điểm chỉ dẫn | Số kịch bản Đạt | Tỷ lệ Pass | Ghi chú phân tích thực nghiệm |
+|---|---|---|---|---|
+| **Bản 1 (Cơ sở)** | Baseline cơ bản | 6 / 8 | **75.0%** | Trượt `TC03` (TikTok dài 3650 ký tự > 1500) và `TC05` (tự bịa thêm số liệu giả định ngoài ngữ cảnh). |
+| **Bản 2 (Rào chắn)** | Bổ sung Guardrails & Grounding | 5 / 8 | **62.5%** | Hiện tượng *Disclaimer Bloat* làm cả `TC02` (2082 ký tự) và `TC03` (3306 ký tự) vượt giới hạn độ dài; trượt `TC05`. |
+| **Bản 3 (Chuẩn KPI)** | Chuẩn hóa KPI & quy chuẩn kênh | 6 / 8 | **75.0%** | Vượt qua `TC05` (Grounding 1.0); còn vượt độ dài ở `TC02` (2467 ký tự) và `TC03` (2789 ký tự). |
+| **Bản 4 (Production)** | Khóa độ dài kênh & bỏ disclaimer thừa | **7 / 8** | **87.5%** | Đạt `TC01, TC02, TC03, TC04, TC06, TC07, TC08`; chỉ trượt nhẹ `TC05` do đưa thêm 1 số ví dụ giả định (`1.212`). |
 
-Fixture không được chứa API key hoặc dữ liệu cá nhân thật. Mỗi run ghi commit, môi trường, seed hash, provider/model, prompt version và thời gian.
+## 3. Kết quả kiểm thử tự động toàn hệ thống (151 ca kiểm thử)
 
-## Ma trận đo
-
-| Nhóm | Biến/metric | Phương pháp | Báo cáo |
-|---|---|---|---|
-| Nghiệp vụ | pass rate T01--T15 | test tự động với fixture | số pass/fail, lỗi blocker và log |
-| Dữ liệu | FK/constraint/state/KPI | test dương và âm | case, expected, actual |
-| AI contract | schema-valid rate, error containment | replay input cố định | output gốc, parser result, status |
-| AI grounding | fact ngoài context, source ids, warning | rubric theo case | điểm và ví dụ fail |
-| AI usefulness | objective/channel/audience/CTA fit | chấm theo rubric định trước | phân bố điểm, edit rate |
-| Performance | p50/p95 latency, error rate, token/cost nếu có | cùng máy và cấu hình | raw result và summary |
-| Usability | task completion, thao tác sai, thời gian | demo script với người dùng | checklist và quan sát |
-| Reproducibility | fresh setup, backup/restore | người khác chạy README | commit, commands, sai khác |
-
-## So sánh prompt/model
-
-Giữ nguyên fixture và thay đổi một biến mỗi vòng. Tối thiểu ba cấu hình được ghi trong prompt log. Không chọn riêng output đẹp để báo cáo. Nếu chỉ có mock provider, kết quả được giới hạn ở parser/workflow; không gọi đó là đánh giá model.
-
-## Kết quả âm
-
-Phải ghi lại timeout, rate limit, invalid JSON, context quá dài, thiếu metrics và output thêm fact. Một hệ thống AI tốt trong phạm vi môn học không phải hệ thống không bao giờ lỗi; đó là hệ thống lỗi có kiểm soát và cho người dùng đường lui rõ.
+| Tầng kiểm thử | Công cụ | Số tệp test | Số ca kiểm thử | Kết quả |
+|---|---|---|---|---|
+| Backend API & FastMCP | `pytest` | 16 tệp (`backend/tests/`) | 104 ca | **104 / 104 Pass (100%)** |
+| AI Runner Service | `pytest` | 2 tệp (`ai-runner/tests/`) | 18 ca | **18 / 18 Pass (100%)** |
+| Frontend E2E Browser | `Playwright` | 9 tệp (`frontend/tests/e2e/`) | 29 ca | **29 / 29 Pass (100%)** |
+| **Tổng cộng** | | **27 tệp** | **151 ca** | **151 / 151 Pass (100%)** |

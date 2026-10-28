@@ -16,49 +16,43 @@
  lifeline/.style={draw=black!50,dashed,line width=0.55pt},
  msg/.style={-{Latex[length=1.9mm]},draw=black,line width=0.75pt},
  ret/.style={-{Latex[length=1.9mm]},draw=black!85,dashed,line width=0.75pt},
- lab/.style={font=\sffamily\scriptsize,fill=white,inner sep=1.5pt,align=center,text=black}
+ lab/.style={font=\sffamily\scriptsize,fill=white,inner sep=1.2pt,align=center,text=black}
 ]
 
-\node[part] (p_stf) at (0.8, 0) {Nhân viên};
-\node[part] (p_ui) at (4.2, 0) {Giao diện Web};
-\node[part] (p_api) at (7.8, 0) {API Backend};
-\node[part] (p_ai) at (11.4, 0) {Điều phối AI};
-\node[part] (p_db) at (14.8, 0) {Cơ sở Dữ liệu};
+\node[part] (p_stf) at (0.8, 0) {Người dùng};
+\node[part] (p_ui) at (4.4, 0) {React SPA};
+\node[part] (p_api) at (8.2, 0) {FastAPI \& MCP};
+\node[part] (p_db) at (12.0, 0) {PostgreSQL / DB};
+\node[part] (p_ai) at (15.6, 0) {AI Runner};
 
-\foreach \x in {0.8, 4.2, 7.8, 11.4, 14.8} {
- \draw[lifeline] (\x, -0.42) -- (\x, -11.8);
+\foreach \x in {0.8, 4.4, 8.2, 12.0, 15.6} {
+ \draw[lifeline] (\x, -0.42) -- (\x, -11.6);
 }
 
-\draw[act] (4.13, -0.95) rectangle (4.27, -10.2);
-\draw[act] (7.73, -1.55) rectangle (7.87, -11.4);
-\draw[act] (11.33, -3.40) rectangle (11.47, -7.95);
-\draw[act] (14.73, -2.10) rectangle (14.87, -2.85);
-\draw[act] (14.73, -5.95) rectangle (14.87, -6.45);
-\draw[act] (14.73, -10.65) rectangle (14.87, -11.4);
+\draw[act] (4.33, -0.95) rectangle (4.47, -11.1);
+\draw[act] (8.13, -1.45) rectangle (8.27, -11.3);
+\draw[act] (11.93, -1.95) rectangle (12.07, -2.55);
+\draw[act] (11.93, -5.20) rectangle (12.07, -6.00);
+\draw[act] (11.93, -9.40) rectangle (12.07, -11.2);
+\draw[act] (15.53, -2.80) rectangle (15.67, -7.60);
 
-\draw[msg] (0.8, -0.95) -- node[lab,above]{1: Yêu cầu sinh nháp} (4.13, -0.95);
-\draw[msg] (4.27, -1.55) -- node[lab,above]{2: POST /api/v1/ai/draft} (7.73, -1.55);
-\draw[msg] (7.87, -2.15) -- node[lab,above,pos=0.5]{3: Kiểm tra quyền \& Đọc ngữ cảnh} (14.73, -2.15);
-\draw[ret] (14.73, -2.80) -- node[lab,above,pos=0.5]{4: Ngữ cảnh hợp lệ} (7.87, -2.80);
-\draw[msg] (7.87, -3.45) -- node[lab,above]{5: Tạo Prompt (prompts.json)} (11.33, -3.45);
-\draw[msg] (11.47, -3.95) -- ++(0.85, 0) -- ++(0, -0.45) node[lab,right]{6: Gọi LLM API} -- (11.47, -4.40);
+\draw[msg] (0.8, -0.95) -- node[lab,above]{1: Gửi yêu cầu soạn nháp} (4.33, -0.95);
+\draw[msg] (4.47, -1.45) -- node[lab,above]{2: POST /assistant/threads/\{id\}/messages} (8.13, -1.45);
+\draw[msg] (8.27, -2.10) -- node[lab,above]{3: Kiểm tra RBAC \& Nạp ngữ cảnh} (11.93, -2.10);
+\draw[msg] (8.27, -2.90) -- node[lab,above,pos=0.76]{4: POST /run (Run-Token)} (15.53, -2.90);
 
-\draw[draw=black!75,line width=0.75pt,rounded corners=3pt,fill=black!1] (6.80, -4.75) rectangle (15.50, -8.55);
-\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=north west] at (6.95, -4.82) {alt [Phản hồi JSON hợp lệ]};
+\draw[draw=black!75,line width=0.75pt,rounded corners=3pt,fill=black!1] (7.20, -3.55) rectangle (16.30, -8.05);
+\node[font=\sffamily\bfseries\scriptsize,text=black,anchor=north west] at (7.35, -3.62) {loop [Gọi công cụ MCP \& Tạo đề xuất]};
 
-\draw[msg] (11.33, -5.65) -- node[lab,above]{7a: Trả JSON đúng Schema} (7.87, -5.65);
-\draw[msg] (11.47, -6.20) -- node[lab,above]{8a: Ghi nhật ký ai\_logs} (14.73, -6.20);
+\draw[msg] (15.53, -4.45) -- node[lab,above,pos=0.25]{5: POST /mcp (propose\_*)} (8.27, -4.45);
+\draw[msg] (8.27, -5.35) -- node[lab,above]{6: Lưu ai\_action (PROPOSED)} (11.93, -5.35);
+\draw[ret] (15.53, -6.30) -- node[lab,above,pos=0.25]{7: Stream NDJSON (delta, done)} (8.27, -6.30);
+\draw[ret] (8.13, -7.35) -- node[lab,above]{8: Stream SSE hiển thị Thẻ đề xuất} (4.47, -7.35);
 
-\draw[line width=0.55pt,dashed,draw=black!60] (6.80, -6.75) -- (15.50, -6.75);
-\node[font=\sffamily\scriptsize\itshape,text=black,anchor=north west] at (6.95, -6.83) {[Timeout / Lỗi Schema]: Chuyển sang Smart Fallback};
-
-\draw[ret] (11.33, -7.85) -- node[lab,above]{7b: Bản nháp dự phòng (is\_fallback)} (7.87, -7.85);
-
-\draw[ret] (7.73, -9.10) -- node[lab,above]{9: Hiển thị bản nháp \& nguồn gốc} (4.27, -9.10);
-\draw[msg] (0.8, -9.70) -- node[lab,above]{10: Chỉnh sửa \& Gửi duyệt} (4.13, -9.70);
-\draw[msg] (4.27, -10.30) -- node[lab,above]{11: POST /contents/\{id\}/submit} (7.73, -10.30);
-\draw[msg] (7.87, -10.80) -- node[lab,above,pos=0.5]{12: Lưu trạng thái IN\_REVIEW} (14.73, -10.80);
-\draw[ret] (14.73, -11.35) -- node[lab,above,pos=0.5]{13: Xác nhận thành công} (7.87, -11.35);
+\draw[msg] (0.8, -8.65) -- node[lab,above]{9: Xem trước \& Bấm Xác nhận} (4.33, -8.65);
+\draw[msg] (4.47, -9.35) -- node[lab,above]{10: POST /assistant/actions/\{id\}/confirm} (8.13, -9.35);
+\draw[msg] (8.27, -10.05) -- node[lab,above]{11: Tạo contents (DRAFT) \& EXECUTED} (11.93, -10.05);
+\draw[msg] (4.47, -10.85) -- node[lab,above]{12: Gửi duyệt (/submit) \& Manager (/approve)} (8.13, -10.85);
 
 \end{tikzpicture}%
 }

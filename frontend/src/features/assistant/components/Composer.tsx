@@ -79,18 +79,27 @@ export function Composer({
   };
 
   const handleApplyTemplate = (template: string) => {
-    onChange(template);
+    let resolved = template;
+    if (currentCampaign?.name) {
+      resolved = resolved
+        .replace(/\[Tên chiến dịch\/sản phẩm\]/g, currentCampaign.name)
+        .replace(/\[Tên sản phẩm\]/g, currentCampaign.name)
+        .replace(/\[Chương trình\/Sản phẩm mới\]/g, currentCampaign.name);
+    }
+    onChange(resolved);
     setShowSlashMenu(false);
 
-    // Focus vào textarea và chọn phần placeholder đầu tiên
+    // Focus vào textarea và chọn phần placeholder đầu tiên (nếu còn)
     setTimeout(() => {
       const el = textareaRef.current;
       if (!el) return;
       el.focus();
-      const firstBracket = template.indexOf('[');
-      const closeBracket = template.indexOf(']');
+      const firstBracket = resolved.indexOf('[');
+      const closeBracket = resolved.indexOf(']');
       if (firstBracket !== -1 && closeBracket !== -1) {
         el.setSelectionRange(firstBracket, closeBracket + 1);
+      } else {
+        el.setSelectionRange(resolved.length, resolved.length);
       }
     }, 50);
   };
@@ -204,20 +213,20 @@ export function Composer({
             />
           </div>
 
-          {/* Thanh công cụ tích hợp ngay đáy thẻ Composer */}
-          <div className="flex flex-wrap items-center justify-between gap-2 px-3 pb-2.5 pt-1.5">
+          {/* Thanh công cụ tích hợp ngay đáy thẻ Composer (1 dòng duy nhất, nút Gửi luôn cố định bên phải) */}
+          <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1.5">
             {/* Cụm nút bên trái: Ngữ cảnh chiến dịch + Mẫu lệnh nhanh */}
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">
               {currentCampaign ? (
-                <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-ai/30 bg-ai-soft px-2.5 py-1 text-xs font-medium text-ai-soft-fg">
+                <span className="inline-flex min-w-0 max-w-[180px] items-center gap-1.5 whitespace-nowrap rounded-lg border border-ai/30 bg-ai-soft px-2.5 py-1 text-xs font-medium text-ai-soft-fg sm:max-w-[240px]">
                   <Megaphone className="h-3 w-3 shrink-0" aria-hidden />
-                  <span className="max-w-[160px] truncate sm:max-w-[220px]">
+                  <span className="min-w-0 truncate" title={currentCampaign.name}>
                     {currentCampaign.name}
                   </span>
                   <button
                     type="button"
                     onClick={() => onSelectCampaign(null)}
-                    className="rounded p-0.5 hover:bg-ai/20 focus:outline-none"
+                    className="shrink-0 rounded p-0.5 hover:bg-ai/20 focus:outline-none"
                     title="Gỡ bỏ ngữ cảnh chiến dịch"
                     aria-label="Gỡ bỏ ngữ cảnh"
                   >
@@ -225,18 +234,18 @@ export function Composer({
                   </button>
                 </span>
               ) : (
-                <div className="relative">
+                <div className="relative shrink-0">
                   <button
                     type="button"
                     onClick={() => setShowCampaignPicker((prev) => !prev)}
-                    className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border bg-subtle/70 px-2.5 py-1 text-xs font-medium text-fg-muted transition-colors hover:border-border-strong hover:bg-subtle hover:text-fg focus:outline-none"
+                    className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border bg-subtle/70 px-2.5 py-1 text-xs font-medium text-fg-muted transition-colors hover:border-border-strong hover:bg-subtle hover:text-fg focus:outline-none"
                   >
-                    <Megaphone className="h-3 w-3 text-ai" aria-hidden />
+                    <Megaphone className="h-3 w-3 shrink-0 text-ai" aria-hidden />
                     <span>Gắn chiến dịch</span>
                   </button>
 
                   {showCampaignPicker && (
-                    <div className="absolute bottom-full left-0 mb-1.5 max-h-56 w-64 overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-overlay animate-scale-in z-30">
+                    <div className="absolute bottom-full left-0 z-30 mb-1.5 max-h-56 w-64 overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-overlay animate-scale-in">
                       <div className="px-2.5 py-1.5 text-[11px] font-semibold text-fg-subtle">
                         Chọn chiến dịch ngữ cảnh
                       </div>
@@ -265,30 +274,32 @@ export function Composer({
               <button
                 type="button"
                 onClick={() => setShowSlashMenu((prev) => !prev)}
-                className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-border bg-subtle/70 px-2 py-1 text-xs text-fg-muted transition-colors hover:border-border-strong hover:bg-subtle hover:text-fg focus:outline-none"
+                className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-border bg-subtle/70 px-2 py-1 text-xs text-fg-muted transition-colors hover:border-border-strong hover:bg-subtle hover:text-fg focus:outline-none"
                 title="Mở danh sách mẫu câu lệnh nhanh"
               >
-                <Command className="h-3 w-3 text-fg-subtle" aria-hidden />
+                <Command className="h-3 w-3 shrink-0 text-fg-subtle" aria-hidden />
                 <span>Mẫu lệnh</span>
               </button>
 
-              <div className="hidden items-center gap-1 md:flex">
-                {QUICK_PROMPTS.slice(0, 2).map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => handleApplyTemplate(p.template)}
-                    className="whitespace-nowrap rounded-lg px-2 py-1 text-[11px] text-fg-subtle transition-colors hover:bg-subtle hover:text-fg focus:outline-none"
-                  >
-                    + {p.title}
-                  </button>
-                ))}
-              </div>
+              {!currentCampaign && !value.trim() && (
+                <div className="hidden min-w-0 items-center gap-1 overflow-hidden xl:flex">
+                  {QUICK_PROMPTS.slice(0, 2).map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => handleApplyTemplate(p.template)}
+                      className="shrink-0 whitespace-nowrap rounded-lg px-2 py-1 text-[11px] text-fg-subtle transition-colors hover:bg-subtle hover:text-fg focus:outline-none"
+                    >
+                      + {p.title}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Cụm nút bên phải: Gợi ý phím tắt + Nút Gửi/Dừng */}
-            <div className="flex items-center gap-2.5">
-              <span className="hidden text-[11px] text-fg-subtle sm:inline">
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="hidden whitespace-nowrap text-[11px] text-fg-subtle sm:inline">
                 Enter để gửi
               </span>
 
@@ -296,11 +307,11 @@ export function Composer({
                 <button
                   type="button"
                   onClick={onStop}
-                  className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-xl bg-danger px-3 text-xs font-medium text-white shadow-2xs transition-colors hover:bg-danger/90 focus:outline-none"
+                  className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-danger px-3 text-xs font-medium text-white shadow-2xs transition-colors hover:bg-danger/90 focus:outline-none"
                   title="Dừng phản hồi"
                   aria-label="Dừng phản hồi"
                 >
-                  <Square className="h-3 w-3 fill-current" aria-hidden />
+                  <Square className="h-3 w-3 shrink-0 fill-current" aria-hidden />
                   <span>Dừng</span>
                 </button>
               ) : (
@@ -308,7 +319,7 @@ export function Composer({
                   type="button"
                   onClick={handleSubmit}
                   disabled={!value.trim() || disabled}
-                  className={`inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 text-xs font-medium transition-all focus:outline-none ${
+                  className={`inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 text-xs font-medium transition-all focus:outline-none ${
                     value.trim() && !disabled
                       ? 'bg-ai text-ai-fg shadow-2xs hover:bg-ai-hover'
                       : 'cursor-not-allowed bg-subtle text-fg-subtle'
@@ -317,7 +328,7 @@ export function Composer({
                   aria-label="Gửi câu lệnh"
                 >
                   <span>Gửi</span>
-                  <ArrowUp className="h-3.5 w-3.5" aria-hidden />
+                  <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 </button>
               )}
             </div>

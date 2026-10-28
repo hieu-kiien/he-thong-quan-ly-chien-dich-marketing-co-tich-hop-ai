@@ -1,193 +1,201 @@
--- AIA331 / 80300
--- Design baseline for the marketing campaign management system.
--- This file is a proposed SQLite schema, not evidence of a running application.
+-- MarketFlow AI — Lược đồ Cơ sở dữ liệu Quan hệ 14 Bảng (PostgreSQL 16 / SQLite WAL)
+-- Đồng bộ 100% với SQLAlchemy 2.0 ORM trong backend/app/models/
 
 PRAGMA foreign_keys = ON;
 
+-- 1. Bảng users
 CREATE TABLE users (
- id INTEGER PRIMARY KEY,
- email TEXT NOT NULL UNIQUE,
- full_name TEXT NOT NULL,
- password_hash TEXT NOT NULL,
- role TEXT NOT NULL CHECK (role IN ('MANAGER', 'MARKETER')),
- status TEXT NOT NULL DEFAULT 'ACTIVE'
- CHECK (status IN ('ACTIVE', 'DISABLED')),
- created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    full_name VARCHAR(200) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('MANAGER', 'MARKETER')),
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE product_categories (
- id INTEGER PRIMARY KEY,
- name TEXT NOT NULL UNIQUE,
- description TEXT,
- created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+-- 2. Bảng channels
+CREATE TABLE channels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code VARCHAR(30) NOT NULL UNIQUE CHECK (code IN ('FACEBOOK', 'INSTAGRAM', 'TIKTOK', 'EMAIL', 'GOOGLE_ADS', 'ZALO_OA', 'WEBSITE')),
+    name VARCHAR(100) NOT NULL,
+    format_rules JSON NOT NULL DEFAULT '{}',
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE products (
- id INTEGER PRIMARY KEY,
- category_id INTEGER NOT NULL,
- name TEXT NOT NULL,
- description TEXT,
- usp TEXT,
- status TEXT NOT NULL DEFAULT 'ACTIVE'
- CHECK (status IN ('ACTIVE', 'INACTIVE')),
- FOREIGN KEY (category_id) REFERENCES product_categories(id)
- ON UPDATE CASCADE ON DELETE RESTRICT
+-- 3. Bảng brand_profile
+CREATE TABLE brand_profile (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    brand_name VARCHAR(200) NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    tone_of_voice TEXT NOT NULL DEFAULT '',
+    target_audience TEXT NOT NULL DEFAULT '',
+    guidelines TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE marketing_channels (
- id INTEGER PRIMARY KEY,
- code TEXT NOT NULL UNIQUE,
- name TEXT NOT NULL,
- format_rules TEXT,
- status TEXT NOT NULL DEFAULT 'ACTIVE'
- CHECK (status IN ('ACTIVE', 'INACTIVE'))
+-- 4. Bảng banned_keywords
+CREATE TABLE banned_keywords (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    keyword VARCHAR(100) NOT NULL UNIQUE,
+    note VARCHAR(255),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 5. Bảng campaigns
 CREATE TABLE campaigns (
- id INTEGER PRIMARY KEY,
- product_id INTEGER NOT NULL,
- owner_id INTEGER NOT NULL,
- name TEXT NOT NULL,
- objective TEXT NOT NULL,
- audience TEXT NOT NULL,
- start_date TEXT NOT NULL,
- end_date TEXT NOT NULL,
- budget NUMERIC NOT NULL DEFAULT 0 CHECK (budget >= 0),
- status TEXT NOT NULL DEFAULT 'DRAFT'
- CHECK (status IN
- ('DRAFT', 'PLANNED', 'ACTIVE', 'PAUSED',
- 'COMPLETED', 'ARCHIVED')),
- created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
- updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
- CHECK (end_date >= start_date),
- FOREIGN KEY (product_id) REFERENCES products(id)
- ON UPDATE CASCADE ON DELETE RESTRICT,
- FOREIGN KEY (owner_id) REFERENCES users(id)
- ON UPDATE CASCADE ON DELETE RESTRICT
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(200) NOT NULL,
+    goal VARCHAR(30) NOT NULL,
+    objective TEXT NOT NULL,
+    target_audience TEXT NOT NULL,
+    product TEXT NOT NULL,
+    key_message TEXT,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    budget NUMERIC(14, 2) NOT NULL DEFAULT 0 CHECK (budget >= 0),
+    status VARCHAR(20) NOT NULL DEFAULT 'PLANNED',
+    owner_id INTEGER NOT NULL REFERENCES users(id),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT date_range CHECK (end_date >= start_date)
 );
 
-CREATE TABLE campaign_members (
- campaign_id INTEGER NOT NULL,
- user_id INTEGER NOT NULL,
- member_role TEXT NOT NULL DEFAULT 'CONTRIBUTOR'
- CHECK (member_role IN ('OWNER', 'CONTRIBUTOR')),
- assigned_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
- PRIMARY KEY (campaign_id, user_id),
- FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
- ON UPDATE CASCADE ON DELETE CASCADE,
- FOREIGN KEY (user_id) REFERENCES users(id)
- ON UPDATE CASCADE ON DELETE RESTRICT
+-- 6. Bảng campaign_channels
+CREATE TABLE campaign_channels (
+    campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    channel_id INTEGER NOT NULL REFERENCES channels(id),
+    planned_budget NUMERIC(14, 2) CHECK (planned_budget IS NULL OR planned_budget >= 0),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (campaign_id, channel_id)
 );
 
-CREATE TABLE marketing_contents (
- id INTEGER PRIMARY KEY,
- campaign_id INTEGER NOT NULL,
- channel_id INTEGER NOT NULL,
- created_by INTEGER NOT NULL,
- title TEXT NOT NULL,
- body TEXT NOT NULL,
- cta TEXT,
- status TEXT NOT NULL DEFAULT 'DRAFT'
- CHECK (status IN
- ('DRAFT', 'AI_DRAFT', 'IN_REVIEW', 'APPROVED',
- 'REJECTED', 'PUBLISHED')),
- source_ids_json TEXT NOT NULL DEFAULT '[]',
- warnings_json TEXT NOT NULL DEFAULT '[]',
- version_no INTEGER NOT NULL DEFAULT 1 CHECK (version_no > 0),
- created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
- updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
- FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
- ON UPDATE CASCADE ON DELETE CASCADE,
- FOREIGN KEY (channel_id) REFERENCES marketing_channels(id)
- ON UPDATE CASCADE ON DELETE RESTRICT,
- FOREIGN KEY (created_by) REFERENCES users(id)
- ON UPDATE CASCADE ON DELETE RESTRICT
+-- 7. Bảng ai_threads
+CREATE TABLE ai_threads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    campaign_id INTEGER REFERENCES campaigns(id) ON DELETE SET NULL,
+    title VARCHAR(200) NOT NULL DEFAULT 'Phiên mới',
+    opencode_session_id VARCHAR(100),
+    pinned BOOLEAN NOT NULL DEFAULT 0,
+    last_message_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 8. Bảng ai_messages
+CREATE TABLE ai_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    thread_id INTEGER NOT NULL REFERENCES ai_threads(id) ON DELETE CASCADE,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('USER', 'ASSISTANT', 'TOOL')),
+    content TEXT NOT NULL DEFAULT '',
+    parts_json JSON NOT NULL DEFAULT '[]',
+    status VARCHAR(20) NOT NULL DEFAULT 'COMPLETE',
+    error_code VARCHAR(50),
+    model VARCHAR(100),
+    latency_ms INTEGER,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 9. Bảng ai_actions
+CREATE TABLE ai_actions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    thread_id INTEGER NOT NULL REFERENCES ai_threads(id) ON DELETE CASCADE,
+    message_id INTEGER NOT NULL REFERENCES ai_messages(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tool VARCHAR(64) NOT NULL,
+    args_json JSON NOT NULL DEFAULT '{}',
+    summary VARCHAR(500) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PROPOSED' CHECK (status IN ('PROPOSED', 'EXECUTED', 'REJECTED', 'FAILED')),
+    result_json JSON,
+    error TEXT,
+    executed_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 10. Bảng contents
+CREATE TABLE contents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    campaign_id INTEGER NOT NULL REFERENCES campaigns(id),
+    channel_id INTEGER NOT NULL REFERENCES channels(id),
+    content_type VARCHAR(30) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    body TEXT NOT NULL,
+    cta VARCHAR(255),
+    status VARCHAR(20) NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'PENDING_REVIEW', 'APPROVED', 'REJECTED', 'PUBLISHED')),
+    origin VARCHAR(20) NOT NULL DEFAULT 'MANUAL',
+    ai_message_id INTEGER REFERENCES ai_messages(id) ON DELETE SET NULL,
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    published_url VARCHAR(500),
+    published_at TIMESTAMP,
+    published_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 11. Bảng content_reviews
 CREATE TABLE content_reviews (
- id INTEGER PRIMARY KEY,
- content_id INTEGER NOT NULL,
- reviewer_id INTEGER NOT NULL,
- decision TEXT NOT NULL CHECK
- (decision IN ('APPROVED', 'REJECTED', 'REQUEST_CHANGES')),
- reason TEXT NOT NULL,
- created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
- FOREIGN KEY (content_id) REFERENCES marketing_contents(id)
- ON UPDATE CASCADE ON DELETE CASCADE,
- FOREIGN KEY (reviewer_id) REFERENCES users(id)
- ON UPDATE CASCADE ON DELETE RESTRICT
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content_id INTEGER NOT NULL REFERENCES contents(id) ON DELETE CASCADE,
+    reviewer_id INTEGER NOT NULL REFERENCES users(id),
+    decision VARCHAR(20) NOT NULL,
+    comment TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE marketing_schedules (
- id INTEGER PRIMARY KEY,
- content_id INTEGER NOT NULL,
- scheduled_at TEXT NOT NULL,
- timezone TEXT NOT NULL,
- status TEXT NOT NULL DEFAULT 'PLANNED'
- CHECK (status IN ('PLANNED', 'CANCELLED', 'EXECUTED')),
- created_by INTEGER NOT NULL,
- created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
- FOREIGN KEY (content_id) REFERENCES marketing_contents(id)
- ON UPDATE CASCADE ON DELETE CASCADE,
- FOREIGN KEY (created_by) REFERENCES users(id)
- ON UPDATE CASCADE ON DELETE RESTRICT
+-- 12. Bảng schedules
+CREATE TABLE schedules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content_id INTEGER NOT NULL REFERENCES contents(id) ON DELETE CASCADE,
+    scheduled_at TIMESTAMP NOT NULL,
+    assignee_id INTEGER REFERENCES users(id),
+    status VARCHAR(20) NOT NULL DEFAULT 'PLANNED',
+    note TEXT,
+    done_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE campaign_metrics (
- id INTEGER PRIMARY KEY,
- campaign_id INTEGER NOT NULL,
- channel_id INTEGER NOT NULL,
- metric_date TEXT NOT NULL,
- views INTEGER NOT NULL DEFAULT 0 CHECK (views >= 0),
- clicks INTEGER NOT NULL DEFAULT 0 CHECK (clicks >= 0),
- conversions INTEGER NOT NULL DEFAULT 0 CHECK (conversions >= 0),
- cost NUMERIC NOT NULL DEFAULT 0 CHECK (cost >= 0),
- revenue NUMERIC NOT NULL DEFAULT 0 CHECK (revenue >= 0),
- created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
- UNIQUE (campaign_id, channel_id, metric_date),
- FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
- ON UPDATE CASCADE ON DELETE CASCADE,
- FOREIGN KEY (channel_id) REFERENCES marketing_channels(id)
- ON UPDATE CASCADE ON DELETE RESTRICT,
- CHECK (clicks <= views)
+-- 13. Bảng metrics
+CREATE TABLE metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    campaign_id INTEGER NOT NULL REFERENCES campaigns(id),
+    channel_id INTEGER NOT NULL REFERENCES channels(id),
+    metric_date DATE NOT NULL,
+    views INTEGER NOT NULL DEFAULT 0,
+    clicks INTEGER NOT NULL DEFAULT 0,
+    conversions INTEGER NOT NULL DEFAULT 0,
+    cost NUMERIC(14, 2) NOT NULL DEFAULT 0,
+    source VARCHAR(20) NOT NULL,
+    entered_by INTEGER REFERENCES users(id),
+    import_batch VARCHAR(64),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_metrics_campaign_channel_date UNIQUE (campaign_id, channel_id, metric_date),
+    CONSTRAINT counts_non_negative CHECK (views >= 0 AND clicks >= 0 AND conversions >= 0),
+    CONSTRAINT cost_non_negative CHECK (cost >= 0),
+    CONSTRAINT clicks_le_views CHECK (views = 0 OR clicks <= views),
+    CONSTRAINT conversions_le_clicks CHECK (clicks = 0 OR conversions <= clicks)
 );
 
-CREATE TABLE ai_logs (
- id INTEGER PRIMARY KEY,
- user_id INTEGER NOT NULL,
- campaign_id INTEGER,
- task_type TEXT NOT NULL CHECK
- (task_type IN ('IDEA', 'DRAFT', 'SUMMARY')),
- provider TEXT NOT NULL,
- model TEXT NOT NULL,
- prompt_version TEXT NOT NULL,
- input_hash TEXT NOT NULL,
- source_ids_json TEXT NOT NULL DEFAULT '[]',
- output_json TEXT,
- result_status TEXT NOT NULL CHECK
- (result_status IN
- ('SUCCESS', 'SCHEMA_ERROR', 'TIMEOUT',
- 'RATE_LIMIT', 'PROVIDER_ERROR', 'BLOCKED')),
- error_code TEXT,
- latency_ms INTEGER CHECK (latency_ms IS NULL OR latency_ms >= 0),
- created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
- FOREIGN KEY (user_id) REFERENCES users(id)
- ON UPDATE CASCADE ON DELETE RESTRICT,
- FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
- ON UPDATE CASCADE ON DELETE SET NULL
+-- 14. Bảng notifications
+CREATE TABLE notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type VARCHAR(40) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    body TEXT NOT NULL DEFAULT '',
+    link VARCHAR(255),
+    is_read BOOLEAN NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE INDEX idx_campaigns_owner_status
- ON campaigns(owner_id, status);
-CREATE INDEX idx_campaigns_dates
- ON campaigns(start_date, end_date);
-CREATE INDEX idx_contents_campaign_status
- ON marketing_contents(campaign_id, status);
-CREATE INDEX idx_reviews_content_created
- ON content_reviews(content_id, created_at);
-CREATE INDEX idx_schedules_time_status
- ON marketing_schedules(scheduled_at, status);
-CREATE INDEX idx_metrics_campaign_date
- ON campaign_metrics(campaign_id, metric_date);
-CREATE INDEX idx_ai_logs_campaign_created
- ON ai_logs(campaign_id, created_at);

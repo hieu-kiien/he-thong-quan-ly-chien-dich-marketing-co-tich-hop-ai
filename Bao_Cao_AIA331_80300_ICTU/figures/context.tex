@@ -6,34 +6,34 @@
  draw=black,
  fill=white,
  rounded corners=3pt,
- minimum width=3.1cm,
- minimum height=1.6cm,
+ minimum width=3.2cm,
+ minimum height=1.65cm,
  align=center,
  line width=0.85pt,
- text width=2.9cm,
+ text width=3.0cm,
  inner sep=3pt
  },
  sys_node/.style={
  draw=black,
  fill=black!4,
  rounded corners=4pt,
- minimum width=4.4cm,
- minimum height=2.6cm,
+ minimum width=4.6cm,
+ minimum height=2.7cm,
  align=center,
  line width=1.1pt,
- text width=4.1cm,
+ text width=4.3cm,
  inner sep=5pt
  },
  ext_node/.style={
  draw=black!80,
  fill=white,
  rounded corners=3pt,
- minimum width=3.1cm,
- minimum height=1.6cm,
+ minimum width=3.2cm,
+ minimum height=1.65cm,
  align=center,
  line width=0.85pt,
  dashed,
- text width=2.9cm,
+ text width=3.0cm,
  inner sep=3pt
  },
  rel/.style={-{Latex[length=2.2mm]},draw=black,line width=0.8pt},
@@ -41,39 +41,40 @@
 ]
 
 \node[user_node] (mgr) at (0.8, 1.65) {
- \textbf{Quản lý / Duyệt bài}\\[2pt]
- {\scriptsize Lập chiến dịch, phân bổ ngân sách, duyệt nội dung}
+ \textbf{Người quản lý (MANAGER)}\\[2pt]
+ {\scriptsize Quản trị kênh, Brand Profile, phê duyệt nội dung, xem báo cáo}
 };
 
 \node[user_node] (stf) at (0.8, -1.65) {
- \textbf{Nhân viên Marketing}\\[2pt]
- {\scriptsize Soạn nội dung, gọi AI nháp, nhập chỉ số kênh}
+ \textbf{Nhân viên (MARKETER)}\\[2pt]
+ {\scriptsize Quản lý chiến dịch, soạn bài, gọi Trợ lý AI, nhập \& import CSV số liệu}
 };
 
 \node[sys_node] (sys) at (7.0, 0) {
- \textbf{\small HỆ THỐNG QUẢN LÝ}\\
- \textbf{\small CHIẾN DỊCH MARKETING}\\
- {\scriptsize (MarketFlow AI -- Đề tài 80300)}\\[3pt]
- {\scriptsize Quản lý chiến dịch, kênh, nội dung, lịch đăng, chỉ số; tích hợp AI có kiểm duyệt con người}
+ \textbf{\small HỆ THỐNG MARKETFLOW}\\
+ {\scriptsize (Đề tài AIA331 -- Mã số 80300)}\\[3pt]
+ {\scriptsize Quản lý chiến dịch, 7 kênh, nội dung, duyệt bài HITL, lịch đăng, chỉ số KPI; tích hợp Trợ lý AI qua MCP \& cơ chế Chỉ Đề Xuất (PROPOSED)}
 };
 
 \node[ext_node] (ai) at (13.2, 1.65) {
- \textbf{Nhà cung cấp AI}\\
- {\scriptsize (Gemini / OpenAI / Ollama)}\\[2pt]
- {\scriptsize Xử lý prompt, trả JSON theo cấu trúc}
+ \textbf{Hạ tầng Đa mô hình AI}\\
+ {\scriptsize (OpenCode Zen / Groq /}\\
+ {\scriptsize NVIDIA NIM / Gemini)}\\[1pt]
+ {\scriptsize Suy luận LLM \& gọi MCP Tool}
 };
 
 \node[ext_node] (soc) at (13.2, -1.65) {
- \textbf{Kênh Truyền thông}\\
- {\scriptsize (Facebook / TikTok / Email)}\\[2pt]
- {\scriptsize Tiếp nhận kế hoạch và nội dung đã duyệt}
+ \textbf{7 Kênh Truyền thông}\\
+ {\scriptsize (FB / TikTok / IG / Zalo /}\\
+ {\scriptsize Email / Google Ads / Web)}\\[1pt]
+ {\scriptsize Đăng bài đã duyệt \& lấy URL}
 };
 
-\draw[rel] (mgr.east) -- node[lab, pos=0.48]{Thiết lập \&\\Phê duyệt} (sys.155);
-\draw[rel] (stf.east) -- node[lab, pos=0.48]{Soạn thảo \&\\Nhập số liệu} (sys.205);
+\draw[rel] (mgr.east) -- node[lab, pos=0.48]{Quản trị \&\\Phê duyệt} (sys.155);
+\draw[rel] (stf.east) -- node[lab, pos=0.48]{Soạn thảo \&\\Xác nhận đề xuất} (sys.205);
 
-\draw[rel] (sys.25) -- node[lab, pos=0.52]{Prompt /\\JSON} (ai.west);
-\draw[rel] (sys.335) -- node[lab, pos=0.52]{Nội dung\\đã duyệt} (soc.west);
+\draw[rel] (sys.25) -- node[lab, pos=0.52]{Prompt /\\MCP Tool Calls} (ai.west);
+\draw[rel] (sys.335) -- node[lab, pos=0.52]{Nội dung\\APPROVED} (soc.west);
 
 \end{tikzpicture}%
 }

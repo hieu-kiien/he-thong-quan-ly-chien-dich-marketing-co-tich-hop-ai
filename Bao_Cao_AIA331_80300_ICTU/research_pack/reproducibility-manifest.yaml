@@ -1,46 +1,52 @@
 project:
- name: "AIA331 80300 - Marketing campaign management with AI"
- repository: "not started at design baseline"
- commit: "not applicable before application implementation"
- report_version: ""
- status: "DESIGNED / PLANNED"
+  name: "AIA331 80300 - Hệ thống quản lý chiến dịch marketing có tích hợp AI (MarketFlow AI)"
+  repository: "https://marketing.kienhieu.id.vn"
+  report_version: "final"
+  status: "IMPLEMENTED / TESTED / MEASURED / DEPLOYED"
 environment:
- os: "Windows 11 or equivalent documented environment"
- hardware: "to be recorded at implementation and evaluation"
- runtime_versions:
- report_builder: "XeLaTeX / MiKTeX"
- backend: "to be locked after implementation"
- frontend: "to be locked after implementation"
- dependency_lockfile: "not available before application implementation"
+  os: "Ubuntu Linux (Production VPS 2 vCPU, 2.5 GB RAM) & Windows 11 (Dev/Test)"
+  runtime_versions:
+    report_builder: "XeLaTeX / MiKTeX"
+    backend: "Python 3.12+ / FastAPI / SQLAlchemy 2.0 / FastMCP"
+    ai_runner: "Python 3.12+ / FastAPI (:8100) / OpenCode CLI 1.19.4"
+    frontend: "Node.js 20+ / React 18 / TypeScript / Vite / Tailwind CSS v4"
+    database: "PostgreSQL 16 (Production & Docker) / SQLite WAL (Dev & Pytest)"
 data:
- source: "synthetic/demo data planned; no real marketing dataset claimed"
- seed_or_snapshot: "to be created with the application"
- preprocessing:
- - "document schema and metric grain"
- - "record data completeness and missing-value policy"
+  source: "Dữ liệu mẫu tái lập qua backend/seed/seed_demo.py"
+  seed_or_snapshot: "3 users (manager, marketer, marketer2), 7 channels, 4 campaigns, 12 contents, 120 metrics"
 ai:
- provider: "not selected"
- model: "not selected"
- model_version_or_date: "unknown"
- prompt_version: "draft-contract-v1"
- parameters: {}
+  primary_model: "opencode/deepseek-v4.1-flash-free"
+  fallback_models_count: 13
+  platforms:
+    - "OpenCode Free (deepseek-v4.1-flash-free, glm-5.3-flash-free, mimo-v2.6-flash-free)"
+    - "Groq LPU (openai/gpt-oss-120b, qwen/qwen3.8-27b, openai/gpt-oss-20b)"
+    - "OpenRouter Free (nemotron-3.5-super-vl:free, nemotron-3-ultra-550b-a55b:free, nemotron-3.5-lightning:free, inkling:free, inkling-small:free)"
+    - "Google AI Studio (gemini-3.5-flash-lite, gemini-3.1-flash-lite)"
+  prompt_versions:
+    - "Bản 1 - Baseline (75.0% - 6/8)"
+    - "Bản 2 - Guardrails (62.5% - 5/8)"
+    - "Bản 3 - KPI Rules (75.0% - 6/8)"
+    - "Bản 4 - Production (87.5% - 7/8)"
 commands:
- setup:
- - "build the LaTeX source with XeLaTeX"
- - "after implementation, add fresh application setup commands"
- test:
- - "after implementation, add unit/integration/UI commands"
- evaluation:
- - "after implementation, add fixture replay and prompt comparison commands"
+  setup:
+    - "cd backend && alembic upgrade head && python -m seed.seed_demo"
+    - "xelatex -interaction=nonstopmode main.tex"
+  test:
+    - "cd backend && python -m pytest -q  # 104 passed"
+    - "python -m pytest ai-runner/tests -q  # 18 passed"
+    - "cd frontend && npx playwright test   # 29 passed"
+    - "python -m ruff check backend         # 0 errors"
+  evaluation:
+    - "python scripts/evaluate_assistant.py --all-versions --transcripts docs/eval/transcripts.json"
 artifacts:
- raw_results:
- - "to be added: test reports and AI output logs"
- processed_results:
- - "to be added: evaluation tables and plots"
- figures:
- - "figures/*.tex"
- - "main.pdf"
+  raw_results:
+    - "docs/eval/transcripts.json"
+  processed_results:
+    - "docs/AI_ASSISTANT.md"
+    - "docs/TESTING.md"
+  figures:
+    - "figures/*.tex"
+    - "main.pdf"
 limitations:
- - "No application runtime exists at this report baseline."
- - "No model quality, performance or usability result is claimed."
- - "External product pages are reference context, not project evidence."
+  - "ai-runner giới hạn RUNNER_CONCURRENCY=1 trên VPS 2.5GB RAM do mỗi tiến trình opencode run tiêu thụ ~490MB RSS."
+  - "Bước xuất bản cuối cùng xác nhận qua /mark-published kèm published_url thay vì tự động đẩy trực tiếp lên Graph API."

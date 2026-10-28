@@ -6,67 +6,64 @@
  draw=black,
  fill=white,
  rounded corners=4pt,
- minimum width=3.2cm,
- minimum height=1.05cm,
+ minimum width=3.0cm,
+ minimum height=1.15cm,
  align=center,
  line width=0.85pt,
- text width=3.0cm,
+ text width=2.8cm,
  inner sep=3pt
  },
  state_ai/.style={
  draw=black,
  fill=black!6,
  rounded corners=4pt,
- minimum width=3.2cm,
- minimum height=1.05cm,
+ minimum width=3.0cm,
+ minimum height=1.15cm,
  align=center,
  line width=0.85pt,
- text width=3.0cm,
+ text width=2.8cm,
  inner sep=3pt
  },
  state_warn/.style={
  draw=black,
  fill=white,
  rounded corners=4pt,
- minimum width=3.2cm,
- minimum height=1.05cm,
+ minimum width=3.0cm,
+ minimum height=1.15cm,
  align=center,
  line width=0.85pt,
  dashed,
- text width=3.0cm,
+ text width=2.8cm,
  inner sep=3pt
  },
- rel/.style={-{Latex[length=2.2mm]},draw=black,line width=0.75pt},
- lab/.style={font=\sffamily\scriptsize,fill=white,inner sep=1.5pt,align=center,text=black}
+ rel/.style={-{Latex[length=2.2mm]},draw=black,line width=0.8pt},
+ lab/.style={font=\sffamily\scriptsize,inner sep=1.5pt,align=center,text=black}
 ]
 
-\node[circle,fill=black,inner sep=3.5pt] (start) at (0.2, 1.8) {};
+\node[circle,fill=black,inner sep=3.5pt] (start) at (0.0, 2.0) {};
 
-\node[state] (draft) at (3.0, 1.8) {\textbf{DRAFT}\\{\scriptsize Bản nháp thủ công}};
-\node[state_ai] (ai_draft) at (7.8, 1.8) {\textbf{AI\_DRAFT}\\{\scriptsize Bản nháp do AI sinh}};
-\node[state] (in_review) at (12.6, 1.8) {\textbf{IN\_REVIEW}\\{\scriptsize Chờ Quản lý duyệt}};
+\node[state_ai] (proposed) at (2.8, 2.0) {\textbf{ai\_action: PROPOSED}\\{\scriptsize Đề xuất từ Trợ lý AI}};
+\node[state] (draft) at (8.4, 2.0) {\textbf{DRAFT}\\{\scriptsize Bản nháp (\mbox{MANUAL} / AI)}};
+\node[state] (pending) at (14.0, 2.0) {\textbf{PENDING\_REVIEW}\\{\scriptsize Chờ Quản lý duyệt}};
 
-\node[state] (published) at (3.0, -1.8) {\textbf{PUBLISHED}\\{\scriptsize Đã xuất bản theo lịch}};
-\node[state] (approved) at (7.8, -1.8) {\textbf{APPROVED}\\{\scriptsize Đã được phê duyệt}};
-\node[state_warn] (rejected) at (12.6, -1.8) {\textbf{REJECTED}\\{\scriptsize Từ chối kèm lý do}};
+\node[state] (published) at (2.8, -2.0) {\textbf{PUBLISHED}\\{\scriptsize Đã đăng \& gắn URL}};
+\node[state] (approved) at (8.4, -2.0) {\textbf{APPROVED}\\{\scriptsize Quản lý đã phê duyệt}};
+\node[state_warn] (rejected) at (14.0, -2.0) {\textbf{REJECTED}\\{\scriptsize Từ chối kèm lý do}};
 
-\node[draw=black,circle,line width=0.9pt,inner sep=4.5pt] (final_out) at (0.2, -1.8) {};
-\node[circle,fill=black,inner sep=2.5pt] at (0.2, -1.8) {};
+\node[draw=black,circle,line width=0.9pt,inner sep=4.5pt] (final_out) at (0.0, -2.0) {};
+\node[circle,fill=black,inner sep=2.5pt] at (0.0, -2.0) {};
 
-\draw[rel] (start) -- (draft.west);
+\draw[rel] (start) -- (proposed.west);
+\draw[rel] (proposed.east) -- node[lab,above=2pt]{Xác nhận\\{\tiny (/confirm)}} (draft.west);
+\draw[rel] (draft.east) -- node[lab,above=2pt]{Gửi duyệt\\{\tiny (/submit)}} (pending.west);
 
-\draw[rel] ([xshift=0.5cm]draft.north) -- ++(0,0.45) -| node[lab,above,pos=0.25]{Gọi AI sinh nháp} ([xshift=-0.5cm]ai_draft.north);
-\draw[rel] ([xshift=-0.5cm]ai_draft.south) -- ++(0,-0.45) -| node[lab,below,pos=0.25]{Sửa thủ công} ([xshift=0.5cm]draft.south);
+\draw[rel] (pending.south) -- node[lab,right=3pt]{Từ chối\\{\tiny (/reject)}} (rejected.north);
+\draw[rel] (pending.south west) -- node[lab,above=2pt,sloped]{Phê duyệt (/approve)} (approved.north east);
 
-\draw[rel] (ai_draft) -- node[lab,above]{Gửi duyệt} (in_review);
+\draw[rel] (approved.west) -- node[lab,above=2pt]{Đã đăng bài\\{\tiny (/mark-published)}} (published.east);
+\draw[rel] (published.west) -- node[lab,above=2pt]{Xong} (final_out.east);
 
-\draw[rel] (in_review.south) -- node[lab,right=2pt]{Từ chối} (rejected.north);
-\draw[rel] (in_review.south west) -- node[lab,above,sloped]{Phê duyệt} (approved.north east);
-
-\draw[rel] (approved) -- node[lab,above]{Lập lịch đăng} (published);
-\draw[rel] (published.west) -- node[lab,above=2pt]{Hoàn tất} (final_out.east);
-
-\draw[rel] (rejected.east) -- ++(0.6,0) -- ++(0,4.55) -- node[lab,above,pos=0.5]{Chỉnh sửa và gửi duyệt lại} ([xshift=-0.7cm,yshift=0.95cm]draft.north) -- ([xshift=-0.7cm]draft.north);
+\draw[rel] (rejected.east) -- ++(0.65,0) -- ++(0,5.0) -- node[lab,above=2pt,pos=0.5]{Tác giả chỉnh sửa \& gửi duyệt lại} ([yshift=1.02cm]draft.north) -- (draft.north);
 
 \end{tikzpicture}%
 }

@@ -6,84 +6,85 @@
  draw=black,
  fill=white,
  rounded corners=3pt,
- minimum width=2.35cm,
- minimum height=1.35cm,
+ minimum width=2.45cm,
+ minimum height=1.40cm,
  align=center,
  line width=0.8pt,
- text width=2.15cm,
+ text width=2.25cm,
  inner sep=2pt
  },
  gate/.style={
  draw=black,
  fill=black!8,
  rounded corners=3pt,
- minimum width=2.35cm,
- minimum height=1.35cm,
+ minimum width=2.45cm,
+ minimum height=1.40cm,
  align=center,
  line width=1.0pt,
- text width=2.15cm,
+ text width=2.25cm,
  inner sep=2pt
  },
  ctrl_box/.style={
  draw=black!80,
  fill=white,
  rounded corners=3pt,
- minimum width=4.6cm,
- minimum height=1.35cm,
+ minimum width=5.0cm,
+ minimum height=1.45cm,
  align=center,
  line width=0.8pt,
  dashed,
- text width=4.4cm,
+ text width=4.8cm,
  inner sep=3pt
  },
  rel/.style={-{Latex[length=2.2mm]},draw=black,line width=0.75pt},
  lab/.style={font=\sffamily\scriptsize,fill=white,inner sep=1.5pt,align=center,text=black}
 ]
 
-\node[stage] (p1) at (1.2, 0) {
+\node[stage] (p1) at (1.3, 0) {
  \textbf{1. Ngữ cảnh}\\[2pt]
- {\scriptsize Lọc brief, sản phẩm, Brand Kit}
+ {\scriptsize Nạp Snapshot, Brand Profile, Run-Token}
 };
 
-\node[stage] (p2) at (4.1, 0) {
- \textbf{2. Tạo Prompt}\\[2pt]
- {\scriptsize Nạp prompts.json, gắn biến}
+\node[stage] (p2) at (4.5, 0) {
+ \textbf{2. AI Runner}\\[2pt]
+ {\scriptsize Hàng đợi FIFO, chạy \mbox{OpenCode} CLI}
 };
 
-\node[stage] (p3) at (7.0, 0) {
- \textbf{3. Gọi Model}\\[2pt]
- {\scriptsize Gọi LLM API, kiểm soát timeout}
+\node[stage] (p3) at (7.7, 0) {
+ \textbf{3. MCP Tools}\\[2pt]
+ {\scriptsize Gọi 9 tool đọc \& 5 tool propose\_* (/mcp)}
 };
 
-\node[stage] (p4) at (9.9, 0) {
- \textbf{4. Kiểm định}\\[2pt]
- {\scriptsize Xác thực JSON, quét từ cấm}
+\node[stage] (p4) at (10.9, 0) {
+ \textbf{4. Đề xuất}\\[2pt]
+ {\scriptsize Tạo ai\_action (PROPOSED) trên UI}
 };
 
-\node[gate] (p5) at (12.8, 0) {
- \textbf{5. Phê duyệt}\\[2pt]
- {\scriptsize Quản lý duyệt trước khi đăng}
+\node[gate] (p5) at (14.1, 0) {
+ \textbf{5. Con người}\\[2pt]
+ {\scriptsize Bấm Xác nhận \& Manager phê duyệt}
 };
 
 \draw[rel] (p1) -- (p2);
 \draw[rel] (p2) -- (p3);
 \draw[rel] (p3) -- (p4);
-\draw[rel] (p4) -- node[lab,above=1pt]{Đạt} (p5);
+\draw[rel] (p4) -- (p5);
 
-\node[ctrl_box] (fallback) at (3.5, -3.25) {
- \textbf{Chế độ Dự phòng (Smart Fallback)}\\[2pt]
- {\scriptsize Khi lỗi mạng hoặc sai Schema: trả mẫu dự phòng kèm cờ is\_fallback = true}
+\node[ctrl_box] (fallback) at (3.8, -3.15) {
+ \textbf{Xoay vòng Đa mô hình (13 Models)}\\[2pt]
+ {\scriptsize Khi gặp HTTP 429 / Timeout: tự động chuyển OpenCode Free $\rightarrow$ Groq LPU $\rightarrow$ OpenRouter $\rightarrow$ Gemini}
 };
 
-\node[ctrl_box] (audit) at (10.5, -3.25) {
- \textbf{Nhật ký Kiểm toán (ai\_logs)}\\[2pt]
- {\scriptsize Lưu vết người gọi, độ trễ, số token, phiên bản prompt và trạng thái}
+\node[ctrl_box] (audit) at (11.6, -3.15) {
+ \textbf{Lưu vết Kiểm toán (ai\_messages \& ai\_actions)}\\[2pt]
+ {\scriptsize Ghi nhận model, latency\_ms, danh sách tool\_calls,}\\
+ {\scriptsize trạng thái \mbox{PROPOSED} / \mbox{EXECUTED} / \mbox{REJECTED}}
 };
 
-\draw[rel] (p3.south) -- (7.0,-1.40) -| node[lab,pos=0.25]{Timeout / Lỗi API} ([xshift=-0.6cm]fallback.north);
-\draw[rel] (p4.south) -- (9.9,-2.05) -| node[lab,pos=0.25]{Sai cấu trúc JSON} ([xshift=0.8cm]fallback.north);
-\draw[rel] (p5.south) -- (12.8,-1.40) -| node[lab,pos=0.25]{Lưu vết duyệt} (audit.north);
-\draw[rel] (fallback.east) -- node[lab,above=1pt]{Ghi nhận lỗi} (audit.west);
+\draw[rel] (p2.south) -- (4.5,-1.55) -| node[lab,pos=0.22,above=1pt]{Khi lỗi / Rate Limit 429} (fallback.north);
+\draw[rel] (p4.south) -- (10.9,-1.55) -| node[lab,pos=0.22,above=1pt]{Lưu thẻ đề xuất} ([xshift=-0.6cm]audit.north);
+\draw[rel] (p5.south) -- (14.1,-1.55) -| ([xshift=1.2cm]audit.north);
+\draw[rel] (fallback.east) -- node[lab,above=2pt]{Ghi nhận Model} (audit.west);
 
 \end{tikzpicture}%
 }
