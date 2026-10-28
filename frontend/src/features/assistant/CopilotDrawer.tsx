@@ -16,6 +16,7 @@ import { Badge, useToast } from '@/components/ui';
 import { ActionCardRouter } from './components/ActionCards';
 import { ChatView } from './components/ChatView';
 import { Composer } from './components/Composer';
+import { ModelSelector } from './components/ModelSelector';
 import { useAssistantStream } from './useAssistantStream';
 
 interface CopilotState {
@@ -255,6 +256,7 @@ export function CopilotDrawer() {
         </div>
 
         <div className="flex items-center gap-1">
+          <ModelSelector compact />
           <button
             type="button"
             onClick={() => {

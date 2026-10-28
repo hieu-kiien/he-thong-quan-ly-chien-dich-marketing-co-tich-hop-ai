@@ -417,6 +417,7 @@ async def start_turn(
     content: str,
     runner: RunnerClient | None = None,
     regenerate_message_id: int | None = None,
+    model: str | None = None,
 ) -> TurnContext:
     """Khởi tạo một lượt hội thoại: kiểm tra quyền, giành khoá phiên, ghi DB, chạy nền.
 
@@ -565,6 +566,7 @@ async def start_turn(
                 session_id=session_id,
                 run_token=run_token,
                 timeout_s=float(settings.ASSISTANT_TURN_TIMEOUT_S),
+                model=model,
             )
             async for ev in stream:
                 if turn.abort_event and turn.abort_event.is_set():

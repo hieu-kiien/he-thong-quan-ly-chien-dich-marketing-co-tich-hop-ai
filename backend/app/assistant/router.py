@@ -105,7 +105,12 @@ async def send_message(
     db: DbSession,
 ) -> StreamingResponse:
     # Kiểm tra quyền, giành khoá phiên và ghi DB TRƯỚC khi mở stream: lỗi 403/404/409 trả JSON chuẩn
-    ctx = await chat_service.start_turn(user_id=user.id, thread_id=thread_id, content=data.content)
+    ctx = await chat_service.start_turn(
+        user_id=user.id,
+        thread_id=thread_id,
+        content=data.content,
+        model=data.model,
+    )
     return StreamingResponse(chat_service.stream_turn(ctx), media_type="text/event-stream", headers=SSE_HEADERS)
 
 

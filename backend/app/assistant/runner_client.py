@@ -67,6 +67,7 @@ class RunnerClient:
         run_token: str,
         run_id: str | None = None,
         timeout_s: float = 150.0,
+        model: str | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Gọi POST /run và stream các sự kiện NDJSON từ ai-runner."""
         if not self.is_configured:
@@ -83,6 +84,8 @@ class RunnerClient:
             "env": {"MF_RUN_TOKEN": run_token},
             "timeout_s": int(timeout_s),
         }
+        if model and model.strip():
+            payload["model"] = model.strip()
 
         url = f"{self.base_url}/run"
         try:
@@ -161,6 +164,7 @@ class FakeRunner:
         run_token: str,
         run_id: str | None = None,
         timeout_s: float = 150.0,
+        model: str | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         if self.on_run_hook:
             await self.on_run_hook(prompt, session_id, run_token, run_id)

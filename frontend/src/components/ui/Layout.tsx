@@ -1,4 +1,5 @@
-import type { HTMLAttributes, ReactNode } from 'react';
+import { useLayoutEffect, useState, type HTMLAttributes, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -53,6 +54,59 @@ export interface PageHeaderProps {
 }
 
 export function PageHeader({ title, description, actions, back, meta }: PageHeaderProps) {
+  const [slot, setSlot] = useState<HTMLElement | null>(() =>
+    typeof document !== 'undefined' ? document.getElementById('mf-topbar-slot') : null,
+  );
+
+  useLayoutEffect(() => {
+    if (typeof document !== 'undefined') {
+      setSlot(document.getElementById('mf-topbar-slot'));
+    }
+  }, []);
+
+  if (slot) {
+    return (
+      <>
+        {createPortal(
+          <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              {back && (
+                <Link
+                  to={back.to}
+                  className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border border-border bg-subtle/70 px-2.5 text-xs font-medium text-fg-muted transition-colors hover:border-border-strong hover:bg-subtle hover:text-fg"
+                  title={`Quay lại ${back.label}`}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+                  <span>{back.label}</span>
+                </Link>
+              )}
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="truncate text-base font-bold tracking-tight text-fg sm:text-[1.0625rem]">
+                    {title}
+                  </h1>
+                  {meta && <div className="flex flex-wrap items-center gap-1.5">{meta}</div>}
+                </div>
+                {description && (
+                  <div className="mt-0.5 truncate text-xs text-fg-muted">{description}</div>
+                )}
+              </div>
+            </div>
+            {actions && (
+              <div className="hidden shrink-0 items-center gap-2 xl:flex">{actions}</div>
+            )}
+          </div>,
+          slot,
+        )}
+        {actions && (
+          <div className="mb-4 flex flex-wrap items-center justify-end gap-2 xl:hidden">
+            {actions}
+          </div>
+        )}
+      </>
+    );
+  }
+
   return (
     <div className="mb-5 border-b border-border/70 pb-4">
       {back && (
@@ -67,11 +121,10 @@ export function PageHeader({ title, description, actions, back, meta }: PageHead
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2.5">
-            <span className="h-5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
             <h1 className="text-xl font-bold tracking-tight text-fg">{title}</h1>
           </div>
-          {description && <div className="mt-1 pl-4 text-sm text-fg-muted">{description}</div>}
-          {meta && <div className="mt-2 flex flex-wrap items-center gap-2 pl-4">{meta}</div>}
+          {description && <div className="mt-1 text-sm text-fg-muted">{description}</div>}
+          {meta && <div className="mt-2 flex flex-wrap items-center gap-2">{meta}</div>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>

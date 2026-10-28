@@ -16,6 +16,7 @@ import { cn } from '@/lib/cn';
 import type { AiThread, AssistantStatus } from '@/lib/types';
 import { Popover } from '@/components/ui';
 import { isSimulatorActive } from '../simulator';
+import { ModelSelector } from './ModelSelector';
 
 interface HeaderBarProps {
   currentThread?: AiThread | null;
@@ -125,14 +126,17 @@ export function HeaderBar({
         </div>
       </div>
 
-      {/* Vùng bên phải: Nhãn mô phỏng + Trạng thái AI dot + Nút mở Actions panel */}
-      <div className="flex items-center gap-3">
+      {/* Vùng bên phải: Chọn mô hình AI + Trạng thái AI dot + Nút mở Actions panel */}
+      <div className="flex items-center gap-2.5">
         {/* Nhãn mô phỏng (chỉ hiện khi DEV và VITE_ASSISTANT_SIMULATOR=true) */}
         {import.meta.env.DEV && isSimulatorActive && (
-          <span className="hidden rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300 md:inline-block">
+          <span className="hidden rounded border border-warning/40 bg-warning-soft px-2 py-0.5 text-[11px] font-medium text-warning-soft-fg md:inline-block">
             Mô phỏng (chỉ dùng khi phát triển)
           </span>
         )}
+
+        {/* Bộ chọn mô hình AI đa nhà cung cấp */}
+        <ModelSelector />
 
         {/* Chấm tròn báo trạng thái AI */}
         <Popover

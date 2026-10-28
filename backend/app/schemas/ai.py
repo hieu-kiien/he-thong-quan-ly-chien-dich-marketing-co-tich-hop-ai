@@ -24,6 +24,7 @@ class AiThreadUpdate(BaseModel):
 
 class MessageSendIn(BaseModel):
     content: str = Field(..., min_length=1, max_length=8000)
+    model: str | None = Field(default=None, max_length=160)
 
 
 class ActionConfirmIn(BaseModel):

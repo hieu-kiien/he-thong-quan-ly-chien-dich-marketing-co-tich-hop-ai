@@ -264,12 +264,19 @@ class Runner:
     def _models(self, override: str | None) -> list[str | None]:
         first = override or self.s.model
         candidates: list[str | None] = [first]
+        if self.s.model and self.s.model not in candidates:
+            candidates.append(self.s.model)
         for m in self.s.fallback_models:
             if m not in candidates:
                 candidates.append(m)
-        if override or len(candidates) <= 1:
+        if len(candidates) <= 1:
             return candidates
         now = time.monotonic()
+        if override:
+            rest = [m for m in candidates if m != override]
+            ready = [m for m in rest if not m or self.model_cooldown_until.get(m, 0.0) <= now]
+            cooling = [m for m in rest if m and self.model_cooldown_until.get(m, 0.0) > now]
+            return [override, *ready, *cooling]
         ready = [m for m in candidates if not m or self.model_cooldown_until.get(m, 0.0) <= now]
         cooling = [m for m in candidates if m and self.model_cooldown_until.get(m, 0.0) > now]
         return ready + cooling

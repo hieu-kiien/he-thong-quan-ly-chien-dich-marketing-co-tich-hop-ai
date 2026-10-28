@@ -3,6 +3,7 @@ import type {
   AssistantPhase,
   ToolCallStatus,
 } from '@/lib/types';
+import { getSelectedAiModel } from './components/ModelSelector';
 import type { AssistantStreamEventCallback } from './types';
 
 /**
@@ -217,7 +218,12 @@ export async function streamSendMessage(
   callbacks: AssistantStreamEventCallback,
   signal?: AbortSignal,
 ): Promise<void> {
-  return streamPost(`/assistant/threads/${threadId}/messages`, { content }, callbacks, signal);
+  const model = getSelectedAiModel();
+  const payload: Record<string, unknown> = { content };
+  if (model) {
+    payload.model = model;
+  }
+  return streamPost(`/assistant/threads/${threadId}/messages`, payload, callbacks, signal);
 }
 
 /**

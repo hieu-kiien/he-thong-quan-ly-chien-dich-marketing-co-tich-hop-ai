@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, ChevronDown, LogOut, Moon, Sparkles, Sun, UserRound } from 'lucide-react';
+import { Bell, ChevronDown, ChevronLeft, LogOut, Moon, Sparkles, Sun, UserRound } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
@@ -9,6 +9,7 @@ import { formatRelative } from '@/lib/format';
 import { notificationsApi } from '@/lib/api/endpoints';
 import { IconButton, Popover, Spinner, useToast } from '@/components/ui';
 import { toggleContextualCopilot, useCopilotDrawerState } from '@/features/assistant/CopilotDrawer';
+import { AI_PROVIDER_PILLS } from '@/features/assistant/components/ModelSelector';
 import type { Notification } from '@/lib/types';
 
 function NotificationsMenu() {
@@ -46,7 +47,7 @@ function NotificationsMenu() {
         <IconButton label={unread ? `Thông báo, ${unread} chưa đọc` : 'Thông báo'} {...p} className="relative">
           <Bell className="h-[18px] w-[18px]" />
           {unread > 0 && (
-            <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-none text-white dark:text-stone-950">
+            <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-none text-white">
               {unread > 99 ? '99+' : unread}
             </span>
           )}
@@ -179,36 +180,86 @@ function UserMenu() {
 export function Topbar() {
   const { mode, toggle } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const copilotState = useCopilotDrawerState();
   const isAssistantRoute = location.pathname.startsWith('/assistant');
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-end gap-1.5 border-b border-border bg-surface px-4">
-      {!isAssistantRoute && (
-        <button
-          type="button"
-          onClick={toggleContextualCopilot}
-          className={cn(
-            'mr-1 inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors',
-            copilotState.open
-              ? 'border-ai/40 bg-ai-soft text-ai-soft-fg shadow-xs'
-              : 'border-border bg-subtle/60 text-fg-muted hover:border-ai/40 hover:bg-ai-soft/60 hover:text-ai',
-          )}
-          title="Mở/đóng khung Trợ lý AI ngữ cảnh (Ctrl+K)"
-        >
-          <Sparkles className="h-3.5 w-3.5 text-ai" aria-hidden />
-          <span>Trợ lý AI</span>
-          <kbd className="hidden rounded border border-border bg-surface px-1 py-0.5 font-mono text-[10px] text-fg-subtle sm:inline">
-            Ctrl+K
-          </kbd>
-        </button>
-      )}
-      <IconButton label={mode === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'} onClick={toggle}>
-        {mode === 'dark' ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
-      </IconButton>
-      <NotificationsMenu />
-      <div className="mx-1 h-6 w-px bg-border" aria-hidden />
-      <UserMenu />
+    <header className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-surface px-4 py-2 lg:px-6">
+      {/* Vùng tiêu đề ngữ cảnh của trang (nhận portal từ PageHeader hoặc hiển thị thông tin Trợ lý AI) */}
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        {isAssistantRoute ? (
+          <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border border-border bg-subtle/70 px-2.5 text-xs font-medium text-fg-muted transition-colors hover:border-border-strong hover:bg-subtle hover:text-fg"
+                title="Quay lại trang trước"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+                <span>Quay lại</span>
+              </button>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className="truncate text-sm font-bold tracking-tight text-fg sm:text-base">
+                    Không gian Trợ lý AI Chiến lược
+                  </h2>
+                  <span className="hidden items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[10px] font-semibold text-success-soft-fg md:inline-flex">
+                    <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
+                    Miễn phí vĩnh viễn • 5 nền tảng
+                  </span>
+                </div>
+                <div className="mt-0.5 hidden items-center gap-1.5 text-[11px] text-fg-muted sm:flex">
+                  {AI_PROVIDER_PILLS.map((p, idx) => (
+                    <span key={p.id} className="inline-flex items-center gap-1.5">
+                      {idx > 0 && <span className="text-fg-subtle">•</span>}
+                      <span>{p.name}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div
+            id="mf-topbar-slot"
+            className="flex min-w-0 flex-1 items-center justify-between gap-3"
+          />
+        )}
+      </div>
+
+      {/* Cụm công cụ toàn cục bên phải */}
+      <div className="flex shrink-0 items-center gap-1.5">
+        {!isAssistantRoute && (
+          <>
+            <div className="mx-1 hidden h-6 w-px bg-border xl:block" aria-hidden />
+            <button
+              type="button"
+              onClick={toggleContextualCopilot}
+              className={cn(
+                'mr-0.5 inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors',
+                copilotState.open
+                  ? 'border-ai/40 bg-ai-soft text-ai-soft-fg shadow-xs'
+                  : 'border-border bg-subtle/60 text-fg-muted hover:border-ai/40 hover:bg-ai-soft/60 hover:text-ai',
+              )}
+              title="Mở/đóng khung Trợ lý AI ngữ cảnh (Ctrl+K)"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-ai" aria-hidden />
+              <span className="hidden sm:inline">Trợ lý AI</span>
+              <kbd className="hidden rounded border border-border bg-surface px-1 py-0.5 font-mono text-[10px] text-fg-subtle md:inline">
+                Ctrl+K
+              </kbd>
+            </button>
+          </>
+        )}
+        <IconButton label={mode === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'} onClick={toggle}>
+          {mode === 'dark' ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+        </IconButton>
+        <NotificationsMenu />
+        <div className="mx-1 h-6 w-px bg-border" aria-hidden />
+        <UserMenu />
+      </div>
     </header>
   );
 }
