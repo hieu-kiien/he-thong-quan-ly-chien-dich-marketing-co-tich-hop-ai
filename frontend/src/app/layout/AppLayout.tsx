@@ -1,4 +1,7 @@
+import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { assistantApi, campaignsApi, channelsApi, contentsApi } from '@/lib/api/endpoints';
 import { CopilotDrawer } from '@/features/assistant/CopilotDrawer';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -11,7 +14,29 @@ import { Topbar } from './Topbar';
  */
 export function AppLayout() {
   const location = useLocation();
+  const queryClient = useQueryClient();
   const fullBleed = location.pathname.startsWith('/assistant');
+
+  // Nạp sẵn dữ liệu cốt lõi vào bộ nhớ đệm React Query để chuyển tab tức thì (0ms, không hiện vòng xoay chờ)
+  useEffect(() => {
+    void queryClient.prefetchQuery({
+      queryKey: ['campaigns', { sort: '-created_at', page: 1, page_size: 15 }],
+      queryFn: () => campaignsApi.list({ sort: '-created_at', page: 1, page_size: 15 }),
+    });
+    void queryClient.prefetchQuery({
+      queryKey: ['contents', { sort: '-created_at', page: 1, page_size: 15 }],
+      queryFn: () => contentsApi.list({ sort: '-created_at', page: 1, page_size: 15 }),
+    });
+    void queryClient.prefetchQuery({
+      queryKey: ['assistant', 'threads'],
+      queryFn: () => assistantApi.listThreads(),
+    });
+    void queryClient.prefetchQuery({
+      queryKey: ['channels'],
+      queryFn: () => channelsApi.list(),
+    });
+  }, [queryClient]);
+
   return (
     <div className="flex h-screen overflow-hidden bg-canvas">
       <a

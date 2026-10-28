@@ -95,17 +95,17 @@ export function MessageItem({
   if (isUser) {
     return (
       <div className="my-4 flex justify-end">
-        <div className="flex max-w-[85%] items-end gap-2 sm:max-w-[75%]">
+        <div className="flex max-w-[85%] items-end gap-2.5 sm:max-w-[75%]">
           <div className="min-w-0">
-            <div className="rounded-2xl rounded-tr-sm border border-border bg-surface px-4 py-2.5 text-sm text-fg shadow-xs">
-              <p className="whitespace-pre-wrap break-words">{message.content}</p>
+            <div className="rounded-2xl rounded-br-sm bg-accent px-4 py-2.5 text-sm text-accent-fg shadow-xs">
+              <p className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
             </div>
             <div className="mt-1 flex justify-end pr-1 text-[11px] text-fg-subtle tabular-nums">
-              <span>{formatTime(message.created_at)}</span>
+              <span>Bạn · {formatTime(message.created_at)}</span>
             </div>
           </div>
           <div
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-subtle text-fg-muted"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent-soft-fg"
             title="Bạn"
           >
             <User className="h-3.5 w-3.5" aria-hidden />
@@ -133,18 +133,18 @@ export function MessageItem({
   const errorMessageText = getAiErrorMessage(message.error_code);
 
   return (
-    <div className="my-5 flex w-full gap-3">
+    <div className="my-4 flex w-full gap-3">
       <div
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ai-soft text-ai"
+        className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-ai-soft text-ai shadow-2xs"
         title="Trợ lý AI"
       >
         <Bot className="h-4 w-4" aria-hidden />
       </div>
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 rounded-2xl rounded-tl-sm border border-border bg-surface px-4 py-3.5 shadow-2xs">
         {/* Tiêu đề & thời gian */}
-        <div className="mb-1.5 flex items-center gap-2">
-          <span className="text-xs font-semibold text-fg">Trợ lý AI</span>
+        <div className="mb-2 flex items-center gap-2">
+          <span className="text-xs font-semibold text-fg">Trợ lý Marketing AI</span>
           <span className="text-[11px] text-fg-subtle tabular-nums">
             {formatTime(message.created_at)}
           </span>

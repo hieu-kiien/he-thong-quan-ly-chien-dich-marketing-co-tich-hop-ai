@@ -300,9 +300,9 @@ export default function CampaignsPage() {
             <Table>
               <THead>
                 <TR>
-                  <TH>Chiến dịch</TH>
+                  <TH className="min-w-[220px]">Chiến dịch</TH>
                   <TH>Mục tiêu</TH>
-                  <TH>Kênh</TH>
+                  <TH className="min-w-[180px]">Kênh</TH>
                   <TH>Thời gian</TH>
                   <TH>Ngân sách / Đã chi</TH>
                   <TH>Trạng thái</TH>
@@ -314,47 +314,60 @@ export default function CampaignsPage() {
                 {data.items.map((item) => {
                   const spentPct = item.budget > 0 ? Math.round((item.spent / item.budget) * 100) : 0;
                   const canEdit = canEditCampaign(user, item);
+                  const visibleChannels = item.channels.slice(0, 2);
+                  const extraChannelsCount = Math.max(0, item.channels.length - 2);
+                  const allChannelNames = item.channels.map((c) => c.name).join(', ');
 
                   return (
                     <TR key={item.id}>
-                      <TD>
+                      <TD className="min-w-[220px] max-w-[280px]">
                         <div>
                           <Link
                             to={`/campaigns/${item.id}`}
-                            className="font-medium text-fg hover:underline focus:outline-none"
+                            className="line-clamp-1 font-medium text-fg hover:text-accent hover:underline focus:outline-none"
+                            title={item.name}
                           >
                             {item.name}
                           </Link>
-                          <p className="text-xs text-fg-subtle">Phụ trách: {item.owner.full_name}</p>
+                          <p className="mt-0.5 truncate text-xs text-fg-subtle">
+                            Phụ trách: {item.owner.full_name}
+                          </p>
                         </div>
                       </TD>
-                      <TD>
-                        <span className="text-sm text-fg-muted">{GOAL_LABEL[item.goal] ?? item.goal}</span>
+                      <TD className="whitespace-nowrap">
+                        <span className="inline-flex items-center whitespace-nowrap rounded-md border border-border bg-subtle/60 px-2 py-0.5 text-xs font-medium text-fg-muted">
+                          {GOAL_LABEL[item.goal] ?? item.goal}
+                        </span>
                       </TD>
-                      <TD>
-                        <div className="flex flex-wrap gap-1">
-                          {item.channels.length > 0 ? (
-                            item.channels.map((ch) => (
-                              <Badge key={ch.id} tone="neutral">
-                                {ch.name}
-                              </Badge>
-                            ))
+                      <TD className="max-w-[240px]">
+                        <div className="flex flex-wrap items-center gap-1" title={allChannelNames}>
+                          {visibleChannels.length > 0 ? (
+                            <>
+                              {visibleChannels.map((ch) => (
+                                <Badge key={ch.id} tone="neutral">
+                                  {ch.name}
+                                </Badge>
+                              ))}
+                              {extraChannelsCount > 0 && (
+                                <Badge tone="info">+{extraChannelsCount} kênh</Badge>
+                              )}
+                            </>
                           ) : (
                             <span className="text-xs text-fg-subtle">—</span>
                           )}
                         </div>
                       </TD>
-                      <TD className="text-xs text-fg-muted">
+                      <TD className="whitespace-nowrap text-xs text-fg-muted tabular-nums">
                         <div>{formatDate(item.start_date)}</div>
-                        <div>đến {formatDate(item.end_date)}</div>
+                        <div className="text-fg-subtle">→ {formatDate(item.end_date)}</div>
                       </TD>
-                      <TD>
+                      <TD className="whitespace-nowrap">
                         <div className="space-y-1">
-                          <div className="text-xs font-medium text-fg">
+                          <div className="whitespace-nowrap font-mono text-xs font-medium text-fg tabular-nums">
                             {formatMoney(item.spent)} / {formatMoney(item.budget)}
                           </div>
                           {item.budget > 0 && (
-                            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-subtle">
+                            <div className="h-1.5 w-28 overflow-hidden rounded-full bg-subtle">
                               <div
                                 className={`h-full rounded-full ${
                                   spentPct > 100 ? 'bg-danger' : spentPct > 80 ? 'bg-warning' : 'bg-accent'
@@ -365,37 +378,37 @@ export default function CampaignsPage() {
                           )}
                         </div>
                       </TD>
-                      <TD>
+                      <TD className="whitespace-nowrap">
                         <StatusBadge kind="campaign" status={item.status} />
                       </TD>
-                      <TD>
-                        <div className="flex flex-wrap items-center gap-1.5 text-xs text-fg-muted">
+                      <TD className="whitespace-nowrap">
+                        <div className="flex items-center gap-1 text-xs text-fg-muted">
                           {item.content_counts.PENDING_REVIEW ? (
-                            <span className="inline-flex items-center rounded bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                            <span className="inline-flex items-center whitespace-nowrap rounded bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
                               {item.content_counts.PENDING_REVIEW} chờ duyệt
                             </span>
                           ) : null}
                           {item.content_counts.APPROVED ? (
-                            <span className="inline-flex items-center rounded bg-blue-500/10 px-1.5 py-0.5 text-[11px] font-medium text-blue-600 dark:text-blue-400">
+                            <span className="inline-flex items-center whitespace-nowrap rounded bg-blue-500/10 px-1.5 py-0.5 text-[11px] font-medium text-blue-600 dark:text-blue-400">
                               {item.content_counts.APPROVED} đã duyệt
                             </span>
                           ) : null}
                           {item.content_counts.PUBLISHED ? (
-                            <span className="inline-flex items-center rounded bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                            <span className="inline-flex items-center whitespace-nowrap rounded bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
                               {item.content_counts.PUBLISHED} đã đăng
                             </span>
                           ) : null}
                           {!item.content_counts.PENDING_REVIEW &&
                             !item.content_counts.APPROVED &&
                             !item.content_counts.PUBLISHED && (
-                              <span className="text-fg-subtle">
+                              <span className="whitespace-nowrap text-fg-subtle">
                                 {Object.values(item.content_counts).reduce((a, b) => (a ?? 0) + (b ?? 0), 0)} nội dung
                               </span>
                             )}
                         </div>
                       </TD>
-                      <TD className="text-right">
-                        <div className="flex items-center justify-end gap-1">
+                      <TD className="whitespace-nowrap text-right">
+                        <div className="flex items-center justify-end gap-1 whitespace-nowrap">
                           <button
                             type="button"
                             onClick={() =>
@@ -408,10 +421,10 @@ export default function CampaignsPage() {
                                     : `Gợi ý tối ưu thông điệp, phân bổ kênh và bài viết cho chiến dịch "${item.name}".`,
                               })
                             }
-                            className="mr-1 inline-flex items-center gap-1 rounded-md border border-ai/30 bg-ai-soft px-2 py-1 text-[11px] font-medium text-ai-soft-fg transition-colors hover:bg-ai hover:text-ai-fg"
+                            className="mr-1 inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-ai/30 bg-ai-soft px-2 py-1 text-[11px] font-medium text-ai-soft-fg transition-colors hover:bg-ai hover:text-ai-fg"
                             title="Mở khung Trợ lý AI cho chiến dịch này"
                           >
-                            <Sparkles className="h-3 w-3" aria-hidden />
+                            <Sparkles className="h-3 w-3 shrink-0" aria-hidden />
                             <span>{spentPct > 85 ? 'Phân tích AI' : 'Tối ưu bằng AI'}</span>
                           </button>
                           <IconButton

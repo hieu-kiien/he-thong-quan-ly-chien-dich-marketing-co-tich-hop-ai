@@ -314,40 +314,42 @@ export default function ContentsPage() {
 
                   return (
                     <TR key={item.id}>
-                      <TD>
+                      <TD className="min-w-[220px] max-w-[300px]">
                         <Link
                           to={`/contents/${item.id}`}
-                          className="font-medium text-fg hover:underline"
+                          className="line-clamp-1 font-medium text-fg hover:text-accent hover:underline"
+                          title={item.title}
                         >
                           {item.title}
                         </Link>
                       </TD>
-                      <TD>
+                      <TD className="min-w-[160px] max-w-[220px]">
                         <Link
                           to={`/campaigns/${item.campaign_id}`}
-                          className="text-xs text-fg-muted hover:underline"
+                          className="line-clamp-1 text-xs text-fg-muted hover:underline"
+                          title={item.campaign.name}
                         >
                           {item.campaign.name}
                         </Link>
                       </TD>
-                      <TD>
+                      <TD className="whitespace-nowrap">
                         <Badge tone="neutral">
                           {item.channel.name}
                         </Badge>
                       </TD>
-                      <TD className="text-xs text-fg-muted">{CONTENT_TYPE_LABEL[item.content_type]}</TD>
-                      <TD>
+                      <TD className="whitespace-nowrap text-xs text-fg-muted">{CONTENT_TYPE_LABEL[item.content_type]}</TD>
+                      <TD className="whitespace-nowrap">
                         <Badge tone={item.origin === 'AI' ? 'accent' : 'neutral'}>
                           {ORIGIN_LABEL[item.origin]}
                         </Badge>
                       </TD>
-                      <TD>
+                      <TD className="whitespace-nowrap">
                         <StatusBadge kind="content" status={item.status} />
                       </TD>
-                      <TD className="text-xs text-fg-muted">{item.created_by.full_name}</TD>
-                      <TD className="text-xs text-fg-muted">{formatDate(item.created_at)}</TD>
-                      <TD className="text-right">
-                        <div className="flex items-center justify-end gap-1">
+                      <TD className="whitespace-nowrap text-xs text-fg-muted">{item.created_by.full_name}</TD>
+                      <TD className="whitespace-nowrap text-xs text-fg-muted tabular-nums">{formatDate(item.created_at)}</TD>
+                      <TD className="whitespace-nowrap text-right">
+                        <div className="flex items-center justify-end gap-1 whitespace-nowrap">
                           <IconButton
                             label="Xem chi tiết"
                             size="sm"

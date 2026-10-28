@@ -8,6 +8,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowUp,
+  Command,
   Megaphone,
   Sparkles,
   Square,
@@ -47,7 +48,7 @@ export function Composer({
   const { data: campaignsData } = useQuery({
     queryKey: ['campaigns', 'list-select'],
     queryFn: () => campaignsApi.list({ page_size: 100 }),
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
   });
 
   const campaigns = campaignsData?.items || [];
@@ -61,7 +62,7 @@ export function Composer({
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 192)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
   }, [value]);
 
   const handleTextChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
@@ -140,166 +141,192 @@ export function Composer({
   };
 
   return (
-    <div className="relative border-t border-border bg-surface px-4 py-3 sm:px-6">
-      {/* Menu popup "/" cho các câu lệnh nhanh */}
-      {showSlashMenu && (
-        <div
-          role="listbox"
-          aria-label="Gợi ý câu lệnh nhanh"
-          className="absolute bottom-full left-4 mb-2 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-surface p-1 shadow-overlay animate-scale-in"
-        >
-          <div className="px-2.5 py-1.5 text-[11px] font-semibold text-fg-subtle">
-            Mẫu prompt nhanh (nhấn Enter để chọn)
-          </div>
-          {QUICK_PROMPTS.map((prompt, idx) => (
-            <button
-              key={prompt.id}
-              type="button"
-              role="option"
-              aria-selected={idx === slashSelectedIndex}
-              onClick={() => handleApplyTemplate(prompt.template)}
-              className={`flex w-full items-start gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors ${
-                idx === slashSelectedIndex
-                  ? 'bg-accent/10 text-accent font-medium'
-                  : 'text-fg hover:bg-subtle'
-              }`}
-            >
-              <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" aria-hidden />
-              <div className="min-w-0">
-                <div className="font-medium">{prompt.title}</div>
-                <div className="truncate text-[11px] text-fg-muted">{prompt.description}</div>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="mx-auto max-w-3xl">
-        {/* Thanh công cụ nhỏ phía trên: Ngữ cảnh chiến dịch + Gợi ý nhanh */}
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          {/* Chip ngữ cảnh chiến dịch */}
-          <div className="relative flex items-center gap-1.5">
-            {currentCampaign ? (
-              <span className="inline-flex items-center gap-1.5 rounded-md border border-accent/30 bg-accent-soft px-2.5 py-1 text-xs text-accent-soft-fg">
-                <Megaphone className="h-3 w-3 shrink-0" aria-hidden />
-                <span className="max-w-[180px] truncate font-medium sm:max-w-[260px]">
-                  Ngữ cảnh: {currentCampaign.name}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => onSelectCampaign(null)}
-                  className="rounded p-0.5 hover:bg-accent/20 focus:outline-none"
-                  title="Gỡ bỏ ngữ cảnh chiến dịch"
-                  aria-label="Gỡ bỏ ngữ cảnh"
-                >
-                  <X className="h-3 w-3" aria-hidden />
-                </button>
-              </span>
-            ) : (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowCampaignPicker((prev) => !prev)}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-subtle px-2.5 py-1 text-xs text-fg-muted hover:border-border-strong hover:text-fg focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
-                >
-                  <Megaphone className="h-3 w-3" aria-hidden />
-                  <span>Gắn chiến dịch</span>
-                </button>
-
-                {showCampaignPicker && (
-                  <div className="absolute bottom-full left-0 mb-1 max-h-56 w-64 overflow-y-auto rounded-md border border-border bg-surface p-1 shadow-overlay animate-scale-in z-20">
-                    <div className="px-2 py-1 text-[11px] font-semibold text-fg-subtle">
-                      Chọn chiến dịch ngữ cảnh
-                    </div>
-                    {campaigns.length === 0 ? (
-                      <div className="px-2 py-2 text-xs text-fg-subtle">Chưa có chiến dịch nào</div>
-                    ) : (
-                      campaigns.map((c: CampaignListItem) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => {
-                            onSelectCampaign(c.id);
-                            setShowCampaignPicker(false);
-                          }}
-                          className="flex w-full items-center justify-between truncate rounded px-2 py-1.5 text-left text-xs text-fg hover:bg-subtle"
-                        >
-                          <span className="truncate">{c.name}</span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Dải chip gợi ý nhanh (có thể bấm để điền mẫu) */}
-          <div className="hidden items-center gap-1.5 sm:flex">
-            <span className="text-[11px] text-fg-subtle">{'Gõ "/" hoặc chọn nhanh:'}</span>
-            {QUICK_PROMPTS.slice(0, 2).map((p) => (
+    <div className="relative shrink-0 bg-gradient-to-t from-canvas via-canvas/95 to-transparent px-4 pb-3 pt-1.5 sm:px-6">
+      <div className="relative mx-auto max-w-3xl">
+        {/* Menu popup "/" cho các câu lệnh nhanh */}
+        {showSlashMenu && (
+          <div
+            role="listbox"
+            aria-label="Gợi ý câu lệnh nhanh"
+            className="absolute bottom-full left-0 mb-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-surface p-1.5 shadow-overlay animate-scale-in z-30"
+          >
+            <div className="flex items-center justify-between px-2.5 py-1.5 text-[11px] font-semibold text-fg-subtle">
+              <span>Mẫu câu lệnh nhanh (Enter để chọn)</span>
               <button
-                key={p.id}
                 type="button"
-                onClick={() => handleApplyTemplate(p.template)}
-                className="rounded-md border border-border bg-subtle px-2 py-0.5 text-[11px] text-fg-muted hover:bg-muted/50 hover:text-fg"
+                onClick={() => setShowSlashMenu(false)}
+                className="rounded p-0.5 hover:bg-subtle hover:text-fg focus:outline-none"
+                aria-label="Đóng menu mẫu"
               >
-                {p.title}
+                <X className="h-3 w-3" aria-hidden />
+              </button>
+            </div>
+            {QUICK_PROMPTS.map((prompt, idx) => (
+              <button
+                key={prompt.id}
+                type="button"
+                role="option"
+                aria-selected={idx === slashSelectedIndex}
+                onClick={() => handleApplyTemplate(prompt.template)}
+                className={`flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs transition-colors focus:outline-none ${
+                  idx === slashSelectedIndex
+                    ? 'bg-ai-soft text-ai-soft-fg font-medium'
+                    : 'text-fg hover:bg-subtle'
+                }`}
+              >
+                <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ai" aria-hidden />
+                <div className="min-w-0">
+                  <div className="font-medium">{prompt.title}</div>
+                  <div className="truncate text-[11px] text-fg-muted">{prompt.description}</div>
+                </div>
               </button>
             ))}
           </div>
-        </div>
+        )}
 
-        {/* Khung soạn thảo tin nhắn */}
-        <div className="relative flex items-end rounded-xl border border-border bg-surface shadow-xs transition-colors focus-within:border-accent focus-within:ring-1 focus-within:ring-accent">
-          <textarea
-            ref={textareaRef}
-            rows={1}
-            value={value}
-            onChange={handleTextChange}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              isStreaming
-                ? 'Trợ lý AI đang phản hồi...'
-                : 'Nhập câu hỏi hoặc yêu cầu cho Trợ lý AI (Shift + Enter để xuống dòng, gõ / để mở mẫu)...'
-            }
-            disabled={disabled}
-            className="auto-grow-textarea max-h-48 min-h-[44px] flex-1 resize-none bg-transparent px-3.5 py-2.5 text-sm leading-relaxed text-fg placeholder:text-fg-subtle focus:outline-none"
-          />
+        {/* Khung soạn thảo hợp nhất kiểu Claude / Notion AI / Linear */}
+        <div className="rounded-2xl border border-border-strong/80 bg-surface shadow-sm transition-all focus-within:border-ai focus-within:shadow-md">
+          {/* Vùng nhập văn bản */}
+          <div className="px-4 pt-3 pb-1">
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={value}
+              onChange={handleTextChange}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                isStreaming
+                  ? 'Trợ lý AI đang tổng hợp và phản hồi...'
+                  : 'Nhập yêu cầu cho Trợ lý AI (phân tích số liệu, viết nội dung, tối ưu ngân sách)...'
+              }
+              disabled={disabled}
+              className="auto-grow-textarea max-h-44 min-h-[40px] w-full resize-none border-0 bg-transparent p-0 text-sm leading-relaxed text-fg placeholder:text-fg-subtle focus:outline-none focus:ring-0 focus-visible:outline-none"
+            />
+          </div>
 
-          <div className="flex shrink-0 items-center p-1.5">
-            {isStreaming ? (
+          {/* Thanh công cụ tích hợp ngay đáy thẻ Composer */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3 pb-2.5 pt-1.5">
+            {/* Cụm nút bên trái: Ngữ cảnh chiến dịch + Mẫu lệnh nhanh */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {currentCampaign ? (
+                <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-ai/30 bg-ai-soft px-2.5 py-1 text-xs font-medium text-ai-soft-fg">
+                  <Megaphone className="h-3 w-3 shrink-0" aria-hidden />
+                  <span className="max-w-[160px] truncate sm:max-w-[220px]">
+                    {currentCampaign.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onSelectCampaign(null)}
+                    className="rounded p-0.5 hover:bg-ai/20 focus:outline-none"
+                    title="Gỡ bỏ ngữ cảnh chiến dịch"
+                    aria-label="Gỡ bỏ ngữ cảnh"
+                  >
+                    <X className="h-3 w-3" aria-hidden />
+                  </button>
+                </span>
+              ) : (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowCampaignPicker((prev) => !prev)}
+                    className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border bg-subtle/70 px-2.5 py-1 text-xs font-medium text-fg-muted transition-colors hover:border-border-strong hover:bg-subtle hover:text-fg focus:outline-none"
+                  >
+                    <Megaphone className="h-3 w-3 text-ai" aria-hidden />
+                    <span>Gắn chiến dịch</span>
+                  </button>
+
+                  {showCampaignPicker && (
+                    <div className="absolute bottom-full left-0 mb-1.5 max-h-56 w-64 overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-overlay animate-scale-in z-30">
+                      <div className="px-2.5 py-1.5 text-[11px] font-semibold text-fg-subtle">
+                        Chọn chiến dịch ngữ cảnh
+                      </div>
+                      {campaigns.length === 0 ? (
+                        <div className="px-2.5 py-2 text-xs text-fg-subtle">Chưa có chiến dịch nào</div>
+                      ) : (
+                        campaigns.map((c: CampaignListItem) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              onSelectCampaign(c.id);
+                              setShowCampaignPicker(false);
+                            }}
+                            className="flex w-full items-center justify-between truncate rounded-lg px-2.5 py-1.5 text-left text-xs text-fg hover:bg-subtle focus:outline-none"
+                          >
+                            <span className="truncate">{c.name}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <button
                 type="button"
-                onClick={onStop}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-danger text-white transition-colors hover:bg-danger-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-danger"
-                title="Dừng phản hồi"
-                aria-label="Dừng phản hồi"
+                onClick={() => setShowSlashMenu((prev) => !prev)}
+                className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-border bg-subtle/70 px-2 py-1 text-xs text-fg-muted transition-colors hover:border-border-strong hover:bg-subtle hover:text-fg focus:outline-none"
+                title="Mở danh sách mẫu câu lệnh nhanh"
               >
-                <Square className="h-3.5 w-3.5 fill-current" aria-hidden />
+                <Command className="h-3 w-3 text-fg-subtle" aria-hidden />
+                <span>Mẫu lệnh</span>
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={!value.trim() || disabled}
-                className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                  value.trim() && !disabled
-                    ? 'bg-accent text-accent-fg hover:bg-accent-hover'
-                    : 'cursor-not-allowed bg-subtle text-fg-subtle'
-                }`}
-                title="Gửi câu lệnh"
-                aria-label="Gửi câu lệnh"
-              >
-                <ArrowUp className="h-4 w-4" aria-hidden />
-              </button>
-            )}
+
+              <div className="hidden items-center gap-1 md:flex">
+                {QUICK_PROMPTS.slice(0, 2).map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => handleApplyTemplate(p.template)}
+                    className="whitespace-nowrap rounded-lg px-2 py-1 text-[11px] text-fg-subtle transition-colors hover:bg-subtle hover:text-fg focus:outline-none"
+                  >
+                    + {p.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Cụm nút bên phải: Gợi ý phím tắt + Nút Gửi/Dừng */}
+            <div className="flex items-center gap-2.5">
+              <span className="hidden text-[11px] text-fg-subtle sm:inline">
+                Enter để gửi
+              </span>
+
+              {isStreaming ? (
+                <button
+                  type="button"
+                  onClick={onStop}
+                  className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-xl bg-danger px-3 text-xs font-medium text-white shadow-2xs transition-colors hover:bg-danger/90 focus:outline-none"
+                  title="Dừng phản hồi"
+                  aria-label="Dừng phản hồi"
+                >
+                  <Square className="h-3 w-3 fill-current" aria-hidden />
+                  <span>Dừng</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={!value.trim() || disabled}
+                  className={`inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 text-xs font-medium transition-all focus:outline-none ${
+                    value.trim() && !disabled
+                      ? 'bg-ai text-ai-fg shadow-2xs hover:bg-ai-hover'
+                      : 'cursor-not-allowed bg-subtle text-fg-subtle'
+                  }`}
+                  title="Gửi câu lệnh (Enter)"
+                  aria-label="Gửi câu lệnh"
+                >
+                  <span>Gửi</span>
+                  <ArrowUp className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Khuyến cáo bắt buộc dưới khung soạn (§8) */}
+        {/* Khuyến cáo ngắn gọn dưới khung soạn (§8) */}
         <p className="mt-1.5 text-center text-[11px] text-fg-subtle">
-          Nội dung do AI tạo cần được kiểm tra và duyệt trước khi sử dụng.
+          Chỉnh sửa từ AI chỉ áp dụng trên bản nháp — bạn luôn kiểm duyệt trước khi xuất bản.
         </p>
       </div>
     </div>

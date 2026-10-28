@@ -1,23 +1,22 @@
-import { lazy, Suspense, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { ShieldAlert } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { isManager } from '@/lib/permissions';
 import { EmptyState, Spinner } from '@/components/ui';
+import LoginPage from '@/features/auth/LoginPage';
+import DashboardPage from '@/features/dashboard/DashboardPage';
+import CampaignsPage from '@/features/campaigns/CampaignsPage';
+import CampaignCreatePage from '@/features/campaigns/CampaignCreatePage';
+import CampaignDetailPage from '@/features/campaigns/CampaignDetailPage';
+import ContentsPage from '@/features/contents/ContentsPage';
+import ContentDetailPage from '@/features/contents/ContentDetailPage';
+import ReviewsPage from '@/features/reviews/ReviewsPage';
+import CalendarPage from '@/features/calendar/CalendarPage';
+import AssistantPage from '@/features/assistant/AssistantPage';
+import SettingsPage from '@/features/settings/SettingsPage';
 import { AppLayout } from './layout/AppLayout';
 import { NotFoundPage, RouteErrorPage } from './ErrorPages';
-
-const LoginPage = lazy(() => import('@/features/auth/LoginPage'));
-const DashboardPage = lazy(() => import('@/features/dashboard/DashboardPage'));
-const CampaignsPage = lazy(() => import('@/features/campaigns/CampaignsPage'));
-const CampaignCreatePage = lazy(() => import('@/features/campaigns/CampaignCreatePage'));
-const CampaignDetailPage = lazy(() => import('@/features/campaigns/CampaignDetailPage'));
-const ContentsPage = lazy(() => import('@/features/contents/ContentsPage'));
-const ContentDetailPage = lazy(() => import('@/features/contents/ContentDetailPage'));
-const ReviewsPage = lazy(() => import('@/features/reviews/ReviewsPage'));
-const CalendarPage = lazy(() => import('@/features/calendar/CalendarPage'));
-const AssistantPage = lazy(() => import('@/features/assistant/AssistantPage'));
-const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'));
 
 function FullScreenLoader() {
   return (
@@ -60,17 +59,13 @@ function RequireManager({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-const page = (node: ReactNode) => <Suspense fallback={<Spinner className="py-24" />}>{node}</Suspense>;
-
 export const router = createBrowserRouter([
   {
     path: '/login',
     errorElement: <RouteErrorPage />,
     element: (
       <GuestOnly>
-        <Suspense fallback={<FullScreenLoader />}>
-          <LoginPage />
-        </Suspense>
+        <LoginPage />
       </GuestOnly>
     ),
   },
@@ -79,9 +74,7 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorPage />,
     element: (
       <GuestOnly>
-        <Suspense fallback={<FullScreenLoader />}>
-          <LoginPage />
-        </Suspense>
+        <LoginPage />
       </GuestOnly>
     ),
   },
@@ -90,24 +83,31 @@ export const router = createBrowserRouter([
     element: <RequireAuth />,
     errorElement: <RouteErrorPage />,
     children: [
-      { index: true, element: page(<DashboardPage />) },
-      { path: 'campaigns', element: page(<CampaignsPage />) },
-      { path: 'campaigns/new', element: page(<CampaignCreatePage />) },
-      { path: 'campaigns/:id', element: page(<CampaignDetailPage />) },
-      { path: 'contents', element: page(<ContentsPage />) },
-      { path: 'contents/:id', element: page(<ContentDetailPage />) },
-      { path: 'reviews', element: page(<RequireManager><ReviewsPage /></RequireManager>) },
-      { path: 'calendar', element: page(<CalendarPage />) },
+      { index: true, element: <DashboardPage /> },
+      { path: 'campaigns', element: <CampaignsPage /> },
+      { path: 'campaigns/new', element: <CampaignCreatePage /> },
+      { path: 'campaigns/:id', element: <CampaignDetailPage /> },
+      { path: 'contents', element: <ContentsPage /> },
+      { path: 'contents/:id', element: <ContentDetailPage /> },
+      {
+        path: 'reviews',
+        element: (
+          <RequireManager>
+            <ReviewsPage />
+          </RequireManager>
+        ),
+      },
+      { path: 'calendar', element: <CalendarPage /> },
       {
         path: 'assistant',
         element: <Outlet />,
         children: [
-          { index: true, element: page(<AssistantPage />) },
-          { path: ':threadId', element: page(<AssistantPage />) },
+          { index: true, element: <AssistantPage /> },
+          { path: ':threadId', element: <AssistantPage /> },
         ],
       },
-      { path: 'settings', element: page(<SettingsPage />) },
-      { path: 'settings/:section', element: page(<SettingsPage />) },
+      { path: 'settings', element: <SettingsPage /> },
+      { path: 'settings/:section', element: <SettingsPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

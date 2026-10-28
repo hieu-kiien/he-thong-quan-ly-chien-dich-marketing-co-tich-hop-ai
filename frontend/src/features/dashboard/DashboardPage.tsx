@@ -664,17 +664,18 @@ export default function DashboardPage() {
                         const isOverOrHigh = (item.used_pct ?? 0) > 85;
                         return (
                           <TR key={item.campaign.id} className="group">
-                            <TD>
+                            <TD className="min-w-[160px] max-w-[220px]">
                               <Link
                                 to={`/campaigns/${item.campaign.id}`}
-                                className="font-medium text-fg hover:text-accent hover:underline"
+                                className="line-clamp-1 font-medium text-fg hover:text-accent hover:underline"
+                                title={item.campaign.name}
                               >
                                 {item.campaign.name}
                               </Link>
                             </TD>
-                            <TD className="text-right text-xs font-mono tabular-nums">{formatMoney(item.budget)}</TD>
-                            <TD className="text-right text-xs font-mono font-medium tabular-nums">{formatMoney(item.cost)}</TD>
-                            <TD className="text-right text-xs font-mono tabular-nums">
+                            <TD className="whitespace-nowrap text-right text-xs font-mono tabular-nums">{formatMoney(item.budget)}</TD>
+                            <TD className="whitespace-nowrap text-right text-xs font-mono font-medium tabular-nums">{formatMoney(item.cost)}</TD>
+                            <TD className="whitespace-nowrap text-right text-xs font-mono tabular-nums">
                               <span
                                 className={
                                   (item.used_pct ?? 0) > 100
@@ -687,10 +688,10 @@ export default function DashboardPage() {
                                 {formatPct(item.used_pct)}
                               </span>
                             </TD>
-                            <TD>
+                            <TD className="whitespace-nowrap">
                               <StatusBadge kind="campaign" status={item.campaign.status} />
                             </TD>
-                            <TD className="text-right">
+                            <TD className="whitespace-nowrap text-right">
                               <button
                                 type="button"
                                 onClick={() =>
@@ -702,10 +703,10 @@ export default function DashboardPage() {
                                       : `Đánh giá hiệu quả hiện tại của chiến dịch "${item.campaign.name}" và đề xuất cách tối ưu tỷ lệ chuyển đổi.`,
                                   })
                                 }
-                                className="inline-flex items-center gap-1 rounded-md border border-ai/30 bg-ai-soft px-2 py-1 text-[11px] font-medium text-ai-soft-fg transition-colors hover:bg-ai hover:text-ai-fg"
+                                className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-ai/30 bg-ai-soft px-2 py-1 text-[11px] font-medium text-ai-soft-fg transition-colors hover:bg-ai hover:text-ai-fg"
                               >
-                                <Sparkles className="h-3 w-3" aria-hidden />
-                                <span>{isOverOrHigh ? 'Phân tích nguyên nhân' : 'Tối ưu bằng AI'}</span>
+                                <Sparkles className="h-3 w-3 shrink-0" aria-hidden />
+                                <span>{isOverOrHigh ? 'Phân tích AI' : 'Tối ưu AI'}</span>
                               </button>
                             </TD>
                           </TR>

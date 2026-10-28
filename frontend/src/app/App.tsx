@@ -8,7 +8,9 @@ import { router } from './router';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000,
+      staleTime: 5 * 60_000,
+      gcTime: 30 * 60_000,
+      placeholderData: (previousData: unknown) => previousData,
       refetchOnWindowFocus: false,
       retry: (count, err) => {
         // Không thử lại lỗi nghiệp vụ (4xx); chỉ thử lại 1 lần với lỗi mạng/5xx.
