@@ -4,7 +4,12 @@ import { ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 export function Card({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('rounded-lg border border-border bg-surface', className)} {...rest} />;
+  return (
+    <div
+      className={cn('rounded-xl border border-border bg-surface shadow-sm', className)}
+      {...rest}
+    />
+  );
 }
 
 export function CardHeader({
@@ -19,7 +24,12 @@ export function CardHeader({
   className?: string;
 }) {
   return (
-    <div className={cn('flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3', className)}>
+    <div
+      className={cn(
+        'flex flex-wrap items-start justify-between gap-3 rounded-t-xl border-b border-border/80 bg-subtle/45 px-5 py-3.5',
+        className,
+      )}
+    >
       <div className="min-w-0">
         <h2 className="text-sm font-semibold text-fg">{title}</h2>
         {description && <div className="mt-0.5 text-[0.8125rem] text-fg-muted">{description}</div>}
@@ -30,7 +40,7 @@ export function CardHeader({
 }
 
 export function CardBody({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('p-4', className)} {...rest} />;
+  return <div className={cn('p-5', className)} {...rest} />;
 }
 
 export interface PageHeaderProps {
@@ -44,21 +54,24 @@ export interface PageHeaderProps {
 
 export function PageHeader({ title, description, actions, back, meta }: PageHeaderProps) {
   return (
-    <div className="mb-6">
+    <div className="mb-5 border-b border-border/70 pb-4">
       {back && (
         <Link
           to={back.to}
-          className="mb-2 inline-flex items-center gap-1 rounded text-[0.8125rem] text-fg-muted hover:text-fg"
+          className="mb-2 inline-flex items-center gap-1 rounded text-[0.8125rem] font-medium text-fg-muted hover:text-accent"
         >
           <ChevronLeft className="h-4 w-4" aria-hidden />
           {back.label}
         </Link>
       )}
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight text-fg">{title}</h1>
-          {description && <div className="mt-1 text-sm text-fg-muted">{description}</div>}
-          {meta && <div className="mt-2 flex flex-wrap items-center gap-2">{meta}</div>}
+          <div className="flex items-center gap-2.5">
+            <span className="h-5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
+            <h1 className="text-xl font-bold tracking-tight text-fg">{title}</h1>
+          </div>
+          {description && <div className="mt-1 pl-4 text-sm text-fg-muted">{description}</div>}
+          {meta && <div className="mt-2 flex flex-wrap items-center gap-2 pl-4">{meta}</div>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
@@ -102,7 +115,7 @@ export function Callout({
   };
   return (
     <div
-      className={cn('flex gap-3 rounded-md border px-3.5 py-3 text-[0.8125rem]', tones[tone], className)}
+      className={cn('flex gap-3 rounded-lg border px-3.5 py-3 text-[0.8125rem]', tones[tone], className)}
       role={tone === 'danger' || tone === 'warning' ? 'alert' : 'status'}
     >
       {icon && <span className="mt-0.5 shrink-0 [&>svg]:h-4 [&>svg]:w-4">{icon}</span>}

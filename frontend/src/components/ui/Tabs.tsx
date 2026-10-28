@@ -16,7 +16,7 @@ export interface TabsProps<K extends string> {
   label?: string;
 }
 
-/** Thanh tab (role=tablist, phím mũi tên). Nội dung đặt trong <TabPanel>. */
+/** Thanh tab dạng Segmented Pill hiện đại (không dùng overflow-x-auto để tránh sinh thanh trượt thừa). */
 export function Tabs<K extends string>({ items, value, onChange, className, label }: TabsProps<K>) {
   const baseId = useId();
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -35,7 +35,14 @@ export function Tabs<K extends string>({ items, value, onChange, className, labe
   };
 
   return (
-    <div role="tablist" aria-label={label} className={cn('flex gap-1 overflow-x-auto border-b border-border', className)}>
+    <div
+      role="tablist"
+      aria-label={label}
+      className={cn(
+        'inline-flex flex-wrap items-center gap-1 rounded-xl border border-border bg-subtle/90 p-1 shadow-2xs',
+        className,
+      )}
+    >
       {items.map((t, i) => {
         const selected = t.key === value;
         return (
@@ -51,13 +58,22 @@ export function Tabs<K extends string>({ items, value, onChange, className, labe
             onClick={() => onChange(t.key)}
             onKeyDown={(e) => onKey(e, i)}
             className={cn(
-              '-mb-px inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors',
-              selected ? 'border-accent text-fg' : 'border-transparent text-fg-muted hover:text-fg',
+              'inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-xs font-semibold transition-all focus:outline-none',
+              selected
+                ? 'bg-accent text-accent-fg shadow-xs'
+                : 'text-fg-muted hover:bg-surface/80 hover:text-fg',
             )}
           >
             {t.label}
             {t.count !== undefined && (
-              <span className="rounded bg-subtle px-1.5 text-xs tabular text-fg-muted">{t.count}</span>
+              <span
+                className={cn(
+                  'rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums',
+                  selected ? 'bg-white/20 text-white' : 'bg-surface text-fg-muted',
+                )}
+              >
+                {t.count}
+              </span>
             )}
           </button>
         );

@@ -287,31 +287,53 @@ export default function SettingsPage() {
 
       <Tabs items={tabItems} value={activeTab} onChange={handleTabChange} />
 
-      {/* 1. TÀI KHOẢN CÁ NHÂN */}
+      {/* 1. TÀI KHOẢN CÁ NHÂN (Bố cục 2 cột rộng rãi, không cần cuộn trang) */}
       {activeTab === 'account' && (
-        <TabPanel tabKey="account" className="mt-6 space-y-6 max-w-2xl">
-          <Card>
-            <CardHeader title="Thông tin người dùng" />
-            <CardBody className="space-y-3 text-sm">
-              <div className="flex justify-between py-1 border-b border-border">
-                <span className="text-fg-muted">Họ và tên:</span>
-                <span className="font-semibold text-fg">{user?.full_name}</span>
+        <TabPanel tabKey="account" className="mt-5 grid gap-6 lg:grid-cols-12">
+          <Card className="lg:col-span-5">
+            <CardHeader
+              title="Thông tin nhân sự"
+              description="Hồ sơ định danh và phạm vi phân quyền của bạn trên hệ thống."
+            />
+            <CardBody className="space-y-4 text-sm">
+              <div className="flex items-center gap-3.5 rounded-xl border border-border/80 bg-subtle/50 p-3.5">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent text-base font-bold text-accent-fg shadow-xs">
+                  {(user?.full_name || 'M')
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .slice(-2)
+                    .map((w) => w[0]?.toUpperCase())
+                    .join('')}
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-base font-semibold text-fg">{user?.full_name}</div>
+                  <div className="truncate font-mono text-xs text-fg-muted">{user?.email}</div>
+                </div>
               </div>
-              <div className="flex justify-between py-1 border-b border-border">
-                <span className="text-fg-muted">Địa chỉ email:</span>
-                <span className="font-mono text-fg">{user?.email}</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-fg-muted">Vai trò trong hệ thống:</span>
-                <Badge tone="accent">{user ? ROLE_LABEL[user.role] : '—'}</Badge>
+
+              <div className="space-y-2.5 pt-1">
+                <div className="flex items-center justify-between border-b border-border/70 py-2">
+                  <span className="text-fg-muted">Họ và tên:</span>
+                  <span className="font-semibold text-fg">{user?.full_name}</span>
+                </div>
+                <div className="flex items-center justify-between border-b border-border/70 py-2">
+                  <span className="text-fg-muted">Địa chỉ email:</span>
+                  <span className="font-mono text-xs font-medium text-fg">{user?.email}</span>
+                </div>
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-fg-muted">Vai trò trong hệ thống:</span>
+                  <Badge tone="accent" dot>
+                    {user ? ROLE_LABEL[user.role] : '—'}
+                  </Badge>
+                </div>
               </div>
             </CardBody>
           </Card>
 
-          <Card>
+          <Card className="lg:col-span-7">
             <CardHeader
-              title="Đổi mật khẩu"
-              description="Để đảm bảo an toàn, vui lòng chọn mật khẩu mạnh gồm chữ, số và ký tự đặc biệt."
+              title="Đổi mật khẩu bảo mật"
+              description="Để đảm bảo an toàn, vui lòng chọn mật khẩu mạnh gồm chữ hoa, chữ thường, số và ký tự đặc biệt."
             />
             <CardBody>
               <form
@@ -346,31 +368,36 @@ export default function SettingsPage() {
                       type="password"
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="Nhập mật khẩu đang sử dụng..."
                     />
                   )}
                 </FormField>
 
-                <FormField label="Mật khẩu mới" required>
-                  {(p) => (
-                    <Input
-                      {...p}
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                    />
-                  )}
-                </FormField>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField label="Mật khẩu mới" required>
+                    {(p) => (
+                      <Input
+                        {...p}
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Tối thiểu 8 ký tự..."
+                      />
+                    )}
+                  </FormField>
 
-                <FormField label="Xác nhận mật khẩu mới" required>
-                  {(p) => (
-                    <Input
-                      {...p}
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                    />
-                  )}
-                </FormField>
+                  <FormField label="Xác nhận mật khẩu mới" required>
+                    {(p) => (
+                      <Input
+                        {...p}
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Nhập lại mật khẩu mới..."
+                      />
+                    )}
+                  </FormField>
+                </div>
 
                 <div className="flex justify-end pt-2">
                   <Button
@@ -378,7 +405,7 @@ export default function SettingsPage() {
                     type="submit"
                     loading={changePasswordMutation.isPending}
                   >
-                    Đổi mật khẩu
+                    Cập nhật mật khẩu
                   </Button>
                 </div>
               </form>
@@ -678,31 +705,32 @@ export default function SettingsPage() {
                     <span className="text-xs font-semibold text-fg-muted">
                       Danh sách từ cấm hiện hành ({brandForm.banned_keywords.length}):
                     </span>
-                    <div className="max-h-80 overflow-y-auto space-y-2 rounded border border-border p-2">
+                    <div className="rounded-xl border border-border bg-subtle/30 p-3">
                       {brandForm.banned_keywords.length === 0 ? (
                         <p className="py-4 text-center text-xs text-fg-muted">Chưa có từ cấm nào được thiết lập.</p>
                       ) : (
-                        brandForm.banned_keywords.map((b, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between rounded bg-surface p-2 text-xs border border-border"
-                          >
-                            <span className="font-mono font-medium text-danger">{b.keyword}</span>
-                            <IconButton
-                              label="Xoá từ cấm"
-                              size="sm"
-                              variant="ghost"
-                              className="text-danger hover:bg-danger/10"
-                              onClick={() => {
-                                const updated = brandForm.banned_keywords.filter((_, i) => i !== idx);
-                                setBrandForm({ ...brandForm, banned_keywords: updated });
-                                saveBrandMutation.mutate({ ...brandForm, banned_keywords: updated });
-                              }}
+                        <div className="flex flex-wrap gap-2">
+                          {brandForm.banned_keywords.map((b, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-danger/25 bg-danger-soft px-2.5 py-1 text-xs font-mono font-medium text-danger-soft-fg"
                             >
-                              <X className="h-3 w-3" />
-                            </IconButton>
-                          </div>
-                        ))
+                              <span>{b.keyword}</span>
+                              <button
+                                type="button"
+                                aria-label="Xoá từ cấm"
+                                className="rounded p-0.5 text-danger hover:bg-danger/15"
+                                onClick={() => {
+                                  const updated = brandForm.banned_keywords.filter((_, i) => i !== idx);
+                                  setBrandForm({ ...brandForm, banned_keywords: updated });
+                                  saveBrandMutation.mutate({ ...brandForm, banned_keywords: updated });
+                                }}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -715,7 +743,7 @@ export default function SettingsPage() {
 
       {/* 5. TRẠNG THÁI AI (MANAGER ONLY) */}
       {isUserAdmin && activeTab === 'ai' && (
-        <TabPanel tabKey="ai" className="mt-6 space-y-6 max-w-2xl">
+        <TabPanel tabKey="ai" className="mt-5 space-y-6">
           <Card>
             <CardHeader
               title="Trạng thái dịch vụ AI Runner"

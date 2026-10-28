@@ -40,12 +40,16 @@ export function Logo({ compact }: { compact?: boolean }) {
   return (
     <span className="flex items-center gap-2.5">
       <span
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent text-[0.8125rem] font-bold text-accent-fg"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-teal-400 text-sm font-bold text-white shadow-sm"
         aria-hidden
       >
         M
       </span>
-      {!compact && <span className="text-[0.9375rem] font-semibold tracking-tight text-fg">MarketFlow</span>}
+      {!compact && (
+        <span className="text-[0.95rem] font-bold tracking-tight text-white">
+          MarketFlow
+        </span>
+      )}
     </span>
   );
 }
@@ -85,29 +89,33 @@ export function Sidebar() {
     });
   };
 
-  const linkCls = ({ isActive }: { isActive: boolean }) =>
+  const linkCls = ({ isActive }: { isActive: boolean }, isAiNav?: boolean) =>
     cn(
-      'group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm font-medium transition-colors',
+      'group flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-all',
       'justify-center',
       !collapsed && 'lg:justify-start',
-      isActive ? 'bg-subtle text-fg' : 'text-fg-muted hover:bg-subtle/70 hover:text-fg',
+      isActive
+        ? isAiNav
+          ? 'bg-teal-600 text-white shadow-xs'
+          : 'bg-blue-600 text-white shadow-xs'
+        : 'text-slate-300 hover:bg-slate-800/80 hover:text-white',
     );
 
   return (
     <aside
       className={cn(
-        'flex w-16 shrink-0 flex-col border-r border-border bg-surface transition-[width] duration-200',
+        'flex w-16 shrink-0 flex-col border-r border-slate-800 bg-slate-900 text-slate-100 transition-[width] duration-200',
         collapsed ? 'lg:w-16' : 'lg:w-60',
       )}
       aria-label="Điều hướng chính"
     >
       <div
         className={cn(
-          'flex h-14 items-center justify-center border-b border-border px-4',
+          'flex h-14 items-center justify-center border-b border-slate-800/90 px-4',
           !collapsed && 'lg:justify-start',
         )}
       >
-        <NavLink to="/" className="rounded-md" aria-label="MarketFlow — Tổng quan">
+        <NavLink to="/" className="rounded-md focus:outline-none" aria-label="MarketFlow — Tổng quan">
           <span className={collapsed ? '' : 'lg:hidden'}>
             <Logo compact />
           </span>
@@ -118,33 +126,36 @@ export function Sidebar() {
           )}
         </NavLink>
       </div>
-      <nav className="flex-1 overflow-y-auto px-2.5 py-3">
-        <ul className="space-y-0.5">
+      <nav className="flex-1 px-2.5 py-3.5">
+        <ul className="space-y-1">
           {items.map((item) => {
             const Icon = item.icon;
             const badge = item.badgeKey === 'reviews' ? pending.data : undefined;
             const isAiNav = item.to === '/assistant';
             return (
               <li key={item.to}>
-                <NavLink to={item.to} end={item.end} className={linkCls} title={item.label}>
+                <NavLink
+                  to={item.to}
+                  end={item.end}
+                  className={(navState) => linkCls(navState, isAiNav)}
+                  title={item.label}
+                >
                   {({ isActive }) => (
                     <>
                       <Icon
                         className={cn(
-                          'h-[18px] w-[18px] shrink-0',
+                          'h-[18px] w-[18px] shrink-0 transition-colors',
                           isActive
-                            ? isAiNav
-                              ? 'text-ai'
-                              : 'text-accent'
+                            ? 'text-white'
                             : isAiNav
-                              ? 'text-ai/80 group-hover:text-ai'
-                              : 'text-fg-subtle group-hover:text-fg-muted',
+                              ? 'text-teal-400 group-hover:text-teal-300'
+                              : 'text-slate-400 group-hover:text-white',
                         )}
                         aria-hidden
                       />
                       {!collapsed && <span className="hidden flex-1 truncate lg:inline">{item.label}</span>}
                       {!collapsed && badge ? (
-                        <span className="hidden rounded bg-warning-soft px-1.5 text-xs font-semibold tabular text-warning-soft-fg lg:inline">
+                        <span className="hidden rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-semibold tabular-nums text-amber-300 lg:inline">
                           {badge}
                           <span className="sr-only"> nội dung chờ duyệt</span>
                         </span>
@@ -157,12 +168,15 @@ export function Sidebar() {
           })}
         </ul>
       </nav>
-      <div className="space-y-1 border-t border-border px-2.5 py-2.5">
-        <NavLink to="/settings" className={linkCls} title="Cài đặt">
+      <div className="space-y-1 border-t border-slate-800/90 px-2.5 py-2.5">
+        <NavLink to="/settings" className={(navState) => linkCls(navState, false)} title="Cài đặt">
           {({ isActive }) => (
             <>
               <Settings
-                className={cn('h-[18px] w-[18px] shrink-0', isActive ? 'text-accent' : 'text-fg-subtle')}
+                className={cn(
+                  'h-[18px] w-[18px] shrink-0',
+                  isActive ? 'text-white' : 'text-slate-400 group-hover:text-white',
+                )}
                 aria-hidden
               />
               {!collapsed && <span className="hidden lg:inline">Cài đặt</span>}
@@ -173,7 +187,7 @@ export function Sidebar() {
           type="button"
           onClick={toggleCollapsed}
           className={cn(
-            'hidden h-8 w-full items-center gap-3 rounded-md px-2.5 text-xs font-medium text-fg-subtle transition-colors hover:bg-subtle hover:text-fg lg:flex',
+            'hidden h-8 w-full items-center gap-3 rounded-lg px-3 text-xs font-medium text-slate-400 transition-colors hover:bg-slate-800 hover:text-white lg:flex',
             collapsed ? 'justify-center' : 'justify-start',
           )}
           title={collapsed ? 'Mở rộng thanh điều hướng (240px)' : 'Thu gọn thanh điều hướng (64px)'}

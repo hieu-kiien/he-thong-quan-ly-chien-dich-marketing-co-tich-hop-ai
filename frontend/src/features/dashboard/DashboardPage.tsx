@@ -577,8 +577,7 @@ export default function DashboardPage() {
                 title="Hiệu quả theo kênh triển khai"
                 description="Tổng hợp số liệu tương tác và chi phí phân bổ cho từng kênh."
               />
-              <div className="overflow-x-auto">
-                <Table>
+              <Table className="rounded-none border-0">
                   <THead>
                     <TR>
                       <TH>Kênh</TH>
@@ -625,7 +624,6 @@ export default function DashboardPage() {
                     )}
                   </TBody>
                 </Table>
-              </div>
             </Card>
 
             {/* Campaign Budget Usage Table */}
@@ -634,8 +632,7 @@ export default function DashboardPage() {
                 title="Tiến độ ngân sách chiến dịch"
                 description="So sánh chi phí thực tế phát sinh với ngân sách đã phân bổ."
               />
-              <div className="overflow-x-auto">
-                <Table>
+              <Table className="rounded-none border-0">
                   <THead>
                     <TR>
                       <TH>Chiến dịch</TH>
@@ -715,7 +712,6 @@ export default function DashboardPage() {
                     )}
                   </TBody>
                 </Table>
-              </div>
             </Card>
           </div>
         </div>

@@ -29,29 +29,29 @@
  */
 @layer base {
   :root {
-    /* Biến CSS chuẩn theo Design System Soft Daylight */
-    --bg-canvas: #F6F7F9;
+    /* Biến CSS chuẩn theo Design System Soft Daylight (Tăng độ tương phản sắc nét) */
+    --bg-canvas: #F1F5F9;
     --bg-surface: #FFFFFF;
     --bg-ai-panel: #F0F4F8;
-    --bg-hover: #EBF0F5;
-    --text-primary: #111827;
-    --text-secondary: #4B5563;
-    --text-muted: #6B7280;
+    --bg-hover: #E2E8F0;
+    --text-primary: #0F172A;
+    --text-secondary: #334155;
+    --text-muted: #64748B;
     --accent-primary: #2563EB;
     --accent-ai: #0D9488;
-    --border-subtle: #E2E8F0;
+    --border-subtle: #CBD5E1;
 
     /* Kênh RGB cho hệ thống token Tailwind (hỗ trợ <alpha-value>) */
-    --canvas: 246 247 249;        /* #F6F7F9 - Cool Alabaster dịu mắt */
+    --canvas: 241 245 249;        /* #F1F5F9 - Cool Slate Alabaster tạo chiều sâu rõ nét cho Card trắng */
     --surface: 255 255 255;       /* #FFFFFF - Nền Card & Bảng chính */
     --ai-panel: 240 244 248;      /* #F0F4F8 - Nền khu vực làm việc với AI */
-    --subtle: 235 240 245;        /* #EBF0F5 - Nền hover dòng bảng & bề mặt phụ */
+    --subtle: 238 242 246;        /* #EEF2F6 - Nền header phụ & hover dòng bảng */
     --muted: 226 232 240;         /* #E2E8F0 */
-    --border: 226 232 240;        /* #E2E8F0 - Viền bảng mảnh, sắc nét */
-    --border-strong: 203 213 225; /* #CBD5E1 */
-    --fg: 17 24 39;               /* #111827 - Chữ chính xám than sâu, không dùng #000000 */
-    --fg-muted: 75 85 99;         /* #4B5563 - Chữ phụ, tiêu đề cột bảng */
-    --fg-subtle: 107 114 128;     /* #6B7280 - Chú thích nhỏ, mốc thời gian */
+    --border: 203 213 225;        /* #CBD5E1 - Viền bảng & thẻ sắc nét, không bị nhạt nhoà */
+    --border-strong: 148 163 184; /* #94A3B8 */
+    --fg: 15 23 42;               /* #0F172A - Chữ chính đậm nét, tương phản cao */
+    --fg-muted: 51 65 85;         /* #334155 - Chữ phụ, tiêu đề cột bảng rõ ràng */
+    --fg-subtle: 100 116 139;     /* #64748B - Chú thích nhỏ, mốc thời gian */
 
     /* Màu nhấn chính: Xanh Cobalt hiện đại (#2563EB) */
     --accent: 37 99 235;
@@ -155,8 +155,27 @@
 
   html {
     -webkit-text-size-adjust: 100%;
-    scrollbar-width: thin;
-    scrollbar-color: rgb(var(--fg-subtle) / 0.55) rgb(var(--subtle));
+  }
+
+  /* Thanh cuộn mảnh hiện đại, ẩn hoàn toàn nút mũi tên 2 đầu (▲ ▼) của Windows */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--fg-subtle) / 0.28);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--fg-subtle) / 0.45);
   }
 
   body {
