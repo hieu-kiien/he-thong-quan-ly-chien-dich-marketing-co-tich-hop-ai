@@ -1,153 +1,234 @@
-\chapter{PHÂN TÍCH YÊU CẦU HỆ THỐNG VÀ KIỂM SOÁT PHÂN QUYỀN}
+\chapter{XÂY DỰNG HỆ THỐNG VÀ TÍCH HỢP TRỢ LÝ AI}
 
-\section{Phân tích tác nhân và mục tiêu nghiệp vụ}
+\section{Tổ chức thư mục mã nguồn}
 
-Hệ thống MarketFlow AI được thiết kế xoay quanh hai nhóm tác nhân con người (\texttt{MANAGER}, \texttt{MARKETER}) cùng hai thực thể kỹ thuật/ngoại vi (Dịch vụ \texttt{ai-runner} + FastMCP và Kênh truyền thông phát hành), được định nghĩa trong Bảng~\ref{tab:actors}.
+Dự án được chia thành 3 thư mục chính gồm \texttt{backend/} (API quản lý và cổng MCP), \texttt{ai-runner/} (dịch vụ chạy lệnh gọi AI) và \texttt{frontend/} (giao diện React), được tóm tắt trong Bảng~\ref{tab:source-tree}.
 
 \begin{table}[!htbp]
 \centering
-\small
-\caption{Tác nhân, mục tiêu và ranh giới quyền hạn trong hệ thống}
-\label{tab:actors}
-\begin{tabularx}{\textwidth}{|L{3.2cm}|Y|Y|}
+\footnotesize
+\renewcommand{\arraystretch}{1.05}
+\caption{Cấu trúc các thư mục chính trong kho mã nguồn}
+\label{tab:source-tree}
+\begin{tabularx}{\textwidth}{|L{4.2cm}|Y|L{3.1cm}|}
 \hline
-\thead{Tác nhân} & \thead{Mục tiêu nghiệp vụ} & \thead{Ranh giới quyền hạn}\\
+\thead{Thư mục} & \thead{Chức năng chính} & \thead{Công nghệ}\\
 \hline
-Người quản lý (\texttt{MANAGER}) & Quản trị tài khoản nhân sự (\texttt{/api/v1/users}), cấu hình hồ sơ thương hiệu (\texttt{brand\_profile}), từ khóa cấm (\texttt{banned\_keywords}), danh mục 7 kênh; thiết lập chiến dịch, thẩm định và phê duyệt nội dung tiếp thị, giám sát báo cáo KPI toàn doanh nghiệp. & Toàn quyền trên toàn hệ thống; có quyền phê duyệt/từ chối (\texttt{/approve}, \texttt{/reject}) đối với nội dung của người khác (\texttt{created\_by != current\_user.id}, chặn tự duyệt qua \texttt{CANNOT\_REVIEW\_OWN}).\\
+\texttt{backend/app/core} & Đọc biến môi trường (\texttt{config.py}), kết nối CSDL (\texttt{database.py}), mã lỗi (\texttt{errors.py}) và tạo/kiểm tra JWT (\texttt{security.py}). & Python 3.12, Passlib, PyJWT\\
 \hline
-Nhân viên Marketing (\texttt{MARKETER}) & Khởi tạo chiến dịch được giao, gọi Trợ lý AI hỗ trợ ý tưởng/soạn bản nháp, biên tập nội dung, gửi duyệt, lập lịch và nhập số liệu thực tế. & Chỉ được sửa/xóa chiến dịch, nội dung, lịch đăng và nhập số liệu trên chiến dịch do chính mình sở hữu (\texttt{owner\_id == current\_user.id}); không có quyền phê duyệt bài viết.\\
+\texttt{backend/alembic} \& \texttt{backend/seed} & Quản lý phiên bản bảng CSDL (Alembic) và kịch bản nạp dữ liệu mẫu (\texttt{seed\_demo.py}). & SQLAlchemy 2.0, Alembic\\
 \hline
-Dịch vụ \texttt{ai-runner} \& FastMCP & Nhận yêu cầu hội thoại kèm \texttt{Run-Token} JWT, truy vấn dữ liệu qua 9 công cụ đọc và tạo thẻ đề xuất qua 5 công cụ \texttt{propose\_*}. & Thực thi dưới quyền của người dùng đang đăng nhập; không có quyền ghi thẳng vào các bảng nghiệp vụ cốt lõi; mọi đề xuất luôn mang trạng thái \texttt{PROPOSED}.\\
+\texttt{backend/app/models} \& \texttt{schemas} & Khai báo 14 bảng dữ liệu và các lớp kiểm tra dữ liệu đầu vào/đầu ra. & SQLAlchemy 2.0, Pydantic v2\\
 \hline
-Kênh truyền thông & Tiếp nhận lịch đăng và nội dung đã được phê duyệt để xuất bản và ghi nhận liên kết (\texttt{published\_url}). & Đứng sau rào chắn kiểm duyệt; chỉ tiếp nhận nội dung có trạng thái \texttt{APPROVED} hoặc \texttt{PUBLISHED}.\\
+\texttt{backend/app/api/v1} & 10 nhóm API: \texttt{auth}, \texttt{users}, \texttt{channels}, \texttt{campaigns}, \texttt{contents}, \texttt{schedules}, \texttt{metrics}, \texttt{stats}, \texttt{brand}, \texttt{notifications}. & FastAPI Routers\\
+\hline
+\texttt{backend/app/assistant} & Máy chủ công cụ FastMCP (\texttt{mcp\_server.py}, \texttt{tools.py}), luồng chat SSE (\texttt{chat\_service.py}) và xử lý xác nhận thẻ đề xuất (\texttt{actions\_service.py}). & FastMCP, HTTPX, SSE\\
+\hline
+\texttt{ai-runner/app} & Dịch vụ nhận yêu cầu gọi AI (\texttt{main.py}, \texttt{runner.py}), xếp hàng tuần tự và chạy tiến trình \texttt{opencode run}. & FastAPI, Asyncio, OpenCode CLI\\
+\hline
+\texttt{frontend/src/features} & 8 nhóm màn hình: \texttt{auth}, \texttt{dashboard}, \texttt{campaigns}, \texttt{contents}, \texttt{schedules}, \texttt{metrics}, \texttt{assistant}, \texttt{settings}. & React 18, TypeScript, TanStack Query\\
+\hline
+\texttt{frontend/src/components} & Khung giao diện (\texttt{AppShell.tsx}, \texttt{Sidebar.tsx}), ngăn kéo chat AI (\texttt{AssistantDrawer.tsx}), thẻ đề xuất (\texttt{ProposedActionCard.tsx}) và chọn model (\texttt{ModelSelector.tsx}). & Tailwind CSS v4, ECharts, FullCalendar\\
 \hline
 \end{tabularx}
 \end{table}
 
+\section{Xây dựng các chức năng quản lý}
+
+\subsection{Phân quyền theo vai trò và người tạo chiến dịch}
+
+Khi người dùng gửi yêu cầu lên API, hàm \texttt{get\_current\_user} trong \texttt{backend/app/api/deps.py} kiểm tra chữ ký JWT, trạng thái hoạt động (\texttt{is\_active == True}) và đối chiếu \texttt{token\_version} với CSDL. Bên cạnh việc phân quyền theo 2 vai trò \texttt{MANAGER} và \texttt{MARKETER}, hệ thống kiểm tra thêm cột \texttt{owner\_id} trên từng chiến dịch để đảm bảo nhân viên này không thể tự ý sửa hoặc xóa chiến dịch, bài viết của nhân viên khác (Bảng~\ref{tab:scope-matrix}).
+
+\begin{table}[!htbp]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{1.05}
+\caption{Bảng phân quyền thao tác theo vai trò và người phụ trách chiến dịch}
+\label{tab:scope-matrix}
+\begin{tabularx}{\textwidth}{|L{2.2cm}|L{2.7cm}|L{3.1cm}|Y|C{2.0cm}|}
+\hline
+\thead{Dữ liệu} & \thead{Thao tác} & \thead{Quản lý (\texttt{MANAGER})} & \thead{Nhân viên phụ trách (\texttt{owner\_id})} & \thead{Nhân viên khác}\\
+\hline
+\multirow{2}{2.2cm}{\raggedright Chiến dịch} & Xem danh sách / Chi tiết & Được phép & Được xem để phối hợp & Được xem\\
+\cline{2-5}
+& Sửa / Xóa / Chia ngân sách & Được phép & Được sửa/xóa chiến dịch của mình & Chặn (HTTP 403)\\
+\hline
+\multirow{3}{2.2cm}{\raggedright Bài viết} & Soạn / Sửa / Gửi duyệt & Được phép & Thực hiện trên chiến dịch của mình & Chặn (HTTP 403)\\
+\cline{2-5}
+& Duyệt / Từ chối bài & Duyệt bài của người khác (\texttt{CANNOT\_}\allowbreak\texttt{REVIEW\_OWN}) & Không có quyền duyệt (HTTP 403) & Chặn (HTTP 403)\\
+\cline{2-5}
+& Xóa bài viết & Cấm xóa bài đã duyệt (\texttt{CONTENT\_LOCKED}) & Chỉ xóa khi ở \texttt{DRAFT}/\texttt{REJECTED} & Chặn (HTTP 403)\\
+\hline
+Lịch \& Chỉ số & Lên lịch / Nhập số liệu & Được phép & Thực hiện trên chiến dịch của mình & Chặn (HTTP 403)\\
+\hline
+Nhân sự \& Kênh & Quản lý Users / Brand Kit & Toàn quyền quản trị & Chỉ được xem thông tin thương hiệu \& kênh & Chặn (HTTP 403)\\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Nhập số liệu quảng cáo (tay \& CSV 2 bước) và tính chỉ số hiệu quả}
+
+Người dùng có thể nhập số liệu quảng cáo theo ngày bằng biểu mẫu hoặc tải lên file báo cáo CSV qua 2 bước:
+\begin{enumerate}[noitemsep,topsep=2pt]
+ \item \textbf{Bước 1 (Xem trước tại \texttt{POST /api/v1/metrics/import/preview})}: Máy chủ đọc từng dòng trong file CSV, kiểm tra tên kênh có thuộc chiến dịch hay không, đồng thời kiểm tra điều kiện số liệu hợp lý $\text{views} \ge \text{clicks} \ge \text{conversions} \ge 0$ và $\text{cost} \ge 0$. Hệ thống trả về danh sách dòng hợp lệ và danh sách dòng lỗi kèm lý do cụ thể trên màn hình.
+ \item \textbf{Bước 2 (Xác nhận lưu tại \texttt{POST /api/v1/metrics/import/commit})}: Chỉ những dòng hợp lệ được người dùng xác nhận mới được ghi vào bảng \texttt{metrics}.
+\end{enumerate}
+
+Để tránh việc tính nhẩm sai hoặc lỗi chia cho 0 khi chiến dịch mới tạo chưa có lượt xem/lượt nhấp, mô-đun \texttt{backend/app/api/v1/stats.py} và hàm MCP \texttt{get\_stats} tính sẵn các chỉ số bằng hàm \texttt{\_safe\_div(num, den)} trước khi trả về cho giao diện và Trợ lý AI:
+\begin{align}
+\text{CTR (\%)} &= \begin{cases} \dfrac{\sum \text{clicks}}{\sum \text{views}} \times 100 & \text{nếu } \sum \text{views} > 0 \\ 0,0 & \text{nếu } \sum \text{views} = 0 \end{cases} \\
+\text{CVR (\%)} &= \begin{cases} \dfrac{\sum \text{conversions}}{\sum \text{clicks}} \times 100 & \text{nếu } \sum \text{clicks} > 0 \\ 0,0 & \text{nếu } \sum \text{clicks} = 0 \end{cases} \\
+\text{CPC} &= \begin{cases} \dfrac{\sum \text{cost}}{\sum \text{clicks}} & \text{nếu } \sum \text{clicks} > 0 \\ 0,0 & \text{nếu } \sum \text{clicks} = 0 \end{cases} \\
+\text{CPA} &= \begin{cases} \dfrac{\sum \text{cost}}{\sum \text{conversions}} & \text{nếu } \sum \text{conversions} > 0 \\ 0,0 & \text{nếu } \sum \text{conversions} = 0 \end{cases}
+\end{align}
+Chỉ số $\text{CPM} = (\sum \text{cost} / \sum \text{views}) \times 1000$ và phần trăm ngân sách đã chi tiêu $\text{used\_pct} = (\sum \text{cost} / \text{budget}) \times 100\%$ cũng được tính theo cùng quy tắc trên.
+
+\subsection{Giao diện thực tế của hệ thống}
+
+Giao diện người dùng được chia thành 3 khu vực như Hình~\ref{fig:ui-wireframe}: thanh menu bên trái (\texttt{Sidebar.tsx}) gồm các mục \textit{Tổng quan}, \textit{Chiến dịch}, \textit{Nội dung}, \textit{Duyệt nội dung}, \textit{Lịch đăng}, \textit{Trợ lý AI} và \textit{Cài đặt}. Khu vực nội dung chính ở giữa hiển thị bảng số liệu, biểu đồ, hàng đợi duyệt bài (có nhãn cảnh báo \textit{``Bạn không thể tự duyệt nội dung do chính mình tạo''}) và lịch đăng. Bên phải hoặc tại trang \texttt{/assistant} là khung Trợ lý AI kết nối trực tiếp với chiến dịch đang chọn.
+
 \begin{figure}[!htbp]
 \centering
-\input{figures/usecase.tex}
-\caption{Sơ đồ ca sử dụng chính của hệ thống MarketFlow AI}
-\label{fig:usecase}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{cc}
+ \fbox{\includegraphics[width=0.47\textwidth]{screenshots/dashboard-1280px.png}} &
+ \fbox{\includegraphics[width=0.47\textwidth]{screenshots/campaign-detail-1280px.png}} \\[2pt]
+ {\scriptsize (a) Trang Tổng quan Marketing và các thẻ KPI thực tế} &
+ {\scriptsize (b) Trang Chi tiết chiến dịch, mục tiêu và phân bổ ngân sách kênh} \\[6pt]
+ \fbox{\includegraphics[width=0.47\textwidth]{screenshots/reviews-1280px.png}} &
+ \fbox{\includegraphics[width=0.47\textwidth]{screenshots/assistant-1280px.png}} \\[2pt]
+ {\scriptsize (c) Hàng đợi duyệt bài chặn người tạo tự duyệt bài của mình} &
+ {\scriptsize (d) Màn hình Trợ lý Marketing AI và các mẫu câu lệnh gợi ý}
+\end{tabular}
+\caption{Ảnh chụp màn hình thực tế các chức năng chính của hệ thống MarketFlow}
+\label{fig:ui-wireframe}
 \end{figure}
 
-\section{Danh mục yêu cầu chức năng (FR)}
+\section{Tích hợp Trợ lý AI và thiết kế System Prompt}
 
-Hệ thống hiện thực hóa trọn vẹn 14 yêu cầu chức năng cốt lõi (FR01--FR14), toàn bộ đều đã được kiểm chứng bằng các ca kiểm thử tự động, như được chi tiết hóa trong Bảng~\ref{tab:functional}.
+\subsection{Cơ chế truyền quyền tạm thời (\texttt{Run-Token}) và đổi mô hình tự động}
 
-\begin{small}
-\begin{longtable}{|C{0.9cm}|L{1.75cm}|L{3.4cm}|L{4.3cm}|C{2.65cm}|}
-\caption{Danh mục yêu cầu chức năng và kết quả nghiệm thu thực chứng}\label{tab:functional}\\
-\hline
-\thead{Mã} & \thead{Phân hệ} & \thead{Nội dung yêu cầu} & \thead{Kết quả kiểm chứng thực tế} & \thead{Trạng thái}\\
-\hline
-\endfirsthead
+Khi người dùng gửi câu hỏi cho Trợ lý AI, Backend tạo một mã JWT ngắn hạn (\texttt{typ="assistant\_run"}, có hiệu lực 10 phút) chứa \texttt{user\_id}, \texttt{role} cùng \texttt{thread\_id}, sau đó gửi sang dịch vụ \texttt{ai-runner}. Khi tiến trình AI gọi vào cổng \texttt{/mcp}, máy chủ giải mã token này để kiểm tra quyền: nếu người đang chat là \texttt{MARKETER}, AI cũng chỉ được tạo đề xuất trên đúng các chiến dịch mà nhân viên đó phụ trách.
 
-\hline
-\thead{Mã} & \thead{Phân hệ} & \thead{Nội dung yêu cầu} & \thead{Kết quả kiểm chứng thực tế} & \thead{Trạng thái}\\
-\hline
-\endhead
+Để hệ thống luôn hoạt động khi dùng các gói API miễn phí, nhóm cấu hình 13 mô hình thuộc 4 nhà cung cấp trong \texttt{deploy/opencode/opencode.json} và \texttt{ModelSelector.tsx} (Bảng~\ref{tab:cost-table}). Nếu mô hình đang chọn bị giới hạn lượt gọi (HTTP 429) hoặc không phản hồi, \texttt{ai-runner} tự động đánh dấu tạm nghỉ mô hình đó 180 giây và chuyển sang mô hình dự phòng kế tiếp.
 
+\begin{table}[!htbp]
+\centering
+\scriptsize
+\renewcommand{\arraystretch}{1.04}
+\caption{Danh sách 13 mô hình LLM được cấu hình trong hệ thống}
+\label{tab:cost-table}
+\begin{tabularx}{\textwidth}{|L{2.6cm}|L{5.5cm}|C{1.8cm}|Y|}
 \hline
-\endfoot
+\thead{Nhà cung cấp} & \thead{Tên mô hình trong cấu hình (13 mô hình)} & \thead{Chi phí} & \thead{Vai trò sử dụng}\\
+\hline
+\textbf{OpenCode Free} (3 mô hình) & \texttt{opencode/deepseek-v4.1-flash-free}, \texttt{opencode/glm-5.3-flash-free}, \texttt{opencode/mimo-v2.6-flash-free} & Miễn phí & Nhóm mặc định, hỗ trợ gọi chuỗi công cụ MCP ổn định.\\
+\hline
+\textbf{Groq Cloud} (3 mô hình) & \texttt{groq/openai/gpt-oss-120b}, \texttt{groq/qwen/qwen3.8-27b}, \texttt{groq/openai/gpt-oss-20b} & Miễn phí (Free Tier) & Nhóm tốc độ phản hồi nhanh, dùng khi cần kết quả tức thì.\\
+\hline
+\textbf{OpenRouter} (5 mô hình) & \texttt{nvidia/nemotron-3.5-super-vl:free}, \texttt{nvidia/nemotron-3-ultra-550b-a55b:free}, \texttt{nvidia/nemotron-3.5-lightning:free}, \texttt{thinkingmachines/inkling:free}, \texttt{inkling-small:free} & Miễn phí (Free Tier) & Nhóm dự phòng khi các cổng chính hết hạn mức theo phút.\\
+\hline
+\textbf{Google AI Studio} (2 mô hình) & \texttt{google/gemini-3.5-flash-lite}, \texttt{google/gemini-3.1-flash-lite} & Miễn phí (Free Tier) & Nhóm dự phòng xử lý tiếng Việt và ngữ cảnh dài.\\
+\hline
+\end{tabularx}
+\end{table}
 
-\hline
-\endlastfoot
+\subsection{Thiết kế System Prompt, định dạng Input/Output và cải tiến qua 4 phiên bản}
 
-FR01 & Xác thực \& Đăng ký & Đăng nhập và tự đăng ký không gian làm việc (\texttt{/register}, mặc định gán quyền \texttt{MANAGER}); cấp phát Bearer JWT token kèm \texttt{token\_version}. & Đăng ký/đăng nhập thành công cấp JWT (\texttt{HS256}); sai mật khẩu trả 401; hỗ trợ đổi mật khẩu và thu hồi token khi đăng xuất (\texttt{test\_auth.py}: 12/12 Pass). & TESTED\\
-\hline
-FR02 & Phân quyền \& Nhân sự & Kiểm soát 2 vai trò quản lý (\texttt{MANAGER}) và nhân viên (\texttt{MARKETER}); Quản lý cấp tài khoản cho nhân viên tại \texttt{Cài đặt -> Người dùng}. & \texttt{MANAGER} thêm/khóa tài khoản nhân viên qua \texttt{/api/v1/users}; \texttt{MARKETER} bị chặn 403 ở các điểm cuối quản trị (\texttt{test\_users.py}: 6/6 Pass). & TESTED\\
-\hline
-FR03 & Kênh \& Brand Kit & Quản lý 7 loại kênh tiếp thị, hồ sơ thương hiệu (\texttt{brand\_profile}) và từ khóa cấm (\texttt{banned\_keywords}). & CRUD kênh và từ khóa cấm; hàm \texttt{scan\_banned\_keywords} quét từ khóa không phân biệt hoa thường (\texttt{test\_channels.py}: 5/5, \texttt{test\_brand.py}: 1/1 Pass). & TESTED\\
-\hline
-FR04 & Chiến dịch & Tạo và quản lý chiến dịch với sản phẩm (\texttt{product}), đối tượng, mục tiêu, ngân sách, thời gian. & Kiểm tra \texttt{budget >= 0}, \texttt{start\_date <= end\_date}; kiểm soát quyền sở hữu \texttt{owner\_id} (\texttt{test\_campaigns.py}: 7/7 Pass). & TESTED\\
-\hline
-FR05 & Phân bổ kênh & Gán kênh truyền thông và phân bổ ngân sách thành phần cho từng chiến dịch (\texttt{campaign\_channels}). & Đảm bảo tổng ngân sách phân bổ kênh không vượt ngân sách tổng; ràng buộc khóa chính kép (\texttt{campaign\_id}, \texttt{channel\_id}). & TESTED\\
-\hline
-FR06 & Soạn nội dung & Tạo bản nháp nội dung gắn với chiến dịch, kênh, người tạo (\texttt{created\_by}) và nguồn gốc (\texttt{MANUAL}/\texttt{AI}). & Nội dung khởi tạo ở trạng thái \texttt{DRAFT}; lưu vết \texttt{origin} và \texttt{ai\_message\_id} nếu xác nhận từ đề xuất AI (\texttt{test\_contents.py}). & TESTED\\
-\hline
-FR07 & Duyệt nội dung HITL & Quy trình phê duyệt: gửi duyệt (\texttt{/submit}), duyệt (\texttt{/approve}), từ chối (\texttt{/reject}), xuất bản (\texttt{/mark-published}). & Tự động quét từ khóa cấm khi \texttt{/submit}; chặn tự duyệt (\texttt{CANNOT\_REVIEW\_OWN}); khóa xóa khi đã duyệt (\texttt{CONTENT\_LOCKED}) (\texttt{test\_contents.py}: 9/9 Pass). & TESTED\\
-\hline
-FR08 & Lập lịch & Tạo, cập nhật, hoàn tất (\texttt{/done}) và hủy lịch xuất bản (\texttt{schedules}) cho nội dung hợp lệ. & Kiểm tra nội dung hợp lệ và thời gian nằm trong khung ngày chiến dịch (\texttt{test\_schedules.py}: 7/7 Pass). & TESTED\\
-\hline
-FR09 & Chỉ số \& CSV & Ghi nhận \texttt{views}, \texttt{clicks}, \texttt{conversions}, \texttt{cost} theo ngày/kênh (nhập tay hoặc CSV 2 bước). & Kiểm tra phễu \texttt{views >= clicks >= conversions}; xem trước CSV (\texttt{import/preview}) và lưu (\texttt{import/commit}); tính CTR, CVR, CPC, CPA, CPM (\texttt{test\_metrics.py}: 9/9 Pass). & TESTED\\
-\hline
-FR10 & Thống kê \& Báo cáo & Bảng điều khiển tổng hợp KPI, chuỗi thời gian, cơ cấu kênh/chiến dịch và tiến độ giải ngân (\texttt{used\_pct}). & Cung cấp 4 điểm cuối \texttt{/stats/overview}, \texttt{/timeseries}, \texttt{/by-channel}, \texttt{/by-campaign} chính xác tuyệt đối (\texttt{test\_stats.py}: 6/6 Pass). & TESTED\\
-\hline
-FR11 & AI Ý tưởng \& Chiến dịch & Đề xuất ý tưởng chiến dịch và cập nhật chiến dịch qua công cụ MCP \texttt{propose\_campaign*}. & AI gọi \texttt{get\_brand\_profile}, \texttt{list\_channels} và tạo thẻ \texttt{ai\_action = PROPOSED} chờ người dùng bấm \textit{Xác nhận} (\texttt{test\_assistant\_actions.py}: 9/9 Pass). & MEASURED\\
-\hline
-FR12 & AI Soạn nháp & Soạn bản nháp đa kênh qua công cụ MCP \texttt{propose\_content\_drafts} có kiểm tra từ khóa cấm. & Bắt buộc gọi \texttt{check\_banned\_keywords} trước khi đề xuất; khi xác nhận tạo bản ghi \texttt{contents} với \texttt{origin=AI} (\texttt{test\_assistant\_tools.py}: 4/4 Pass). & MEASURED\\
-\hline
-FR13 & AI Phân tích số liệu & Truy vấn số liệu thực qua \texttt{get\_stats}, \texttt{get\_campaign} để tóm tắt hiệu quả và đề xuất lịch/chỉ số. & Khử ảo giác nhờ truy vấn trực tiếp CSDL qua MCP; phiên bản Prompt \texttt{v4} đạt 7/8 (87,5\%) trên bộ đánh giá tự động (\texttt{test\_assistant\_mcp.py}: 6/6 Pass). & MEASURED\\
-\hline
-FR14 & Nhật ký \& Thông báo & Lưu lịch sử duyệt (\texttt{content\_reviews}), thông báo (\texttt{notifications}) và nhật ký hội thoại/hành động AI. & Tự động gửi thông báo khi gửi duyệt/duyệt/từ chối; lưu trọn vẹn \texttt{ai\_threads}, \texttt{ai\_messages}, \texttt{ai\_actions} (\texttt{test\_notifications.py}: 1/1, \texttt{test\_assistant\_stream.py}: 14/14 Pass). & TESTED\\
-\end{longtable}
-\end{small}
+System Prompt của Trợ lý AI được tách riêng khỏi mã nguồn Python, lưu tại \texttt{deploy/opencode/\allowbreak agent/marketflow.md} và \texttt{deploy/opencode/prompts/}. Bảng~\ref{tab:prompt-io-spec} trích dẫn nội dung thực tế của System Prompt (Bản 4), câu lệnh người dùng mẫu và cấu trúc JSON đầu vào/đầu ra khi gọi công cụ MCP.
 
-\section{Danh mục yêu cầu chất lượng (NFR)}
+\begin{table}[!htbp]
+\centering
+\scriptsize
+\renewcommand{\arraystretch}{1.03}
+\caption{Trích dẫn System Prompt thực tế, User Prompt mẫu và định dạng Input/Output}
+\label{tab:prompt-io-spec}
+\begin{tabularx}{\textwidth}{|L{2.9cm}|Y|}
+\hline
+\thead{Thành phần} & \thead{Nội dung cấu hình thực tế trong hệ thống}\\
+\hline
+\textbf{System Prompt}\par (\texttt{deploy/opencode/\allowbreak agent/marketflow.md}) &
+\texttt{permission: \{"*": "deny", "external\_directory": "deny", "marketflow\_*": "allow"\}}\par
+1. \textbf{Trung thực về dữ liệu}: Chỉ dùng con số có thực từ công cụ \texttt{marketflow\_*} hoặc \texttt{[NGỮ CẢNH]}. Nếu chưa có số liệu, ghi rõ ``chưa có dữ liệu thống kê''. Công thức: $\text{CTR}=\text{Clicks}/\text{Views}$, $\text{CVR}=\text{Conversions}/\text{Clicks}$, $\text{CPC}=\text{Cost}/\text{Clicks}$, $\text{CPA}=\text{Cost}/\text{Conversions}$.\par
+2. \textbf{Chỉ tạo đề xuất (\texttt{PROPOSED})}: Mọi thao tác ghi phải gọi \texttt{propose\_*}. Không tự tuyên bố đã duyệt hay đã đăng bài. Sau khi gọi \texttt{propose\_*}, không chép lặp lại toàn bộ bài nháp vào khung chat.\par
+3. \textbf{Giới hạn độ dài kênh \& từ cấm}: Facebook $<$ 1.500 ký tự, kịch bản TikTok $<$ 1.200 ký tự (chia 3 phần \texttt{[Hook 0-3s]}, \texttt{[Nội dung 3-25s]}, \texttt{[CTA 25-30s]}), tiêu đề Email $<$ 60 ký tự. Không dùng từ cấm (\textit{``cam kết 100\%'', ``thần dược'', ``rẻ nhất''}).\\
+\hline
+\textbf{User Prompt mẫu}\par \& Ngữ cảnh đính kèm &
+\texttt{[NGỮ CẢNH] campaign\_id=1, name="Ra Mắt Dòng Cold Brew Đóng Chai Tiện Lợi", goal="SALES", role="MARKETER"}\par
+\textbf{Câu hỏi}: \textit{``Hãy đề xuất 1 bản nháp bài đăng Facebook cho chiến dịch Cold Brew, bám sát mục tiêu tăng doanh số.''}\\
+\hline
+\textbf{Đầu vào công cụ}\par (\texttt{MCP Tool Input JSON}) &
+\texttt{propose\_content\_drafts(\{"campaign\_id": 1, "rationale": "Tập trung tiện lợi pha sẵn cho dân văn phòng", "items": [\{"channel\_code": "FACEBOOK", "content\_type": "SOCIAL\_POST", "title": "Cold Brew Ủ Lạnh 18 Tiếng", "body": "...", "cta": "Đặt mua combo 3 chai ngay", "hashtags": "\#AnNamCoffee \#ColdBrew"\}]\})}\\
+\hline
+\textbf{Đầu ra công cụ}\par (\texttt{MCP Tool Output JSON}) &
+\texttt{\{"action\_id": 14, "action\_type": "CREATE\_CONTENT\_BATCH", "status": "PROPOSED", "banned\_warnings": [], "message": "Đã tạo thẻ đề xuất \#14 chờ người dùng xác nhận."\}}\\
+\hline
+\end{tabularx}
+\end{table}
 
-Hệ thống tuân thủ 6 yêu cầu phi chức năng (NFR01--NFR06) đã được kiểm chứng thực nghiệm:
-\begin{itemize}
- \item \textbf{NFR01 (Kiểm soát truy cập đa tầng và chống xung đột lợi ích)}: Kết hợp RBAC 2 vai trò (\texttt{MANAGER}, \texttt{MARKETER}), kiểm soát quyền sở hữu mức bản ghi (\texttt{owner\_id}) và quy tắc chống tự duyệt (\texttt{CANNOT\_REVIEW\_OWN}).
- \item \textbf{NFR02 (Toàn vẹn dữ liệu và giao dịch)}: Ràng buộc khóa ngoại, kiểm tra bất biến số học phễu tiếp thị (\texttt{views >= clicks >= conversions >= 0}) và khóa xóa nội dung đã duyệt (\texttt{CONTENT\_LOCKED}).
- \item \textbf{NFR03 (Hiệu năng và giới hạn tài nguyên)}: Các điểm cuối REST API nghiệp vụ phản hồi trung bình dưới 30ms; dịch vụ \texttt{ai-runner} giới hạn hàng đợi tuần tự \texttt{RUNNER\_CONCURRENCY=1} và trần bộ nhớ \texttt{MemoryMax=896M} dựa trên kết quả đo P0 Spike (\texttt{\~{}490 MB RSS}).
- \item \textbf{NFR04 (Trải nghiệm giao diện và truyền phát SSE)}: Giao diện tiếng Việt chuẩn hóa, truyền phát sự kiện hội thoại AI theo thời gian thực qua SSE, hiển thị trực quan thẻ công cụ và thẻ đề xuất.
- \item \textbf{NFR05 (Khả năng chịu lỗi và đa nhà cung cấp AI)}: Hỗ trợ 13 mô hình LLM trên 5 nền tảng với cơ chế tự động chuyển đổi dự phòng (failover); khi \texttt{ai-runner} ngoại tuyến, hệ thống báo lỗi chuẩn hóa mà không ảnh hưởng đến toàn bộ chức năng CRUD.
- \item \textbf{NFR06 (Khả năng tái lập và kiểm thử tự động)}: Đóng gói Docker Compose, kịch bản tạo dữ liệu mẫu \texttt{seed\_demo.py} và 151 ca kiểm thử tự động (Pytest + Playwright E2E) vượt qua 100\%.
+Nhóm đã thử nghiệm và chỉnh sửa System Prompt qua 4 phiên bản:
+\begin{itemize}[noitemsep,topsep=2pt]
+ \item \textbf{Bản 1 (Cơ sở)}: Chỉ mô tả ngắn gọn vai trò trợ lý marketing. Ở bản này, AI đôi khi tự bịa thêm con số giả định khi chiến dịch chưa có dữ liệu hoặc viết kịch bản TikTok quá dài (hơn 3.600 ký tự).
+ \item \textbf{Bản 2 (Thêm quy tắc an toàn)}: Bổ sung yêu cầu không bịa số liệu và chỉ tạo đề xuất chờ duyệt. Tuy nhiên, do viết câu dặn dò quá dài, AI lại sinh kèm một đoạn cảnh báo dài dòng ở cuối mỗi bài viết khiến độ dài bài đăng Facebook và TikTok vượt quá giới hạn ký tự cho phép.
+ \item \textbf{Bản 3 (Thêm công thức KPI và định dạng kênh)}: Quy định rõ cách đọc chỉ số từ hàm \texttt{get\_stats} và cấu trúc bài viết từng kênh (mở bài, nội dung, CTA, hashtag).
+ \item \textbf{Bản 4 (Bản chính thức đang chạy)}: Bỏ các câu rào đón thừa, quy định cứng giới hạn độ dài từng kênh, bắt buộc gọi \texttt{check\_banned\_keywords} trước khi đề xuất bài nháp và từ chối các câu lệnh yêu cầu vượt quyền.
 \end{itemize}
 
-\section{Kiến trúc phân quyền RBAC và Kiểm soát mức bản ghi}
+\section{Nhật ký sử dụng AI trong quá trình phát triển phần mềm (SDLC)}
 
-Một trong những trọng tâm quan trọng nhất trong kiến trúc an ninh của MarketFlow AI là việc siết chặt phân quyền mức bản ghi và tách biệt quyền phê duyệt, được minh họa trong Hình~\ref{fig:auth-sequence}.
+Trong quá trình làm đồ án, nhóm sử dụng công cụ lập trình AI để hỗ trợ ở cả 4 giai đoạn (từ thiết kế bảng, viết khung CRUD đến viết test). Thay vì dùng nguyên mã do AI sinh ra, nhóm đã kiểm tra lại và tự sửa 4 lỗi thực tế như ghi nhận trong Bảng~\ref{tab:sdlc-ai-log}. Bảng~\ref{tab:sdlc-code-diff} minh họa cụ thể câu lệnh nhóm đã hỏi AI, đoạn mã bị lỗi do AI sinh ra và đoạn mã nhóm đã tự sửa lại trong dự án.
 
-\begin{figure}[!htbp]
+\begin{table}[!htbp]
 \centering
-\input{figures/approval-sequence.tex}
-\caption{Quy trình gửi duyệt, phê duyệt HITL và kiểm soát phân quyền}
-\label{fig:auth-sequence}
-\end{figure}
+\scriptsize
+\renewcommand{\arraystretch}{1.02}
+\caption{Nhật ký sử dụng AI trong quá trình làm dự án và các lỗi nhóm đã tự khắc phục}
+\label{tab:sdlc-ai-log}
+\begin{tabularx}{\textwidth}{|C{1.8cm}|L{2.8cm}|Y|Y|}
+\hline
+\thead{Giai đoạn} & \thead{Việc nhờ AI hỗ trợ} & \thead{Vấn đề trong kết quả do AI tạo ra} & \thead{Cách nhóm kiểm tra và sửa lại}\\
+\hline
+\textbf{KT1}\par Phân tích \& Thiết kế & Gợi ý các bảng CSDL và danh sách công cụ MCP. & AI đề xuất cho các hàm MCP ghi thẳng vào bảng \texttt{campaigns} và \texttt{contents}, dễ làm hỏng dữ liệu nếu AI gọi nhầm hàm. & Thêm bảng trung gian \texttt{ai\_actions}: mọi hàm \texttt{propose\_*} chỉ tạo bản ghi \texttt{PROPOSED} chờ người dùng bấm xác nhận.\\
+\hline
+\textbf{KT2}\par Xây dựng Backend \& UI & Viết khung dịch vụ \texttt{ai-runner}, luồng SSE và kết nối \texttt{/mcp}. & (1) AI dùng chung một khóa tĩnh cho \texttt{/mcp} nên mất phân quyền theo người dùng. (2) Không giới hạn số tiến trình \texttt{opencode} chạy cùng lúc. (3) Trên frontend dùng \texttt{EventSource} mặc định nên không gửi kèm được header \texttt{Authorization}. & (1) Tự viết hàm \texttt{create\_run\_token} (JWT 10 phút chứa \texttt{user\_id, role}). (2) Đo thử trên VPS thấy mỗi tiến trình tốn $\sim$490 MB RAM nên đặt \texttt{Semaphore(1)} chạy tuần tự. (3) Đổi sang dùng \texttt{fetch()} + \texttt{ReadableStream}.\\
+\hline
+\textbf{KT3}\par Tối ưu Prompt \& Test & Viết System Prompt và kịch bản chấm điểm tự động. & Ở Bản 2, AI thêm quá nhiều câu lưu ý an toàn ở cuối bài viết làm vượt giới hạn ký tự kênh Facebook và TikTok (tỷ lệ đạt giảm từ 6/8 xuống 5/8). & Sửa lại Bản 4: cấm chèn lời giải thích thừa bên ngoài bài nháp và đặt giới hạn ký tự cụ thể cho từng kênh, nâng kết quả lên 7/8 kịch bản.\\
+\hline
+\textbf{Cuối kỳ}\par Đưa lên VPS & Viết cấu hình Nginx và Systemd trên Ubuntu VPS. & Cấu hình Nginx do AI gợi ý mở toàn bộ đường dẫn của Backend ra ngoài (lộ cổng \texttt{/mcp}) và bật bộ đệm làm nghẽn luồng chữ SSE. & Thêm cấu hình chặn \texttt{location \^{}\~{} /mcp \{ return 404; \}} và tắt bộ đệm \texttt{proxy\_buffering off} cho đường dẫn stream SSE.\\
+\hline
+\end{tabularx}
+\end{table}
 
-\subsection{Cơ chế xác thực kép: User JWT và Ephemeral Run-Token JWT}
-Trong mô-đun \texttt{backend/app/core/security.py} và \texttt{backend/app/api/deps.py}, hệ thống vận hành hai loại mã thông báo JWT tách biệt:
-\begin{enumerate}
- \item \textbf{Access Token cho người dùng (\texttt{token\_version})}: Khi người dùng gọi API, hàm \texttt{get\_current\_user} giải mã token, truy vấn bảng \texttt{users} và xác nhận \texttt{user.is\_active == True} cùng \texttt{token\_version} khớp với CSDL. Nếu tài khoản bị khóa hoặc đã đăng xuất, yêu cầu bị từ chối ngay lập tức.
- \item \textbf{Run-Token tạm thời cho tiến trình AI (\texttt{typ="assistant\_run"})}: Khi khởi chạy lượt hội thoại, hàm \texttt{create\_run\_token} sinh một JWT có hiệu lực đúng 10 phút mang theo \texttt{uid=user.id} và \texttt{thread\_id}. Máy chủ FastMCP tại \texttt{/mcp} giải mã token này trong mỗi lần gọi công cụ để áp dụng đúng phạm vi quyền của người dùng đang chat.
-\end{enumerate}
-
-\subsection{Quy tắc kiểm soát quyền sở hữu (\texttt{owner\_id}) và chống tự duyệt (\texttt{CANNOT\_REVIEW\_OWN})}
-\begin{enumerate}
- \item \textbf{Quyền sở hữu Chiến dịch (\texttt{owner\_id})}: Trong \texttt{backend/app/services/campaign\_service.py}, \texttt{MARKETER} chỉ được phép chỉnh sửa, xóa, thêm nội dung, lập lịch hoặc nhập số liệu trên chiến dịch mà \texttt{campaign.owner\_id == current\_user.id}. Mọi nỗ lực can thiệp vào chiến dịch của người khác đều bị từ chối với mã lỗi HTTP 403 (\texttt{PERMISSION\_DENIED}).
- \item \textbf{Quy tắc chống tự duyệt (\texttt{CANNOT\_REVIEW\_OWN})}: Trong \texttt{backend/app/services/content\_service.py}, ngay cả khi người dùng có vai trò \texttt{MANAGER}, nếu họ là người tạo ra bài viết (\texttt{content.created\_by == current\_user.id}), hệ thống sẽ chặn thao tác \texttt{POST /contents/\{id\}/approve} hoặc \texttt{/reject} với mã lỗi \texttt{CANNOT\_REVIEW\_OWN}. Quy tắc này đảm bảo nguyên tắc ``bốn mắt'' (\textit{four-eyes principle}) trong kiểm duyệt truyền thông.
-\end{enumerate}
-
-\section{Máy trạng thái duyệt nội dung Human-in-the-loop (HITL State Machine)}
-
-Để bảo đảm tính toàn vẹn của nội dung truyền thông doanh nghiệp, vòng đời của mỗi bài viết tiếp thị tuân thủ một máy trạng thái hữu hạn (Finite State Machine) nghiêm ngặt gồm 5 trạng thái được mô tả tại Hình~\ref{fig:content-state}.
-
-\begin{figure}[!htbp]
+\begin{table}[!htbp]
 \centering
-\input{figures/content-state.tex}
-\caption{Máy trạng thái duyệt nội dung Human-in-the-loop}
-\label{fig:content-state}
-\end{figure}
-
-\subsection{Các trạng thái và thuộc tính nguồn gốc}
-\begin{itemize}
- \item \texttt{DRAFT}: Bản nháp mới khởi tạo (có thuộc tính \texttt{origin = MANUAL} nếu soạn tay, hoặc \texttt{origin = AI} kèm \texttt{ai\_message\_id} nếu được xác nhận từ thẻ đề xuất của Trợ lý AI).
- \item \texttt{PENDING\_REVIEW}: Bài viết đã được tác giả gửi lên hàng đợi phê duyệt qua \texttt{POST /contents/\{id\}/submit}.
- \item \texttt{APPROVED}: Bài viết đã được một \texttt{MANAGER} khác thẩm định và phê duyệt qua \texttt{POST /contents/\{id\}/approve}.
- \item \texttt{REJECTED}: Bài viết bị từ chối qua \texttt{POST /contents/\{id\}/reject} (bắt buộc kèm lý do phản hồi trong \texttt{content\_reviews.comment}).
- \item \texttt{PUBLISHED}: Bài viết đã được xác nhận xuất bản qua \texttt{POST /contents/\{id\}/mark-published} kèm đường dẫn \texttt{published\_url}.
-\end{itemize}
-
-\subsection{Các rào chắn toàn vẹn quy trình (Workflow Guardrails)}
-\begin{enumerate}
- \item \textbf{Tự động quét từ khóa cấm khi gửi duyệt}: Khi gọi \texttt{POST /contents/\{id\}/submit}, hệ thống tự động đối chiếu tiêu đề, nội dung và CTA với bảng \texttt{banned\_keywords}. Nếu phát hiện từ khóa vi phạm, hệ thống chuyển trạng thái sang \texttt{PENDING\_REVIEW} và trả kèm danh sách \texttt{banned\_matches} cảnh báo cụ thể để Người quản lý xem xét.
- \item \textbf{Tự động thu hồi phê duyệt khi sửa nội dung đã duyệt}: Nếu một bài viết đang ở trạng thái \texttt{APPROVED} hoặc \texttt{REJECTED} bị chỉnh sửa nội dung, hệ thống tự động đưa trạng thái về lại \texttt{DRAFT}, buộc phải gửi duyệt lại từ đầu.
- \item \textbf{Khóa xóa đối với nội dung đã duyệt hoặc đã xuất bản (\texttt{CONTENT\_LOCKED})}: Điểm cuối \texttt{DELETE /contents/\{id\}} từ chối xóa mọi bản ghi có trạng thái \texttt{APPROVED} hoặc \texttt{PUBLISHED} với mã lỗi HTTP 409 Conflict (\texttt{CONTENT\_LOCKED}), bảo vệ toàn vẹn lịch sử kiểm toán và dữ liệu xuất bản.
- \item \textbf{Đồng bộ tự động với Lịch xuất bản (\texttt{schedules})}: Khi bài viết chuyển sang \texttt{PUBLISHED} qua \texttt{/mark-published}, các lịch đăng đang ở trạng thái \texttt{PLANNED} gắn với bài viết đó sẽ tự động được cập nhật sang \texttt{DONE}.
-\end{enumerate}
-
-\section{Kết luận chương}
-
-Chương 3 đã hoàn thiện phân tích chi tiết toàn bộ các yêu cầu nghiệp vụ và phi chức năng của MarketFlow AI. Sự kết hợp chặt chẽ giữa RBAC 2 vai trò (\texttt{MANAGER}, \texttt{MARKETER}), kiểm soát quyền sở hữu (\texttt{owner\_id}), quy tắc chống tự duyệt (\texttt{CANNOT\_REVIEW\_OWN}) và máy trạng thái duyệt nội dung HITL 5 trạng thái đã thiết lập nên một kiến trúc bảo mật đa tầng vững chắc. Chương tiếp theo sẽ trình bày thiết kế kiến trúc tổng thể, lược đồ CSDL 14 bảng và thiết kế 14 công cụ MCP của hệ thống.
+\scriptsize
+\renewcommand{\arraystretch}{1.03}
+\caption{Minh chứng cụ thể câu lệnh hỏi AI, mã lỗi AI sinh ra và mã nhóm đã tự sửa lại}
+\label{tab:sdlc-code-diff}
+\begin{tabularx}{\textwidth}{|L{3.2cm}|Y|Y|}
+\hline
+\thead{Câu lệnh nhóm hỏi AI} & \thead{Kết quả AI sinh ra (Có lỗ hổng)} & \thead{Mã nhóm đã kiểm tra và sửa lại trong code}\\
+\hline
+\textit{``Viết hàm MCP tạo bản nháp bài viết cho chiến dịch và xác thực kết nối giữa ai-runner với cổng /mcp''} &
+\texttt{MCP\_API\_KEY = "static-secret"}\par
+\texttt{def create\_content(campaign\_id, body):}\par
+\texttt{~~db.add(Content(campaign\_id=campaign\_id, body=body, status="APPROVED"))}\par
+\texttt{~~db.commit()}\par
+$\rightarrow$ \textbf{Lỗi}: Dùng khóa tĩnh nên \texttt{marketer2} có thể nhờ AI sửa chiến dịch của \texttt{marketer1}, và AI ghi thẳng bài \texttt{APPROVED} vào bảng \texttt{contents}. &
+\texttt{claims = verify\_run\_token(token) \# JWT 10p}\par
+\texttt{require\_campaign\_owner(db, campaign\_id, claims.user\_id, claims.role)}\par
+\texttt{action = AIAction(thread\_id=claims.thread\_id, action\_type="CREATE\_CONTENT\_BATCH", status="PROPOSED", payload=items)}\par
+\texttt{db.add(action); db.commit()}\\
+\hline
+\textit{``Viết hàm gọi tiến trình opencode run trong ai-runner khi có yêu cầu chat từ người dùng''} &
+\texttt{async def run\_endpoint(req: RunRequest):}\par
+\texttt{~~proc = await asyncio.create\_subprocess\_exec("opencode", "run", req.prompt)}\par
+$\rightarrow$ \textbf{Lỗi}: Khi 3 người bấm chat cùng lúc, 3 tiến trình ngốn $3 \times 490\text{ MB} \approx 1,5\text{ GB RAM}$ làm VPS 2,5 GB bị tràn bộ nhớ (OOM). &
+\texttt{\_SEM = asyncio.Semaphore(1) \# Hàng đợi tuần tự}\par
+\texttt{async def run\_endpoint(req: RunRequest):}\par
+\texttt{~~async with \_SEM:}\par
+\texttt{~~~~for model in fallback\_chain: \# Tự đổi model khi lỗi 429}\par
+\texttt{~~~~~~proc = await run\_with\_timeout(model, req)}\\
+\hline
+\end{tabularx}
+\end{table}

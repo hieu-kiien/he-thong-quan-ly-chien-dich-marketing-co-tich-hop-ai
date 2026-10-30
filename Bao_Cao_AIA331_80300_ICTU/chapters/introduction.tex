@@ -3,30 +3,18 @@
 
 \section*{Lý do chọn đề tài}
 
-Trong hoạt động tiếp thị số hiện đại, một chiến dịch marketing thường trải qua nhiều công đoạn có tính liên đới cao: xác định mục tiêu kinh doanh, phân bổ ngân sách, lựa chọn kênh truyền thông, sáng tạo nội dung đa định dạng, phê duyệt phân tầng, lập lịch phát hành và giám sát các chỉ số hiệu quả chuyển đổi (\texttt{views}, \texttt{clicks}, \texttt{conversions}, \texttt{cost}, CTR, CVR, CPC, CPA, CPM). Khi dữ liệu bị phân tán trên nhiều bảng tính rời rạc, đội ngũ marketing gặp nhiều trở ngại trong việc đối chiếu phiên bản nội dung, bảo đảm tính toàn vẹn số liệu và tổng hợp báo cáo. Sự ra đời của các mô hình ngôn ngữ lớn (LLMs) và giao thức công cụ tác tử (Model Context Protocol -- MCP) mở ra tiềm năng tự động hóa mạnh mẽ, nhưng việc ứng dụng AI thiếu kiểm soát tiềm ẩn rủi ro lớn về ảo giác (\textit{hallucination}), tự ý ghi đè dữ liệu nghiệp vụ và thiếu cơ chế truy cứu trách nhiệm.
+Khi triển khai một chiến dịch marketing trên nhiều kênh như Facebook, Instagram, TikTok, Zalo OA, Email, Google Ads hay Website, người làm marketing phải theo dõi nhiều đầu việc cùng lúc: mục tiêu chiến dịch, ngân sách từng kênh, bài viết nháp, trạng thái duyệt bài, lịch đăng và các chỉ số kết quả (\texttt{views}, \texttt{clicks}, \texttt{conversions}, \texttt{cost}). Nếu quản lý rời rạc trên các file bảng tính và tài liệu riêng lẻ, nhóm làm việc rất dễ nhầm phiên bản bài viết, nhập sai số liệu hoặc để sót các từ ngữ quảng cáo quá đà khi đăng bài.
 
-Đề tài \textbf{``Hệ thống quản lý chiến dịch marketing có tích hợp trí tuệ nhân tạo (MarketFlow AI)''} (Mã đề tài: 80300) được triển khai nhằm xử lý hiệu quả bài toán này. Hệ thống kết hợp kiến trúc quản trị dữ liệu theo chuẩn RESTful với quy trình \textit{Human-in-the-Loop} (HITL) nghiêm ngặt, tích hợp dịch vụ \texttt{ai-runner} cô lập và máy chủ FastMCP nội bộ kết nối 13 mô hình ngôn ngữ lớn đa nhà cung cấp (OpenCode Free, Groq, OpenRouter, Google Gemini) để hỗ trợ người dùng ở ba tác vụ cốt lõi: gợi ý chiến dịch và kênh phù hợp, soạn bản nháp nội dung chuẩn hóa có đối chiếu từ khóa cấm, và phân tích chỉ số hiệu quả thực tế.
+Bên cạnh đó, khi nhân viên sử dụng các công cụ trò chuyện AI bên ngoài để viết bài hoặc tóm tắt báo cáo, họ phải tự chép thông tin chiến dịch sang khung chat. Do không kết nối trực tiếp với cơ sở dữ liệu của chiến dịch, AI thường tự suy diễn con số hoặc dùng các từ ngữ nằm trong danh sách cấm của thương hiệu.
 
-\section*{Mục đích và phạm vi của Báo cáo}
+Từ thực tế đó, nhóm thực hiện đề tài mã số 80300: \textbf{``Hệ thống quản lý chiến dịch marketing có tích hợp AI (MarketFlow)''}. Hệ thống gom toàn bộ quy trình quản lý chiến dịch, nội dung, duyệt bài, lịch đăng và chỉ số quảng cáo về một ứng dụng web chung, đồng thời tích hợp Trợ lý AI đọc dữ liệu trực tiếp từ cơ sở dữ liệu thông qua 14 công cụ MCP để hỗ trợ lên ý tưởng, viết bài nháp theo kênh và tóm tắt hiệu quả chiến dịch. Mọi nội dung hay thay đổi do AI tạo ra đều chỉ dừng ở dạng thẻ đề xuất (\texttt{PROPOSED}), bắt buộc người dùng kiểm tra và bấm xác nhận mới được lưu vào hệ thống.
 
-Báo cáo tổng kết toàn diện quá trình nghiên cứu, thiết kế, hiện thực hóa mã nguồn, triển khai Production VPS (\url{https://marketing.kienhieu.id.vn}) và đánh giá thực nghiệm của dự án MarketFlow AI qua 8 chương và 3 phụ lục:
+\section*{Bố cục báo cáo}
+
+Nội dung báo cáo được trình bày ngắn gọn trong 4 chương, bám sát các yêu cầu của học phần AIA331:
 \begin{enumerate}[noitemsep,topsep=2pt]
- \item \textbf{Chương 1 -- Tổng quan đề tài và bối cảnh ứng dụng}: Phân tích bối cảnh tiếp thị số, các bên liên quan, mục tiêu đo lường được và ranh giới hệ thống.
- \item \textbf{Chương 2 -- Cơ sở kỹ thuật và lựa chọn công nghệ}: Khảo sát nền tảng FastAPI, React 18 + TypeScript, PostgreSQL 16 / SQLite WAL, \texttt{ai-runner} + OpenCode CLI + FastMCP \texttt{/mcp} kết nối 13 mô hình LLM, và Docker Compose.
- \item \textbf{Chương 3 -- Phân tích yêu cầu hệ thống và kiểm soát phân quyền}: Đặc tả 14 yêu cầu chức năng (FR01--FR14), 6 yêu cầu phi chức năng (NFR01--NFR06), phân quyền RBAC + mức bản ghi (\texttt{owner\_id}, \texttt{CANNOT\_REVIEW\_OWN}) và máy trạng thái HITL.
- \item \textbf{Chương 4 -- Thiết kế kiến trúc, dữ liệu và tích hợp AI}: Trình bày kiến trúc C4 Container, mô hình dữ liệu ERD 14 bảng, 14 công cụ MCP (\textit{9 Read + 5 Propose} tạo \texttt{ai\_action = PROPOSED}) và tiến hóa System Prompt qua 4 giai đoạn tối ưu hóa.
- \item \textbf{Chương 5 -- Hiện thực hóa hệ thống}: Chi tiết cài đặt Backend FastAPI, giao diện web React 18, dịch vụ \texttt{ai-runner} tách biệt tiến trình và ứng dụng AI có kiểm soát trong SDLC.
- \item \textbf{Chương 6 -- Kiểm thử thực nghiệm và đối kháng}: Báo cáo kết quả bộ kiểm thử tự động 151 ca kiểm thử (104 Backend Pytest + 18 AI-Runner Pytest + 29 Playwright E2E) đạt tỷ lệ vượt qua 100\%.
- \item \textbf{Chương 7 -- Đánh giá định lượng hệ thống AI và kinh tế vận hành}: Phân tích kết quả đo P0 Spike (\texttt{490MB RSS}, \texttt{RUNNER\_CONCURRENCY=1}), đánh giá 4 giai đoạn tối ưu hóa Prompt trên 8 kịch bản (bản Production đạt 7/8 -- 87,5\%) và chi phí vận hành 0 USD.
- \item \textbf{Chương 8 -- Kết luận và giới hạn đã biết}: Tổng kết kết quả đạt được, phân tích khách quan các giới hạn kỹ thuật và lộ trình nâng cấp.
+ \item \textbf{Chương 1 (Phân tích bài toán và yêu cầu hệ thống)}: Trình bày bài toán quản lý thực tế, phân quyền người dùng (\texttt{MANAGER}, \texttt{MARKETER}), sơ đồ Use Case cùng danh sách yêu cầu chức năng và phi chức năng.
+ \item \textbf{Chương 2 (Thiết kế kiến trúc và cơ sở dữ liệu)}: Trình bày kiến trúc 3 phần (Frontend React, Backend FastAPI tích hợp cổng \texttt{/mcp}, và dịch vụ \texttt{ai-runner}), thiết kế cơ sở dữ liệu 14 bảng, quy trình duyệt bài viết và 14 công cụ MCP dành cho AI.
+ \item \textbf{Chương 3 (Xây dựng hệ thống và tích hợp Trợ lý AI)}: Mô tả cấu trúc mã nguồn, cách cài đặt các chức năng quản lý cốt lõi, công thức tính chỉ số quảng cáo, cách kết nối 13 mô hình AI, quá trình sửa System Prompt qua 4 phiên bản và nhật ký sử dụng AI trong khi làm đồ án.
+ \item \textbf{Chương 4 (Kiểm thử, triển khai và kết luận)}: Trình bày kết quả chạy 151 bài kiểm thử tự động, kết quả đánh giá 4 phiên bản System Prompt trên 8 kịch bản, cách triển khai hệ thống lên VPS (\url{https://marketing.kienhieu.id.vn}) cùng các hạn chế hiện tại.
 \end{enumerate}
-
-\section*{Đóng góp kỹ thuật và phương pháp tiếp cận thực chứng}
-
-Dự án tập trung vào bốn đóng góp kỹ thuật chính, đối chiếu trực tiếp với mã nguồn thực tế và kết quả đo đạc từ môi trường kiểm thử cũng như máy chủ Production VPS:
-\begin{itemize}[noitemsep,topsep=2pt]
- \item \textbf{Kiểm soát truy cập mức bản ghi và chống tự duyệt (\texttt{CANNOT\_REVIEW\_OWN})}: Xử lý triệt để nguy cơ lộ lọt dữ liệu chéo (IDOR) và xung đột lợi ích khi phê duyệt nội dung.
- \item \textbf{Kiến trúc AI Tác tử có kiểm soát (FastMCP + \textit{Proposal-Only} HITL)}: Cô lập tiến trình \texttt{ai-runner} dưới tài khoản \texttt{mfai}, xác thực bằng \texttt{Run-Token} JWT ngắn hạn (10 phút) và bắt buộc mọi đề xuất ghi đi qua thẻ \texttt{ai\_action} (\texttt{PROPOSED}).
- \item \textbf{Khử ảo giác bằng đối chiếu công cụ MCP và kiểm tra từ khóa cấm}: Bắt buộc mô hình ngôn ngữ truy vấn số liệu thực qua 9 công cụ đọc và đối chiếu \texttt{check\_banned\_keywords} trước khi đề xuất bản nháp.
- \item \textbf{Độ tin cậy đa nhà cung cấp với chi phí 0 USD}: Tự động chuyển đổi dự phòng (failover) giữa 13 mô hình LLM trên 5 nền tảng mà không làm gián đoạn luồng nghiệp vụ CRUD cốt lõi.
-\end{itemize}

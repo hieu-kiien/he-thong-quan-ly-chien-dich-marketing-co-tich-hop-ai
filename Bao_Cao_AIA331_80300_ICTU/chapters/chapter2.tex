@@ -1,76 +1,181 @@
-\chapter{CƠ SỞ KỸ THUẬT VÀ CÔNG NGHỆ NỀN TẢNG}
+\chapter{THIẾT KẾ KIẾN TRÚC VÀ CƠ SỞ DỮ LIỆU}
 
-\section{Phương pháp luận và tiêu chuẩn kỹ thuật áp dụng}
+\section{Kiến trúc hệ thống và công nghệ sử dụng}
 
-Để đảm bảo tính chuẩn mực học thuật và độ tin cậy kỹ thuật trong công nghiệp, hệ thống MarketFlow AI được thiết kế và hiện thực hóa dựa trên khung phương pháp luận Nghiên cứu Khoa học Thiết kế (\textit{Design Science Research Methodology} -- DSRM) đề xuất bởi Peffers và cộng sự \cite{peffers2007dsrm}. Quá trình phát triển tuân thủ một chu trình lặp chặt chẽ: xuất phát từ việc nhận diện điểm nghẽn thực tế trong vận hành tiếp thị và tích hợp AI tác tử (khảo sát bộ nhớ P0 Spike), xác lập các mục tiêu giải pháp khả thi, kiến tạo cấu trúc phần mềm thực thi, và tiến hành kiểm định tự động đa tầng.
+Hệ thống MarketFlow được chia thành 3 dịch vụ tách biệt: giao diện web (\texttt{frontend}), máy chủ nghiệp vụ kiêm cổng công cụ MCP (\texttt{backend}), và dịch vụ điều phối tiến trình AI (\texttt{ai-runner}). Lý do tách riêng \texttt{ai-runner} ra khỏi \texttt{backend} là vì mỗi lần gọi CLI điều phối AI (\texttt{opencode run}) tiêu tốn khoảng 490 MB RAM và mất nhiều giây chờ phản hồi từ mô hình ngôn ngữ; việc tách riêng giúp máy chủ FastAPI chính luôn phản hồi nhanh các thao tác quản lý chiến dịch hàng ngày.
 
-Hệ thống tích hợp đồng bộ các tiêu chuẩn kỹ thuật quốc tế:
-\begin{itemize}
- \item \textbf{ISO/IEC/IEEE 29148:2018 (Requirements Engineering)}: Toàn bộ 14 yêu cầu chức năng (FR01--FR14) và 6 yêu cầu phi chức năng (NFR01--NFR06) được định danh duy nhất, phân rã nguyên tử, có điều kiện nghiệm thu rõ ràng và liên kết trực tiếp với 151 ca kiểm thử tự động trong Ma trận truy xuất nguồn gốc (RTM).
- \item \textbf{ISO/IEC/IEEE 42010:2011 (Architecture Description)}: Kiến trúc hệ thống được phân tách theo góc nhìn của các bên liên quan, mô hình hóa theo khung chuẩn C4 (Context, Container, Component) và tách biệt rõ ranh giới giữa dịch vụ nghiệp vụ (\texttt{backend}) với dịch vụ thực thi AI (\texttt{ai-runner}).
- \item \textbf{ISO/IEC 25010:2011 (System and Software Quality Models)}: Định chuẩn các thuộc tính chất lượng phần mềm bao gồm: Tính đúng đắn chức năng, Hiệu năng phản hồi, Tính khả dụng, Độ tin cậy (chịu lỗi khi dịch vụ AI ngoại tuyến), và An toàn bảo mật.
- \item \textbf{NIST AI Risk Management Framework (AI RMF 1.0)}: Khung quản lý rủi ro trí tuệ nhân tạo của Viện Tiêu chuẩn và Công nghệ Quốc gia Hoa Kỳ \cite{nist-airmf,nist-genai-profile}, đặc biệt là nguyên tắc kiểm soát ảo giác bằng truy vấn công cụ (\textit{tool-grounded generation}), cô lập quyền thực thi qua mã thông báo tạm thời (\texttt{Run-Token} JWT) và bảo đảm sự phê duyệt của con người (\textit{Proposal-Only HITL}).
-\end{itemize}
+Hình~\ref{fig:container} mô tả kiến trúc các thành phần và luồng dữ liệu của hệ thống. Bảng~\ref{tab:tech-stack} liệt kê các công nghệ được sử dụng.
 
-\section{Khảo sát và phân tích lựa chọn công nghệ cốt lõi}
-
-Hệ thống MarketFlow AI được xây dựng trên một ngăn xếp công nghệ hiện đại, cân bằng tối ưu giữa hiệu năng thực thi cao, độ an toàn khi điều phối tác tử AI và tính linh hoạt khi triển khai trên cả môi trường cục bộ lẫn máy chủ đám mây. Bảng~\ref{tab:tech-stack} tổng hợp các công nghệ nền tảng đã được triển khai trong thực tế.
+\begin{figure}[!htbp]
+\centering
+\input{figures/container.tex}
+\caption{Sơ đồ kiến trúc các dịch vụ trong hệ thống MarketFlow}
+\label{fig:container}
+\end{figure}
 
 \begin{table}[!htbp]
 \centering
-\small
-\caption{Ngăn xếp công nghệ hiện thực hóa hệ thống MarketFlow AI}
+\footnotesize
+\renewcommand{\arraystretch}{1.05}
+\caption{Các công nghệ sử dụng trong dự án}
 \label{tab:tech-stack}
-\begin{tabularx}{\textwidth}{|L{2.8cm}|L{3.2cm}|Y|}
+\begin{tabularx}{\textwidth}{|L{2.8cm}|L{3.4cm}|Y|}
 \hline
-\thead{Thành phần} & \thead{Công nghệ lựa chọn} & \thead{Phân tích kỹ thuật và lý do lựa chọn thực tế}\\
+\thead{Thành phần} & \thead{Công nghệ} & \thead{Vai trò trong hệ thống}\\
 \hline
-Backend Web API \& MCP Server & FastAPI (Python 3.12+), Pydantic v2, FastMCP & Framework ASGI hiệu năng cao; tích hợp Pydantic v2 kiểm định dữ liệu tự động; nhúng trực tiếp máy chủ giao thức \texttt{FastMCP} (\texttt{stateless\_http=True}) tại đường dẫn nội bộ \texttt{/mcp} cung cấp 14 công cụ nghiệp vụ.\\
+Giao diện Web (Frontend) & React 18, TypeScript, Vite, Tailwind CSS v4 & Xây dựng giao diện quản lý chiến dịch, bảng thống kê (ECharts), lịch đăng bài (FullCalendar) và ngăn kéo chat với Trợ lý AI qua luồng SSE.\\
 \hline
-AI Runner \& Agent Runtime & FastAPI (\texttt{:8100}), OpenCode CLI v1.19.4 & Dịch vụ vi mô tách biệt quản lý hàng đợi FIFO (\texttt{RUNNER\_CONCURRENCY=1}), khởi chạy tiến trình con \texttt{opencode run --agent marketflow --format json} trong môi trường cô lập (tài khoản \texttt{mfai}, giới hạn \texttt{MemoryMax=896M}).\\
+Máy chủ chính (Backend API \& MCP) & FastAPI (Python 3.12), SQLAlchemy 2.0, Pydantic v2, FastMCP & Xử lý toàn bộ REST API nghiệp vụ (\texttt{/api/v1/*}), kiểm tra phân quyền JWT và mở đường dẫn nội bộ \texttt{/mcp} cung cấp 14 công cụ cho AI.\\
 \hline
-Hệ sinh thái Mô hình LLM & 13 mô hình trên 5 nền tảng (OpenCode, Groq, OpenRouter, Gemini) & Mô hình chính \texttt{opencode/deepseek-v4.1-flash-free} kết hợp 12 mô hình dự phòng (GLM-5.3, MiMo-v2.6, GPT-OSS-120B, Qwen3.8-27B, Nemotron-3.5, Gemini 3.5/3.1 Flash Lite) giúp duy trì chi phí vận hành 0 USD và chống đứt gãy dịch vụ.\\
+Dịch vụ chạy AI (AI Runner) & FastAPI (\texttt{:8100}), OpenCode CLI & Nhận yêu cầu từ Backend, xếp hàng xử lý tuần tự (\texttt{RUNNER\_CONCURRENCY=1}), gọi \texttt{opencode run} dưới tài khoản giới hạn quyền và trả luồng sự kiện về Backend.\\
 \hline
-Frontend Client & React 18, TypeScript, Vite, Tailwind CSS v4 & Kiến trúc SPA phân tách theo miền nghiệp vụ (\texttt{src/features/*}); tích hợp TanStack Query v5, ECharts (biểu đồ KPI), FullCalendar (lịch xuất bản) và luồng đọc sự kiện thời gian thực \texttt{fetch} + \texttt{ReadableStream} (SSE).\\
+Mô hình ngôn ngữ (LLM) & 13 mô hình trên 4 cổng (OpenCode, Groq, OpenRouter, Gemini) & Mô hình chính \texttt{deepseek-v4.1-flash-free} cùng 12 mô hình dự phòng miễn phí giúp hệ thống tự đổi mô hình khi bị giới hạn lượt gọi.\\
 \hline
-Cơ sở dữ liệu & PostgreSQL 16 (Production) \& SQLite WAL (Dev/Test) & Quản lý 14 bảng quan hệ qua SQLAlchemy 2.0 ORM và Alembic migrations; sử dụng PostgreSQL 16 trên VPS đảm bảo tính bền vững đồng thời cao, kết hợp SQLite (WAL mode + \texttt{foreign\_keys=ON}) cho kiểm thử nhanh.\\
+Cơ sở dữ liệu & PostgreSQL 16 (VPS/Docker) \& SQLite WAL (Dev/Test) & Lưu trữ 14 bảng dữ liệu quan hệ, quản lý phiên bản cấu trúc bảng bằng Alembic.\\
 \hline
-Đóng gói, Hạ tầng \& Kiểm thử & Docker Compose, Systemd, Nginx, Pytest, Playwright & Đóng gói 3 container (\texttt{postgres}, \texttt{backend}, \texttt{ai-runner}); vận hành thực tế qua Cloudflare Tunnel + Nginx + Systemd; kiểm chứng bằng 151 ca kiểm thử tự động (Pytest + Playwright E2E).\\
+Triển khai \& Kiểm thử & Ubuntu VPS, Nginx, Systemd, Docker, Pytest, Playwright & Vận hành thực tế tại \url{https://marketing.kienhieu.id.vn}; kiểm thử tự động bằng 151 bài test (Pytest và Playwright).\\
 \hline
 \end{tabularx}
 \end{table}
 
-\subsection{Backend Framework: FastAPI, Pydantic v2 và FastMCP nội bộ}
-FastAPI được lựa chọn làm máy chủ trung tâm nhờ các ưu điểm kỹ thuật vượt trội:
-\begin{enumerate}
- \item \textbf{Kiến trúc đồng bộ kết hợp truyền phát SSE}: Các điểm cuối REST API nghiệp vụ (\texttt{/api/v1/*}) được xử lý rõ ràng, trong khi điểm cuối hội thoại AI (\texttt{POST /api/v1/assistant/threads/\{id\}/messages}) sử dụng \texttt{StreamingResponse} chuẩn \texttt{text/event-stream} để đẩy từng sự kiện \texttt{meta}, \texttt{status}, \texttt{tool}, \texttt{delta}, \texttt{action} và \texttt{done} về trình duyệt theo thời gian thực.
- \item \textbf{Kiểm định dữ liệu chặt chẽ qua Pydantic v2}: Hệ thống tận dụng Pydantic v2 để kiểm tra tính hợp lệ của ngày tháng (\texttt{start\_date} $\le$ \texttt{end\_date}), ngân sách dương (\texttt{budget} $> 0$), số liệu phễu tiếp thị (\texttt{views} $\ge$ \texttt{clicks} $\ge$ \texttt{conversions}) và cấu trúc đầu vào của toàn bộ 14 công cụ MCP.
- \item \textbf{Nhúng trực tiếp máy chủ FastMCP}: Thay vì mở thêm một cổng mạng riêng biệt khó kiểm soát, mô-đun \texttt{backend/app/assistant/mcp\_server.py} gắn trực tiếp ứng dụng \texttt{FastMCP("marketflow-assistant", stateless\_http=True)} vào đường dẫn \texttt{/mcp} của FastAPI. Máy chủ Nginx chặn hoàn toàn truy cập \texttt{/mcp} từ bên ngoài (\texttt{location \^{}\~{} /mcp \{ return 404; \}}), chỉ cho phép tiến trình cục bộ trên cùng máy chủ gọi vào kèm mã thông báo xác thực.
+\section{Thiết kế cơ sở dữ liệu (14 bảng)}
+
+Cơ sở dữ liệu của hệ thống gồm 14 bảng có quan hệ khóa ngoại chặt chẽ, chia làm hai nhóm:
+\begin{itemize}[noitemsep,topsep=2pt]
+ \item \textbf{Nhóm 7 bảng quản lý chính} (Hình~\ref{fig:erd-core}): \texttt{users}, \texttt{channels}, \texttt{brand\_profile}, \texttt{banned\_keywords}, \texttt{campaigns}, \texttt{campaign\_channels} và \texttt{contents}.
+ \item \textbf{Nhóm 7 bảng vận hành và Trợ lý AI} (Hình~\ref{fig:erd-ops}): \texttt{content\_reviews}, \texttt{schedules}, \texttt{metrics}, \texttt{notifications}, \texttt{ai\_threads}, \texttt{ai\_messages} và \texttt{ai\_actions}.
+\end{itemize}
+
+\begin{figure}[!htbp]
+\centering
+\input{figures/erd-core.tex}
+\caption{Sơ đồ ERD nhóm 7 bảng quản lý chiến dịch, kênh, thương hiệu và nội dung}
+\label{fig:erd-core}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\input{figures/erd-ops.tex}
+\caption{Sơ đồ ERD nhóm 7 bảng duyệt bài, lịch đăng, chỉ số và Trợ lý AI}
+\label{fig:erd-ops}
+\end{figure}
+
+Bảng~\ref{tab:data-dictionary} mô tả chức năng, khóa chính, khóa ngoại và các ràng buộc dữ liệu của toàn bộ 14 bảng.
+
+\begin{small}
+\begin{longtable}{|L{3.1cm}|L{2.3cm}|L{2.8cm}|L{5.5cm}|}
+\caption{Mô tả 14 bảng dữ liệu và điều kiện ràng buộc}\label{tab:data-dictionary}\\
+\hline
+\thead{Tên bảng} & \thead{Chức năng} & \thead{Khóa chính / ngoại} & \thead{Điều kiện ràng buộc chính}\\
+\hline
+\endfirsthead
+\hline
+\thead{Tên bảng} & \thead{Chức năng} & \thead{Khóa chính / ngoại} & \thead{Điều kiện ràng buộc chính}\\
+\hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+\texttt{users} & Tài khoản người dùng & PK: \texttt{id} & \texttt{email} không trùng; \texttt{role} thuộc \{\texttt{MANAGER}, \texttt{MARKETER}\}; lưu \texttt{is\_active}, \texttt{token\_version} và mật khẩu băm.\\
+\hline
+\texttt{channels} & Kênh truyền thông & PK: \texttt{id} & \texttt{code} duy nhất (\texttt{FACEBOOK}, \texttt{INSTAGRAM}, \texttt{TIKTOK}, \texttt{ZALO\_OA}, \texttt{EMAIL}, \texttt{GOOGLE\_ADS}, \texttt{WEBSITE}).\\
+\hline
+\texttt{brand\_profile} & Hồ sơ thương hiệu & PK: \texttt{id} & Lưu tên thương hiệu, mô tả sản phẩm, giọng văn, khách hàng mục tiêu và quy tắc viết bài.\\
+\hline
+\texttt{banned\_keywords} & Danh sách từ cấm & PK: \texttt{id} & \texttt{keyword} duy nhất; dùng để quét cảnh báo khi nhân viên gửi duyệt bài hoặc khi AI soạn bài nháp.\\
+\hline
+\texttt{campaigns} & Chiến dịch marketing & PK: \texttt{id}; FK: \texttt{owner\_id} & Lưu sản phẩm, mục tiêu, \texttt{budget >= 0}, \texttt{start\_date <= end\_date}; trạng thái \{\texttt{PLANNED}, \texttt{ACTIVE}, \texttt{PAUSED}, \texttt{COMPLETED}, \texttt{CANCELLED}\}.\\
+\hline
+\texttt{campaign\_channels} & Ngân sách từng kênh & PK kép: (\texttt{campaign\_id}, \texttt{channel\_id}) & FK tới \texttt{campaigns} và \texttt{channels}; lưu ngân sách phân bổ \texttt{planned\_budget >= 0}.\\
+\hline
+\texttt{contents} & Bài viết marketing & PK: \texttt{id}; FK: \texttt{campaign\_id}, \texttt{channel\_id}, \texttt{created\_by}, \texttt{ai\_message\_id} & Trạng thái \{\texttt{DRAFT}, \texttt{PENDING\_REVIEW}, \texttt{APPROVED}, \texttt{REJECTED}, \texttt{PUBLISHED}\}; nguồn tạo \texttt{origin} thuộc \{\texttt{MANUAL}, \texttt{AI}\}.\\
+\hline
+\texttt{content\_reviews} & Lịch sử duyệt bài & PK: \texttt{id}; FK: \texttt{content\_id}, \texttt{reviewer\_id} & Lưu quyết định duyệt (\texttt{APPROVED} hoặc \texttt{REJECTED}), nhận xét (\texttt{comment}) và thời điểm duyệt.\\
+\hline
+\texttt{schedules} & Lịch đăng bài & PK: \texttt{id}; FK: \texttt{content\_id}, \texttt{assignee\_id} & Lưu thời gian hẹn đăng (\texttt{scheduled\_at}), ghi chú và trạng thái \{\texttt{PLANNED}, \texttt{DONE}, \texttt{CANCELLED}\}.\\
+\hline
+\texttt{metrics} & Số liệu quảng cáo ngày & PK: \texttt{id}; FK: \texttt{campaign\_id}, \texttt{channel\_id}, \texttt{entered\_by} & Duy nhất theo cặp (\texttt{campaign\_id}, \texttt{channel\_id}, \texttt{metric\_date}); bắt buộc \texttt{views >= clicks >= conversions >= 0} và \texttt{cost >= 0}.\\
+\hline
+\texttt{notifications} & Thông báo nội bộ & PK: \texttt{id}; FK: \texttt{user\_id} & Tự động sinh thông báo cho quản lý hoặc người viết khi bài viết được gửi duyệt, duyệt hoặc từ chối.\\
+\hline
+\texttt{ai\_threads} & Cuộc trò chuyện AI & PK: \texttt{id}; FK: \texttt{user\_id}, \texttt{campaign\_id} & Lưu phiên chat của từng người dùng; cho phép gắn cố định ngữ cảnh vào một chiến dịch đang xem.\\
+\hline
+\texttt{ai\_messages} & Tin nhắn chat AI & PK: \texttt{id}; FK: \texttt{thread\_id} & Lưu nội dung câu hỏi của người dùng (\texttt{USER}) và câu trả lời của AI (\texttt{ASSISTANT}), tên model và thời gian phản hồi (\texttt{latency\_ms}).\\
+\hline
+\texttt{ai\_actions} & Thẻ đề xuất của AI & PK: \texttt{id}; FK: \texttt{thread\_id}, \texttt{message\_id}, \texttt{user\_id} & Lưu tên hàm đề xuất (\texttt{propose\_*}), dữ liệu JSON đề xuất và trạng thái \{\texttt{PROPOSED}, \texttt{EXECUTED}, \texttt{REJECTED}, \texttt{FAILED}\}.\\
+\hline
+\end{longtable}
+\end{small}
+
+\section{Thiết kế quy trình duyệt bài và công cụ MCP cho AI}
+
+\subsection{Quy trình trạng thái bài viết}
+
+Để tránh việc bài viết chưa kiểm tra đã được đem đi đăng, mỗi bài viết trong bảng \texttt{contents} phải đi qua 5 trạng thái như Hình~\ref{fig:content-state}:
+\begin{enumerate}[noitemsep,topsep=2pt]
+ \item Khi người dùng tự tạo bài mới hoặc bấm \textit{Xác nhận} một thẻ đề xuất của AI, bài viết được lưu ở trạng thái bản nháp (\texttt{DRAFT}).
+ \item Khi người viết bấm gửi duyệt (\texttt{POST /contents/\{id\}/submit}), hệ thống tự động quét tiêu đề, nội dung và CTA với bảng \texttt{banned\_keywords}, chuyển bài sang trạng thái chờ duyệt (\texttt{PENDING\_REVIEW}) và đính kèm danh sách từ cấm phát hiện được để cảnh báo cho người duyệt.
+ \item Quản lý (\texttt{MANAGER}) xem bài chờ duyệt và bấm phê duyệt (\texttt{APPROVED}) hoặc từ chối kèm lý do (\texttt{REJECTED}). Hệ thống kiểm tra \texttt{content.created\_by != current\_user.id} để không cho phép tác giả tự duyệt bài của chính mình.
+ \item Bài viết đã duyệt nếu bị chỉnh sửa lại nội dung sẽ tự động quay về trạng thái \texttt{DRAFT} để duyệt lại. Bài đã ở trạng thái \texttt{APPROVED} hoặc \texttt{PUBLISHED} sẽ bị khóa không cho xóa (\texttt{CONTENT\_LOCKED}).
 \end{enumerate}
 
-\subsection{Dịch vụ AI Runner, OpenCode CLI và Hệ sinh thái 13 mô hình đa nhà cung cấp}
-Đáp ứng tiêu chí tích hợp AI hiện đại, có kiểm soát và tối ưu kinh tế của học phần AIA331, hệ thống thiết kế kiến trúc điều phối tác tử 2 tầng:
-\begin{enumerate}
- \item \textbf{Cô lập tiến trình thực thi qua \texttt{ai-runner}}: Qua khảo sát thực nghiệm P0 Spike trên máy chủ mục tiêu, mỗi tiến trình \texttt{opencode run} (vận hành trên runtime Bun) tiêu thụ trung bình \texttt{\~{}490 MB RSS}. Để bảo vệ máy chủ VPS (2,5 GB RAM) khỏi nguy cơ tràn bộ nhớ (OOM), dịch vụ \texttt{ai-runner} (\texttt{ai-runner/app/runner.py}) sử dụng khóa điều phối \texttt{asyncio.Semaphore(1)} (\texttt{RUNNER\_CONCURRENCY=1}) để xếp hàng tuần tự các lượt gọi AI và chạy dưới tài khoản hệ thống \texttt{mfai} bị giới hạn cứng \texttt{MemoryMax=896M}.
- \item \textbf{Xác thực uỷ quyền ngắn hạn (\texttt{Run-Token} JWT)}: Khi người dùng gửi tin nhắn, Backend sinh một mã thông báo tạm thời (\texttt{typ="assistant\_run"}, thời hạn 10 phút) chứa định danh \texttt{user\_id}, \texttt{role} và \texttt{thread\_id}, truyền qua biến môi trường \texttt{MARKETFLOW\_RUN\_TOKEN} cho tiến trình \texttt{opencode}. Nhờ đó, mọi công cụ MCP mà AI gọi đều chịu sự kiểm soát phân quyền giống hệt người dùng đang đăng nhập, đồng thời không cần lưu trữ khóa phiên dài hạn trong tiến trình AI.
- \item \textbf{Hỗ trợ 13 mô hình LLM đa nhà cung cấp}: Giao diện \texttt{ModelSelector.tsx} và cấu hình \texttt{deploy/opencode/opencode.json} cho phép người dùng lựa chọn hoặc tự động chuyển đổi dự phòng (failover) giữa 13 mô hình thuộc 5 nền tảng: OpenCode Free (\texttt{deepseek-v4.1-flash-free}, \texttt{glm-5.3-flash-free}, \texttt{mimo-v2.6-flash-free}), Groq (\texttt{gpt-oss-120b}, \texttt{qwen3.8-27b}, \texttt{gpt-oss-20b}), OpenRouter (\texttt{nemotron-3.5-super-vl:free}, \texttt{nemotron-3-ultra-550b-a55b:free}, \texttt{nemotron-3.5-lightning:free}, \texttt{inkling:free}, \texttt{inkling-small:free}) và Google AI Studio (\texttt{gemini-3.5-flash-lite}, \texttt{gemini-3.1-flash-lite}).
-\end{enumerate}
+\begin{figure}[!htbp]
+\centering
+\input{figures/content-state.tex}
+\caption{Sơ đồ chuyển trạng thái bài viết trong hệ thống}
+\label{fig:content-state}
+\end{figure}
 
-\subsection{Frontend: React 18, TypeScript, TanStack Query và ECharts}
-Giao diện người dùng được xây dựng theo kiến trúc mô-đun hóa theo miền nghiệp vụ (\texttt{frontend/src/features/*}):
-\begin{enumerate}
- \item \textbf{Quản lý trạng thái bất đồng bộ với TanStack Query v5}: Tự động đồng bộ bộ nhớ đệm (cache invalidation) ngay sau khi người dùng phê duyệt nội dung, nhập chỉ số CSV hoặc bấm \textit{Áp dụng} một thẻ đề xuất \texttt{ai\_action} từ khung chat Trợ lý AI.
- \item \textbf{Trực quan hóa dữ liệu chuyên sâu}: Sử dụng thư viện \texttt{ECharts} (\texttt{KpiChart.tsx}, \texttt{ChannelBreakdown.tsx}) để biểu diễn xu hướng lượt xem, lượt nhấp, chi phí và tỷ lệ giải ngân ngân sách; kết hợp \texttt{FullCalendar} (\texttt{CalendarPage.tsx}) hỗ trợ kéo-thả lịch xuất bản trực quan.
- \item \textbf{Khung Trợ lý AI tương tác thời gian thực (\texttt{AssistantDrawer.tsx} \& \texttt{AssistantPage.tsx})}: Hiển thị trực tiếp tiến trình suy luận, các thẻ gọi công cụ (\texttt{ToolCallChip.tsx}) và thẻ hành động đề xuất (\texttt{ProposedActionCard.tsx}) với hai nút quyết định rõ ràng: \textit{Áp dụng} và \textit{Bỏ qua}.
-\end{enumerate}
+\subsection{Luồng tương tác và 14 công cụ FastMCP cho Trợ lý AI}
 
-\subsection{Cơ sở dữ liệu: PostgreSQL 16 (Production) và SQLite WAL (Dev/Test)}
-Hệ thống sử dụng SQLAlchemy 2.0 ORM (\texttt{backend/app/models/}) kết hợp công cụ quản lý phiên bản lược đồ Alembic (\texttt{backend/alembic/}):
-\begin{enumerate}
- \item \textbf{Mô hình dữ liệu chuẩn hóa 14 bảng}: Bao quát trọn vẹn 4 phân hệ: Quản trị \& Thương hiệu (\texttt{users}, \texttt{channels}, \texttt{brand\_profile}, \texttt{banned\_keywords}), Chiến dịch \& Phê duyệt HITL (\texttt{campaigns}, \texttt{campaign\_channels}, \texttt{contents}, \texttt{content\_reviews}), Vận hành \& Chỉ số (\texttt{schedules}, \texttt{metrics}, \texttt{notifications}) và Trợ lý AI (\texttt{ai\_threads}, \texttt{ai\_messages}, \texttt{ai\_actions}).
- \item \textbf{Tính tương thích kép PostgreSQL / SQLite}: Trên môi trường Production VPS và Docker Compose, hệ thống vận hành trên PostgreSQL 16 đảm bảo tính toàn vẹn giao dịch cao. Trong môi trường phát triển và chạy kiểm thử tự động (\texttt{pytest}), hệ thống hỗ trợ SQLite với chế độ \texttt{PRAGMA journal\_mode = WAL} và \texttt{PRAGMA foreign\_keys = ON} được kích hoạt tự động tại \texttt{backend/app/core/database.py}.
-\end{enumerate}
+Thay vì cho mô hình ngôn ngữ truy cập thẳng vào cơ sở dữ liệu, hệ thống mở cổng giao thức MCP nội bộ tại đường dẫn \texttt{/mcp} (chỉ cho phép gọi nội bộ trên máy chủ, chặn truy cập từ Internet qua Nginx). Hình~\ref{fig:auth-sequence} và Hình~\ref{fig:ai-pipeline} mô tả trình tự từ lúc người dùng gửi yêu cầu đến khi xác nhận thẻ đề xuất của AI.
 
-\section{Kết luận chương}
+\begin{figure}[!htbp]
+\centering
+\input{figures/approval-sequence.tex}
+\caption{Sơ đồ tuần tự khi nhờ Trợ lý AI soạn bài nháp và gửi duyệt}
+\label{fig:auth-sequence}
+\end{figure}
 
-Việc lựa chọn và kết hợp hài hòa giữa FastAPI, FastMCP, dịch vụ cô lập \texttt{ai-runner} với OpenCode CLI (13 mô hình LLM), React 18 + TypeScript và hệ quản trị CSDL PostgreSQL 16 / SQLite WAL đã tạo nên một nền tảng kỹ thuật hiện đại, an toàn và có tính thực tiễn cao cho MarketFlow AI. Chương tiếp theo sẽ đặc tả chi tiết các yêu cầu chức năng, phi chức năng, ma trận phân quyền RBAC và máy trạng thái duyệt nội dung HITL.
+\begin{figure}[!htbp]
+\centering
+\input{figures/ai-pipeline.tex}
+\caption{Luồng xử lý yêu cầu AI qua \texttt{ai-runner}, 14 công cụ MCP và bước người dùng xác nhận}
+\label{fig:ai-pipeline}
+\end{figure}
+
+Tập 14 công cụ MCP trong \texttt{backend/app/assistant/tools.py} được chia rõ thành 9 hàm đọc dữ liệu và 5 hàm tạo đề xuất như trong Bảng~\ref{tab:ai-schemas}. Hệ thống không cung cấp bất kỳ hàm MCP nào để xóa dữ liệu hay duyệt bài.
+
+\begin{table}[!htbp]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{1.05}
+\caption{Danh sách 14 công cụ MCP cung cấp cho Trợ lý AI}
+\label{tab:ai-schemas}
+\begin{tabularx}{\textwidth}{|L{2.2cm}|L{4.2cm}|Y|}
+\hline
+\thead{Nhóm công cụ} & \thead{Tên hàm MCP} & \thead{Chức năng và phạm vi hoạt động}\\
+\hline
+\multirow{5}{2.2cm}{\textbf{9 hàm chỉ đọc dữ liệu (Read-Only)}} & \texttt{list\_campaigns}, \texttt{get\_campaign} & Lấy danh sách chiến dịch và thông tin chi tiết của một chiến dịch (mục tiêu, ngân sách, kênh tham gia, tổng chỉ số).\\
+\cline{2-3}
+& \texttt{get\_stats} & Lấy số liệu thống kê (views, clicks, conversions, cost, CTR, CVR, CPC, CPA, CPM) và phần trăm ngân sách đã dùng.\\
+\cline{2-3}
+& \texttt{list\_contents}, \texttt{get\_content} & Xem danh sách bài viết của chiến dịch và chi tiết nội dung kèm lịch sử nhận xét khi duyệt.\\
+\cline{2-3}
+& \texttt{list\_schedules}, \texttt{list\_channels} & Tra cứu lịch đăng bài và danh sách 7 kênh truyền thông đang hoạt động.\\
+\cline{2-3}
+& \texttt{get\_brand\_profile}, \texttt{check\_banned\_keywords} & Đọc thông tin giọng văn thương hiệu và kiểm tra xem đoạn văn bản nháp có chứa từ cấm hay không.\\
+\hline
+\multirow{5}{2.2cm}{\textbf{5 hàm tạo đề xuất (Proposal-Only)}} & \texttt{propose\_content\_drafts} & Tạo thẻ đề xuất (\texttt{PROPOSED}) gồm 1--5 bài viết nháp; khi người dùng bấm \textit{Xác nhận} sẽ lưu vào bảng \texttt{contents} (\texttt{origin=AI}).\\
+\cline{2-3}
+& \texttt{propose\_campaign} & Đề xuất tạo chiến dịch mới kèm phân bổ ngân sách theo kênh.\\
+\cline{2-3}
+& \texttt{propose\_campaign\_update} & Đề xuất sửa mục tiêu, ngân sách hoặc trạng thái của chiến dịch hiện có.\\
+\cline{2-3}
+& \texttt{propose\_schedule} & Đề xuất lịch đăng bài mới cho bài viết đã được duyệt.\\
+\cline{2-3}
+& \texttt{propose\_metrics} & Đề xuất ghi nhận số liệu quảng cáo ngày (có kiểm tra điều kiện \texttt{views >= clicks >= conversions}).\\
+\hline
+\end{tabularx}
+\end{table}

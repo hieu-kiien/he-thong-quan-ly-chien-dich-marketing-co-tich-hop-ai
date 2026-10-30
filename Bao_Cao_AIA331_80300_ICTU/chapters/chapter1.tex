@@ -1,111 +1,127 @@
-\chapter{TỔNG QUAN ĐỀ TÀI VÀ BỐI CẢNH ỨNG DỤNG}
+\chapter{PHÂN TÍCH BÀI TOÁN VÀ YÊU CẦU HỆ THỐNG}
 
-\section{Bối cảnh thực tiễn}
+\section{Bài toán quản lý thực tế}
 
-Trong kỷ nguyên số hóa mạnh mẽ, hoạt động tiếp thị (marketing) của doanh nghiệp đã chuyển dịch từ các chiến dịch đơn lẻ sang quy trình vận hành đa kênh (omni-channel) liên tục. Một chiến dịch marketing điển hình đòi hỏi sự phối hợp nhịp nhàng giữa nhiều mắt xích: hoạch định mục tiêu kinh doanh, phân bổ ngân sách tài chính, lựa chọn sản phẩm trọng tâm và 7 nhóm kênh tiếp cận (\texttt{FACEBOOK}, \texttt{INSTAGRAM}, \texttt{TIKTOK}, \texttt{ZALO\_OA}, \texttt{EMAIL}, \texttt{GOOGLE\_ADS}, \texttt{WEBSITE}), sáng tạo thông điệp, kiểm duyệt nội dung, lập lịch đăng tải và giám sát chỉ số chuyển đổi theo thời gian thực.
+Tại các nhóm marketing nhỏ, một chiến dịch quảng cáo thường chạy song song trên nhiều kênh truyền thông như Facebook, Instagram, TikTok, Zalo OA, Email, Google Ads và Website. Quy trình làm việc hàng ngày gồm 5 bước nối tiếp nhau:
+\begin{enumerate}[noitemsep,topsep=2pt]
+ \item Tạo chiến dịch gắn với sản phẩm, đối tượng khách hàng, mục tiêu (\texttt{SALES}, \texttt{LEADS}, \texttt{TRAFFIC}, \texttt{AWARENESS}), thời gian chạy và tổng ngân sách.
+ \item Chọn các kênh truyền thông tham gia chiến dịch và chia ngân sách dự kiến cho từng kênh.
+ \item Soạn bài viết (tiêu đề, nội dung chính, lời kêu gọi hành động CTA, hashtag) theo quy định độ dài của từng kênh và gửi cho quản lý duyệt.
+ \item Lên lịch đăng cho các bài viết đã được duyệt và cập nhật đường dẫn bài đăng thực tế sau khi phát hành.
+ \item Ghi nhận số liệu quảng cáo theo ngày (\texttt{views}, \texttt{clicks}, \texttt{conversions}, \texttt{cost}) để tính các chỉ số hiệu quả (CTR, CVR, CPC, CPA, CPM) và theo dõi tiến độ chi tiêu ngân sách.
+\end{enumerate}
 
-Khi dữ liệu vận hành bị phân mảnh trên các bảng tính Excel rời rạc hoặc các công cụ giao tiếp phân tán, các rủi ro vận hành nghiêm trọng xuất hiện:
-\begin{itemize}
- \item \textbf{Bất nhất thông tin}: Sai lệch số liệu giữa ngân sách kế hoạch và chi phí quảng cáo thực tế, thiếu tính truy vết về phiên bản nội dung cuối cùng đã được phê duyệt cũng như nguồn gốc tạo lập (\texttt{MANUAL} hay \texttt{AI}).
- \item \textbf{Lỗ hổng quy trình}: Thiếu cơ chế kiểm soát phân quyền dẫn đến nguy cơ nội dung chưa qua kiểm duyệt hoặc chứa từ khóa cấm (\texttt{banned\_keywords}) bị phát hành sai lệch tôn chỉ thương hiệu, hoặc người soạn thảo tự phê duyệt bài viết của chính mình.
- \item \textbf{Lãng phí nguồn lực sáng tạo}: Đội ngũ tiếp thị tiêu tốn phần lớn thời gian vào việc định dạng lại bài viết cho từng kênh hoặc tổng hợp báo cáo thủ công thay vì tập trung tối ưu chiến lược.
+Khi làm thủ công qua nhiều file bảng tính và tin nhắn rời rạc, nhóm làm việc thường gặp 3 vấn đề chính:
+\begin{itemize}[noitemsep,topsep=2pt]
+ \item \textbf{Lệch dữ liệu và sai số khi nhập báo cáo}: Ngân sách kế hoạch nằm ở một file, kết quả quảng cáo nằm ở các file CSV xuất ra từ từng kênh. Khi nhập tay hoặc gộp file dễ xảy ra lỗi dữ liệu vô lý (ví dụ số lượt nhấp lớn hơn số lượt hiển thị, hoặc số chuyển đổi lớn hơn số lượt nhấp).
+ \item \textbf{Thiếu bước kiểm soát từ cấm và phân quyền duyệt bài}: Nhân viên viết bài dễ vô tình dùng các cụm từ quảng cáo quá đà bị cấm (như \textit{``cam kết 100\%''}, \textit{``thần dược''}, \textit{``rẻ nhất''}), hoặc người viết tự đăng bài khi chưa có người khác kiểm tra.
+ \item \textbf{AI bên ngoài không nắm được dữ liệu thật của chiến dịch}: Khi dùng các trang chat AI rời rạc, nhân viên phải tự chép mục tiêu và số liệu sang cửa sổ chat. Nếu chiến dịch chưa có số liệu, AI rất dễ tự bịa ra con số giả định hoặc viết bài không đúng giọng văn thương hiệu.
 \end{itemize}
 
-Sự bùng nổ của các mô hình ngôn ngữ lớn (Large Language Models -- LLMs) và kiến trúc tác tử kết nối công cụ (Model Context Protocol -- MCP) mở ra cơ hội tự động hóa sáng tạo nội dung và diễn giải dữ liệu. Tuy nhiên, nếu tích hợp LLM vào doanh nghiệp một cách tự phát và thiếu rào chắn kỹ thuật (\textit{guardrails}), hệ thống sẽ đối mặt với hiện tượng ảo giác (\textit{hallucination}), tự ý ghi đè dữ liệu nghiệp vụ hoặc không kiểm soát được trách nhiệm quyết định.
+Hệ thống \textbf{MarketFlow} (Đề tài 80300) được xây dựng để giải quyết trực tiếp 3 vấn đề trên: quản lý tập trung toàn bộ dữ liệu chiến dịch trên một cơ sở dữ liệu thống nhất, kiểm tra từ cấm và bắt buộc người duyệt bài phải khác người tạo bài, đồng thời tích hợp Trợ lý AI đọc trực tiếp số liệu thật trong hệ thống để gợi ý ý tưởng, viết bài nháp và tóm tắt kết quả chiến dịch.
 
-Đề tài \textbf{``Hệ thống quản lý chiến dịch marketing có tích hợp AI (MarketFlow AI)''} (Mã đề tài: 80300) được triển khai nhằm cung cấp giải pháp quản trị tập trung, kết hợp quy trình phê duyệt \textit{Human-in-the-Loop} (HITL) nghiêm ngặt với dịch vụ \texttt{ai-runner} cô lập và máy chủ nội bộ FastMCP kết nối 13 mô hình ngôn ngữ lớn đa nhà cung cấp. Hệ thống bảo đảm AI luôn đóng vai trò trợ lý đề xuất (\textit{Proposal-Only}), tuyệt đối không tự ý ghi đè cơ sở dữ liệu hay thay thế con người trong các quyết định kinh doanh nhạy cảm.
+\section{Người dùng hệ thống và sơ đồ Use Case}
 
-\section{Các bên liên quan và phân tích nhu cầu}
-
-Hệ thống được thiết kế và hiện thực hóa nhằm phục vụ bốn nhóm tác nhân chính, với nhu cầu và tiêu chí bảo đảm cụ thể được lượng hóa trong Bảng~\ref{tab:stakeholders}.
+Hệ thống phân chia thành 2 vai trò người dùng chính (\texttt{MANAGER} và \texttt{MARKETER}) cùng dịch vụ chạy AI nội bộ, được mô tả trong Bảng~\ref{tab:actors}.
 
 \begin{table}[!htbp]
 \centering
 \footnotesize
-\renewcommand{\arraystretch}{1.02}
-\caption{Người sử dụng và tiêu chí bảo đảm kỹ thuật}
-\label{tab:stakeholders}
+\renewcommand{\arraystretch}{1.05}
+\caption{Vai trò người dùng và phạm vi quyền hạn trong hệ thống}
+\label{tab:actors}
 \begin{tabularx}{\textwidth}{|L{3.2cm}|Y|Y|}
 \hline
-\thead{Bên liên quan} & \thead{Nhu cầu cốt lõi} & \thead{Điều hệ thống bảo đảm thực tế}\\
+\thead{Vai trò} & \thead{Công việc thực hiện} & \thead{Giới hạn quyền hạn trong hệ thống}\\
 \hline
-Người quản lý (\texttt{MANAGER}) & Quản trị vòng đời tài khoản nhân sự, thiết lập hồ sơ thương hiệu (\texttt{brand\_profile}), từ khóa cấm (\texttt{banned\_keywords}), danh mục 7 kênh; giám sát ngân sách, phê duyệt nội dung tiếp thị và theo dõi KPI (CTR, CVR, CPC, CPA, CPM). & Toàn quyền quản trị người dùng (\texttt{/api/v1/users}), kênh và Brand Kit; máy trạng thái HITL khóa chặt quyền phê duyệt (\texttt{/approve}, \texttt{/reject}) kèm quy tắc chống tự duyệt (\texttt{CANNOT\_REVIEW\_OWN}).\\
+Quản lý (\texttt{MANAGER}) & Quản lý tài khoản nhân sự, thiết lập hồ sơ thương hiệu (\texttt{brand\_profile}), danh sách từ cấm (\texttt{banned\_keywords}) và 7 kênh. Tạo chiến dịch, duyệt hoặc từ chối bài viết của nhân viên, theo dõi báo cáo toàn hệ thống. & Có quyền quản trị chung, nhưng không được tự duyệt bài viết do chính mình tạo ra (bị chặn bởi mã lỗi \texttt{CANNOT\_REVIEW\_OWN}).\\
 \hline
-Nhân viên Marketing (\texttt{MARKETER}) & Khởi tạo chiến dịch được giao, gọi Trợ lý AI hỗ trợ lên ý tưởng/soạn bản nháp, chỉnh sửa nội dung, gửi duyệt, lập lịch và nhập chỉ số hiệu quả. & Phân quyền mức bản ghi (\texttt{owner\_id}): chỉ thao tác trên chiến dịch/nội dung thuộc sở hữu; giao diện SSE streaming trực quan với thẻ đề xuất \texttt{ai\_action = PROPOSED}.\\
+Nhân viên Marketing (\texttt{MARKETER}) & Quản lý chiến dịch được giao, tự soạn bài hoặc nhờ Trợ lý AI tạo bản nháp, gửi duyệt, lên lịch đăng cho bài đã duyệt và nhập số liệu quảng cáo (nhập tay hoặc tải file CSV). & Chỉ được sửa, xóa chiến dịch, bài viết, lịch đăng và nhập số liệu trên các chiến dịch do chính mình phụ trách (\texttt{owner\_id == current\_user.id}). Không có quyền duyệt bài.\\
 \hline
-Kỹ sư vận hành (DevOps/SecOps) & Đóng gói triển khai nhanh, cô lập tiến trình AI an toàn, dễ dàng sao lưu và kiểm thử tự động. & Dịch vụ \texttt{ai-runner} cô lập dưới tài khoản \texttt{mfai} (\texttt{MemoryMax=896M}), chặn \texttt{/mcp} từ Internet qua Nginx, CI/CD tự động kiểm thử 151 ca test.\\
+Trợ lý AI (\texttt{ai-runner} \& FastMCP) & Nhận câu hỏi của người dùng, gọi 9 hàm đọc dữ liệu từ CSDL để lấy thông tin thật và gọi 5 hàm \texttt{propose\_*} để tạo thẻ đề xuất trên giao diện. & Chạy dưới quyền của tài khoản đang đăng nhập. Không có hàm xóa dữ liệu hay tự duyệt bài, mọi đề xuất phải chờ người dùng bấm \textit{Xác nhận} mới được lưu.\\
 \hline
 \end{tabularx}
 \end{table}
 
-\section{Ranh giới và phạm vi hệ thống}
-
-Hình~\ref{fig:context} thể hiện ranh giới hệ thống MarketFlow AI trong mối tương quan với các thực thể bên ngoài.
+Hình~\ref{fig:context} thể hiện phạm vi của hệ thống MarketFlow và các kết nối bên ngoài. Hình~\ref{fig:usecase} mô tả các ca sử dụng (Use Case) chính theo từng vai trò.
 
 \begin{figure}[!htbp]
 \centering
 \vspace{2pt}
 \input{figures/context.tex}
 \vspace{2pt}
-\caption{Sơ đồ ranh giới hệ thống MarketFlow AI}
+\caption{Sơ đồ phạm vi hệ thống MarketFlow}
 \label{fig:context}
 \end{figure}
 
-Trong phạm vi hiện thực hóa của hệ thống:
-\begin{itemize}[noitemsep,topsep=2pt]
- \item \textbf{Bên trong ranh giới}: Ứng dụng Single Page Application (React 18 + TypeScript + Vite), máy chủ dịch vụ REST API kiêm máy chủ công cụ nội bộ FastMCP \texttt{/mcp} (FastAPI), cơ sở dữ liệu quan hệ 14 bảng (PostgreSQL 16 trên Production VPS và SQLite WAL mode khi phát triển/kiểm thử), cùng dịch vụ vi mô \texttt{ai-runner} (\texttt{127.0.0.1:8100}) điều phối tiến trình \texttt{opencode run}.
- \item \textbf{Ngoài ranh giới}: 5 cổng nhà cung cấp mô hình ngôn ngữ lớn (OpenCode Free, Groq, OpenRouter, Google AI Studio) kết nối qua HTTPS từ \texttt{ai-runner}, và các kênh phát hành nội dung bên ngoài (được quản lý thông qua quy trình duyệt nội bộ, lập lịch và xác nhận liên kết xuất bản \texttt{published\_url}).
-\end{itemize}
-
-\section{Mục tiêu và tiêu chí nghiệm thu thực chứng}
-
-Hệ thống đặt ra 5 mục tiêu kỹ thuật cốt lõi (M1--M5), toàn bộ đều được hiện thực hóa và kiểm chứng bằng các bài kiểm thử tự động cũng như dữ liệu thực tế tại Bảng~\ref{tab:goals}.
-
-\begin{table}[!htbp]
+\begin{figure}[!htbp]
 \centering
-\footnotesize
-\renewcommand{\arraystretch}{1.02}
-\caption{Mục tiêu kỹ thuật và kết quả kiểm chứng thực tế}
-\label{tab:goals}
-\begin{tabularx}{\textwidth}{|C{1.0cm}|L{3.5cm}|Y|L{3.4cm}|}
-\hline
-\thead{Mã} & \thead{Mục tiêu} & \thead{Giải pháp kỹ thuật đã cài đặt} & \thead{Bằng chứng thực chứng}\\
-\hline
-M1 & Quản trị tập trung toàn bộ vòng đời tiếp thị trên 14 bảng CSDL. & CRUD hoàn chỉnh: Người dùng, Kênh, Chiến dịch, Nội dung, Lịch sử duyệt, Lịch đăng, Chỉ số (nhập tay + CSV 2 bước), Brand Kit, Thông báo. & Bộ kiểm thử Backend Pytest (104 ca kiểm thử trên 16 tệp test) đạt tỷ lệ Pass 100\%.\\
-\hline
-M2 & An toàn phân quyền RBAC + mức bản ghi và toàn vẹn quy trình HITL. & Phân quyền 2 vai trò (\texttt{MANAGER}, \texttt{MARKETER}) kết hợp kiểm tra \texttt{owner\_id}; quy tắc \texttt{CANNOT\_REVIEW\_OWN} và \texttt{CONTENT\_LOCKED} (HTTP 409) khi xóa bài đã duyệt. & Kiểm thử đối kháng bảo mật trên \texttt{test\_contents.py}, \texttt{test\_campaigns.py} chặn 100\% truy cập trái phép.\\
-\hline
-M3 & Tích hợp AI tác tử có kiểm soát (\textit{Proposal-Only}) và khử ảo giác. & Dịch vụ \texttt{ai-runner} + FastMCP 14 công cụ (9 Read, 5 Propose tạo \texttt{ai\_action = PROPOSED}); đối chiếu \texttt{check\_banned\_keywords}. & Đánh giá 4 giai đoạn tối ưu Prompt trên 8 kịch bản (bản Production đạt 7/8 -- 87,5\%); 18 ca test \texttt{ai-runner} + 38 ca test Assistant.\\
-\hline
-M4 & Trải nghiệm giao diện trực quan, truyền phát SSE thời gian thực. & Giao diện React 18 + Tailwind CSS v4, biểu đồ ECharts, lịch FullCalendar, khung chat SSE streaming hiển thị trực tiếp thẻ công cụ và đề xuất. & Kiểm thử TypeScript/ESLint 0 lỗi; 29 ca kiểm thử tự động đầu-cuối Playwright E2E trên Chromium đạt Pass 100\%.\\
-\hline
-M5 & Khả năng tái lập, đóng gói Docker và vận hành Production VPS. & \texttt{docker-compose.yml} 3 dịch vụ, kịch bản \texttt{seed\_demo.py}, triển khai thực tế trên VPS Ubuntu + PostgreSQL 16 + Systemd + Nginx. & Hệ thống vận hành ổn định tại \url{https://marketing.kienhieu.id.vn} với \texttt{health: ok, db: ok, ai\_runner: ok}.\\
-\hline
-\end{tabularx}
-\end{table}
+\vspace{2pt}
+\input{figures/usecase.tex}
+\vspace{2pt}
+\caption{Sơ đồ Use Case chính của hệ thống}
+\label{fig:usecase}
+\end{figure}
 
-\section{Phạm vi hiện thực hóa}
+\section{Yêu cầu chức năng và phi chức năng}
 
-\subsection{Các chức năng đã hiện thực hóa hoàn chỉnh}
-\begin{enumerate}
- \item \textbf{Xác thực và quản trị nhân sự}: Đăng nhập và tự đăng ký JWT (\texttt{HS256}) kèm quản lý phiên \texttt{token\_version}, băm mật khẩu Bcrypt, kiểm soát 2 vai trò (\texttt{MANAGER}, \texttt{MARKETER}) và trạng thái hoạt động (\texttt{is\_active}).
- \item \textbf{Phân quyền mức bản ghi (Record-level Authorization)}: \texttt{MARKETER} chỉ được sửa/xóa chiến dịch, biên tập nội dung, lập lịch và nhập số liệu trên các chiến dịch do chính mình sở hữu (\texttt{owner\_id}). \texttt{MANAGER} có quyền quản trị và giám sát toàn cục.
- \item \textbf{Quản lý chiến dịch, kênh và hồ sơ thương hiệu}: Quản trị chiến dịch gắn với sản phẩm mục tiêu (\texttt{product}), đối tượng (\texttt{target\_audience}), ngân sách (\texttt{budget} $\ge 0$), thời gian (\texttt{start\_date} $\le$ \texttt{end\_date}), phân bổ ngân sách theo 7 loại kênh (\texttt{campaign\_channels}), cấu hình \texttt{brand\_profile} và từ khóa cấm (\texttt{banned\_keywords}).
- \item \textbf{Quy trình phê duyệt nội dung Human-in-the-loop}: Vòng đời trạng thái nghiêm ngặt: \texttt{DRAFT} $\rightarrow$ \texttt{PENDING\_REVIEW} (tự động quét từ khóa cấm khi \texttt{/submit}) $\rightarrow$ \texttt{APPROVED} / \texttt{REJECTED} (bởi \texttt{MANAGER}, chặn tự duyệt bài của chính mình qua mã lỗi \texttt{CANNOT\_REVIEW\_OWN}) $\rightarrow$ \texttt{PUBLISHED} (\texttt{/mark-published} kèm \texttt{published\_url}). Chặn xóa nội dung đã duyệt/xuất bản (\texttt{CONTENT\_LOCKED}) và tự động tạo thông báo (\texttt{notifications}).
- \item \textbf{Lập lịch xuất bản có điều kiện}: Tạo lịch đăng (\texttt{schedules}) đối với nội dung hợp lệ, đảm bảo thời gian lên lịch nằm trong khung thời gian của chiến dịch.
- \item \textbf{Ghi nhận chỉ số (nhập tay \& CSV 2 bước) và tính toán KPI}: Ghi nhận số liệu theo bộ ba duy nhất (\texttt{campaign\_id}, \texttt{channel\_id}, \texttt{metric\_date}); hỗ trợ tải tệp CSV xem trước (\texttt{/metrics/import/preview}) và xác nhận lưu (\texttt{/metrics/import/commit}); tự động tính toán CTR, CVR, CPC, CPA, CPM và tỷ lệ giải ngân ngân sách (\texttt{used\_pct}) với cơ chế chống chia cho 0.
- \item \textbf{Trợ lý AI tác tử qua FastMCP và SSE Streaming}: Hỗ trợ hội thoại nhiều luồng (\texttt{ai\_threads}, \texttt{ai\_messages}), lựa chọn trực tiếp 13 mô hình LLM đa nhà cung cấp trên giao diện, gọi 9 công cụ đọc dữ liệu thật và 5 công cụ tạo đề xuất (\texttt{ai\_actions} ở trạng thái \texttt{PROPOSED}) để người dùng xem xét bấm \textit{Xác nhận} (\texttt{EXECUTED}) hoặc \textit{Từ chối} (\texttt{REJECTED}).
-\end{enumerate}
+\subsection{Yêu cầu chức năng}
 
-\subsection{Các nội dung chủ động loại trừ khỏi phạm vi}
-Để tập trung tối đa nguồn lực vào độ tin cậy của kiến trúc phần mềm và kiểm soát an toàn AI, hệ thống chủ động đặt ngoài phạm vi:
-\begin{itemize}
- \item Tự động trích tiền từ thẻ tín dụng hoặc kết nối trực tiếp vào cổng thanh toán ngân hàng.
- \item Tự động đẩy bài viết trực tiếp lên Graph API/TikTok API mà không qua xác nhận xuất bản của con người (sử dụng quy trình duyệt nội bộ và xác nhận \texttt{published\_url} tại bước \texttt{mark-published}).
- \item Tự huấn luyện (\textit{pre-training}) mô hình ngôn ngữ riêng từ đầu (sử dụng kỹ thuật điều phối tác tử MCP và tối ưu hóa System Prompt qua 4 giai đoạn cải tiến).
+Bám sát đề cương đề tài 80300, hệ thống gồm 14 yêu cầu chức năng (FR01--FR14), chia làm hai nhóm: nhóm chức năng quản lý (FR01--FR10) và nhóm chức năng tích hợp AI (FR11--FR14), trình bày trong Bảng~\ref{tab:functional}.
+
+\begin{small}
+\begin{longtable}{|C{0.9cm}|L{2.3cm}|L{4.8cm}|L{5.7cm}|}
+\caption{Danh sách 14 yêu cầu chức năng của hệ thống}\label{tab:functional}\\
+\hline
+\thead{Mã} & \thead{Nhóm chức năng} & \thead{Mô tả đầu vào, xử lý và đầu ra} & \thead{Kiểm tra trong hệ thống}\\
+\hline
+\endfirsthead
+\hline
+\thead{Mã} & \thead{Nhóm chức năng} & \thead{Mô tả đầu vào, xử lý và đầu ra} & \thead{Kiểm tra trong hệ thống}\\
+\hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+FR01 & Đăng nhập \& Đăng ký & Đăng nhập bằng email và mật khẩu, cấp mã JWT (\texttt{HS256}) kèm \texttt{token\_version} để thu hồi phiên khi đăng xuất hoặc đổi mật khẩu. & Sai mật khẩu trả lỗi 401, giới hạn số lần thử đăng nhập liên tiếp (\texttt{test\_auth.py}).\\
+\hline
+FR02 & Quản lý nhân sự & Quản lý (\texttt{MANAGER}) thêm tài khoản nhân viên, đổi vai trò hoặc khóa tài khoản (\texttt{is\_active = false}). & Chặn \texttt{MARKETER} gọi API nhân sự (HTTP 403), chặn quản lý tự khóa tài khoản của mình (\texttt{test\_users.py}).\\
+\hline
+FR03 & Kênh \& Hồ sơ thương hiệu & Quản lý 7 kênh truyền thông, thông tin giọng văn thương hiệu (\texttt{brand\_profile}) và danh sách từ cấm (\texttt{banned\_keywords}). & Không cho xóa kênh đang gắn với chiến dịch (HTTP 409), quét từ cấm không phân biệt chữ hoa/thường.\\
+\hline
+FR04 & Quản lý chiến dịch & Tạo, xem, sửa, xóa chiến dịch gồm tên, sản phẩm, đối tượng khách hàng, mục tiêu, ngân sách và ngày bắt đầu/kết thúc. & Kiểm tra \texttt{budget >= 0}, \texttt{start\_date <= end\_date}. Nhân viên chỉ sửa được chiến dịch của mình (\texttt{owner\_id}).\\
+\hline
+FR05 & Phân bổ kênh \& ngân sách & Gán các kênh truyền thông vào chiến dịch kèm mức ngân sách dự kiến cho từng kênh (\texttt{campaign\_channels}). & Tổng ngân sách chia cho các kênh không vượt quá ngân sách tổng của chiến dịch.\\
+\hline
+FR06 & Soạn thảo bài viết & Tạo và sửa bài viết nháp (\texttt{DRAFT}) theo từng chiến dịch và kênh, ghi nhận bài do người tự viết (\texttt{MANUAL}) hay từ AI (\texttt{AI}). & Lưu tiêu đề, nội dung, CTA, hashtag. Nếu sửa bài đã duyệt thì tự động đưa về lại trạng thái \texttt{DRAFT}.\\
+\hline
+FR07 & Duyệt bài viết & Nhân viên bấm gửi duyệt (\texttt{/submit}), quản lý vào xem xét để bấm duyệt (\texttt{/approve}) hoặc từ chối kèm lý do (\texttt{/reject}). & Tự động báo các từ cấm xuất hiện trong bài khi gửi duyệt, chặn người tạo tự duyệt bài của mình (\texttt{CANNOT\_REVIEW\_OWN}), cấm xóa bài đã duyệt (\texttt{CONTENT\_LOCKED}).\\
+\hline
+FR08 & Lịch đăng bài & Tạo lịch đăng (\texttt{schedules}) cho bài viết, đánh dấu hoàn thành hoặc hủy lịch. & Chỉ cho phép lên lịch trong khoảng thời gian diễn ra chiến dịch. Khi xác nhận đã đăng bài thì lịch tự chuyển sang \texttt{DONE}.\\
+\hline
+FR09 & Nhập chỉ số \& file CSV & Nhập số lượt xem (\texttt{views}), lượt nhấp (\texttt{clicks}), chuyển đổi (\texttt{conversions}) và chi phí (\texttt{cost}) bằng tay hoặc tải file CSV 2 bước (xem trước và lưu). & Kiểm tra điều kiện \texttt{views >= clicks >= conversions >= 0} và \texttt{cost >= 0}, tách riêng các dòng lỗi khi xem trước file CSV.\\
+\hline
+FR10 & Thống kê \& Báo cáo & Tổng hợp số liệu trên bảng điều khiển theo ngày, theo kênh và theo chiến dịch. & Tự động tính CTR, CVR, CPC, CPA, CPM và phần trăm ngân sách đã dùng (\texttt{used\_pct}), có xử lý trường hợp mẫu số bằng 0.\\
+\hline
+FR11 & AI gợi ý ý tưởng \& chiến dịch & Người dùng yêu cầu gợi ý ý tưởng hoặc tạo/cập nhật chiến dịch, AI đọc thông tin thương hiệu và danh sách kênh để tạo thẻ đề xuất. & Tạo bản ghi trong bảng \texttt{ai\_actions} với trạng thái \texttt{PROPOSED}. Chỉ khi người dùng bấm \textit{Xác nhận} mới tạo chiến dịch.\\
+\hline
+FR12 & AI soạn bài viết nháp & AI tạo bản nháp bài đăng Facebook, TikTok, Instagram, Email... theo mục tiêu chiến dịch. & AI gọi hàm \texttt{check\_banned\_keywords} để kiểm tra từ cấm trước khi trả thẻ đề xuất \texttt{propose\_content\_drafts}.\\
+\hline
+FR13 & AI tóm tắt hiệu quả \& gợi ý & AI đọc số liệu thực tế của chiến dịch qua hàm \texttt{get\_stats} và \texttt{get\_campaign} để nhận xét kết quả và gợi ý điều chỉnh. & Lấy đúng số liệu từ CSDL, không tự bịa số khi chiến dịch chưa có dữ liệu quảng cáo.\\
+\hline
+FR14 & Thông báo \& Lưu lịch sử & Tự động tạo thông báo khi bài viết được gửi duyệt, được duyệt hoặc bị từ chối, đồng thời lưu lại lịch sử duyệt và các phiên chat AI. & Lưu chi tiết vào các bảng \texttt{content\_reviews}, \texttt{notifications}, \texttt{ai\_threads}, \texttt{ai\_messages} cùng bảng \texttt{ai\_actions}.\\
+\hline
+\end{longtable}
+\end{small}
+
+\subsection{Yêu cầu phi chức năng}
+
+\begin{itemize}[noitemsep,topsep=2pt]
+ \item \textbf{NFR01 (Bảo mật và phân quyền)}: Mật khẩu được băm bằng Bcrypt. API kiểm tra quyền theo vai trò (\texttt{MANAGER}/\texttt{MARKETER}) và theo người phụ trách chiến dịch (\texttt{owner\_id}). Khóa API của các nhà cung cấp AI chỉ lưu ở máy chủ, không lộ ra trình duyệt.
+ \item \textbf{NFR02 (Kiểm soát tính hợp lệ của dữ liệu)}: Kiểm tra chặt các điều kiện ngày tháng, ngân sách không âm, điều kiện số liệu quảng cáo (\texttt{views >= clicks >= conversions}) ở cả tầng kiểm tra đầu vào (Pydantic) và tầng cơ sở dữ liệu.
+ \item \textbf{NFR03 (Hiệu năng và giới hạn bộ nhớ)}: Các API quản lý phản hồi nhanh dưới 50ms. Dịch vụ chạy AI (\texttt{ai-runner}) được giới hạn chạy tuần tự từng yêu cầu (\texttt{RUNNER\_CONCURRENCY=1}) và giới hạn mức RAM tối đa \texttt{896M} để không làm treo máy chủ VPS.
+ \item \textbf{NFR04 (Giao diện dễ thao tác)}: Giao diện tiếng Việt thống nhất, có thông báo lỗi rõ ràng ở từng biểu mẫu. Phần chat với Trợ lý AI hiển thị kết quả trực tiếp theo luồng sự kiện thời gian thực (SSE).
+ \item \textbf{NFR05 (Tự động đổi mô hình AI khi lỗi)}: Kết nối 13 mô hình AI miễn phí trên 4 nền tảng. Khi một mô hình hết lượt gọi (HTTP 429) hoặc quá thời gian chờ, hệ thống tự chuyển sang mô hình dự phòng tiếp theo, và nếu dịch vụ AI tắt thì các chức năng quản lý vẫn hoạt động bình thường.
+ \item \textbf{NFR06 (Dễ cài đặt và chạy thử)}: Có sẵn cấu hình Docker Compose, kịch bản tạo dữ liệu mẫu (\texttt{seed\_demo.py}) và bộ 151 bài kiểm thử tự động.
 \end{itemize}
-
-\section{Kết luận chương}
-\enlargethispage{1.5\baselineskip}
-
-Chương 1 đã định hình bối cảnh bài toán thực tế, xác lập các mục tiêu kỹ thuật định lượng và ranh giới hệ thống MarketFlow AI. Toàn bộ mục tiêu đề ra đều được quy chiếu vào các thành phần phần mềm cụ thể đã hoàn tất và vận hành thực tế. Chương tiếp theo sẽ phân tích cơ sở lý thuyết, các tiêu chuẩn kỹ thuật quốc tế và các quyết định công nghệ định hình nên kiến trúc hệ thống.
